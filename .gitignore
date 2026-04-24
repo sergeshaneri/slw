@@ -1,0 +1,15 @@
+.obsidian/workspace*.json
+.obsidian/cache
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+.env
+.env.local
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/

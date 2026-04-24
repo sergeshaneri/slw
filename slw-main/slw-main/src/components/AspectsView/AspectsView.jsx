@@ -1,380 +1,493 @@
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
+import { BLOCKS, LEVEL_LABELS } from './blocks'
 import styles from './AspectsView.module.css'
 
 export default function AspectsView({ selectedAspect, onAspectSelect, scores, onScoreChange, diary, t }) {
-  const [tab, setTab] = useState('theory')
+  const [blockId, setBlockId] = useState(null)
+
+  useEffect(() => {
+    setBlockId(null)
+  }, [selectedAspect])
 
   if (!selectedAspect) {
-    return (
-      <div className={styles.grid}>
-        {ASPECT_KEYS.map(key => (
-          <div
-            key={key}
-            onClick={() => onAspectSelect(key)}
-            className={styles.card}
-            style={{ borderColor: `${ASPECT_COLORS[key]}33` }}
-          >
-            <div className={styles.code} style={{ color: ASPECT_COLORS[key] }}>{key}</div>
-            <div className={styles.name}>{ASPECT_DATA[key].name}</div>
-            <div className={styles.sub}>{ASPECT_DATA[key].sub}</div>
-            <div className={styles.scoreBar}>
-              <div className={styles.bar}>
-                <div 
-                  className={styles.fill} 
-                  style={{ 
-                    width: `${scores[key] * 10}%`,
-                    background: ASPECT_COLORS[key]
-                  }} 
-                />
-              </div>
-              <span style={{ color: ASPECT_COLORS[key] }}>{scores[key]}/10</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    )
+    return <AspectsGrid scores={scores} onAspectSelect={onAspectSelect} />
   }
 
   const data = ASPECT_DATA[selectedAspect]
   const color = ASPECT_COLORS[selectedAspect]
-  const aspectDiary = diary.filter(e => e.aspect === selectedAspect)
+  const available = BLOCKS.filter(b => b.has(data))
 
-  const handleScoreChange = (value) => {
-    onScoreChange({ ...scores, [selectedAspect]: value })
+  if (blockId) {
+    const idx = available.findIndex(b => b.id === blockId)
+    const block = available[idx]
+    if (!block) {
+      return <Toc aspect={selectedAspect} data={data} color={color} available={available}
+        scores={scores} onScoreChange={onScoreChange} onAspectSelect={onAspectSelect}
+        onOpenBlock={setBlockId} />
+    }
+    return (
+      <BlockReader
+        key={blockId}
+        aspect={selectedAspect}
+        data={data}
+        color={color}
+        block={block}
+        available={available}
+        prev={available[idx - 1]}
+        next={available[idx + 1]}
+        onBack={() => setBlockId(null)}
+        onGoto={setBlockId}
+      />
+    )
   }
 
-  const tabs = [
-    ['theory', 'Теория'],
-    ['assess', 'Самооценка'],
-    ['goals', 'Цели'],
-    ['practices', 'Практики'],
-    ['synergy', 'Синергия'],
-    ['diary', 'Дневник']
-  ]
+  return <Toc aspect={selectedAspect} data={data} color={color} available={available}
+    scores={scores} onScoreChange={onScoreChange} onAspectSelect={onAspectSelect}
+    onOpenBlock={setBlockId} />
+}
+
+// ─── Сетка 8 аспектов ──────────────────────────────────────────────────────
+
+function AspectsGrid({ scores, onAspectSelect }) {
+  return (
+    <div className={`${styles.aspectsGrid} ${styles.fadeIn}`}>
+      {ASPECT_KEYS.map((key, i) => {
+        const d = ASPECT_DATA[key]
+        const color = ASPECT_COLORS[key]
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onAspectSelect(key)}
+            className={`${styles.aspectCard} ${styles.stagger}`}
+            style={{ '--accent': color, '--i': i }}
+          >
+            <div className={styles.aspectGlow} style={{ background: `radial-gradient(circle at 30% 20%, ${color}22, transparent 60%)` }} />
+            <div className={styles.aspectTop}>
+              <span className={styles.aspectCode} style={{ color, textShadow: `0 0 30px ${color}66` }}>{key}</span>
+              <span className={styles.aspectScore}>{scores[key]}<span>/10</span></span>
+            </div>
+            <div className={styles.aspectName}>{d.name}</div>
+            <div className={styles.aspectSub}>{d.sub}</div>
+            <div className={styles.aspectMeter}>
+              <div className={styles.aspectMeterFill} style={{
+                width: `${scores[key] * 10}%`,
+                background: `linear-gradient(90deg, ${color}, ${color}cc)`,
+                boxShadow: `0 0 12px ${color}88`
+              }} />
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Оглавление аспекта ────────────────────────────────────────────────────
+
+function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSelect, onOpenBlock }) {
+  const byLevel = useMemo(() => {
+    const m = { 0: [], 1: [], 2: [], 3: [] }
+    available.forEach(b => m[b.level].push(b))
+    return m
+  }, [available])
 
   return (
-    <div className={styles.detail}>
-      {/* Header */}
-      <div className={styles.detailHeader}>
-        <button onClick={() => onAspectSelect(null)} className={styles.backButton}>
-          ← Назад
-        </button>
-        <div className={styles.headerContent}>
-          <div>
-            <span className={styles.detailCode} style={{ color, textShadow: `0 0 20px ${color}66` }}>
-              {selectedAspect}
-            </span>
-            <span className={styles.detailName}>{data.name}</span>
-            <div className={styles.detailMeta}>{data.sub} · {data.metaphor}</div>
+    <div className={`${styles.tocPage} ${styles.fadeIn}`}>
+      <AspectHeader
+        aspect={aspect}
+        data={data}
+        color={color}
+        score={scores[aspect]}
+        onScoreChange={v => onScoreChange({ ...scores, [aspect]: v })}
+        onBack={() => onAspectSelect(null)}
+      />
+
+      <div className={styles.tocIntro}>
+        <p className={styles.tocIntroText}>{data.essence}</p>
+      </div>
+
+      {[0, 1, 2, 3].map(lvl => (
+        byLevel[lvl].length > 0 && (
+          <section key={lvl} className={styles.tocLevel}>
+            <header className={styles.tocLevelHeader} style={{ '--accent': color }}>
+              <span className={styles.tocLevelCode} style={{ color }}>{LEVEL_LABELS[lvl].code}</span>
+              <div className={styles.tocLevelTitles}>
+                <h2 className={styles.tocLevelName}>{LEVEL_LABELS[lvl].name}</h2>
+                <p className={styles.tocLevelHint}>{LEVEL_LABELS[lvl].hint}</p>
+              </div>
+              <span className={styles.tocLevelCount}>{byLevel[lvl].length}</span>
+            </header>
+            <ul className={styles.tocList}>
+              {byLevel[lvl].map((b, i) => (
+                <li key={b.id} className={styles.stagger} style={{ '--i': i }}>
+                  <button
+                    type="button"
+                    className={styles.tocItem}
+                    style={{ '--accent': color }}
+                    onClick={() => onOpenBlock(b.id)}
+                  >
+                    <span className={styles.tocItemIdx}>{String(i + 1).padStart(2, '0')}</span>
+                    <span className={styles.tocItemBody}>
+                      <span className={styles.tocItemTitle}>{b.title}</span>
+                      <span className={styles.tocItemLead}>{b.lead}</span>
+                    </span>
+                    <span className={styles.tocItemArrow} aria-hidden="true">→</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )
+      ))}
+    </div>
+  )
+}
+
+// ─── Шапка аспекта (одинаковая в оглавлении и чтении) ──────────────────────
+
+function AspectHeader({ aspect, data, color, score, onScoreChange, onBack, compact }) {
+  return (
+    <header className={`${styles.aspectHeader} ${compact ? styles.aspectHeaderCompact : ''}`} style={{ '--accent': color }}>
+      <div
+        className={styles.aspectHeaderBackdrop}
+        style={{ background: `radial-gradient(ellipse at 10% 0%, ${color}33, transparent 55%)` }}
+      />
+      <button type="button" className={styles.backLink} onClick={onBack}>
+        <span className={styles.backArrow}>←</span>
+        <span>{compact ? 'оглавление' : 'ко всем аспектам'}</span>
+      </button>
+      {!compact && (
+        <div className={styles.aspectHeaderBody}>
+          <div className={styles.aspectHeaderTitle}>
+            <span className={styles.aspectHeaderCode} style={{ color, textShadow: `0 0 40px ${color}88` }}>{aspect}</span>
+            <div>
+              <h1 className={styles.aspectHeaderName}>{data.name}</h1>
+              <p className={styles.aspectHeaderSub}>{data.sub}</p>
+            </div>
           </div>
-          <div className={styles.scoreControl}>
-            <div className={styles.scoreLabel}>ОЦЕНКА</div>
-            <div className={styles.scoreInput}>
+          <div className={styles.scoreBox}>
+            <span className={styles.scoreLabel}>моя оценка</span>
+            <div className={styles.scoreRow}>
               <input
                 type="range"
                 min="1"
                 max="10"
-                value={scores[selectedAspect]}
-                onChange={(e) => handleScoreChange(+e.target.value)}
+                value={score}
+                onChange={e => onScoreChange(+e.target.value)}
                 style={{ accentColor: color }}
+                className={styles.scoreRange}
               />
-              <span style={{ color }}>{scores[selectedAspect]}</span>
+              <span className={styles.scoreValue} style={{ color }}>{score}</span>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className={styles.tabs}>
-        {tabs.map(([t, l]) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`${styles.tab} ${tab === t ? styles.tabActive : ''}`}
-            style={tab === t ? { borderBottomColor: color, color } : {}}
-          >
-            {l}
-          </button>
-        ))}
-      </div>
-
-      {/* Theory Tab */}
-      {tab === 'theory' && (
-        <div className={styles.theoryGrid}>
-          {/* Суть */}
-          <div className={styles.card} style={{ borderColor: `${color}22` }}>
-            <div className={styles.cardTitle} style={{ color }}>Суть Аспекта</div>
-            <p className={styles.cardText}>{data.essence}</p>
-          </div>
-
-          {/* Суперспособность */}
-          <div className={styles.card} style={{ borderColor: `${color}44`, boxShadow: `0 0 20px ${color}33` }}>
-            <div className={styles.cardTitle} style={{ color }}>✦ Суперспособность</div>
-            <p className={styles.cardTextItalic}>{data.superpower}</p>
-          </div>
-
-          {/* Дилеммы */}
-          {data.dilemmas && data.dilemmas.length > 0 && (
-            <div className={styles.card}>
-              <div className={styles.cardTitle} style={{ color }}>Ключевые Дилеммы</div>
-              {data.dilemmas.map((d, i) => (
-                <div key={i} className={styles.dilemma}>
-                  <div className={styles.dilemmaTitle}>{d.t}</div>
-                  <div className={styles.dilemmaGrid}>
-                    <div className={styles.dilemmaShadow}>
-                      <span className={styles.dilemmaLabel}>ТЕНЬ</span> {d.s}
-                    </div>
-                    <div className={styles.dilemmaGift}>
-                      <span className={styles.dilemmaLabel}>ДАР</span> {d.g}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Архетипы */}
-          {data.archetypes && (
-            <div className={styles.card}>
-              <div className={styles.cardTitle} style={{ color }}>Архетипы</div>
-              <div className={styles.archetypeSection}>
-                <div className={styles.archetypeLabel} style={{ color: '#f87171' }}>ТЕНЬ</div>
-                {data.archetypes.shadow.map((a, i) => (
-                  <div key={i} className={styles.archetypeItem}>{a}</div>
-                ))}
-              </div>
-              <div className={styles.archetypeSection}>
-                <div className={styles.archetypeLabel} style={{ color: '#4ade80' }}>ДАР</div>
-                {data.archetypes.gift.map((a, i) => (
-                  <div key={i} className={styles.archetypeItem} style={{ borderLeftColor: `${color}44` }}>{a}</div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Красные флаги */}
-          {data.redFlags && data.redFlags.length > 0 && (
-            <div className={styles.card}>
-              <div className={styles.cardTitle} style={{ color: '#f87171' }}>⚠ Красные Флаги</div>
-              {data.redFlags.map((f, i) => (
-                <div key={i} className={styles.redFlag}>
-                  <span style={{ color: '#f87171' }}>›</span> {f}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Страхи + Советы */}
-          <div className={styles.card}>
-            <div className={styles.cardTitle} style={{ color }}>Страхи & Защиты</div>
-            <p className={styles.fearText}><b>Страхи:</b> {data.fears}</p>
-            <p className={styles.fearText}><b>Защиты:</b> {data.defenses}</p>
-            <div className={styles.divider} />
-            <div className={styles.cardTitle} style={{ color }}>Советы Коуча</div>
-            {data.coachTips && data.coachTips.map((t, i) => (
-              <div key={i} className={styles.coachTip}>
-                <span style={{ color }}>{i + 1}.</span> {t}
-              </div>
-            ))}
-          </div>
-
-          {/* Resources */}
-          {data.resources && data.resources.length > 0 && (
-            <div className={styles.card} style={{ gridColumn: '1/-1' }}>
-              <div className={styles.cardTitle} style={{ color }}>Ресурсные Действия</div>
-              <div className={styles.resourceGrid}>
-                {data.resources.map((r, i) => (
-                  <div key={i} className={styles.resourceItem} style={{ borderColor: `${color}22` }}>
-                    <span style={{ color: `${color}88` }}>◦ </span>{r}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
+    </header>
+  )
+}
 
-      {/* Self Assessment Tab */}
-      {tab === 'assess' && (
-        <div className={styles.assessGrid}>
-          {data.selfAssessment && data.selfAssessment.map((mp, mi) => (
-            <div key={mi} className={styles.card} style={{ borderColor: `${color}22` }}>
-              <div className={styles.cardTitle} style={{ color }}>
-                Микрополе {mi + 1}: {mp.pole}
-              </div>
-              {mp.qs.map((q, qi) => (
-                <div key={qi} className={styles.assessQuestion}>
-                  <div className={styles.questionText}>{q}</div>
-                  <div className={styles.questionLine}>───────────────── (отвечай в дневнике)</div>
+// ─── Чтение одного блока (с sidebar) ───────────────────────────────────────
+
+function BlockReader({ aspect, data, color, block, available, prev, next, onBack, onGoto }) {
+  const byLevel = useMemo(() => {
+    const m = { 0: [], 1: [], 2: [], 3: [] }
+    available.forEach(b => m[b.level].push(b))
+    return m
+  }, [available])
+
+  return (
+    <div className={`${styles.readerLayout} ${styles.fadeIn}`} style={{ '--accent': color }}>
+      {/* Левая колонка: sidebar */}
+      <aside className={styles.sidebar}>
+        <button type="button" className={styles.sidebarBack} onClick={onBack}>
+          <span className={styles.backArrow}>←</span>
+          <span>все блоки</span>
+        </button>
+        <div className={styles.sidebarAspect}>
+          <span className={styles.sidebarAspectCode} style={{ color }}>{aspect}</span>
+          <span className={styles.sidebarAspectName}>{data.name}</span>
+        </div>
+        <nav className={styles.sidebarNav}>
+          {[0, 1, 2, 3].map(lvl => (
+            byLevel[lvl].length > 0 && (
+              <div key={lvl} className={styles.sidebarLevel}>
+                <div className={styles.sidebarLevelHeader}>
+                  <span className={styles.sidebarLevelCode} style={{ color }}>{LEVEL_LABELS[lvl].code}</span>
+                  <span className={styles.sidebarLevelName}>{LEVEL_LABELS[lvl].name}</span>
                 </div>
-              ))}
+                <ul className={styles.sidebarList}>
+                  {byLevel[lvl].map(b => {
+                    const active = b.id === block.id
+                    return (
+                      <li key={b.id}>
+                        <button
+                          type="button"
+                          className={`${styles.sidebarItem} ${active ? styles.sidebarItemActive : ''}`}
+                          onClick={() => onGoto(b.id)}
+                          style={active ? { color, borderLeftColor: color, background: `${color}14` } : {}}
+                        >
+                          {b.title}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )
+          ))}
+        </nav>
+      </aside>
+
+      {/* Правая колонка: чтение */}
+      <article className={styles.reader}>
+        <div
+          className={styles.readerBackdrop}
+          style={{ background: `radial-gradient(ellipse at 50% -10%, ${color}22, transparent 60%)` }}
+        />
+
+        <header className={styles.readerHeader}>
+          <span className={styles.readerLevel} style={{ color }}>
+            {LEVEL_LABELS[block.level].code} · {LEVEL_LABELS[block.level].name}
+          </span>
+          <h1 className={styles.readerTitle}>{block.title}</h1>
+          <p className={styles.readerLead}>{block.lead}</p>
+        </header>
+
+        <div className={styles.readerBody}>
+          <BlockBody block={block} data={data} color={color} />
+        </div>
+
+        <nav className={styles.readerNav}>
+          {prev ? (
+            <button type="button" className={styles.navBtn} onClick={() => onGoto(prev.id)}>
+              <span className={styles.navDir}>← предыдущий</span>
+              <span className={styles.navTitle}>{prev.title}</span>
+            </button>
+          ) : <span />}
+          {next ? (
+            <button type="button" className={`${styles.navBtn} ${styles.navBtnRight}`} onClick={() => onGoto(next.id)}>
+              <span className={styles.navDir}>следующий →</span>
+              <span className={styles.navTitle}>{next.title}</span>
+            </button>
+          ) : <span />}
+        </nav>
+      </article>
+    </div>
+  )
+}
+
+// ─── Рендереры для каждого вида блока ──────────────────────────────────────
+
+function BlockBody({ block, data, color }) {
+  const { kind, field } = block
+  switch (kind) {
+    case 'text':
+      return <Prose>{data.essence}</Prose>
+
+    case 'textItalic':
+      return <Prose italic>{data.superpower}</Prose>
+
+    case 'list': {
+      const items = data[field] || []
+      return (
+        <ul className={styles.bulletList}>
+          {items.map((it, i) => (
+            <li key={i} className={styles.bulletItem}>
+              <span className={styles.bulletMark} style={{ background: color, boxShadow: `0 0 8px ${color}99` }} />
+              <span>{it}</span>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+
+    case 'numberedList': {
+      const items = data[field] || []
+      return (
+        <ol className={styles.numberList}>
+          {items.map((it, i) => (
+            <li key={i} className={styles.numberItem}>
+              <span className={styles.numberIdx} style={{ color }}>{String(i + 1).padStart(2, '0')}</span>
+              <span className={styles.numberText}>{it}</span>
+            </li>
+          ))}
+        </ol>
+      )
+    }
+
+    case 'archetypes':
+      return (
+        <div className={styles.twoCols}>
+          <PolarBlock label="Тень" tone="shadow" items={data.archetypes.shadow} />
+          <PolarBlock label="Дар" tone="gift" items={data.archetypes.gift} />
+        </div>
+      )
+
+    case 'dilemmas':
+      return (
+        <div className={styles.dilemmaList}>
+          {data.dilemmas.map((d, i) => (
+            <div key={i} className={styles.dilemmaBlock}>
+              <h3 className={styles.dilemmaTitle}>{d.t}</h3>
+              <div className={styles.twoCols}>
+                <div className={styles.polar}>
+                  <div className={`${styles.polarLabel} ${styles.polarShadow}`}>Тень</div>
+                  <p className={styles.polarText}>{d.s}</p>
+                </div>
+                <div className={styles.polar}>
+                  <div className={`${styles.polarLabel} ${styles.polarGift}`}>Дар</div>
+                  <p className={styles.polarText}>{d.g}</p>
+                </div>
+              </div>
             </div>
           ))}
         </div>
-      )}
+      )
 
-      {/* Goals Tab */}
-      {tab === 'goals' && (
-        <div className={styles.goalsContainer}>
-          <div className={styles.card}>
-            <div className={styles.cardTitle} style={{ color }}>Вопросы для Желаний и Целей</div>
-            {data.goals && data.goals.map((g, i) => (
-              <div key={i} className={styles.goalItem}>
-                <span className={styles.goalNumber} style={{ color: `${color}88` }}>{i + 1}</span>
-                <span className={styles.goalText}>{g}</span>
+    case 'integration':
+      return (
+        <>
+          <p className={styles.integrationIntro}>
+            Противоположный аспект — <b style={{ color }}>{data.integration.opposite}</b>.
+            {' '}{data.integration.desc}
+          </p>
+          {data.integration.practices?.map((p, i) => (
+            <PracticeItem key={i} name={p.name} desc={p.desc} color={color} />
+          ))}
+        </>
+      )
+
+    case 'synergy':
+      return (
+        <div className={styles.synergyList}>
+          {data.synergy.map((s, i) => (
+            <div key={i} className={styles.synergyBlock}>
+              <div className={styles.synergyHead} style={{ color }}>
+                <span className={styles.synergyPair}>{s.aspects}</span>
+                <span className={styles.synergySep}>·</span>
+                <span className={styles.synergyName}>{s.name}</span>
               </div>
-            ))}
+              <p className={styles.synergyDesc}>{s.desc}</p>
+            </div>
+          ))}
+        </div>
+      )
+
+    case 'polysemy':
+      return (
+        <div className={styles.polysemyList}>
+          {data.polysemy.map((p, i) => (
+            <div key={i} className={styles.polysemyBlock}>
+              <div className={styles.polysemyWord} style={{ color }}>{p.word}</div>
+              <div className={styles.polysemyVariants}>{p.variants}</div>
+            </div>
+          ))}
+        </div>
+      )
+
+    case 'practices':
+      return data.practices.map((p, i) => (
+        <PracticeItem key={i} name={p.name} desc={p.desc} color={color} index={i + 1} />
+      ))
+
+    case 'archetypePath':
+      return (
+        <div className={styles.pathList}>
+          {data.archetypePath.map((p, i) => (
+            <div key={i} className={styles.pathBlock} style={{ borderColor: `${color}33` }}>
+              <h3 className={styles.pathName} style={{ color }}>{p.name}</h3>
+              <div className={styles.pathRow}>
+                <div className={styles.pathLabel}>Предпосылка</div>
+                <div className={styles.pathText}>{p.prerequisite}</div>
+              </div>
+              <div className={styles.pathRow}>
+                <div className={styles.pathLabel}>Главный урок</div>
+                <div className={styles.pathText}>{p.lesson}</div>
+              </div>
+              <div className={styles.pathTransition}>
+                <span style={{ color }}>→</span> {p.transition}
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+
+    case 'fears':
+      return (
+        <>
+          <div className={styles.fearRow}>
+            <div className={styles.fearLabel}>Страхи</div>
+            <p className={styles.fearText}>{data.fears}</p>
           </div>
-        </div>
-      )}
+          <div className={styles.fearRow}>
+            <div className={styles.fearLabel}>Защиты</div>
+            <p className={styles.fearText}>{data.defenses}</p>
+          </div>
+        </>
+      )
 
-      {/* Practices Tab */}
-      {tab === 'practices' && (
-        <div className={styles.practicesContainer}>
-          {/* Навыки (только для БС) */}
-          {data.skills && data.skills.length > 0 && (
-            <div className={styles.card} style={{ borderColor: `${color}22` }}>
-              <div className={styles.cardTitle} style={{ color }}>Психологические Навыки</div>
-              <div className={styles.skillsGrid}>
-                {data.skills.map((skill, i) => (
-                  <div key={i} className={styles.skillItem}>
-                    <span style={{ color: `${color}88` }}>◦ </span>{skill}
-                  </div>
+    case 'somatic':
+      return (
+        <div className={styles.twoCols}>
+          <PolarBlock label="Тень" tone="shadow" items={data.somatic.shadow} />
+          <PolarBlock label="Дар" tone="gift" items={data.somatic.gift} />
+        </div>
+      )
+
+    case 'assessment':
+      return (
+        <div className={styles.assessList}>
+          {data.selfAssessment.map((mp, mi) => (
+            <div key={mi} className={styles.assessBlock}>
+              <h3 className={styles.assessPole} style={{ color }}>
+                <span className={styles.assessIdx}>{String(mi + 1).padStart(2, '0')}</span>
+                {mp.pole}
+              </h3>
+              <ul className={styles.assessQs}>
+                {mp.qs.map((q, qi) => (
+                  <li key={qi} className={styles.assessQ}>{q}</li>
                 ))}
-              </div>
+              </ul>
             </div>
-          )}
-
-          {/* Практики и Упражнения */}
-          {data.practices && data.practices.length > 0 && (
-            <div className={styles.card} style={{ borderColor: `${color}22` }}>
-              <div className={styles.cardTitle} style={{ color }}>Практики и Упражнения</div>
-              {data.practices.map((practice, i) => (
-                <div key={i} className={styles.practiceItem}>
-                  <div className={styles.practiceName} style={{ color }}>{i + 1}. {practice.name}</div>
-                  <div className={styles.practiceDesc}>{practice.desc}</div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Интеграция с Противоположностью */}
-          {data.integration && (
-            <div className={styles.card} style={{ borderColor: `${color}44`, boxShadow: `0 0 20px ${color}22` }}>
-              <div className={styles.cardTitle} style={{ color }}>
-                Интеграция с Противоположностью ({data.integration.opposite})
-              </div>
-              <p className={styles.integrationDesc}>{data.integration.desc}</p>
-              {data.integration.practices && data.integration.practices.map((p, i) => (
-                <div key={i} className={styles.integrationPractice}>
-                  <div className={styles.practiceName} style={{ color }}>{p.name}</div>
-                  <div className={styles.practiceDesc}>{p.desc}</div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Путь Становления Архетипов (только для БС) */}
-          {data.archetypePath && data.archetypePath.length > 0 && (
-            <div className={styles.card} style={{ borderColor: `${color}44`, gridColumn: '1/-1' }}>
-              <div className={styles.cardTitle} style={{ color }}>Путь Становления Архетипов</div>
-              {data.archetypePath.map((path, i) => (
-                <div key={i} className={styles.archetypePathItem}>
-                  <div className={styles.archetypePathName} style={{ color }}>{path.name}</div>
-                  <div className={styles.archetypePathSection}>
-                    <b>Предпосылка:</b> {path.prerequisite}
-                  </div>
-                  <div className={styles.archetypePathSection}>
-                    <b>Главный Урок:</b> {path.lesson}
-                  </div>
-                  <div className={styles.archetypePathTransition} style={{ color: `${color}88` }}>
-                    → {path.transition}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          ))}
+          <p className={styles.assessNote}>Ответы записывай в раздел «Дневник».</p>
         </div>
-      )}
+      )
 
-      {/* Synergy Tab */}
-      {tab === 'synergy' && (
-        <div className={styles.synergyContainer}>
-          {/* Взаимодействие с Другими Аспектами */}
-          {data.synergy && data.synergy.length > 0 && (
-            <div className={styles.card} style={{ borderColor: `${color}22` }}>
-              <div className={styles.cardTitle} style={{ color }}>Взаимодействие с Другими Аспектами</div>
-              {data.synergy.map((syn, i) => (
-                <div key={i} className={styles.synergyItem}>
-                  <div className={styles.synergyAspects} style={{ color }}>{syn.aspects}: {syn.name}</div>
-                  <div className={styles.synergyDesc}>{syn.desc}</div>
-                </div>
-              ))}
-            </div>
-          )}
+    default:
+      return null
+  }
+}
 
-          {/* Ложные Друзья Аспекта */}
-          {data.polysemy && data.polysemy.length > 0 && (
-            <div className={styles.card} style={{ borderColor: `${color}22` }}>
-              <div className={styles.cardTitle} style={{ color }}>Ложные Друзья Аспекта (Полисемия)</div>
-              <p className={styles.polysemyIntro}>
-                Слова, которые могут относиться к разным аспектам в зависимости от контекста:
-              </p>
-              {data.polysemy.map((poly, i) => (
-                <div key={i} className={styles.polysemyItem}>
-                  <div className={styles.polysemyWord} style={{ color }}>{poly.word}</div>
-                  <div className={styles.polysemyVariants}>{poly.variants}</div>
-                </div>
-              ))}
-            </div>
-          )}
+// ─── Переиспользуемые кусочки ──────────────────────────────────────────────
 
-          {/* Соматические Маркеры */}
-          {data.somatic && (
-            <div className={styles.card} style={{ borderColor: `${color}22` }}>
-              <div className={styles.cardTitle} style={{ color }}>Соматические Маркеры (Как аспект "живет" в теле)</div>
-              <div className={styles.somaticSection}>
-                <div className={styles.somaticLabel} style={{ color: '#f87171' }}>ТЕНЬ</div>
-                {data.somatic.shadow.map((s, i) => (
-                  <div key={i} className={styles.somaticItem}>
-                    <span style={{ color: '#f87171' }}>›</span> {s}
-                  </div>
-                ))}
-              </div>
-              <div className={styles.somaticSection}>
-                <div className={styles.somaticLabel} style={{ color: '#4ade80' }}>ДАР</div>
-                {data.somatic.gift.map((g, i) => (
-                  <div key={i} className={styles.somaticItem} style={{ borderLeftColor: `${color}44` }}>
-                    <span style={{ color: '#4ade80' }}>›</span> {g}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+function Prose({ children, italic }) {
+  return <p className={`${styles.prose} ${italic ? styles.proseItalic : ''}`}>{children}</p>
+}
 
-      {/* Diary Tab */}
-      {tab === 'diary' && (
-        <div className={styles.diaryContainer}>
-          {aspectDiary.length === 0 ? (
-            <div className={styles.card}>
-              <div className={styles.emptyDiary}>
-                Записей по этому аспекту пока нет.<br />
-                <span>Перейди в раздел «Дневник», чтобы добавить запись.</span>
-              </div>
-            </div>
-          ) : (
-            aspectDiary.map(entry => (
-              <div key={entry.id} className={styles.card} style={{ borderColor: `${color}33` }}>
-                <div className={styles.diaryDate}>{entry.date}</div>
-                <div className={styles.diaryText}>{entry.text}</div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
+function PolarBlock({ label, tone, items }) {
+  return (
+    <div className={styles.polar}>
+      <div className={`${styles.polarLabel} ${tone === 'shadow' ? styles.polarShadow : styles.polarGift}`}>
+        {label}
+      </div>
+      <ul className={styles.polarList}>
+        {items.map((it, i) => <li key={i} className={styles.polarItem}>{it}</li>)}
+      </ul>
+    </div>
+  )
+}
+
+function PracticeItem({ name, desc, color, index }) {
+  return (
+    <div className={styles.practiceItem}>
+      <h3 className={styles.practiceName} style={{ color }}>
+        {index != null && <span className={styles.practiceIdx}>{String(index).padStart(2, '0')}</span>}
+        {name}
+      </h3>
+      <p className={styles.practiceDesc}>{desc}</p>
     </div>
   )
 }

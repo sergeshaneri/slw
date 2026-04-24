@@ -1,13 +1,16 @@
 .app {
-  background: #0A0A0F;
-  min-height: 100vh;
-  font-family: 'Inter', system-ui, sans-serif;
-  color: #e0e0e0;
-  user-select: none;
+  background: #0e1014;
+  min-height: 100dvh;
+  font-family: inherit;
+  color: #e9eaee;
 }
 
 .main {
-  padding: 24px;
-  max-width: 1200px;
+  padding: 32px 24px 64px;
+  max-width: 1120px;
   margin: 0 auto;
+}
+
+@media (min-width: 1024px) {
+  .main { padding: 40px 40px 80px; }
 }
