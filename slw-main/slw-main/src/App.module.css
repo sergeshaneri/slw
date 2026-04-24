@@ -1,0 +1,13 @@
+.app {
+  background: #0A0A0F;
+  min-height: 100vh;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: #e0e0e0;
+  user-select: none;
+}
+
+.main {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}

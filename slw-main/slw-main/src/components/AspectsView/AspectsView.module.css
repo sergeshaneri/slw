@@ -1,0 +1,638 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.card {
+  background: #0d0d1a;
+  border: 1px solid #1a1a2e;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.card:hover {
+  box-shadow: 0 0 20px rgba(157, 78, 221, 0.3);
+}
+
+.code {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.name {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 2px;
+}
+
+.sub {
+  font-size: 10px;
+  color: #555;
+  font-style: italic;
+  margin-bottom: 10px;
+}
+
+.scoreBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bar {
+  flex: 1;
+  height: 2px;
+  background: #1a1a2e;
+}
+
+.fill {
+  height: 100%;
+  transition: width 0.2s;
+}
+
+/* Detail View */
+.detail {
+  max-width: 1200px;
+}
+
+.detailHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.backButton {
+  background: none;
+  border: 1px solid #1a1a2e;
+  color: #555;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 11px;
+  letter-spacing: 2px;
+  transition: color 0.2s;
+}
+
+.backButton:hover {
+  color: #9d4edd;
+}
+
+.headerContent {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.detailCode {
+  font-size: 32px;
+  font-weight: 700;
+  margin-right: 12px;
+}
+
+.detailName {
+  font-size: 16px;
+  color: #888;
+  font-weight: 300;
+}
+
+.detailMeta {
+  font-size: 11px;
+  color: #555;
+  margin-top: 2px;
+}
+
+.scoreControl {
+  text-align: right;
+}
+
+.scoreLabel {
+  font-size: 11px;
+  color: #555;
+  margin-bottom: 4px;
+  letter-spacing: 2px;
+}
+
+.scoreInput {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scoreInput input {
+  width: 80px;
+  cursor: pointer;
+}
+
+.scoreInput span {
+  font-size: 22px;
+  font-weight: 300;
+  min-width: 24px;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #1a1a2e;
+}
+
+.tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #555;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  transition: all 0.2s;
+}
+
+.tabActive {
+  color: #9d4edd;
+}
+
+/* Theory Grid */
+.theoryGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.theoryGrid .card {
+  cursor: default;
+}
+
+.theoryGrid .card:hover {
+  box-shadow: none;
+}
+
+.cardTitle {
+  font-size: 10px;
+  letter-spacing: 3px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+.cardText {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #bbb;
+  margin: 0;
+}
+
+.cardTextItalic {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #ddd;
+  margin: 0;
+  font-style: italic;
+}
+
+/* Dilemmas */
+.dilemma {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #0d0d2a;
+}
+
+.dilemma:last-child {
+  border-bottom: none;
+}
+
+.dilemmaTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e0e0e0;
+  margin-bottom: 8px;
+}
+
+.dilemmaGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.dilemmaShadow {
+  background: #1a0010;
+  border: 1px solid #330011;
+  padding: 8px;
+  font-size: 11px;
+  color: #888;
+  line-height: 1.6;
+}
+
+.dilemmaGift {
+  background: #001a10;
+  border: 1px solid #003311;
+  padding: 8px;
+  font-size: 11px;
+  color: #888;
+  line-height: 1.6;
+}
+
+.dilemmaLabel {
+  font-size: 9px;
+  letter-spacing: 2px;
+}
+
+.dilemmaShadow .dilemmaLabel {
+  color: #f87171;
+}
+
+.dilemmaGift .dilemmaLabel {
+  color: #4ade80;
+}
+
+/* Archetypes */
+.archetypeSection {
+  margin-bottom: 12px;
+}
+
+.archetypeLabel {
+  font-size: 9px;
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+}
+
+.archetypeItem {
+  font-size: 12px;
+  color: #777;
+  margin-bottom: 4px;
+  padding-left: 8px;
+  border-left: 1px solid #330011;
+}
+
+/* Red Flags */
+.redFlag {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #888;
+  line-height: 1.5;
+}
+
+.redFlag span {
+  flex-shrink: 0;
+}
+
+/* Fears */
+.fearText {
+  font-size: 12px;
+  color: #777;
+  line-height: 1.7;
+  margin-bottom: 12px;
+}
+
+.fearText b {
+  color: #aaa;
+}
+
+.divider {
+  height: 1px;
+  background: #1a1a2e;
+  margin: 14px 0;
+}
+
+.coachTip {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 7px;
+  font-size: 12px;
+  color: #888;
+  line-height: 1.5;
+}
+
+.coachTip span {
+  flex-shrink: 0;
+}
+
+/* Resources */
+.resourceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.resourceItem {
+  background: #0A0A0F;
+  border: 1px solid;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: #777;
+  line-height: 1.5;
+}
+
+/* Assessment */
+.assessGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.assessGrid .card {
+  cursor: default;
+}
+
+.assessGrid .card:hover {
+  box-shadow: none;
+}
+
+.assessQuestion {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #0d0d2a;
+}
+
+.assessQuestion:last-child {
+  border-bottom: none;
+}
+
+.questionText {
+  font-size: 12px;
+  color: #aaa;
+  line-height: 1.6;
+  margin-bottom: 4px;
+}
+
+.questionLine {
+  font-size: 9px;
+  color: #444;
+  letter-spacing: 3px;
+}
+
+/* Goals */
+.goalsContainer {
+  max-width: 800px;
+}
+
+.goalsContainer .card {
+  cursor: default;
+}
+
+.goalsContainer .card:hover {
+  box-shadow: none;
+}
+
+.goalItem {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #0d0d2a;
+}
+
+.goalItem:last-child {
+  border-bottom: none;
+}
+
+.goalNumber {
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 20px;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+.goalText {
+  font-size: 13px;
+  color: #bbb;
+  line-height: 1.7;
+}
+
+/* Diary */
+.diaryContainer {
+  max-width: 700px;
+}
+
+.diaryContainer .card {
+  cursor: default;
+  margin-bottom: 10px;
+}
+
+.diaryContainer .card:hover {
+  box-shadow: none;
+}
+
+.emptyDiary {
+  color: #333;
+  font-size: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+.emptyDiary span {
+  color: #555;
+}
+
+.diaryDate {
+  font-size: 10px;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+.diaryText {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #aaa;
+  white-space: pre-wrap;
+}
+
+/* Practices Tab */
+.practicesContainer {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+.practicesContainer .card {
+  cursor: default;
+}
+
+.practicesContainer .card:hover {
+  box-shadow: none;
+}
+
+.skillsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px;
+}
+
+.skillItem {
+  font-size: 11px;
+  color: #777;
+  line-height: 1.6;
+  padding: 4px 0;
+}
+
+.practiceItem {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #0d0d2a;
+}
+
+.practiceItem:last-child {
+  border-bottom: none;
+}
+
+.practiceName {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.practiceDesc {
+  font-size: 12px;
+  color: #888;
+  line-height: 1.7;
+}
+
+.integrationDesc {
+  font-size: 12px;
+  color: #888;
+  line-height: 1.7;
+  margin-bottom: 16px;
+  font-style: italic;
+}
+
+.integrationPractice {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #0d0d2a;
+}
+
+.integrationPractice:last-child {
+  border-bottom: none;
+}
+
+.archetypePathItem {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #0A0A0F;
+  border: 1px solid #1a1a2e;
+}
+
+.archetypePathName {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.archetypePathSection {
+  font-size: 12px;
+  color: #888;
+  line-height: 1.7;
+  margin-bottom: 8px;
+}
+
+.archetypePathTransition {
+  font-size: 11px;
+  font-style: italic;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #1a1a2e;
+}
+
+/* Synergy Tab */
+.synergyContainer {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+.synergyContainer .card {
+  cursor: default;
+}
+
+.synergyContainer .card:hover {
+  box-shadow: none;
+}
+
+.synergyItem {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #0d0d2a;
+}
+
+.synergyItem:last-child {
+  border-bottom: none;
+}
+
+.synergyAspects {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.synergyDesc {
+  font-size: 12px;
+  color: #888;
+  line-height: 1.7;
+}
+
+.polysemyIntro {
+  font-size: 12px;
+  color: #777;
+  line-height: 1.7;
+  margin-bottom: 16px;
+  font-style: italic;
+}
+
+.polysemyItem {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #0d0d2a;
+}
+
+.polysemyItem:last-child {
+  border-bottom: none;
+}
+
+.polysemyWord {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.polysemyVariants {
+  font-size: 11px;
+  color: #777;
+  line-height: 1.6;
+}
+
+.somaticSection {
+  margin-bottom: 16px;
+}
+
+.somaticSection:last-child {
+  margin-bottom: 0;
+}
+
+.somaticLabel {
+  font-size: 9px;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.somaticItem {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #888;
+  line-height: 1.6;
+  padding-left: 8px;
+  border-left: 1px solid #1a1a2e;
+}
+
+.somaticItem span {
+  flex-shrink: 0;
+}

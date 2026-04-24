@@ -1,0 +1,161 @@
+.container {
+  max-width: 800px;
+}
+
+.title {
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: #4a0080;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+}
+
+.newEntry {
+  background: #0d0d1a;
+  border: 1px solid #1a1a2e;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.entryHeader {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.select {
+  background: #0A0A0F;
+  border: 1px solid #1a1a2e;
+  color: #9d4edd;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-family: inherit;
+}
+
+.date {
+  font-size: 11px;
+  color: #555;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 100px;
+  background: transparent;
+  border: 1px solid #1a1a2e;
+  color: #e0e0e0;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.saveButton {
+  background: #1a0030;
+  border: 1px solid #9d4edd;
+  color: #c77dff;
+  padding: 8px 20px;
+  cursor: pointer;
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  box-shadow: 0 0 8px rgba(157, 78, 221, 0.3);
+  font-family: inherit;
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.filterButton {
+  background: transparent;
+  border: 1px solid #1a1a2e;
+  color: #666;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 10px;
+  letter-spacing: 2px;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.filterButton.active {
+  background: #1a0030;
+  border-color: #9d4edd;
+  color: #c77dff;
+}
+
+.entries {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.entry {
+  background: #0d0d1a;
+  border: 1px solid;
+  padding: 16px;
+}
+
+.entryTop {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.entryInfo {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.entryAspect {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.entryDate {
+  font-size: 10px;
+  color: #555;
+}
+
+.deleteButton {
+  background: none;
+  border: none;
+  color: #333;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.deleteButton:hover {
+  color: #9d4edd;
+}
+
+.entryText {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #aaa;
+  white-space: pre-wrap;
+}
+
+.noEntries {
+  color: #333;
+  font-size: 12px;
+  text-align: center;
+  padding: 40px;
+}

@@ -1,0 +1,85 @@
+.container {
+  width: 100%;
+}
+
+.title {
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: #4a0080;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+}
+
+.noData {
+  background: #0d0d1a;
+  border: 1px solid #1a1a2e;
+  padding: 40px;
+  text-align: center;
+  color: #444;
+  font-size: 13px;
+}
+
+.chartCard {
+  background: #0d0d1a;
+  border: 1px solid #1a1a2e;
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+  justify-content: center;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendLine {
+  width: 20px;
+  height: 2px;
+}
+
+.legendItem span {
+  font-size: 10px;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.statCard {
+  background: #0d0d1a;
+  border: 1px solid;
+  padding: 12px;
+  text-align: center;
+}
+
+.statCode {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.statValue {
+  font-size: 22px;
+  font-weight: 200;
+  color: #e0e0e0;
+  margin: 4px 0;
+}
+
+.statDiff {
+  font-size: 11px;
+}
+
+@media (max-width: 768px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

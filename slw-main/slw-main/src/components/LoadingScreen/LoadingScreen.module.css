@@ -1,0 +1,14 @@
+.container {
+  background: #0A0A0F;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.text {
+  color: #9d4edd;
+  font-family: monospace;
+  font-size: 14px;
+  letter-spacing: 4px;
+}
