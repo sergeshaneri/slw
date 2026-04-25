@@ -238,6 +238,34 @@
   background: rgba(240, 143, 182, 0.08);
 }
 
+.entryPrompt {
+  border-left: 2px solid var(--line-strong);
+  padding: 4px 0 4px 14px;
+  margin-bottom: 12px;
+  background: rgba(255,255,255,0.015);
+  border-radius: 0 6px 6px 0;
+}
+
+.entryPromptTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-soft);
+  margin-bottom: 4px;
+  letter-spacing: -0.005em;
+}
+
+.entryPromptText {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  font-style: italic;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .entryText {
   font-size: 16px;
   line-height: 1.7;

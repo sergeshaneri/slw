@@ -78,10 +78,17 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   const aspectIntro = currentJourney?.intro ?? []
   const accent = ASPECT_COLORS[state.currentAspect] ?? '#4cc9f0'
 
+  // Первый скрол после mount/смены экрана — мгновенный, чтобы юзер
+  // сразу видел последние сообщения. Дальше — плавный.
+  const isFirstScroll = useRef(true)
   useEffect(() => {
     if (chatRef.current) {
       const el = chatRef.current
-      const id = setTimeout(() => el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }), 80)
+      const behavior = isFirstScroll.current ? 'auto' : 'smooth'
+      const id = setTimeout(() => {
+        el.scrollTo({ top: el.scrollHeight, behavior })
+        isFirstScroll.current = false
+      }, 50)
       return () => clearTimeout(id)
     }
   }, [state.messages, isTyping, state.screen, state.awaitingInput])
@@ -266,17 +273,20 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       setInputVal('')
       setState(s => ({ ...s, awaitingInput: null }))
       await addBotMessage('Спасибо за честный ответ. Это важная работа.', 600)
-      // Сайд-эффект: рефлексия → запись в дневник
+      // Сайд-эффект: рефлексия → запись в дневник с подписью «на какой вопрос ответ».
       onDiaryChange([
-        ...diary,
         {
           id: Date.now(),
           date: new Date().toLocaleDateString('ru-RU'),
+          ts: Date.now(),
           aspect: state.currentAspect,
           text: val,
           source: 'journey',
-          scriptId: script?.id ?? null
-        }
+          scriptId: script?.id ?? null,
+          promptTitle: script?.title ?? null,
+          prompt: script?.text ?? null
+        },
+        ...(diary ?? [])
       ])
       if (script?.id) removePending(script.id)
       awardXP(script?.xp ?? 10, 0, script?.id ?? null)

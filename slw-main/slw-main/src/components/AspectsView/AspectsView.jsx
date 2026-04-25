@@ -221,7 +221,9 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
       text,
       source: 'aspect',
       blockId: block.id,
-      blockTitle: block.title
+      blockTitle: block.title,
+      promptTitle: block.title,
+      prompt: block.lead ?? null
     }
     onDiaryChange([entry, ...(diary ?? [])])
     setNoteText('')

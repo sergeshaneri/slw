@@ -4,7 +4,9 @@ import styles from './DiaryView.module.css'
 
 const SOURCE_LABEL = {
   journey: 'из путешествия',
-  aspect: 'из аспекта'
+  'journey-question': 'вопрос путешествия',
+  aspect: 'из аспекта',
+  'aspect-item': 'к фрагменту'
 }
 
 export default function DiaryView({ diary, onDiaryChange, t }) {
@@ -118,13 +120,17 @@ export default function DiaryView({ diary, onDiaryChange, t }) {
                 ×
               </button>
             </div>
-            <div className={styles.entryText}>{entry.text}</div>
-            {entry.blockTitle && (
-              <div className={styles.entryContext}>
-                {entry.source === 'aspect' ? 'Блок: ' : 'Шаг: '}
-                {entry.blockTitle}
+            {(entry.promptTitle || entry.prompt) && (
+              <div className={styles.entryPrompt}>
+                {entry.promptTitle && (
+                  <div className={styles.entryPromptTitle}>{entry.promptTitle}</div>
+                )}
+                {entry.prompt && (
+                  <div className={styles.entryPromptText}>{entry.prompt}</div>
+                )}
               </div>
             )}
+            <div className={styles.entryText}>{entry.text}</div>
           </div>
         ))}
 

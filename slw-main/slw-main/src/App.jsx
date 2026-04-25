@@ -90,7 +90,7 @@ export default function App() {
         t={t}
       />
 
-      <main className={styles.main}>
+      <main className={view === 'journey' ? styles.mainJourney : styles.main}>
         {view === 'wheel' && (
           <WheelView
             scores={scores}
