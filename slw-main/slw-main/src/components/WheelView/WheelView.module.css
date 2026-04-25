@@ -174,6 +174,49 @@
 
 .journeyCta:active { transform: translateY(1px); }
 
+.journeyButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: auto;
+  align-items: center;
+}
+
+.journeyTasksCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: color-mix(in srgb, var(--bsAccent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bsAccent) 40%, transparent);
+  color: var(--bsAccent);
+  padding: 12px 18px;
+  border-radius: 100px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, transform .1s;
+  animation: tasksGlow 2.2s infinite ease-in-out;
+}
+
+.journeyTasksCta:hover {
+  background: color-mix(in srgb, var(--bsAccent) 22%, transparent);
+  border-color: color-mix(in srgb, var(--bsAccent) 60%, transparent);
+}
+
+.journeyTasksCta:active { transform: translateY(1px); }
+
+.journeyTasksDot {
+  font-size: 9px;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--bsAccent) 80%, transparent));
+}
+
+@keyframes tasksGlow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--bsAccent) 0%, transparent); }
+  50%      { box-shadow: 0 0 0 5px color-mix(in srgb, var(--bsAccent) 14%, transparent); }
+}
+
 /* ── Сетка аспектов с дескрипторами ──────────────────── */
 
 .aspectsSection { margin-bottom: 20px; }

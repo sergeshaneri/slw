@@ -4,10 +4,12 @@ import styles from './JourneyView.module.css'
 
 export default function Chat({
   state, accent, chatRef, inputRef, isTyping,
-  inputVal, setInputVal, currentScript, onAction, onSend,
+  inputVal, setInputVal, currentScript, scripts, onAction, onSend,
   onOpenProfile, onOpenTasks, pendingCount = 0,
   aspectName, planet
 }) {
+  const scriptById = (id) => scripts?.find(s => s.id === id)
+
   return (
     <>
       <div className={styles.topbar}>
@@ -34,12 +36,19 @@ export default function Chat({
       </div>
 
       <div className={styles.chatScroll} ref={chatRef}>
-        {state.messages.map(m => (
-          <div key={m.id} className={`${styles.msg} ${m.role === 'user' ? styles.msgUser : ''}`}>
-            {m.role === 'bot' && <div className={styles.msgAvatar}>◐</div>}
-            <div className={`${styles.msgBubble} ${m.role === 'user' ? styles.msgBubbleUser : styles.msgBot}`}>{m.text}</div>
-          </div>
-        ))}
+        {state.messages.map(m => {
+          if (m.kind === 'script') {
+            const sc = scriptById(m.scriptId)
+            if (!sc) return null
+            return <ScriptCard key={m.id} script={sc} />
+          }
+          return (
+            <div key={m.id} className={`${styles.msg} ${m.role === 'user' ? styles.msgUser : ''}`}>
+              {m.role === 'bot' && <div className={styles.msgAvatar}>◐</div>}
+              <div className={`${styles.msgBubble} ${m.role === 'user' ? styles.msgBubbleUser : styles.msgBot}`}>{m.text}</div>
+            </div>
+          )
+        })}
 
         {isTyping && (
           <div className={styles.typing}>
@@ -52,11 +61,8 @@ export default function Chat({
           </div>
         )}
 
-        {!isTyping && currentScript && (
-          <>
-            <ScriptCard script={currentScript} />
-            {!state.awaitingInput && <ScriptButtons script={currentScript} onAction={onAction} />}
-          </>
+        {!isTyping && currentScript && !state.awaitingInput && (
+          <ScriptButtons script={currentScript} onAction={onAction} />
         )}
 
         {state.awaitingInput && (

@@ -3,7 +3,7 @@ import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
 import { BLOCKS, LEVEL_LABELS } from './blocks'
 import styles from './AspectsView.module.css'
 
-export default function AspectsView({ selectedAspect, onAspectSelect, scores, onScoreChange, diary, t }) {
+export default function AspectsView({ selectedAspect, onAspectSelect, scores, onScoreChange, diary, onDiaryChange, t }) {
   const [blockId, setBlockId] = useState(null)
 
   useEffect(() => {
@@ -36,6 +36,8 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, on
         available={available}
         prev={available[idx - 1]}
         next={available[idx + 1]}
+        diary={diary}
+        onDiaryChange={onDiaryChange}
         onBack={() => setBlockId(null)}
         onGoto={setBlockId}
       />
@@ -190,12 +192,43 @@ function AspectHeader({ aspect, data, color, score, onScoreChange, onBack, compa
 
 // ─── Чтение одного блока (с sidebar) ───────────────────────────────────────
 
-function BlockReader({ aspect, data, color, block, available, prev, next, onBack, onGoto }) {
+function BlockReader({ aspect, data, color, block, available, prev, next, diary, onDiaryChange, onBack, onGoto }) {
   const byLevel = useMemo(() => {
     const m = { 0: [], 1: [], 2: [], 3: [] }
     available.forEach(b => m[b.level].push(b))
     return m
   }, [available])
+
+  const [noteOpen, setNoteOpen] = useState(false)
+  const [noteText, setNoteText] = useState('')
+  const [noteSaved, setNoteSaved] = useState(false)
+
+  // Закрыть форму и сбросить при смене блока
+  useEffect(() => {
+    setNoteOpen(false)
+    setNoteText('')
+    setNoteSaved(false)
+  }, [block?.id])
+
+  const handleSaveNote = () => {
+    const text = noteText.trim()
+    if (!text || !onDiaryChange) return
+    const entry = {
+      id: Date.now(),
+      date: new Date().toLocaleDateString('ru-RU'),
+      ts: Date.now(),
+      aspect,
+      text,
+      source: 'aspect',
+      blockId: block.id,
+      blockTitle: block.title
+    }
+    onDiaryChange([entry, ...(diary ?? [])])
+    setNoteText('')
+    setNoteSaved(true)
+    setNoteOpen(false)
+    setTimeout(() => setNoteSaved(false), 2200)
+  }
 
   return (
     <div className={`${styles.readerLayout} ${styles.fadeIn}`} style={{ '--accent': color }}>
@@ -258,6 +291,54 @@ function BlockReader({ aspect, data, color, block, available, prev, next, onBack
         <div className={styles.readerBody}>
           <BlockBody block={block} data={data} color={color} />
         </div>
+
+        {onDiaryChange && (
+          <div className={styles.noteSection}>
+            {!noteOpen && (
+              <button
+                type="button"
+                className={styles.noteOpenBtn}
+                onClick={() => setNoteOpen(true)}
+              >
+                <span className={styles.noteOpenIcon}>✎</span>
+                <span>Записать заметку</span>
+                {noteSaved && <span className={styles.noteSavedBadge}>сохранено</span>}
+              </button>
+            )}
+            {noteOpen && (
+              <div className={styles.noteForm}>
+                <div className={styles.noteFormHead}>
+                  <span className={styles.noteFormLabel}>Заметка к блоку «{block.title}»</span>
+                  <button
+                    type="button"
+                    className={styles.noteCancelBtn}
+                    onClick={() => { setNoteOpen(false); setNoteText('') }}
+                  >
+                    отмена
+                  </button>
+                </div>
+                <textarea
+                  className={styles.noteTextarea}
+                  value={noteText}
+                  onChange={e => setNoteText(e.target.value)}
+                  placeholder="Что отзывается, что хочется попробовать, какие ассоциации…"
+                  autoFocus
+                />
+                <div className={styles.noteFormActions}>
+                  <button
+                    type="button"
+                    className={styles.noteSaveBtn}
+                    onClick={handleSaveNote}
+                    disabled={!noteText.trim()}
+                    style={{ '--accent': color }}
+                  >
+                    В дневник
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <nav className={styles.readerNav}>
           {prev ? (

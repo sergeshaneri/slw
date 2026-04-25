@@ -1,85 +1,165 @@
 .container {
-  width: 100%;
+  --text: #f1f2f5;
+  --text-soft: #c8cad1;
+  --text-muted: #8f929c;
+  --text-dim: #5f6169;
+  --line: rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.16);
+  --surface: #15161c;
+  --surface-2: #1c1d25;
+  color: var(--text);
+}
+
+.titleBlock {
+  margin-bottom: 28px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.eyebrow {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 
 .title {
-  font-size: 11px;
-  letter-spacing: 4px;
-  color: #4a0080;
-  margin-bottom: 20px;
-  text-transform: uppercase;
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  margin: 0;
+  color: var(--text);
 }
 
 .noData {
-  background: #0d0d1a;
-  border: 1px solid #1a1a2e;
-  padding: 40px;
   text-align: center;
-  color: #444;
-  font-size: 13px;
+  padding: 64px 24px;
+  color: var(--text-muted);
+  font-size: 15px;
+  background: var(--surface-2);
+  border: 1px dashed var(--line);
+  border-radius: 14px;
 }
 
+/* ── График ──────────────────────────────────────────── */
+
 .chartCard {
-  background: #0d0d1a;
-  border: 1px solid #1a1a2e;
-  padding: 24px;
-  margin-bottom: 16px;
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 24px 22px 18px;
+  margin-bottom: 24px;
 }
 
 .legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 16px;
+  gap: 14px;
   justify-content: center;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
 }
 
 .legendItem {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .legendLine {
-  width: 20px;
+  width: 18px;
   height: 2px;
+  border-radius: 1px;
 }
 
-.legendItem span {
-  font-size: 10px;
-}
+/* ── Сетка статистик ────────────────────────────────── */
 
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
 }
 
 .statCard {
-  background: #0d0d1a;
-  border: 1px solid;
-  padding: 12px;
-  text-align: center;
+  --accent: #9d4edd;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color .15s, transform .15s;
+}
+
+.statCard:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.statTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .statCode {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.statName {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.statValueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
 }
 
 .statValue {
-  font-size: 22px;
-  font-weight: 200;
-  color: #e0e0e0;
-  margin: 4px 0;
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1;
+}
+
+.statValueMax {
+  font-size: 14px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
 }
 
 .statDiff {
-  font-size: 11px;
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 
-@media (max-width: 768px) {
-  .statsGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.statBar {
+  height: 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.statBarFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .3s ease;
 }

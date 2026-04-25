@@ -139,7 +139,13 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       ...s,
       currentScriptIndex: index,
       currentScriptId: script.id,
-      awaitingInput: null
+      awaitingInput: null,
+      // Архивируем скрипт в историю чата — чтобы при пролистывании
+      // вверх юзер видел все пройденные карточки.
+      messages: [
+        ...s.messages,
+        { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: script.id }
+      ]
     }))
   }, [scripts, setState])
 
@@ -169,7 +175,10 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         screen: 'chat',
         onboardingStep: 6,
         currentScriptIndex: 0,
-        currentScriptId: scripts[0]?.id ?? null
+        currentScriptId: scripts[0]?.id ?? null,
+        messages: scripts[0]
+          ? [...s.messages, { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: scripts[0].id }]
+          : s.messages
       }))
     }
   }, [state.onboardingStep, aspectIntro, scripts, addBotMessage, addUserMessage, awardXP, setState])
@@ -313,6 +322,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           inputVal={inputVal}
           setInputVal={setInputVal}
           currentScript={currentScript}
+          scripts={scripts}
           onAction={handleScriptAction}
           onSend={handleSend}
           onOpenProfile={() => goToScreen('profile')}

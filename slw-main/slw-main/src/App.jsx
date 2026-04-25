@@ -66,6 +66,14 @@ export default function App() {
     try { await window.storage?.set('whl_journey', JSON.stringify(newJourney)) } catch (e) { console.error(e) }
   }
 
+  // Открыть путешествие на конкретном экране (например, сразу к активным заданиям с главной).
+  const goToJourney = async (screen) => {
+    if (screen) {
+      await saveJourney({ ...journey, screen })
+    }
+    setView('journey')
+  }
+
   if (loading) {
     return <LoadingScreen text={t.loading} />
   }
@@ -93,7 +101,8 @@ export default function App() {
               setSelectedAspect(aspect)
               setView('aspects')
             }}
-            onStartJourney={() => setView('journey')}
+            onStartJourney={() => goToJourney(null)}
+            onOpenTasks={() => goToJourney('tasks')}
             t={t}
           />
         )}
@@ -117,6 +126,7 @@ export default function App() {
             scores={scores}
             onScoreChange={saveScores}
             diary={diary}
+            onDiaryChange={saveDiary}
             t={t}
           />
         )}

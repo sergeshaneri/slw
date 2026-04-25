@@ -2,6 +2,11 @@ import { useState } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
 import styles from './DiaryView.module.css'
 
+const SOURCE_LABEL = {
+  journey: 'из путешествия',
+  aspect: 'из аспекта'
+}
+
 export default function DiaryView({ diary, onDiaryChange, t }) {
   const [text, setText] = useState('')
   const [aspect, setAspect] = useState('general')
@@ -9,15 +14,14 @@ export default function DiaryView({ diary, onDiaryChange, t }) {
 
   const handleAdd = () => {
     if (!text.trim()) return
-    
     const entry = {
       id: Date.now(),
       date: new Date().toLocaleDateString('ru-RU'),
       ts: Date.now(),
       aspect,
-      text: text.trim()
+      text: text.trim(),
+      source: 'manual'
     }
-    
     onDiaryChange([entry, ...diary])
     setText('')
   }
@@ -30,12 +34,15 @@ export default function DiaryView({ diary, onDiaryChange, t }) {
 
   return (
     <div className={styles.container}>
-      <div className={styles.title}>{t.diary.title}</div>
-      
+      <div className={styles.titleBlock}>
+        <span className={styles.eyebrow}>Дневник</span>
+        <h1 className={styles.title}>{t.diary.title}</h1>
+      </div>
+
       <div className={styles.newEntry}>
         <div className={styles.entryHeader}>
-          <select 
-            value={aspect} 
+          <select
+            value={aspect}
             onChange={(e) => setAspect(e.target.value)}
             className={styles.select}
           >
@@ -46,16 +53,16 @@ export default function DiaryView({ diary, onDiaryChange, t }) {
           </select>
           <div className={styles.date}>{new Date().toLocaleDateString('ru-RU')}</div>
         </div>
-        
+
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={t.diary.placeholder}
           className={styles.textarea}
         />
-        
+
         <div className={styles.actions}>
-          <button onClick={handleAdd} className={styles.saveButton}>
+          <button type="button" onClick={handleAdd} className={styles.saveButton}>
             {t.diary.save}
           </button>
         </div>
@@ -65,6 +72,7 @@ export default function DiaryView({ diary, onDiaryChange, t }) {
         {[['all', t.diary.filterAll], ['general', t.diary.general], ...ASPECT_KEYS.map(k => [k, k])].map(([value, label]) => (
           <button
             key={value}
+            type="button"
             onClick={() => setFilter(value)}
             className={`${styles.filterButton} ${filter === value ? styles.active : ''}`}
           >
@@ -75,36 +83,51 @@ export default function DiaryView({ diary, onDiaryChange, t }) {
 
       <div className={styles.entries}>
         {filteredDiary.map(entry => (
-          <div 
-            key={entry.id} 
+          <div
+            key={entry.id}
             className={styles.entry}
-            style={{ 
-              borderColor: entry.aspect === 'general' ? '#1a1a2e' : `${ASPECT_COLORS[entry.aspect]}33` 
+            style={{
+              borderColor: entry.aspect === 'general' ? undefined : `${ASPECT_COLORS[entry.aspect]}33`
             }}
           >
             <div className={styles.entryTop}>
               <div className={styles.entryInfo}>
                 {entry.aspect !== 'general' && (
-                  <span 
+                  <span
                     className={styles.entryAspect}
                     style={{ color: ASPECT_COLORS[entry.aspect] }}
                   >
                     {entry.aspect}
                   </span>
                 )}
+                {entry.source && entry.source !== 'manual' && (
+                  <span className={`${styles.entrySource} ${
+                    entry.source === 'journey' ? styles.entrySourceJourney : styles.entrySourceAspect
+                  }`}>
+                    {SOURCE_LABEL[entry.source] ?? entry.source}
+                  </span>
+                )}
                 <span className={styles.entryDate}>{entry.date}</span>
               </div>
-              <button 
+              <button
+                type="button"
                 onClick={() => handleDelete(entry.id)}
                 className={styles.deleteButton}
+                aria-label="Удалить"
               >
                 ×
               </button>
             </div>
             <div className={styles.entryText}>{entry.text}</div>
+            {entry.blockTitle && (
+              <div className={styles.entryContext}>
+                {entry.source === 'aspect' ? 'Блок: ' : 'Шаг: '}
+                {entry.blockTitle}
+              </div>
+            )}
           </div>
         ))}
-        
+
         {filteredDiary.length === 0 && (
           <div className={styles.noEntries}>{t.diary.noEntries}</div>
         )}

@@ -3,7 +3,7 @@ import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Responsi
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_REALMS } from '../../data/aspects'
 import styles from './WheelView.module.css'
 
-export default function WheelView({ scores, onSaveHistory, history, journey, onAspectClick, onStartJourney, t }) {
+export default function WheelView({ scores, onSaveHistory, history, journey, onAspectClick, onStartJourney, onOpenTasks, t }) {
   const [saveStatus, setSaveStatus] = useState('')
 
   const radarData = ASPECT_KEYS.map(key => ({
@@ -26,6 +26,7 @@ export default function WheelView({ scores, onSaveHistory, history, journey, onA
 
   const journeyStarted = journey?.totalCompleted > 0 || journey?.screen === 'chat' || journey?.screen === 'levelcomplete' || journey?.screen === 'profile'
   const journeyXp = journey?.xp ?? 0
+  const pendingCount = journey?.pendingTasks?.length ?? 0
 
   return (
     <div className={styles.container}>
@@ -89,9 +90,17 @@ export default function WheelView({ scores, onSaveHistory, history, journey, onA
             </div>
           )}
 
-          <button type="button" onClick={onStartJourney} className={styles.journeyCta}>
-            {journeyStarted ? t.wheel.journeyContinue : t.wheel.journeyCta}
-          </button>
+          <div className={styles.journeyButtons}>
+            <button type="button" onClick={onStartJourney} className={styles.journeyCta}>
+              {journeyStarted ? t.wheel.journeyContinue : t.wheel.journeyCta}
+            </button>
+            {pendingCount > 0 && (
+              <button type="button" onClick={onOpenTasks} className={styles.journeyTasksCta}>
+                <span className={styles.journeyTasksDot} aria-hidden="true">●</span>
+                Активные задания · {pendingCount}
+              </button>
+            )}
+          </div>
         </section>
       </div>
 
