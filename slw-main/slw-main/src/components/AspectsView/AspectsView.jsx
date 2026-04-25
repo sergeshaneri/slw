@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
-import { BLOCKS, LEVEL_LABELS } from './blocks'
+import { BLOCKS, LEVEL_LABELS, getBlockItems } from './blocks'
 import styles from './AspectsView.module.css'
 
 export default function AspectsView({ selectedAspect, onAspectSelect, scores, onScoreChange, diary, onDiaryChange, t }) {
@@ -202,12 +202,20 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
   const [noteOpen, setNoteOpen] = useState(false)
   const [noteText, setNoteText] = useState('')
   const [noteSaved, setNoteSaved] = useState(false)
+  const [pickedItemId, setPickedItemId] = useState('')
+
+  const blockItems = useMemo(() => getBlockItems(block, data), [block, data])
+  const pickedItem = useMemo(
+    () => blockItems.find(it => it.id === pickedItemId) ?? null,
+    [blockItems, pickedItemId]
+  )
 
   // Закрыть форму и сбросить при смене блока
   useEffect(() => {
     setNoteOpen(false)
     setNoteText('')
     setNoteSaved(false)
+    setPickedItemId('')
   }, [block?.id])
 
   const handleSaveNote = () => {
@@ -219,16 +227,18 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
       ts: Date.now(),
       aspect,
       text,
-      source: 'aspect',
+      source: pickedItem ? 'aspect-item' : 'aspect',
       blockId: block.id,
       blockTitle: block.title,
-      promptTitle: block.title,
-      prompt: block.lead ?? null
+      promptTitle: pickedItem ? pickedItem.label : block.title,
+      prompt: pickedItem ? pickedItem.text : (block.lead ?? null),
+      itemId: pickedItem?.id ?? null
     }
     onDiaryChange([entry, ...(diary ?? [])])
     setNoteText('')
     setNoteSaved(true)
     setNoteOpen(false)
+    setPickedItemId('')
     setTimeout(() => setNoteSaved(false), 2200)
   }
 
@@ -310,15 +320,43 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
             {noteOpen && (
               <div className={styles.noteForm}>
                 <div className={styles.noteFormHead}>
-                  <span className={styles.noteFormLabel}>Заметка к блоку «{block.title}»</span>
+                  <span className={styles.noteFormLabel}>Заметка</span>
                   <button
                     type="button"
                     className={styles.noteCancelBtn}
-                    onClick={() => { setNoteOpen(false); setNoteText('') }}
+                    onClick={() => { setNoteOpen(false); setNoteText(''); setPickedItemId('') }}
                   >
                     отмена
                   </button>
                 </div>
+
+                {blockItems.length > 0 && (
+                  <div className={styles.noteTarget}>
+                    <label className={styles.noteTargetLabel}>К чему именно?</label>
+                    <select
+                      className={styles.noteSelect}
+                      value={pickedItemId}
+                      onChange={e => setPickedItemId(e.target.value)}
+                    >
+                      <option value="">Ко всему блоку «{block.title}»</option>
+                      {blockItems.map(it => (
+                        <option key={it.id} value={it.id}>{it.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className={styles.notePreview} style={{ '--accent': color }}>
+                  <div className={styles.notePreviewTitle}>
+                    {pickedItem ? pickedItem.label : block.title}
+                  </div>
+                  {(pickedItem ? pickedItem.text : block.lead) && (
+                    <div className={styles.notePreviewText}>
+                      {pickedItem ? pickedItem.text : block.lead}
+                    </div>
+                  )}
+                </div>
+
                 <textarea
                   className={styles.noteTextarea}
                   value={noteText}

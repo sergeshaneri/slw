@@ -1,3 +1,125 @@
+// Утилита для блоков
+const truncate = (s, n) => {
+  if (!s) return ''
+  const v = String(s).replace(/\s+/g, ' ').trim()
+  return v.length > n ? v.slice(0, n - 1) + '…' : v
+}
+
+// Извлечение «комментабельных пунктов» из блока для дропдауна
+// «К чему именно записать заметку?». Возвращает [{id, label, text}].
+export function getBlockItems(block, data) {
+  const { kind, field, id: blockId } = block
+  switch (kind) {
+    case 'list': {
+      const items = data[field] || []
+      return items.map((it, i) => ({
+        id: `${blockId}-${i}`,
+        label: truncate(it, 64),
+        text: it
+      }))
+    }
+    case 'numberedList': {
+      const items = data[field] || []
+      return items.map((it, i) => ({
+        id: `${blockId}-${i}`,
+        label: `${i + 1}. ${truncate(it, 60)}`,
+        text: it
+      }))
+    }
+    case 'archetypes': {
+      const out = []
+      data.archetypes?.shadow?.forEach((it, i) => out.push({
+        id: `${blockId}-shadow-${i}`,
+        label: `Тень: ${truncate(it, 50)}`,
+        text: it
+      }))
+      data.archetypes?.gift?.forEach((it, i) => out.push({
+        id: `${blockId}-gift-${i}`,
+        label: `Дар: ${truncate(it, 50)}`,
+        text: it
+      }))
+      return out
+    }
+    case 'dilemmas': {
+      return (data.dilemmas ?? []).flatMap((d, i) => [
+        { id: `${blockId}-${i}-shadow`, label: `${d.t} — тень`, text: `${d.t} — тень: ${d.s}` },
+        { id: `${blockId}-${i}-gift`, label: `${d.t} — дар`, text: `${d.t} — дар: ${d.g}` }
+      ])
+    }
+    case 'integration': {
+      const out = []
+      if (data.integration?.desc) {
+        out.push({
+          id: `${blockId}-desc`,
+          label: 'Описание интеграции',
+          text: data.integration.desc
+        })
+      }
+      data.integration?.practices?.forEach((p, i) => out.push({
+        id: `${blockId}-p-${i}`,
+        label: p.name,
+        text: `${p.name}\n\n${p.desc}`
+      }))
+      return out
+    }
+    case 'synergy':
+      return (data.synergy ?? []).map((s, i) => ({
+        id: `${blockId}-${i}`,
+        label: `${s.aspects} · ${s.name}`,
+        text: `${s.aspects} — ${s.name}\n\n${s.desc}`
+      }))
+    case 'polysemy':
+      return (data.polysemy ?? []).map((p, i) => ({
+        id: `${blockId}-${i}`,
+        label: p.word,
+        text: `${p.word}\n${p.variants}`
+      }))
+    case 'practices':
+      return (data.practices ?? []).map((p, i) => ({
+        id: `${blockId}-${i}`,
+        label: p.name,
+        text: `${p.name}\n\n${p.desc}`
+      }))
+    case 'archetypePath':
+      return (data.archetypePath ?? []).map((p, i) => ({
+        id: `${blockId}-${i}`,
+        label: p.name,
+        text: `${p.name}\n\nПредпосылка: ${p.prerequisite}\nГлавный урок: ${p.lesson}\nПереход: ${p.transition}`
+      }))
+    case 'fears':
+      return [
+        ...(data.fears ? [{ id: `${blockId}-fears`, label: 'Страхи', text: data.fears }] : []),
+        ...(data.defenses ? [{ id: `${blockId}-defenses`, label: 'Защиты', text: data.defenses }] : [])
+      ]
+    case 'somatic': {
+      const out = []
+      data.somatic?.shadow?.forEach((it, i) => out.push({
+        id: `${blockId}-shadow-${i}`,
+        label: `Тень: ${truncate(it, 50)}`,
+        text: it
+      }))
+      data.somatic?.gift?.forEach((it, i) => out.push({
+        id: `${blockId}-gift-${i}`,
+        label: `Дар: ${truncate(it, 50)}`,
+        text: it
+      }))
+      return out
+    }
+    case 'assessment':
+      return (data.selfAssessment ?? []).flatMap((mp, mi) =>
+        mp.qs.map((q, qi) => ({
+          id: `${blockId}-${mi}-${qi}`,
+          label: `${mp.pole}: ${truncate(q, 50)}`,
+          text: `Микрополе «${mp.pole}»\n\n${q}`
+        }))
+      )
+    case 'text':
+    case 'textItalic':
+    default:
+      return []
+  }
+}
+
 // Блоки по каждому аспекту в порядке, соответствующем файлу "Колесо БС LP":
 // Уровень 0 — Первый контакт · Уровень 1 — Эпоха племён · Уровень 2 — Эпоха цивилизаций · Уровень 3 — Эпоха алхимии
 //
