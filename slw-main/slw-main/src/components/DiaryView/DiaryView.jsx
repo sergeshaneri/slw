@@ -85,59 +85,83 @@ export default function DiaryView({ diary, onDiaryChange, t }) {
 
       <div className={styles.entries}>
         {filteredDiary.map(entry => (
-          <div
-            key={entry.id}
-            className={styles.entry}
-            style={{
-              borderColor: entry.aspect === 'general' ? undefined : `${ASPECT_COLORS[entry.aspect]}33`
-            }}
-          >
-            <div className={styles.entryTop}>
-              <div className={styles.entryInfo}>
-                {entry.aspect !== 'general' && (
-                  <span
-                    className={styles.entryAspect}
-                    style={{ color: ASPECT_COLORS[entry.aspect] }}
-                  >
-                    {entry.aspect}
-                  </span>
-                )}
-                {entry.source && entry.source !== 'manual' && (
-                  <span className={`${styles.entrySource} ${
-                    entry.source === 'journey' ? styles.entrySourceJourney : styles.entrySourceAspect
-                  }`}>
-                    {SOURCE_LABEL[entry.source] ?? entry.source}
-                  </span>
-                )}
-                <span className={styles.entryDate}>{entry.date}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleDelete(entry.id)}
-                className={styles.deleteButton}
-                aria-label="Удалить"
-              >
-                ×
-              </button>
-            </div>
-            {(entry.promptTitle || entry.prompt) && (
-              <div className={styles.entryPrompt}>
-                {entry.promptTitle && (
-                  <div className={styles.entryPromptTitle}>{entry.promptTitle}</div>
-                )}
-                {entry.prompt && (
-                  <div className={styles.entryPromptText}>{entry.prompt}</div>
-                )}
-              </div>
-            )}
-            <div className={styles.entryText}>{entry.text}</div>
-          </div>
+          <DiaryEntry key={entry.id} entry={entry} onDelete={() => handleDelete(entry.id)} />
         ))}
 
         {filteredDiary.length === 0 && (
           <div className={styles.noEntries}>{t.diary.noEntries}</div>
         )}
       </div>
+    </div>
+  )
+}
+
+function DiaryEntry({ entry, onDelete }) {
+  const [expanded, setExpanded] = useState(false)
+  const hasPrompt = !!(entry.promptTitle || entry.prompt)
+  // Раскрываем, если в исходнике больше ~140 символов или несколько строк.
+  const longPrompt = (entry.prompt?.length ?? 0) > 140 || (entry.prompt?.split('\n').length ?? 0) > 3
+
+  return (
+    <div
+      className={styles.entry}
+      style={{
+        borderColor: entry.aspect === 'general' ? undefined : `${ASPECT_COLORS[entry.aspect]}33`
+      }}
+    >
+      <div className={styles.entryTop}>
+        <div className={styles.entryInfo}>
+          {entry.aspect !== 'general' && (
+            <span
+              className={styles.entryAspect}
+              style={{ color: ASPECT_COLORS[entry.aspect] }}
+            >
+              {entry.aspect}
+            </span>
+          )}
+          {entry.source && entry.source !== 'manual' && (
+            <span className={`${styles.entrySource} ${
+              entry.source === 'journey' || entry.source === 'journey-question'
+                ? styles.entrySourceJourney
+                : styles.entrySourceAspect
+            }`}>
+              {SOURCE_LABEL[entry.source] ?? entry.source}
+            </span>
+          )}
+          <span className={styles.entryDate}>{entry.date}</span>
+        </div>
+        <button
+          type="button"
+          onClick={onDelete}
+          className={styles.deleteButton}
+          aria-label="Удалить"
+        >
+          ×
+        </button>
+      </div>
+
+      {hasPrompt && (
+        <div className={`${styles.entryPrompt} ${expanded ? styles.entryPromptOpen : ''}`}>
+          {entry.promptTitle && (
+            <div className={styles.entryPromptTitle}>{entry.promptTitle}</div>
+          )}
+          {entry.prompt && (
+            <div className={styles.entryPromptText}>{entry.prompt}</div>
+          )}
+          {longPrompt && (
+            <button
+              type="button"
+              className={styles.entryPromptToggle}
+              onClick={() => setExpanded(v => !v)}
+              aria-expanded={expanded}
+            >
+              {expanded ? '▲ свернуть' : '▼ показать целиком'}
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className={styles.entryText}>{entry.text}</div>
     </div>
   )
 }
