@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts'
-import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
+import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_REALMS } from '../../data/aspects'
 import styles from './WheelView.module.css'
 
-export default function WheelView({ scores, onScoresChange, onSaveHistory, history, onAspectClick, t }) {
+export default function WheelView({ scores, onSaveHistory, history, journey, onAspectClick, onStartJourney, t }) {
   const [saveStatus, setSaveStatus] = useState('')
 
   const radarData = ASPECT_KEYS.map(key => ({
@@ -11,10 +11,6 @@ export default function WheelView({ scores, onScoresChange, onSaveHistory, histo
     value: scores[key],
     fullMark: 10
   }))
-
-  const handleScoreChange = (aspect, value) => {
-    onScoresChange({ ...scores, [aspect]: value })
-  }
 
   const handleSaveToHistory = async () => {
     const entry = {
@@ -28,109 +24,115 @@ export default function WheelView({ scores, onScoresChange, onSaveHistory, histo
     setTimeout(() => setSaveStatus(''), 2000)
   }
 
+  const journeyStarted = journey?.totalCompleted > 0 || journey?.screen === 'chat' || journey?.screen === 'levelcomplete' || journey?.screen === 'profile'
+  const journeyXp = journey?.xp ?? 0
+
   return (
     <div className={styles.container}>
       <div className={styles.grid}>
         {/* Radar Chart */}
-        <div className={styles.radarCard}>
-          <div className={styles.cardTitle}>{t.wheel.currentBalance}</div>
-          <ResponsiveContainer width="100%" height={340}>
-            <RadarChart data={radarData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
-              <PolarGrid stroke="#1a1a2e" />
-              <PolarAngleAxis 
-                dataKey="subject" 
-                tick={{ fill: '#9d4edd', fontSize: 13, fontWeight: 600 }} 
-              />
-              <PolarRadiusAxis domain={[0, 10]} tick={false} axisLine={false} />
-              <Radar 
-                dataKey="value" 
-                stroke="#9d4edd" 
-                fill="#9d4edd" 
-                fillOpacity={0.15} 
-                strokeWidth={2} 
-                dot={{ fill: '#9d4edd', r: 4 }} 
-              />
-            </RadarChart>
-          </ResponsiveContainer>
+        <section className={styles.radarCard}>
+          <header className={styles.cardHead}>
+            <span className={styles.cardEyebrow}>Колесо</span>
+            <h2 className={styles.cardTitle}>{t.wheel.currentBalance}</h2>
+          </header>
+          <div className={styles.radarWrap}>
+            <ResponsiveContainer width="100%" height={360}>
+              <RadarChart data={radarData} margin={{ top: 14, right: 32, bottom: 14, left: 32 }}>
+                <PolarGrid stroke="rgba(255,255,255,0.06)" />
+                <PolarAngleAxis
+                  dataKey="subject"
+                  tick={{ fill: '#c8cad1', fontSize: 14, fontWeight: 600 }}
+                />
+                <PolarRadiusAxis domain={[0, 10]} tick={false} axisLine={false} />
+                <Radar
+                  dataKey="value"
+                  stroke="#9d4edd"
+                  fill="#9d4edd"
+                  fillOpacity={0.18}
+                  strokeWidth={2}
+                  dot={{ fill: '#c77dff', r: 4 }}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
           <div className={styles.saveSection}>
-            <button onClick={handleSaveToHistory} className={styles.saveButton}>
+            <button type="button" onClick={handleSaveToHistory} className={styles.saveButton}>
               {t.wheel.saveToHistory}
             </button>
             {saveStatus && <span className={styles.saveStatus}>{saveStatus}</span>}
           </div>
-        </div>
+        </section>
 
-        {/* Sliders */}
-        <div className={styles.slidersCard}>
-          <div className={styles.cardTitle}>{t.wheel.selfAssessment}</div>
-          {ASPECT_KEYS.map(key => (
-            <div key={key} className={styles.sliderRow}>
-              <div className={styles.sliderHeader}>
-                <span className={styles.aspectLabel} style={{ color: ASPECT_COLORS[key] }}>
-                  {key} <span className={styles.aspectName}>{ASPECT_DATA[key].name}</span>
-                </span>
-                <span className={styles.scoreValue} style={{ color: ASPECT_COLORS[key] }}>
-                  {scores[key]}
-                </span>
+        {/* Journey CTA */}
+        <section className={styles.journeyCard}>
+          <header className={styles.cardHead}>
+            <span className={styles.cardEyebrow}>Путешествие</span>
+            <h2 className={styles.cardTitle}>{t.wheel.journeyTitle}</h2>
+          </header>
+          <p className={styles.journeyText}>{t.wheel.journeySub}</p>
+
+          {journeyStarted && (
+            <div className={styles.journeyStats}>
+              <div className={styles.statItem}>
+                <span className={styles.statVal}>{journeyXp}</span>
+                <span className={styles.statLbl}>XP</span>
               </div>
-              <div className={styles.sliderTrack}>
-                <div 
-                  className={styles.sliderFill} 
-                  style={{ 
-                    width: `${scores[key] * 10}%`,
-                    background: `linear-gradient(90deg, #4a0080, ${ASPECT_COLORS[key]})`,
-                    boxShadow: `0 0 8px ${ASPECT_COLORS[key]}66`
-                  }} 
-                />
-                <input
-                  type="range"
-                  min="1"
-                  max="10"
-                  value={scores[key]}
-                  onChange={(e) => handleScoreChange(key, +e.target.value)}
-                  className={styles.sliderInput}
-                />
+              <div className={styles.statItem}>
+                <span className={styles.statVal}>{journey?.totalCompleted ?? 0}</span>
+                <span className={styles.statLbl}>заданий</span>
+              </div>
+              <div className={styles.statItem}>
+                <span className={styles.statVal}>{journey?.streak ?? 0}</span>
+                <span className={styles.statLbl}>дней подряд</span>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+
+          <button type="button" onClick={onStartJourney} className={styles.journeyCta}>
+            {journeyStarted ? t.wheel.journeyContinue : t.wheel.journeyCta}
+          </button>
+        </section>
       </div>
 
-      {/* Aspect Grid */}
-      <div className={styles.aspectGrid}>
-        {ASPECT_KEYS.map(key => (
-          <div
-            key={key}
-            onClick={() => onAspectClick(key)}
-            className={styles.aspectCard}
-            style={{ borderColor: `${ASPECT_COLORS[key]}44` }}
-          >
-            <div 
-              className={styles.aspectCorner} 
-              style={{ background: `${ASPECT_COLORS[key]}11` }} 
-            />
-            <div className={styles.aspectCode} style={{ color: ASPECT_COLORS[key] }}>
-              {key}
-            </div>
-            <div className={styles.aspectTitle}>{ASPECT_DATA[key].name}</div>
-            <div className={styles.aspectProgress}>
-              <div className={styles.progressBar}>
-                <div 
-                  className={styles.progressFill} 
-                  style={{ 
-                    width: `${scores[key] * 10}%`,
-                    background: ASPECT_COLORS[key],
-                    boxShadow: `0 0 6px ${ASPECT_COLORS[key]}88`
-                  }} 
+      {/* Aspect Grid с дескрипторами */}
+      <section className={styles.aspectsSection}>
+        <header className={styles.aspectsHead}>
+          <h2 className={styles.aspectsTitle}>Сферы жизни</h2>
+          <p className={styles.aspectsHint}>{t.wheel.sphereHint}</p>
+        </header>
+        <div className={styles.aspectGrid}>
+          {ASPECT_KEYS.map(key => {
+            const color = ASPECT_COLORS[key]
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onAspectClick(key)}
+                className={styles.aspectCard}
+                style={{ '--accent': color }}
+              >
+                <div
+                  className={styles.aspectGlow}
+                  style={{ background: `radial-gradient(circle at 30% 20%, ${color}28, transparent 60%)` }}
                 />
-              </div>
-              <span className={styles.progressValue} style={{ color: ASPECT_COLORS[key] }}>
-                {scores[key]}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
+                <div className={styles.aspectTop}>
+                  <span className={styles.aspectCode} style={{ color, textShadow: `0 0 24px ${color}66` }}>{key}</span>
+                  <span className={styles.aspectScore}>{scores[key]}<span>/10</span></span>
+                </div>
+                <div className={styles.aspectName}>{ASPECT_DATA[key].name}</div>
+                <div className={styles.aspectRealm}>{ASPECT_REALMS[key]}</div>
+                <div className={styles.aspectBar}>
+                  <div
+                    className={styles.aspectBarFill}
+                    style={{ width: `${scores[key] * 10}%`, background: `linear-gradient(90deg, ${color}, ${color}aa)`, boxShadow: `0 0 10px ${color}88` }}
+                  />
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </section>
     </div>
   )
 }

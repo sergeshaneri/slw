@@ -5,15 +5,20 @@ export const ru = {
   },
   nav: {
     wheel: '◎ Колесо',
+    journey: '◐ Путешествие',
     aspects: '⬡ Аспекты',
     diary: '✎ Дневник',
     progress: '↗ Прогресс',
   },
   wheel: {
-    currentBalance: 'Текущий Баланс',
-    selfAssessment: 'Самооценка',
+    currentBalance: 'Текущий баланс',
     saveToHistory: 'Сохранить в историю',
     saved: 'Сохранено ✓',
+    sphereHint: 'Тыкни в любую сферу — почитать или начать путешествие',
+    journeyTitle: 'Готов к путешествию?',
+    journeySub: 'Коуч-бот проведёт по сферам жизни шаг за шагом. Сейчас открыта первая планета — Terra Harmonia.',
+    journeyCta: '→ Начать путешествие',
+    journeyContinue: '↻ Продолжить',
   },
   aspects: {
     back: '← Назад',

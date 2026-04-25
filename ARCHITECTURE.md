@@ -42,21 +42,21 @@
 
 ## 3. Стек
 
-| Слой | Выбор | Почему |
-|---|---|---|
-| Бот | **Python 3.11 + `python-telegram-bot` v21** | Зрелый async framework, лучший в экосистеме. LLM-интеграции будут простыми. |
-| Веб-бэк | **FastAPI + `asyncpg`** | Тот же Python, общие модели. Read-only API для web. |
-| Фронт | **React + Vite** (оставляем как есть) | Переписывать нечего. |
-| БД | **PostgreSQL 16** | С первого дня. Postgres JSONB для гибкости, полнотекст, в будущем — pgvector для embeddings. SQLite не выбираем — мигрировать потом больно. |
-| Миграции | **Alembic** | Стандарт для SQLAlchemy. |
-| ORM | **SQLAlchemy 2.0 async** | Если без ORM — больно при росте. |
-| Auth (web) | **Telegram Login Widget** | Используем существующую Telegram-идентичность, не строим свою auth. |
-| Хостинг (MVP) | **Railway** (или Fly.io) | Free tier, встроенный Postgres, git-based deploy. $0-5/мес. |
-| Хостинг (позже) | VPS (Hetzner €4/мес) | Когда упрёмся в лимиты Railway. |
-| Контент | `.md` файлы в репо → build-step парсит в JSON → бот грузит JSON в память | `.md` остаются source-of-truth, легко править вручную. В БД позже (admin-панель). |
-| Логи | Stdout → Railway UI (MVP) → Loki/Grafana (позже) | Без переинжиниринга. |
-| Мониторинг | Sentry (free tier) | Для раннего отлова багов бота. |
-| Env | `.env` + `pydantic-settings` | Типизированные настройки. |
+| Слой            | Выбор                                                                    | Почему                                                                                                                                      |
+| --------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Бот             | **Python 3.11 + `python-telegram-bot` v21**                              | Зрелый async framework, лучший в экосистеме. LLM-интеграции будут простыми.                                                                 |
+| Веб-бэк         | **FastAPI + `asyncpg`**                                                  | Тот же Python, общие модели. Read-only API для web.                                                                                         |
+| Фронт           | **React + Vite** (оставляем как есть)                                    | Переписывать нечего.                                                                                                                        |
+| БД              | **PostgreSQL 16**                                                        | С первого дня. Postgres JSONB для гибкости, полнотекст, в будущем — pgvector для embeddings. SQLite не выбираем — мигрировать потом больно. |
+| Миграции        | **Alembic**                                                              | Стандарт для SQLAlchemy.                                                                                                                    |
+| ORM             | **SQLAlchemy 2.0 async**                                                 | Если без ORM — больно при росте.                                                                                                            |
+| Auth (web)      | **Telegram Login Widget**                                                | Используем существующую Telegram-идентичность, не строим свою auth.                                                                         |
+| Хостинг (MVP)   | **Railway** (или Fly.io)                                                 | Free tier, встроенный Postgres, git-based deploy. $0-5/мес.                                                                                 |
+| Хостинг (позже) | VPS (Hetzner €4/мес)                                                     | Когда упрёмся в лимиты Railway.                                                                                                             |
+| Контент         | `.md` файлы в репо → build-step парсит в JSON → бот грузит JSON в память | `.md` остаются source-of-truth, легко править вручную. В БД позже (admin-панель).                                                           |
+| Логи            | Stdout → Railway UI (MVP) → Loki/Grafana (позже)                         | Без переинжиниринга.                                                                                                                        |
+| Мониторинг      | Sentry (free tier)                                                       | Для раннего отлова багов бота.                                                                                                              |
+| Env             | `.env` + `pydantic-settings`                                             | Типизированные настройки.                                                                                                                   |
 
 **Альтернатива, которую я отклонил:**
 - Node.js (grammy) — чтобы match React-стек. Но Python выиграл у ML/LLM-будущего и зрелостью бот-библиотек.

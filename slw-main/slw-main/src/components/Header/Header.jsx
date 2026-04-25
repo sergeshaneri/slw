@@ -3,6 +3,7 @@ import styles from './Header.module.css'
 export default function Header({ view, onViewChange, t }) {
   const navItems = [
     { id: 'wheel', label: t.nav.wheel },
+    { id: 'journey', label: t.nav.journey },
     { id: 'aspects', label: t.nav.aspects },
     { id: 'diary', label: t.nav.diary },
     { id: 'progress', label: t.nav.progress }
