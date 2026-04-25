@@ -41,7 +41,15 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   // Локальный стейт — единственный source of truth.
   // Наружу синхронизируется через useEffect (ниже), чтобы persist-callback
   // не ломал серийные setState в одном хэндлере.
-  const [state, setState] = useState(extJourney ?? DEFAULT_JOURNEY)
+  // Мердж с DEFAULT_JOURNEY гарантирует, что у старых юзеров в storage
+  // присутствуют все поля (например, pendingTasks мог быть добавлен позже).
+  const [state, setState] = useState(() => ({
+    ...DEFAULT_JOURNEY,
+    ...(extJourney ?? {}),
+    messages: extJourney?.messages ?? [],
+    completedScripts: extJourney?.completedScripts ?? [],
+    pendingTasks: extJourney?.pendingTasks ?? []
+  }))
 
   // Стабильная ссылка на текущий persist-callback (он пересоздаётся
   // каждый рендер родителя — через ref эффект-зависимость остаётся чистой).
@@ -171,7 +179,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setState(s => ({
       ...s,
       pendingTasks: [
-        ...s.pendingTasks.filter(t => t.scriptId !== script.id),
+        ...(s.pendingTasks ?? []).filter(t => t.scriptId !== script.id),
         {
           id: `${script.id}-${Date.now()}`,
           scriptId: script.id,
@@ -184,7 +192,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   }, [state.currentAspect])
 
   const removePending = useCallback((scriptId) => {
-    setState(s => ({ ...s, pendingTasks: s.pendingTasks.filter(t => t.scriptId !== scriptId) }))
+    setState(s => ({ ...s, pendingTasks: (s.pendingTasks ?? []).filter(t => t.scriptId !== scriptId) }))
   }, [])
 
   // ─── Действия в чате ─────────────────────────────────────────
