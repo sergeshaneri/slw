@@ -37,6 +37,9 @@
 }
 
 .navButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: transparent;
   border: 1px solid #1a1a2e;
   color: #666;
@@ -47,6 +50,29 @@
   text-transform: uppercase;
   transition: all 0.2s;
   font-family: inherit;
+}
+
+.navBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 100px;
+  background: #4cc9f0;
+  color: #0c1218;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 10px rgba(76, 201, 240, 0.55);
+  animation: badgePulse 1.6s infinite ease-in-out;
+}
+
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.07); opacity: .92; }
 }
 
 .navButton.active {

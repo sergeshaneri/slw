@@ -78,6 +78,7 @@ export default function App() {
           setView(newView)
           setSelectedAspect(null)
         }}
+        journeyPendingCount={journey?.pendingTasks?.length ?? 0}
         t={t}
       />
 

@@ -5,7 +5,8 @@ import styles from './JourneyView.module.css'
 export default function Chat({
   state, accent, chatRef, inputRef, isTyping,
   inputVal, setInputVal, currentScript, onAction, onSend,
-  onOpenProfile, aspectName, planet
+  onOpenProfile, onOpenTasks, pendingCount = 0,
+  aspectName, planet
 }) {
   return (
     <>
@@ -18,8 +19,17 @@ export default function Chat({
           <div className={styles.topbarSub}>{aspectName}</div>
         </div>
         <div className={styles.topbarStats}>
+          <button
+            type="button"
+            className={`${styles.tasksToggle} ${pendingCount > 0 ? styles.tasksToggleActive : ''}`}
+            onClick={onOpenTasks}
+            aria-label="Активные задания"
+            title={pendingCount > 0 ? `Активных: ${pendingCount}` : 'Активные задания'}
+          >
+            <span className={styles.tasksBulb} aria-hidden="true">●</span>
+            {pendingCount > 0 && <span className={styles.tasksCount}>{pendingCount}</span>}
+          </button>
           <span className={styles.xpBadge}>{state.xp} XP</span>
-          {state.streak > 0 && <span className={styles.streakBadge}>{state.streak} дн</span>}
         </div>
       </div>
 
@@ -42,10 +52,10 @@ export default function Chat({
           </div>
         )}
 
-        {!isTyping && currentScript && !state.awaitingInput && (
+        {!isTyping && currentScript && (
           <>
             <ScriptCard script={currentScript} />
-            <ScriptButtons script={currentScript} onAction={onAction} />
+            {!state.awaitingInput && <ScriptButtons script={currentScript} onAction={onAction} />}
           </>
         )}
 

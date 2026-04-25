@@ -6,6 +6,7 @@ import Onboarding from './Onboarding'
 import Chat from './Chat'
 import LevelComplete from './LevelComplete'
 import JourneyProfile from './JourneyProfile'
+import TasksScreen from './TasksScreen'
 import styles from './JourneyView.module.css'
 
 export const DEFAULT_JOURNEY = {
@@ -18,6 +19,7 @@ export const DEFAULT_JOURNEY = {
   currentScriptId: null,
   awaitingInput: null,
   completedScripts: [],
+  pendingTasks: [],   // { id, scriptId, aspect, addedAt, status: 'taken' | 'deferred' }
   xp: 0,
   stardust: 0,
   streak: 0,
@@ -164,17 +166,46 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     }
   }, [state.onboardingStep, aspectIntro, scripts, addBotMessage, addUserMessage, awardXP, setState])
 
+  // Помещаем задание в очередь активных (без дублей по scriptId).
+  const enqueueTask = useCallback((script, status) => {
+    setState(s => ({
+      ...s,
+      pendingTasks: [
+        ...s.pendingTasks.filter(t => t.scriptId !== script.id),
+        {
+          id: `${script.id}-${Date.now()}`,
+          scriptId: script.id,
+          aspect: state.currentAspect,
+          addedAt: Date.now(),
+          status
+        }
+      ]
+    }))
+  }, [state.currentAspect])
+
+  const removePending = useCallback((scriptId) => {
+    setState(s => ({ ...s, pendingTasks: s.pendingTasks.filter(t => t.scriptId !== scriptId) }))
+  }, [])
+
   // ─── Действия в чате ─────────────────────────────────────────
   const handleScriptAction = useCallback(async (action, scriptId) => {
     const script = scripts.find(s => s.id === scriptId)
     if (!script) return
 
+    // Postponable types add to pendingTasks.
+    const isDeferrable = script.type === 'exercise' || script.type === 'question'
+
     if (action === 'next' || action === 'done' || action === 'skip') {
       if (action === 'skip') addUserMessage('Пропустить')
       else if (action === 'done') {
         addUserMessage('Взял задание')
-        await addBotMessage('Задание взято. Выполни его сегодня и отметь результат.', 500)
-      } else addUserMessage('Далее')
+        await addBotMessage('Задание добавлено в активные. Открой раздел «Активные задания», когда выполнишь.', 500)
+      } else addUserMessage('Позже')
+
+      if (isDeferrable && (action === 'done' || action === 'next')) {
+        enqueueTask(script, action === 'done' ? 'taken' : 'deferred')
+      }
+
       awardXP(script.xp, script.stardust ?? 0, script.id)
       setTimeout(() => deliverScript(state.currentScriptIndex + 1), 600)
     } else if (action === 'answer_number') {
@@ -186,10 +217,11 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     } else if (action === 'complete_exercise') {
       addUserMessage('Выполнил')
       await addBotMessage('Отлично. Каждое маленькое действие — это шаг к большим переменам.', 500)
+      removePending(script.id)
       awardXP(script.xp, script.stardust ?? 0, script.id)
       setTimeout(() => deliverScript(state.currentScriptIndex + 1), 600)
     }
-  }, [scripts, state.currentScriptIndex, addBotMessage, addUserMessage, awardXP, deliverScript, setState])
+  }, [scripts, state.currentScriptIndex, addBotMessage, addUserMessage, awardXP, deliverScript, enqueueTask, removePending])
 
   // ─── Ввод текста / числа ─────────────────────────────────────
   const handleSend = useCallback(async () => {
@@ -209,6 +241,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       else await addBotMessage(`Записал: ${val}/10.`, 500)
       // Сайд-эффект: оценка вопроса → score аспекта
       onScoresChange({ ...scores, [state.currentAspect]: num })
+      if (script?.id) removePending(script.id)
       awardXP(script?.xp ?? 10, 0, script?.id ?? null)
       setTimeout(() => deliverScript(state.currentScriptIndex + 1), 700)
     } else if (state.awaitingInput === 'text') {
@@ -228,10 +261,11 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           scriptId: script?.id ?? null
         }
       ])
+      if (script?.id) removePending(script.id)
       awardXP(script?.xp ?? 10, 0, script?.id ?? null)
       setTimeout(() => deliverScript(state.currentScriptIndex + 1), 700)
     }
-  }, [inputVal, state.awaitingInput, state.currentScriptIndex, state.currentAspect, scripts, scores, diary, addBotMessage, addUserMessage, awardXP, deliverScript, onDiaryChange, onScoresChange, setState])
+  }, [inputVal, state.awaitingInput, state.currentScriptIndex, state.currentAspect, scripts, scores, diary, addBotMessage, addUserMessage, awardXP, deliverScript, onDiaryChange, onScoresChange, removePending])
 
   const handleReset = useCallback(() => {
     setState(DEFAULT_JOURNEY)
@@ -274,6 +308,8 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           onAction={handleScriptAction}
           onSend={handleSend}
           onOpenProfile={() => goToScreen('profile')}
+          onOpenTasks={() => goToScreen('tasks')}
+          pendingCount={state.pendingTasks?.length ?? 0}
           aspectName={currentJourney ? `Уровень ${state.currentLevel} · ${currentLevel?.title}` : 'Путешествие'}
           planet={currentJourney?.planet}
         />
@@ -298,6 +334,20 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           planet={currentJourney?.planet}
           onContinue={() => goToScreen(state.currentScriptIndex >= scripts.length ? 'levelcomplete' : 'chat')}
           onReset={handleReset}
+        />
+      )}
+
+      {state.screen === 'tasks' && (
+        <TasksScreen
+          tasks={state.pendingTasks ?? []}
+          scripts={scripts}
+          accent={accent}
+          onBack={() => goToScreen('chat')}
+          onComplete={(script) => {
+            removePending(script.id)
+            awardXP(script.xp ?? 0, script.stardust ?? 0, script.id)
+          }}
+          onDelete={(scriptId) => removePending(scriptId)}
         />
       )}
 
