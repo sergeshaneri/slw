@@ -35,12 +35,26 @@ function calcStreak(s) {
   return diff === 1 ? s.streak + 1 : 1
 }
 
-export default function JourneyView({ journey, onJourneyChange, scores, onScoresChange, diary, onDiaryChange, t }) {
-  const state = journey ?? DEFAULT_JOURNEY
-  const setState = useCallback(
-    (updater) => onJourneyChange(typeof updater === 'function' ? updater(state) : updater),
-    [state, onJourneyChange]
-  )
+export default function JourneyView({ journey: extJourney, onJourneyChange, scores, onScoresChange, diary, onDiaryChange, t }) {
+  // Локальный стейт — единственный source of truth.
+  // Наружу синхронизируется через useEffect (ниже), чтобы persist-callback
+  // не ломал серийные setState в одном хэндлере.
+  const [state, setState] = useState(extJourney ?? DEFAULT_JOURNEY)
+
+  // Стабильная ссылка на текущий persist-callback (он пересоздаётся
+  // каждый рендер родителя — через ref эффект-зависимость остаётся чистой).
+  const persistRef = useRef(onJourneyChange)
+  useEffect(() => { persistRef.current = onJourneyChange }, [onJourneyChange])
+
+  // Сохраняем стейт наружу при каждом изменении, кроме первого рендера.
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    persistRef.current?.(state)
+  }, [state])
 
   const [inputVal, setInputVal] = useState('')
   const [isTyping, setIsTyping] = useState(false)
@@ -220,8 +234,8 @@ export default function JourneyView({ journey, onJourneyChange, scores, onScores
   }, [inputVal, state.awaitingInput, state.currentScriptIndex, state.currentAspect, scripts, scores, diary, addBotMessage, addUserMessage, awardXP, deliverScript, onDiaryChange, onScoresChange, setState])
 
   const handleReset = useCallback(() => {
-    onJourneyChange(DEFAULT_JOURNEY)
-  }, [onJourneyChange])
+    setState(DEFAULT_JOURNEY)
+  }, [])
 
   const goToScreen = useCallback((screen) => {
     setState(s => ({ ...s, screen }))
