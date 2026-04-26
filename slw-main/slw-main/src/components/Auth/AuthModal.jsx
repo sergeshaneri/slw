@@ -9,7 +9,7 @@ import styles from './AuthModal.module.css'
  *   onSuccess(userData)  — called after successful auth
  *   user                 — if provided (logged in via email), shows "Link Telegram" option
  */
-export default function AuthModal({ onSuccess, user = null }) {
+export default function AuthModal({ onSuccess, onClose, user = null }) {
   const [tab, setTab] = useState('login')      // 'login' | 'register'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -72,11 +72,26 @@ export default function AuthModal({ onSuccess, user = null }) {
     : tab === 'login' ? 'Вход' : 'Регистрация'
 
   return (
-    <div className={styles.overlay}>
-      <div className={styles.modal}>
+    <div className={styles.overlay} onClick={onClose}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+        {onClose && (
+          <button
+            type="button"
+            className={styles.closeBtn}
+            onClick={onClose}
+            aria-label="Закрыть"
+          >
+            ×
+          </button>
+        )}
         <div className={styles.logo}>🌀</div>
         <h1 className={styles.title}>Соционика</h1>
         <p className={styles.subtitle}>Колесо Баланса</p>
+        {!user && (
+          <p className={styles.guestHint}>
+            Без аккаунта можно смотреть приложение, но Путешествие требует входа — данные привязываются к профилю.
+          </p>
+        )}
 
         {!user && (
           <div className={styles.tabs}>

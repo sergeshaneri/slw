@@ -1,6 +1,6 @@
 import styles from './Header.module.css'
 
-export default function Header({ view, onViewChange, journeyPendingCount = 0, t }) {
+export default function Header({ view, onViewChange, journeyPendingCount = 0, user, onLogin, onLogout, t }) {
   const navItems = [
     { id: 'wheel', label: t.nav.wheel },
     { id: 'journey', label: t.nav.journey, badge: journeyPendingCount },
@@ -29,6 +29,27 @@ export default function Header({ view, onViewChange, journeyPendingCount = 0, t 
           </button>
         ))}
       </nav>
+
+      <div className={styles.authBlock}>
+        {user ? (
+          <button
+            type="button"
+            onClick={onLogout}
+            className={styles.authBtn}
+            title={user.email ?? user.name ?? 'Профиль'}
+          >
+            {user.name || user.email?.split('@')[0] || 'Профиль'} · выйти
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onLogin}
+            className={styles.authBtn}
+          >
+            Войти
+          </button>
+        )}
+      </div>
     </header>
   )
 }
