@@ -19,6 +19,26 @@ import styles from './App.module.css'
 
 const initScores = () => ASPECT_KEYS.reduce((acc, key) => ({ ...acc, [key]: 5 }), {})
 
+// localStorage ключи для гостевого режима (без auth).
+// При логине данные с локалки могут переехать на бэк (миграцию пока не делаем).
+const LS = {
+  scores: 'whl_scores',
+  history: 'whl_history',
+  diary: 'whl_diary',
+  journey: 'whl_journey'
+}
+
+const lsGet = (key, fallback) => {
+  try {
+    const v = localStorage.getItem(key)
+    return v ? JSON.parse(v) : fallback
+  } catch { return fallback }
+}
+
+const lsSet = (key, value) => {
+  try { localStorage.setItem(key, JSON.stringify(value)) } catch (e) { console.error(e) }
+}
+
 export default function App() {
   const { user, loading: authLoading, onAuthSuccess, logout } = useAuth()
 
@@ -28,16 +48,22 @@ export default function App() {
   const [diary, setDiary] = useState([])
   const [journey, setJourney] = useState(DEFAULT_JOURNEY)
   const [selectedAspect, setSelectedAspect] = useState(null)
-  const [dataLoading, setDataLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(false)
+  const [showAuth, setShowAuth] = useState(false)
   const t = ru
 
-  // Load data from backend when user is authenticated
+  // Загрузка данных при изменении статуса auth.
+  // Залогинен → API. Гость → localStorage.
   useEffect(() => {
-    if (!user) return
-    loadData()
+    if (user === null) return  // ещё проверяем токен — ничего не делаем
+    if (user) {
+      loadFromApi()
+    } else {
+      loadFromLocal()
+    }
   }, [user])
 
-  const loadData = async () => {
+  const loadFromApi = async () => {
     setDataLoading(true)
     try {
       const [stateRes, scoresRes, diaryRes] = await Promise.all([
@@ -68,72 +94,124 @@ export default function App() {
     }
   }
 
+  const loadFromLocal = () => {
+    setScores(lsGet(LS.scores, initScores()))
+    setHistory(lsGet(LS.history, []))
+    setDiary(lsGet(LS.diary, []))
+    setJourney(lsGet(LS.journey, DEFAULT_JOURNEY))
+  }
+
   const saveScores = async (newScores) => {
     setScores(newScores)
-    try { await apiSaveScores(newScores) } catch (e) { console.error(e) }
+    if (user) {
+      try { await apiSaveScores(newScores) } catch (e) { console.error(e) }
+    } else {
+      lsSet(LS.scores, newScores)
+    }
   }
 
   const saveHistory = async (newHistory) => {
     setHistory(newHistory)
-    try { await saveState({ history: newHistory }) } catch (e) { console.error(e) }
+    if (user) {
+      try { await saveState({ history: newHistory }) } catch (e) { console.error(e) }
+    } else {
+      lsSet(LS.history, newHistory)
+    }
   }
 
   const saveDiary = async (newDiary) => {
     const prev = diary
     setDiary(newDiary)
-    // Send only entries that are new (not yet saved to backend)
-    const newEntries = newDiary.filter(e => !prev.find(p => p.id === e.id))
-    for (const entry of newEntries) {
-      try {
-        await postDiaryEntry({
-          text: entry.text,
-          aspect: entry.aspect,
-          source: entry.source ?? 'web',
-          extra: {
-            scriptId: entry.scriptId ?? null,
-            promptTitle: entry.promptTitle ?? null,
-            prompt: entry.prompt ?? null,
-            survey: entry.survey ?? null,
-          },
-        })
-      } catch (e) { console.error(e) }
+    if (user) {
+      const newEntries = newDiary.filter(e => !prev.find(p => p.id === e.id))
+      for (const entry of newEntries) {
+        try {
+          await postDiaryEntry({
+            text: entry.text,
+            aspect: entry.aspect,
+            source: entry.source ?? 'web',
+            extra: {
+              scriptId: entry.scriptId ?? null,
+              promptTitle: entry.promptTitle ?? null,
+              prompt: entry.prompt ?? null,
+              survey: entry.survey ?? null,
+            },
+          })
+        } catch (e) { console.error(e) }
+      }
+    } else {
+      lsSet(LS.diary, newDiary)
     }
   }
 
   const saveJourney = async (newJourney) => {
     setJourney(newJourney)
-    try { await saveState({ journey: newJourney }) } catch (e) { console.error(e) }
+    if (user) {
+      try { await saveState({ journey: newJourney }) } catch (e) { console.error(e) }
+    } else {
+      lsSet(LS.journey, newJourney)
+    }
   }
 
   const goToJourney = async (screen) => {
+    // Путешествие требует авторизации — гостям показываем AuthModal.
+    if (!user) {
+      setShowAuth(true)
+      return
+    }
     if (screen) await saveJourney({ ...journey, screen })
     setView('journey')
   }
 
   const goToBSSurveys = async () => {
+    if (!user) {
+      setShowAuth(true)
+      return
+    }
     await saveJourney({ ...journey, currentAspect: 'БС', screen: 'skill-tree', awaitingInput: null })
     setView('journey')
   }
 
+  const handleAuthSuccess = (userData) => {
+    onAuthSuccess(userData)
+    setShowAuth(false)
+  }
+
+  const handleViewChange = (newView) => {
+    if (newView === 'journey' && !user) {
+      setShowAuth(true)
+      return
+    }
+    setView(newView)
+    setSelectedAspect(null)
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
+  // Пока useAuth проверяет токен — короткий лоадер, чтобы не моргало.
   if (authLoading) return <LoadingScreen text="Загрузка..." />
-  if (!user) return <AuthModal onSuccess={onAuthSuccess} />
-  if (dataLoading) return <LoadingScreen text={t.loading} />
+  // Залогиненный юзер ждёт данные с бэка — лоадер.
+  if (user && dataLoading) return <LoadingScreen text={t.loading} />
 
   return (
     <div className={styles.app}>
       <Header
         view={view}
-        onViewChange={(newView) => {
-          setView(newView)
-          setSelectedAspect(null)
-        }}
+        onViewChange={handleViewChange}
         journeyPendingCount={journey?.pendingTasks?.length ?? 0}
         user={user}
+        onLogin={() => setShowAuth(true)}
         onLogout={logout}
         t={t}
       />
+
+      {showAuth && (
+        <AuthModal
+          onSuccess={handleAuthSuccess}
+          onClose={() => setShowAuth(false)}
+          user={user || null}
+        />
+      )}
 
       <main className={view === 'journey' ? styles.mainJourney : styles.main}>
         {view === 'wheel' && (

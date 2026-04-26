@@ -6,6 +6,7 @@ export default function Chat({
   state, accent, chatRef, inputRef, isTyping,
   inputVal, setInputVal, currentScript, scripts, resolveScript, onAction, onSend,
   onOpenProfile, onOpenTasks, pendingCount = 0,
+  onGoToSurveys, surveyRemaining = 0,
   aspectName, planet
 }) {
   // Резолвер из props учитывает level, fallback на текущие scripts.
@@ -25,6 +26,19 @@ export default function Chat({
           <div className={styles.topbarSub}>{aspectName}</div>
         </div>
         <div className={styles.topbarStats}>
+          {/* Кнопка дерева навыков — показываем, пока есть непройденные. */}
+          {surveyRemaining > 0 && onGoToSurveys && (
+            <button
+              type="button"
+              className={styles.skillsBtn}
+              onClick={onGoToSurveys}
+              aria-label="Оценить навыки"
+              title={`Непройденных навыков: ${surveyRemaining}`}
+            >
+              <span>Оценить навыки</span>
+              <span className={styles.skillsBtnCount}>{surveyRemaining}</span>
+            </button>
+          )}
           <button
             type="button"
             className={`${styles.tasksToggle} ${pendingCount > 0 ? styles.tasksToggleActive : ''}`}

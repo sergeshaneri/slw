@@ -1,0 +1,200 @@
+.wheel {
+  margin: 16px 0 24px;
+  padding: 20px 22px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 8%, var(--surface-2)),
+    var(--surface-2)
+  );
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+  border-radius: 18px;
+}
+
+.wheelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.wheelTitleBlock { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+.wheelEyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--accent);
+  opacity: 0.85;
+}
+
+.wheelTitle {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  line-height: 1.25;
+}
+
+.wheelStat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.wheelStatVal {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.wheelStatTotal {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+
+.wheelStatLbl {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.wheelEmpty {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.55;
+  padding: 12px 0 4px;
+}
+
+.wheelEmpty p { margin: 0 0 8px; }
+
+.wheelEmptyHint { font-size: 12px; color: var(--text-dim); }
+
+.wheelArches {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.arche { display: flex; flex-direction: column; gap: 6px; }
+
+.archeHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.archeTitleBlock { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+
+.archeGlyph {
+  font-size: 14px;
+  color: var(--accent);
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+
+.archeName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.archeAvg {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.archeAvgTotal {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: 1px;
+}
+
+.archeBar {
+  height: 6px;
+  background: var(--line);
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.archeBarFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, transparent));
+  border-radius: 100px;
+  transition: width .4s ease;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.archeFoot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.archeSub {
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.archeProgress {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.wheelFoot {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  .wheel { padding: 16px 16px; }
+  .wheelStatVal { font-size: 24px; }
+  .wheelTitle { font-size: 15px; }
+}
+
+.wheelCta {
+  margin-top: 14px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, transform .1s;
+}
+
+.wheelCta:hover {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.wheelCta:active { transform: scale(0.98); }

@@ -913,3 +913,480 @@
   from { opacity: 0; transform: translateX(-50%) translateY(10px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
+
+/* ── survey (анкета навыка) ─────────────────────────── */
+
+.surveyShell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--surface);
+  position: relative;
+  overflow: hidden;
+}
+
+.surveyHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  flex-shrink: 0;
+}
+
+.surveyClose {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background .15s, color .15s;
+}
+
+.surveyClose:hover { background: var(--surface); color: var(--text); }
+
+.surveyTitleBlock { flex: 1; min-width: 0; }
+
+.surveyTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+  margin-bottom: 4px;
+}
+
+.surveySub {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.surveyProgress {
+  height: 3px;
+  background: var(--line);
+  flex-shrink: 0;
+}
+
+.surveyProgressFill {
+  height: 100%;
+  background: var(--accent);
+  transition: width .3s ease;
+}
+
+.surveyBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.surveyStatement {
+  font-size: 19px;
+  line-height: 1.45;
+  color: var(--text);
+  font-weight: 500;
+  text-align: center;
+  padding: 0 8px;
+}
+
+.surveyHint {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.surveyScale {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.surveyScaleBtn {
+  aspect-ratio: 1;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, transform .1s;
+  font-variant-numeric: tabular-nums;
+}
+
+.surveyScaleBtn:hover {
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.surveyScaleBtn:active { transform: scale(0.95); }
+
+.surveyActions {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+@media (max-width: 480px) {
+  .surveyScale { gap: 4px; }
+  .surveyScaleBtn { font-size: 14px; border-radius: 10px; }
+  .surveyStatement { font-size: 17px; }
+  .surveyBody { padding: 24px 14px; gap: 20px; }
+}
+
+/* ── survey slider (ползунок оценки) ─────────────── */
+
+.surveyValue {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  margin-top: 8px;
+}
+
+.surveyValueNum {
+  font-size: 56px;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
+  text-shadow: 0 0 30px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.surveyValueTotal {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+.surveySliderWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+.surveySlider {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    var(--accent) calc((var(--val, 50)) * 1%),
+    var(--line) calc((var(--val, 50)) * 1%),
+    var(--line) 100%
+  );
+  border-radius: 100px;
+  outline: none;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+/* WebKit thumb */
+.surveySlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--surface);
+  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--accent), 0 0 16px color-mix(in srgb, var(--accent) 60%, transparent);
+  transition: transform .12s;
+}
+
+.surveySlider::-webkit-slider-thumb:hover { transform: scale(1.1); }
+.surveySlider::-webkit-slider-thumb:active { transform: scale(0.95); }
+
+/* Firefox thumb */
+.surveySlider::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--surface);
+  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--accent), 0 0 16px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+/* Firefox track */
+.surveySlider::-moz-range-track {
+  height: 8px;
+  background: var(--line);
+  border-radius: 100px;
+}
+
+.surveySlider::-moz-range-progress {
+  height: 8px;
+  background: var(--accent);
+  border-radius: 100px;
+}
+
+.surveySliderEnds {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  padding: 0 4px;
+}
+
+.surveyActions {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+
+.surveyActions .btn { flex: 1; }
+
+/* ── skill tree (меню веток талантов) ─────────────── */
+
+.treeShell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.treeHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  flex-shrink: 0;
+}
+
+.treeHeaderTitleBlock { flex: 1; min-width: 0; }
+
+.treeHeaderTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.treeHeaderSub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.treeProgress {
+  height: 3px;
+  background: var(--line);
+  flex-shrink: 0;
+}
+
+.treeProgressFill {
+  height: 100%;
+  background: var(--accent);
+  transition: width .4s ease;
+}
+
+.treeBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 14px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.treeBranch { display: flex; flex-direction: column; gap: 8px; }
+
+.treeBranchHead {
+  width: 100%;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: background .12s, border-color .12s;
+}
+
+.treeBranchHead:hover {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+}
+
+.treeBranchTitleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.treeBranchChevron {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.treeBranchGlyph {
+  font-size: 16px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.treeBranchName {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+}
+
+.treeBranchCount {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.treeBranchSubRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.treeBranchSub {
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.treeBranchAvg {
+  color: var(--accent);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.treeSkillList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.treeSkill {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+
+.treeSkill:hover {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+}
+
+.treeSkillDone {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+}
+
+.treeSkillDraft {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface-2));
+}
+
+.treeSkillName {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.treeSkillStatus {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.treeSkillDone .treeSkillStatus { color: var(--accent); }
+.treeSkillDraft .treeSkillStatus { color: var(--accent); }
+
+/* ── skills button (в шапке чата) ─────────────────── */
+
+.skillsBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 100px;
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, transform .1s;
+}
+
+.skillsBtn:hover {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.skillsBtn:active { transform: scale(0.95); }
+
+.skillsBtnCount {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 100px;
+  background: color-mix(in srgb, var(--accent) 35%, var(--surface));
+  font-variant-numeric: tabular-nums;
+}
+
+/* На узких экранах оставляем только число с короткой надписью */
+@media (max-width: 480px) {
+  .skillsBtn { padding: 5px 10px; font-size: 11px; gap: 5px; }
+}

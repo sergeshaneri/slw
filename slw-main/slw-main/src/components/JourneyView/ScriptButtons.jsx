@@ -50,6 +50,13 @@ export default function ScriptButtons({ script, onAction }) {
           <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => act('skip')}>Пропустить</button>
         </div>
       )
+    case 'survey':
+      return (
+        <div className={styles.btnRow}>
+          <button type="button" className={`${styles.btn} ${styles.btnAccent}`} onClick={() => act('start_survey')}>Начать анкету</button>
+          <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => act('next')}>Позже</button>
+        </div>
+      )
     default:
       return null
   }

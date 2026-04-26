@@ -5,7 +5,8 @@ const TYPE_CONFIG = {
   question:   { label: 'Вопрос',     glyph: '?' },
   exercise:   { label: 'Упражнение', glyph: '△' },
   word:       { label: 'Слово дня',  glyph: '✦' },
-  reflection: { label: 'Рефлексия',  glyph: '◯' }
+  reflection: { label: 'Рефлексия',  glyph: '◯' },
+  survey:     { label: 'Анкета',     glyph: '⌛' }
 }
 
 export default function ScriptCard({ script }) {

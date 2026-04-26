@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
+import { SURVEY_BLOCKS } from '../../data/journey/skills'
 import styles from './DiaryView.module.css'
 
 const SOURCE_LABEL = {
   journey: 'из путешествия',
   'journey-question': 'вопрос путешествия',
+  'journey-survey': 'анкета навыка',
   aspect: 'из аспекта',
   'aspect-item': 'к фрагменту'
 }
@@ -121,7 +123,7 @@ function DiaryEntry({ entry, onDelete }) {
           )}
           {entry.source && entry.source !== 'manual' && (
             <span className={`${styles.entrySource} ${
-              entry.source === 'journey' || entry.source === 'journey-question'
+              entry.source === 'journey' || entry.source === 'journey-question' || entry.source === 'journey-survey'
                 ? styles.entrySourceJourney
                 : styles.entrySourceAspect
             }`}>
@@ -162,6 +164,62 @@ function DiaryEntry({ entry, onDelete }) {
       )}
 
       <div className={styles.entryText}>{entry.text}</div>
+
+      {entry.survey && <SurveyDetails survey={entry.survey} />}
+    </div>
+  )
+}
+
+// Раскрывающийся блок с подробной разбивкой ответов на анкету.
+// Показывает все 15 утверждений со средней по каждому блоку и общей.
+function SurveyDetails({ survey }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className={styles.surveyDetails}>
+      <button
+        type="button"
+        className={styles.surveyDetailsToggle}
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+      >
+        {open ? '▲ свернуть ответы' : `▼ показать все 15 ответов`}
+      </button>
+      {open && (
+        <div className={styles.surveyDetailsBody}>
+          {SURVEY_BLOCKS.filter(b => (survey.blocks?.[b.id] ?? []).length > 0).map(block => {
+            const statements = survey.blocks[block.id] ?? []
+            const answers = survey.answers?.[block.id] ?? []
+            const blockAvg = survey.blockAvgs?.[block.id]
+            return (
+              <div key={block.id} className={styles.surveyDetailsBlock}>
+                <div className={styles.surveyDetailsBlockHead}>
+                  <span className={styles.surveyDetailsBlockName}>{block.name}</span>
+                  {blockAvg != null && (
+                    <span className={styles.surveyDetailsBlockAvg}>
+                      ср. {blockAvg.toFixed(1)}
+                    </span>
+                  )}
+                </div>
+                <ol className={styles.surveyDetailsList}>
+                  {statements.map((stmt, i) => (
+                    <li key={i}>
+                      <span className={styles.surveyDetailsStatement}>{stmt}</span>
+                      <span className={styles.surveyDetailsAnswer}>
+                        {Number.isFinite(answers[i]) ? `${answers[i]}/10` : '—'}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )
+          })}
+          {Number.isFinite(survey.skillAvg) && (
+            <div className={styles.surveyDetailsTotal}>
+              Средняя по навыку: <strong>{survey.skillAvg.toFixed(1)}/10</strong>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

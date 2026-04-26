@@ -87,6 +87,10 @@ export function parseJourneyMd(md) {
     // pool: true — шаг идёт в опциональный пул уровня (см. SCRIPT_GUIDELINES §8).
     // Любое значение, кроме строго "false", считаем за true.
     if (metadata.pool && metadata.pool.toLowerCase() !== 'false') script.pool = true
+    // skill: <id> — для type='survey' указывает на анкету в SURVEYS.
+    // Текст утверждений берётся из SURVEYS[skill]; тело шага в md можно
+    // оставлять пустым или давать короткое описание навыка.
+    if (metadata.skill) script.skill = metadata.skill
 
     if (followUps.length > 0) {
       script.followUp = (ans) => {

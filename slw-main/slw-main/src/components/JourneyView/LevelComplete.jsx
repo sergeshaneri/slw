@@ -57,26 +57,26 @@ export default function LevelComplete({
           </div>
         </div>
 
-        {/* Главная кнопка — переход на следующий уровень, если он есть. */}
-        {onNextLevel && (
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`}
-            onClick={onNextLevel}
-          >
-            Перейти на «{nextLevelTitle ?? 'следующий уровень'}»
-          </button>
-        )}
-
-        {/* Кнопка «копать здесь дальше» — даём только когда core
-            пройден и в уровне есть непустой pool. */}
+        {/* На L0 после core логичный следующий шаг — проанализировать
+            себя по навыкам БС (заполнить колесо самооценкой). Кнопка
+            ведёт на дерево навыков (выбор любого), не сразу на анкету. */}
         {onStayPool && (
           <button
             type="button"
-            className={`${styles.btn} ${onNextLevel ? styles.btnGhost : styles.btnPrimary} ${styles.btnFull}`}
+            className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`}
             onClick={onStayPool}
           >
-            Копать здесь дальше {poolCount > 0 ? `· ${poolCount} заданий` : ''}
+            Проанализировать себя по навыкам БС
+          </button>
+        )}
+
+        {onNextLevel && (
+          <button
+            type="button"
+            className={`${styles.btn} ${onStayPool ? styles.btnGhost : styles.btnPrimary} ${styles.btnFull}`}
+            onClick={onNextLevel}
+          >
+            Перейти на «{nextLevelTitle ?? 'следующий уровень'}»
           </button>
         )}
 

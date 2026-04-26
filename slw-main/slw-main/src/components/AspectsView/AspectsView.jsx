@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
 import { BLOCKS, LEVEL_LABELS, getBlockItems } from './blocks'
+import BSWheel from './BSWheel'
 import styles from './AspectsView.module.css'
 
-export default function AspectsView({ selectedAspect, onAspectSelect, scores, onScoreChange, diary, onDiaryChange, t }) {
+export default function AspectsView({ selectedAspect, onAspectSelect, scores, onScoreChange, diary, onDiaryChange, journey, onGoToBSSurveys, t }) {
   const [blockId, setBlockId] = useState(null)
 
   useEffect(() => {
@@ -24,7 +25,7 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, on
     if (!block) {
       return <Toc aspect={selectedAspect} data={data} color={color} available={available}
         scores={scores} onScoreChange={onScoreChange} onAspectSelect={onAspectSelect}
-        onOpenBlock={setBlockId} />
+        journey={journey} onGoToBSSurveys={onGoToBSSurveys} onOpenBlock={setBlockId} />
     }
     return (
       <BlockReader
@@ -46,7 +47,7 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, on
 
   return <Toc aspect={selectedAspect} data={data} color={color} available={available}
     scores={scores} onScoreChange={onScoreChange} onAspectSelect={onAspectSelect}
-    onOpenBlock={setBlockId} />
+    journey={journey} onGoToBSSurveys={onGoToBSSurveys} onOpenBlock={setBlockId} />
 }
 
 // ─── Сетка 8 аспектов ──────────────────────────────────────────────────────
@@ -88,7 +89,7 @@ function AspectsGrid({ scores, onAspectSelect }) {
 
 // ─── Оглавление аспекта ────────────────────────────────────────────────────
 
-function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSelect, onOpenBlock }) {
+function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSelect, journey, onGoToBSSurveys, onOpenBlock }) {
   const byLevel = useMemo(() => {
     const m = { 0: [], 1: [], 2: [], 3: [] }
     available.forEach(b => m[b.level].push(b))
@@ -105,6 +106,16 @@ function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSe
         onScoreChange={v => onScoreChange({ ...scores, [aspect]: v })}
         onBack={() => onAspectSelect(null)}
       />
+
+      {/* Мини-колесо БС с разбивкой по 4 архетипам — только на странице БС.
+          Для остальных аспектов появится позже, когда напишем для них анкеты. */}
+      {aspect === 'БС' && (
+        <BSWheel
+          skills={journey?.skills ?? {}}
+          color={color}
+          onContinueSurveys={onGoToBSSurveys}
+        />
+      )}
 
       <div className={styles.tocIntro}>
         <p className={styles.tocIntroText}>{data.essence}</p>
