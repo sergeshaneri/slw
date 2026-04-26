@@ -186,6 +186,24 @@
   color: rgba(255,255,255,0.9);
 }
 
+.tgBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: #2AABEE;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.2s;
+  box-sizing: border-box;
+}
+
+.tgBtn:hover { opacity: 0.88; }
+
 .guestHint {
   font-size: 12px;
   color: rgba(255,255,255,0.55);

@@ -1,16 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
-import { login, register, linkTelegram } from '../../api/client'
+import { login, register, linkTelegram, addEmail } from '../../api/client'
 import styles from './AuthModal.module.css'
 
 /**
- * AuthModal — shown when user is not authenticated.
+ * AuthModal — три режима в зависимости от user-prop:
  *
- * Props:
- *   onSuccess(userData)  — called after successful auth
- *   user                 — if provided (logged in via email), shows "Link Telegram" option
+ *   user = null                         → гостевой логин/регистрация
+ *                                         (форма email+пароль + TG-виджет)
+ *
+ *   user.email && !user.telegram_id     → "Подключить Telegram"
+ *                                         (только TG-виджет в callback-режиме)
+ *
+ *   !user.email && user.telegram_id     → "Добавить email и пароль"
+ *                                         (только форма email+пароль, без виджета)
  */
 export default function AuthModal({ onSuccess, onClose, user = null }) {
-  const [tab, setTab] = useState('login')      // 'login' | 'register'
+  const isAddingEmail = !!(user && !user.email && user.telegram_id)
+  const isLinkingTelegram = !!(user && user.email && !user.telegram_id)
+
+  const [tab, setTab] = useState('login')      // 'login' | 'register' (только для гостя)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
@@ -18,10 +26,12 @@ export default function AuthModal({ onSuccess, onClose, user = null }) {
   const [loading, setLoading] = useState(false)
   const tgRef = useRef(null)
 
-  // Inject Telegram Login Widget into the container div
+  // TG-виджет нужен только для линка email→TG (пользователь уже залогинен).
+  // Для гостевого логина используем прямую ссылку (без виджета и popup).
   useEffect(() => {
     if (!tgRef.current) return
     tgRef.current.innerHTML = ''
+    if (!isLinkingTelegram) return  // виджет только для link-режима
 
     const script = document.createElement('script')
     script.src = 'https://telegram.org/js/telegram-widget.js?22'
@@ -30,42 +40,38 @@ export default function AuthModal({ onSuccess, onClose, user = null }) {
     script.setAttribute('data-radius', '8')
     script.setAttribute('data-request-access', 'write')
     script.setAttribute('data-userpic', 'false')
-    const apiBase = import.meta.env.VITE_API_URL ?? ''
-    if (user) {
-      // Link flow: existing email account → link Telegram via POST
-      // Keep callback approach since user is already authenticated
-      script.setAttribute('data-onauth', '__slwTgLink(user)')
-      window.__slwTgLink = async (tgUser) => {
-        setError('')
-        setLoading(true)
-        try {
-          const data = await linkTelegram(tgUser)
-          onSuccess(data)
-        } catch (e) {
-          setError(e.message)
-        } finally {
-          setLoading(false)
-        }
-      }
-    } else {
-      // Login flow: redirect-based (works on mobile)
-      script.setAttribute('data-auth-url', `${apiBase}/api/auth/telegram-redirect`)
-    }
+    script.setAttribute('data-onauth', '__slwTgLink(user)')
     script.async = true
     tgRef.current.appendChild(script)
 
-    return () => {
-      delete window.__slwTgLink
+    window.__slwTgLink = async (tgUser) => {
+      setError('')
+      setLoading(true)
+      try {
+        const data = await linkTelegram(tgUser)
+        onSuccess(data)
+      } catch (e) {
+        setError(e.message)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [user, onSuccess])
+
+    return () => { delete window.__slwTgLink }
+  }, [isLinkingTelegram, onSuccess])
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      const action = tab === 'login' ? login : register
-      const data = await action(email, password, name)
+      let data
+      if (isAddingEmail) {
+        data = await addEmail(email, password)
+      } else {
+        const action = tab === 'login' ? login : register
+        data = await action(email, password, name)
+      }
       onSuccess(data)
     } catch (e) {
       setError(e.message)
@@ -74,9 +80,16 @@ export default function AuthModal({ onSuccess, onClose, user = null }) {
     }
   }
 
-  const title = user
-    ? 'Подключить Telegram'
-    : tab === 'login' ? 'Вход' : 'Регистрация'
+  const title = isAddingEmail
+    ? 'Добавить email'
+    : isLinkingTelegram
+      ? 'Подключить Telegram'
+      : tab === 'login' ? 'Вход' : 'Регистрация'
+
+  // Форму email/пароль показываем гостю и при добавлении email к TG-аккаунту.
+  const showForm = !user || isAddingEmail
+  // TG-секцию (виджет + разделитель) скрываем, если юзер уже привязан к TG.
+  const showTgSection = !isAddingEmail
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -99,6 +112,12 @@ export default function AuthModal({ onSuccess, onClose, user = null }) {
             Без аккаунта можно смотреть приложение, но Путешествие требует входа — данные привязываются к профилю.
           </p>
         )}
+        {isAddingEmail && (
+          <p className={styles.guestHint}>
+            Сейчас аккаунт привязан только к Telegram. Добавь email и пароль —
+            сможешь входить любым из двух способов.
+          </p>
+        )}
 
         {!user && (
           <div className={styles.tabs}>
@@ -113,49 +132,59 @@ export default function AuthModal({ onSuccess, onClose, user = null }) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className={styles.form}>
-          {tab === 'register' && !user && (
+        {showForm && (
+          <form onSubmit={handleSubmit} className={styles.form}>
+            {tab === 'register' && !user && (
+              <input
+                className={styles.input}
+                placeholder="Имя (необязательно)"
+                value={name}
+                onChange={e => setName(e.target.value)}
+              />
+            )}
             <input
               className={styles.input}
-              placeholder="Имя (необязательно)"
-              value={name}
-              onChange={e => setName(e.target.value)}
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+              autoComplete="email"
             />
-          )}
-          {!user && (
-            <>
-              <input
-                className={styles.input}
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-              />
-              <input
-                className={styles.input}
-                type="password"
-                placeholder="Пароль"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
-              />
-              <button className={styles.btn} type="submit" disabled={loading}>
-                {loading ? '...' : title}
-              </button>
-            </>
-          )}
-        </form>
+            <input
+              className={styles.input}
+              type="password"
+              placeholder="Пароль"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              autoComplete={tab === 'login' && !isAddingEmail ? 'current-password' : 'new-password'}
+            />
+            <button className={styles.btn} type="submit" disabled={loading}>
+              {loading ? '...' : title}
+            </button>
+          </form>
+        )}
 
         {error && <p className={styles.error}>{error}</p>}
 
-        <div className={styles.divider}>
-          <span>{user ? 'Авторизуйтесь через Telegram' : 'или'}</span>
-        </div>
-
-        <div ref={tgRef} className={styles.tgWidget} />
+        {showTgSection && (
+          <>
+            <div className={styles.divider}>
+              <span>{isLinkingTelegram ? 'Авторизуйтесь через Telegram' : 'или'}</span>
+            </div>
+            {isLinkingTelegram ? (
+              <div ref={tgRef} className={styles.tgWidget} />
+            ) : (
+              <a
+                href={`${import.meta.env.VITE_API_URL ?? ''}/api/auth/telegram-start`}
+                className={styles.tgBtn}
+              >
+                Войти через Telegram
+              </a>
+            )}
+          </>
+        )}
 
         {loading && <p className={styles.hint}>Подождите...</p>}
       </div>

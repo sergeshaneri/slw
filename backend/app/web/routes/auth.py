@@ -4,8 +4,10 @@ Auth routes:
   POST /api/auth/login      — email + password
   POST /api/auth/telegram   — Telegram Login Widget (creates or logs in)
   POST /api/auth/link       — link Telegram to existing email account (requires auth)
+  POST /api/auth/add-email  — add email+password to existing TG-only account (requires auth)
   GET  /api/auth/me         — current user info (requires auth)
 """
+import urllib.parse
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -14,6 +16,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.db.models import Score, WebScore, WebUser
 from app.db.session import get_session
 from app.web.auth import (
@@ -38,6 +41,11 @@ class RegisterIn(BaseModel):
 
 
 class LoginIn(BaseModel):
+    email: str
+    password: str
+
+
+class AddEmailIn(BaseModel):
     email: str
     password: str
 
@@ -185,6 +193,33 @@ async def link_telegram(
     return _user_out(current_user)
 
 
+# ── Add email + password to TG-only account ──────────────────────────────────
+
+@router.post("/add-email")
+async def add_email(
+    body: AddEmailIn,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """User зарегался через TG (нет email) и хочет добавить email+пароль,
+    чтобы можно было входить и тем, и другим способом."""
+    if current_user.email:
+        raise HTTPException(400, "У этого аккаунта уже есть email")
+
+    # Проверяем, что email не занят кем-то ещё.
+    conflict = (
+        await session.execute(select(WebUser).where(WebUser.email == body.email))
+    ).scalar_one_or_none()
+    if conflict and conflict.id != current_user.id:
+        raise HTTPException(400, "Этот email уже зарегистрирован")
+
+    current_user.email = body.email
+    current_user.password_hash = hash_password(body.password)
+    await session.commit()
+    await session.refresh(current_user)
+    return _user_out(current_user)
+
+
 # ── Me ────────────────────────────────────────────────────────────────────────
 
 @router.get("/me")
@@ -192,10 +227,29 @@ async def me(current_user: WebUser = Depends(get_current_user)) -> dict:
     return _user_out(current_user)
 
 
-# ── Telegram redirect (mobile-friendly auth flow) ────────────────────────────
-# Used with data-auth-url on the Login Widget — Telegram redirects here with
-# auth params in the query string. We verify, create/find user, then redirect
-# back to the frontend with a JWT token in the URL.
+# ── Telegram OAuth start (no-popup, full-page redirect) ──────────────────────
+# Frontend links directly to this endpoint. It builds the Telegram OAuth URL
+# and redirects the browser there — no widget popup needed, works on mobile.
+
+@router.get("/telegram-start")
+async def telegram_start() -> RedirectResponse:
+    bot_id = settings.bot_token.split(":")[0]
+    origin = urllib.parse.quote("https://sergeshaneri.github.io", safe="")
+    return_to = urllib.parse.quote(
+        "https://slw-production.up.railway.app/api/auth/telegram-redirect",
+        safe="",
+    )
+    tg_url = (
+        f"https://oauth.telegram.org/auth"
+        f"?bot_id={bot_id}&origin={origin}"
+        f"&return_to={return_to}&embed=1&request_access=write"
+    )
+    return RedirectResponse(tg_url)
+
+
+# ── Telegram redirect (callback after OAuth) ──────────────────────────────────
+# Telegram sends auth params here as query string after the user authorizes.
+# We verify, create/find user, then redirect to the frontend with a JWT token.
 
 @router.get("/telegram-redirect")
 async def telegram_redirect(
