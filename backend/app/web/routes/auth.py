@@ -9,7 +9,7 @@ Auth routes:
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,8 +40,13 @@ class LoginIn(BaseModel):
 
 
 class TelegramAuthIn(BaseModel):
+    # Accept any extra fields Telegram may send (last_name, photo_url, etc.)
+    # so they're included in the hash check string
+    model_config = ConfigDict(extra="allow")
+
     id: int
     first_name: str = ""
+    last_name: str | None = None
     username: str | None = None
     photo_url: str | None = None
     auth_date: int
