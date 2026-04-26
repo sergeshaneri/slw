@@ -2,14 +2,17 @@ import re
 from datetime import datetime
 
 from sqlalchemy import select
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import Update
 from telegram.ext import ContextTypes
 
-from app.bot.fsm import IN_SCRIPT, WAITING_EXERCISE_ACK, WAITING_OPEN_ANSWER, WAITING_SCORE, WAITING_THEORY_NOTE
+from app.bot.fsm import IN_SCRIPT, WAITING_OPEN_ANSWER, WAITING_SCORE, WAITING_THEORY_NOTE
 from app.content.loader import Step, first_step, get_step, next_step
 from app.db.models import Answer, DiaryEntry, UserState
 from app.db.session import AsyncSessionLocal
-from app.bot.handlers.start import MAIN_KEYBOARD, SCORE_KEYBOARD, REFLECTION_KEYBOARD
+from app.bot.handlers.start import (
+    MAIN_KEYBOARD, NEXT_KEYBOARD, NEXT_INSIGHT_KEYBOARD,
+    ACK_KEYBOARD, SCORE_KEYBOARD, REFLECTION_KEYBOARD,
+)
 
 TG_MAX = 4000
 
@@ -35,17 +38,6 @@ def _trim(text: str) -> str:
     if len(text) <= TG_MAX:
         return text
     return text[:TG_MAX] + "\n\n(текст обрезан)"
-
-
-def _btn(label: str, data: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton(label, callback_data=data)]])
-
-
-def _btn_with_note(label: str, data: str, step_id: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(label, callback_data=data)],
-        [InlineKeyboardButton("Записать заметку ✏️", callback_data=f"note_btn:{step_id}")],
-    ])
 
 
 async def _get_state(user_id: int) -> UserState | None:
@@ -82,15 +74,13 @@ async def show_step(update: Update, context: ContextTypes.DEFAULT_TYPE, step: St
     header = f"{step.title}\n\n" if step.title and step.kind not in ("intro", "onboarding") else ""
 
     if step.kind in INFO_KINDS:
-        label = step.button or "Далее ▶"
         if step.kind == "complete":
-            await msg.reply_text(header + body)
+            await msg.reply_text(header + body, reply_markup=MAIN_KEYBOARD)
             return IN_SCRIPT
         if step.kind in ("theory", "word"):
-            markup = _btn_with_note(label, f"next:{step.id}", step.id)
+            await msg.reply_text(header + body, reply_markup=NEXT_INSIGHT_KEYBOARD)
         else:
-            markup = _btn(label, f"next:{step.id}")
-        await msg.reply_text(header + body, reply_markup=markup)
+            await msg.reply_text(header + body, reply_markup=NEXT_KEYBOARD)
         return IN_SCRIPT
 
     elif step.kind in QUESTION_KINDS:
@@ -99,9 +89,8 @@ async def show_step(update: Update, context: ContextTypes.DEFAULT_TYPE, step: St
         return WAITING_SCORE
 
     elif step.kind in EXERCISE_KINDS:
-        markup = _btn("Выполнил ✓", f"ack:{step.id}")
-        await msg.reply_text(header + body, reply_markup=markup)
-        return WAITING_EXERCISE_ACK
+        await msg.reply_text(header + body, reply_markup=ACK_KEYBOARD)
+        return IN_SCRIPT
 
     elif step.kind in REFLECTION_KINDS:
         await msg.reply_text(header + body)
@@ -128,32 +117,34 @@ async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return await show_step(update, context, step)
 
 
-async def on_next_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-    current_id = query.data.split(":", 1)[1]
-    await query.edit_message_reply_markup(reply_markup=None)
-
-    nxt = next_step(current_id)
+async def on_next_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    state = await _get_state(update.effective_user.id)
+    step_id = state.current_step_id if state else None
+    nxt = next_step(step_id) if step_id else None
     if nxt is None:
-        await query.message.reply_text("Путешествие завершено!")
+        await update.message.reply_text("Путешествие завершено!", reply_markup=MAIN_KEYBOARD)
         return IN_SCRIPT
     return await show_step(update, context, nxt)
 
 
-async def on_ack_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-    current_id = query.data.split(":", 1)[1]
-    await _save_answer(query.from_user.id, current_id, "exercise_ack", text="ack")
-    await query.edit_message_reply_markup(reply_markup=None)
-    await query.message.reply_text("Записал!", reply_markup=MAIN_KEYBOARD)
-
-    nxt = next_step(current_id)
+async def on_ack_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    state = await _get_state(update.effective_user.id)
+    step_id = state.current_step_id if state else None
+    if step_id:
+        await _save_answer(update.effective_user.id, step_id, "exercise_ack", text="ack")
+    await update.message.reply_text("Записал!", reply_markup=MAIN_KEYBOARD)
+    nxt = next_step(step_id) if step_id else None
     if nxt is None:
-        await query.message.reply_text("Путешествие завершено!")
+        await update.message.reply_text("Путешествие завершено!", reply_markup=MAIN_KEYBOARD)
         return IN_SCRIPT
     return await show_step(update, context, nxt)
+
+
+async def on_insight_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    state = await _get_state(update.effective_user.id)
+    context.user_data["pending_note_step_id"] = state.current_step_id if state else None
+    await update.message.reply_text("Напиши свой инсайт:", reply_markup=REFLECTION_KEYBOARD)
+    return WAITING_THEORY_NOTE
 
 
 async def on_open_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -165,7 +156,7 @@ async def on_open_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     nxt = next_step(step_id) if step_id else None
     if nxt is None:
-        await update.message.reply_text("Путешествие завершено!")
+        await update.message.reply_text("Путешествие завершено!", reply_markup=MAIN_KEYBOARD)
         return IN_SCRIPT
     return await show_step(update, context, nxt)
 
@@ -177,7 +168,7 @@ async def on_score_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         if not 1 <= val <= 10:
             raise ValueError
     except ValueError:
-        await update.message.reply_text("Пожалуйста, введи число от 1 до 10.")
+        await update.message.reply_text("Пожалуйста, введи число от 1 до 10.", reply_markup=SCORE_KEYBOARD)
         return WAITING_SCORE
 
     state = await _get_state(update.effective_user.id)
@@ -192,19 +183,9 @@ async def on_score_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     nxt = next_step(step_id) if step_id else None
     if nxt is None:
-        await update.message.reply_text("Путешествие завершено!")
+        await update.message.reply_text("Путешествие завершено!", reply_markup=MAIN_KEYBOARD)
         return IN_SCRIPT
     return await show_step(update, context, nxt)
-
-
-
-async def on_note_btn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-    step_id = query.data.split(":", 1)[1]
-    context.user_data["pending_note_step_id"] = step_id
-    await query.message.reply_text("Напиши свою заметку к этому разделу:")
-    return WAITING_THEORY_NOTE
 
 
 async def on_theory_note(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -217,5 +198,5 @@ async def on_theory_note(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             step_id=step_id,
         ))
         await session.commit()
-    await update.message.reply_text("Заметка сохранена.", reply_markup=MAIN_KEYBOARD)
+    await update.message.reply_text("Инсайт сохранён.", reply_markup=MAIN_KEYBOARD)
     return IN_SCRIPT

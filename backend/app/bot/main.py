@@ -10,7 +10,7 @@ from telegram.ext import (
     filters,
 )
 
-from app.bot.fsm import IN_SCRIPT, WAITING_EXERCISE_ACK, WAITING_OPEN_ANSWER, WAITING_SCORE, WAITING_THEORY_NOTE
+from app.bot.fsm import IN_SCRIPT, WAITING_OPEN_ANSWER, WAITING_SCORE, WAITING_THEORY_NOTE
 from app.bot.handlers.admin import cmd_reload, cmd_reset
 from app.bot.handlers.note import cmd_note
 from app.bot.handlers.profile import cmd_profile, on_profile_resume
@@ -18,9 +18,9 @@ from app.bot.handlers.progress import cmd_progress
 from app.bot.handlers.script import (
     cmd_go,
     cmd_resume,
-    on_ack_button,
-    on_next_button,
-    on_note_btn,
+    on_ack_keyboard,
+    on_insight_keyboard,
+    on_next_keyboard,
     on_open_answer,
     on_score_answer,
     on_theory_note,
@@ -32,16 +32,21 @@ from app.config import settings
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-# Reply-keyboard button text
-BTN_PROFILE = filters.Regex(r"^Профиль$")
+BTN_PROFILE  = filters.Regex(r"^Профиль$")
 BTN_CONTINUE = filters.Regex(r"^Продолжить$")
+BTN_NEXT     = filters.Regex(r"^Далее ▶$")
+BTN_ACK      = filters.Regex(r"^Выполнил ✓$")
+BTN_INSIGHT  = filters.Regex(r"^Записать инсайт$")
+
+# все кнопки нижней клавиатуры — исключаем из text-хендлеров
+BTN_ANY = BTN_PROFILE | BTN_CONTINUE | BTN_NEXT | BTN_ACK | BTN_INSIGHT | \
+          filters.Regex(r"^(Ввести оценку|Написать ответ)$")
 
 
 def run() -> None:
     asyncio.set_event_loop(asyncio.new_event_loop())
     app = ApplicationBuilder().token(settings.bot_token).build()
 
-    # Global handlers (outside conversation)
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("reload", cmd_reload))
     app.add_handler(CommandHandler("reset", cmd_reset))
@@ -59,22 +64,19 @@ def run() -> None:
         ],
         states={
             IN_SCRIPT: [
-                CallbackQueryHandler(on_next_button, pattern=r"^next:"),
-                CallbackQueryHandler(on_ack_button, pattern=r"^ack:"),
-                CallbackQueryHandler(on_note_btn, pattern=r"^note_btn:"),
+                MessageHandler(BTN_NEXT & ~filters.COMMAND, on_next_keyboard),
+                MessageHandler(BTN_ACK & ~filters.COMMAND, on_ack_keyboard),
+                MessageHandler(BTN_INSIGHT & ~filters.COMMAND, on_insight_keyboard),
             ],
             WAITING_OPEN_ANSWER: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND & ~BTN_PROFILE & ~BTN_CONTINUE, on_open_answer),
-            ],
-            WAITING_EXERCISE_ACK: [
-                CallbackQueryHandler(on_ack_button, pattern=r"^ack:"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND & ~BTN_ANY, on_open_answer),
             ],
             WAITING_SCORE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND & ~BTN_PROFILE & ~BTN_CONTINUE, on_score_answer),
+                MessageHandler(filters.TEXT & ~filters.COMMAND & ~BTN_ANY, on_score_answer),
             ],
             WAITING_THEORY_NOTE: [
                 MessageHandler(BTN_CONTINUE & ~filters.COMMAND, cmd_resume),
-                MessageHandler(filters.TEXT & ~filters.COMMAND & ~BTN_PROFILE & ~BTN_CONTINUE, on_theory_note),
+                MessageHandler(filters.TEXT & ~filters.COMMAND & ~BTN_ANY, on_theory_note),
             ],
         },
         fallbacks=[

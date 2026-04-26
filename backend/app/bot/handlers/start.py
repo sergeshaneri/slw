@@ -7,23 +7,15 @@ from telegram.ext import ContextTypes
 from app.db.models import User, UserState
 from app.db.session import AsyncSessionLocal
 
-MAIN_KEYBOARD = ReplyKeyboardMarkup(
-    [["Продолжить", "Профиль"]],
-    resize_keyboard=True,
-    one_time_keyboard=False,
-)
+def _kb(*buttons):
+    return ReplyKeyboardMarkup([list(buttons)], resize_keyboard=True, one_time_keyboard=False)
 
-SCORE_KEYBOARD = ReplyKeyboardMarkup(
-    [["Ввести оценку", "Профиль"]],
-    resize_keyboard=True,
-    one_time_keyboard=False,
-)
-
-REFLECTION_KEYBOARD = ReplyKeyboardMarkup(
-    [["Написать ответ", "Профиль"]],
-    resize_keyboard=True,
-    one_time_keyboard=False,
-)
+MAIN_KEYBOARD         = _kb("Продолжить", "Профиль")
+NEXT_KEYBOARD         = _kb("Далее ▶", "Профиль")
+NEXT_INSIGHT_KEYBOARD = _kb("Далее ▶", "Записать инсайт", "Профиль")
+ACK_KEYBOARD          = _kb("Выполнил ✓", "Профиль")
+SCORE_KEYBOARD        = _kb("Ввести оценку", "Профиль")
+REFLECTION_KEYBOARD   = _kb("Написать ответ", "Профиль")
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
