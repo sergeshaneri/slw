@@ -10,10 +10,9 @@ from app.web.routes.state import router as state_router
 
 app = FastAPI(title="SLW API")
 
-origins = [settings.web_origin] if settings.web_origin != "*" else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
