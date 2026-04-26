@@ -43,8 +43,8 @@ BTN_ANY = BTN_PROFILE | BTN_CONTINUE | BTN_NEXT | BTN_ACK | BTN_INSIGHT | \
           filters.Regex(r"^(Ввести оценку|Написать ответ)$")
 
 
-def run() -> None:
-    asyncio.set_event_loop(asyncio.new_event_loop())
+def build() -> "Application":
+    """Build and return the configured Application (without starting polling)."""
     app = ApplicationBuilder().token(settings.bot_token).build()
 
     app.add_handler(CommandHandler("start", cmd_start))
@@ -91,9 +91,12 @@ def run() -> None:
         per_message=False,
     )
     app.add_handler(script_conv)
+    return app
 
-    log.info("Bot started")
-    app.run_polling(drop_pending_updates=True)
+
+def run() -> None:
+    """Standalone entry point (used when running bot without web server)."""
+    build().run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
