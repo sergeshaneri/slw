@@ -119,3 +119,40 @@
 @media (max-width: 540px) {
   .authBtn { font-size: 11px; padding: 5px 10px; }
 }
+
+/* На узких экранах header сворачиваем в две строки:
+   1. Заголовок + auth-блок (с переносом)
+   2. Nav на всю ширину со свайп-скроллом
+   Ставим breakpoint на 720px — на этой ширине 6 пунктов уже не лезут. */
+@media (max-width: 720px) {
+  .header {
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    gap: 10px;
+  }
+
+  .title { flex: 1; min-width: 0; }
+
+  .mainTitle { font-size: 16px; letter-spacing: 1px; }
+  .subtitle  { font-size: 11px; letter-spacing: 4px; }
+
+  .nav {
+    order: 3;            /* всегда вторая строка */
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+
+  .navButton {
+    padding: 6px 10px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    flex-shrink: 0;        /* не дать шринкаться — пусть скроллит */
+    white-space: nowrap;
+  }
+
+  .authBlock { margin-left: 0; }
+}
