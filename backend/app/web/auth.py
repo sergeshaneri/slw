@@ -51,8 +51,11 @@ def verify_telegram_auth(data: dict) -> bool:
     Returns False if data is older than 1 hour.
     """
     received_hash = data.get("hash", "")
-    # Build the check string from all fields except 'hash', sorted
-    check_parts = sorted(f"{k}={v}" for k, v in data.items() if k != "hash")
+    # Build the check string: exclude 'hash' and None values (Telegram omits absent fields)
+    check_parts = sorted(
+        f"{k}={v}" for k, v in data.items()
+        if k != "hash" and v is not None
+    )
     check_string = "\n".join(check_parts)
 
     secret = hashlib.sha256(settings.bot_token.encode()).digest()
