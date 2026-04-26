@@ -7,14 +7,29 @@ import logging
 import os
 
 import uvicorn
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.bot.main import build as build_bot
+from app.config import settings
 from app.web.main import app as web_app
 
 log = logging.getLogger(__name__)
 
 
+async def apply_ddl() -> None:
+    """Add any missing columns that alembic can't apply due to lock issues."""
+    engine = create_async_engine(settings.database_url)
+    async with engine.connect() as conn:
+        await conn.execute(text(
+            "ALTER TABLE web_users ADD COLUMN IF NOT EXISTS display_name TEXT"
+        ))
+        await conn.commit()
+    await engine.dispose()
+
+
 async def main() -> None:
+    await apply_ddl()
     port = int(os.environ.get("PORT", 8000))
 
     bot = build_bot()
