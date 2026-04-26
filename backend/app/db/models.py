@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, ForeignKey, Integer, Numeric, SmallInteger, Text, TIMESTAMP
+from sqlalchemy import BigInteger, Boolean, ForeignKey, Integer, Numeric, SmallInteger, Text, TIMESTAMP
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -101,6 +101,15 @@ class WebUser(Base):
     telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True, nullable=True)
     telegram_username: Mapped[str | None] = mapped_column(Text, nullable=True)
     telegram_first_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Отображаемое имя — редактируется юзером из настроек. Если пусто,
+    # фронт показывает telegram_first_name либо часть email до @.
+    display_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Админ-флаг: даёт доступ к dev-панели на фронте (skip step, авто-анкета,
+    # прыжок между уровнями, полный сброс). Ставится вручную в БД:
+    #   UPDATE web_users SET is_admin = true WHERE email = '...';
+    is_admin: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
 
 

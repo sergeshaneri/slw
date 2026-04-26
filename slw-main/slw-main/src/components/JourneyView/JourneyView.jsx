@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { ASPECT_COLORS } from '../../data/aspects'
 import { ONBOARDING } from '../../data/journey/onboarding'
 import { getJourney } from '../../data/journey/registry'
-import { getSurvey, calcSurveyResult, calcBSScoreFromSkills, getSkillProgress, findFirstUnansweredSurveyIndex } from '../../data/journey/skills'
+import { getSurvey, calcSurveyResult, calcBSScoreFromSkills, getSkillProgress, findFirstUnansweredSurveyIndex, ALL_SKILL_IDS, SURVEY_BLOCK_KEYS, SURVEYS } from '../../data/journey/skills'
 import Onboarding from './Onboarding'
 import Chat from './Chat'
 import LevelComplete from './LevelComplete'
@@ -10,6 +10,7 @@ import JourneyProfile from './JourneyProfile'
 import TasksScreen from './TasksScreen'
 import SurveyScreen from './SurveyScreen'
 import SkillTree from './SkillTree'
+import AdminPanel from './AdminPanel'
 import styles from './JourneyView.module.css'
 
 // Версия контента уровня. При несовпадении с сохранённой в state
@@ -90,7 +91,7 @@ function calcStreak(s) {
   return diff === 1 ? s.streak + 1 : 1
 }
 
-export default function JourneyView({ journey: extJourney, onJourneyChange, scores, onScoresChange, diary, onDiaryChange, t }) {
+export default function JourneyView({ journey: extJourney, onJourneyChange, scores, onScoresChange, diary, onDiaryChange, t, isAdmin = false }) {
   // Локальный стейт — единственный source of truth.
   // Наружу синхронизируется через useEffect (ниже), чтобы persist-callback
   // не ломал серийные setState в одном хэндлере.
@@ -658,6 +659,98 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setState(s => ({ ...s, screen }))
   }, [setState])
 
+  // ─── Админ-действия (видимы только при isAdmin) ──────────────
+  // Все хендлеры обходят геймификацию: XP не выдаём, в дневник
+  // не пишем, через addBotMessage не отвечаем.
+
+  // 1. Пропустить текущий шаг в чате — просто двигаем currentScriptIndex.
+  const handleAdminSkipStep = useCallback(() => {
+    setState(s => ({ ...s, awaitingInput: null }))
+    setTimeout(() => deliverScript(state.currentScriptIndex + 1), 50)
+  }, [deliverScript, state.currentScriptIndex])
+
+  // 2. Заполнить активную анкету. Все ответы = 7. Выставляем blockIndex
+  //    за конец, SurveyScreen.useEffect триггерит handleSurveyComplete,
+  //    который дальше всё штатно — записывает skill, пересчитывает БС,
+  //    переходит к следующему скрипту.
+  const handleAdminFillSurvey = useCallback(() => {
+    setState(s => {
+      if (!s.activeSurvey) return s
+      const survey = SURVEYS[s.activeSurvey.skillId]
+      if (!survey) return s
+      const answers = {}
+      const orderedKeys = SURVEY_BLOCK_KEYS.filter(k => (survey.blocks[k] ?? []).length > 0)
+      for (const key of orderedKeys) {
+        answers[key] = survey.blocks[key].map(() => 7)
+      }
+      return {
+        ...s,
+        activeSurvey: {
+          ...s.activeSurvey,
+          answers,
+          blockIndex: orderedKeys.length,
+          statementIndex: 0
+        }
+      }
+    })
+  }, [setState])
+
+  // 3. Заполнить все 33 навыка по 7/10. Считаем, что blocks тоже = 7.
+  //    Сразу пересчитываем БС.
+  const handleAdminFillAllSkills = useCallback(() => {
+    const completedAt = Date.now()
+    const newSkills = {}
+    for (const skillId of ALL_SKILL_IDS) {
+      const survey = SURVEYS[skillId]
+      const blocks = {}
+      const answers = {}
+      if (survey) {
+        for (const key of SURVEY_BLOCK_KEYS) {
+          const arr = survey.blocks[key] ?? []
+          if (arr.length > 0) {
+            blocks[key] = 7
+            answers[key] = arr.map(() => 7)
+          }
+        }
+      } else {
+        // На случай, если анкеты нет — только агрегаты, без массивов ответов.
+        for (const key of SURVEY_BLOCK_KEYS) blocks[key] = 7
+      }
+      newSkills[skillId] = { result: 7, blocks, completedAt, answers, _admin: true }
+    }
+    setState(s => ({ ...s, skills: newSkills }))
+    const bs = calcBSScoreFromSkills(newSkills)
+    if (Number.isFinite(bs)) {
+      onScoresChange({ ...scores, БС: Math.round(bs) })
+    }
+  }, [scores, onScoresChange, setState])
+
+  // 4. Прыжок на конкретный уровень. Сбрасываем core-индекс, mode='core',
+  //    подаём первый скрипт в чат. Если уровня нет — no-op.
+  const handleAdminJumpLevel = useCallback((targetLevel) => {
+    const lvlData = currentJourney?.levels?.[targetLevel]
+    if (!lvlData) return
+    const first = (lvlData.core ?? lvlData.scripts ?? [])[0]
+    setState(s => ({
+      ...s,
+      currentLevel: targetLevel,
+      mode: 'core',
+      screen: 'chat',
+      currentScriptIndex: 0,
+      currentScriptId: first?.id ?? null,
+      awaitingInput: null,
+      activeSurvey: null,
+      messages: first
+        ? [...s.messages, { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: first.id, level: targetLevel }]
+        : s.messages
+    }))
+  }, [currentJourney, setState])
+
+  // 5. Полный сброс journey-state. Без подтверждения.
+  const handleAdminReset = useCallback(() => {
+    setState(DEFAULT_JOURNEY)
+  }, [setState])
+
   const currentScript = scripts[state.currentScriptIndex]
   const progressPct = scripts.length > 0
     ? Math.round((state.currentScriptIndex / scripts.length) * 100)
@@ -790,6 +883,18 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       )}
 
       {toast && <div className={styles.toast}>{toast}</div>}
+
+      {isAdmin && (
+        <AdminPanel
+          state={state}
+          aspect={state.currentAspect}
+          onSkipStep={handleAdminSkipStep}
+          onFillSurvey={handleAdminFillSurvey}
+          onFillAllSkills={handleAdminFillAllSkills}
+          onJumpLevel={handleAdminJumpLevel}
+          onReset={handleAdminReset}
+        />
+      )}
     </div>
   )
 }

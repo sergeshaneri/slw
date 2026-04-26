@@ -1,11 +1,17 @@
 """
 Auth routes:
-  POST /api/auth/register   — email + password
-  POST /api/auth/login      — email + password
-  POST /api/auth/telegram   — Telegram Login Widget (creates or logs in)
-  POST /api/auth/link       — link Telegram to existing email account (requires auth)
-  POST /api/auth/add-email  — add email+password to existing TG-only account (requires auth)
-  GET  /api/auth/me         — current user info (requires auth)
+  POST /api/auth/register         — email + password
+  POST /api/auth/login            — email + password
+  POST /api/auth/telegram         — Telegram Login Widget (creates or logs in)
+  POST /api/auth/link             — link Telegram to existing email account
+  POST /api/auth/add-email        — add email+password to TG-only account
+  GET  /api/auth/me               — current user info
+  PUT  /api/auth/profile          — edit display_name
+  POST /api/auth/change-password  — change password (requires old)
+  POST /api/auth/remove-email     — remove email+password (TG must remain)
+  POST /api/auth/unlink-telegram  — unlink TG (email must remain)
+  POST /api/auth/delete-account   — delete user + cascade everything
+  GET  /api/auth/export           — JSON export of all user data
 """
 import urllib.parse
 from datetime import datetime
@@ -17,7 +23,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.db.models import Score, WebScore, WebUser
+from sqlalchemy import delete
+
+from app.db.models import (
+    Score,
+    WebDiaryEntry,
+    WebScore,
+    WebState,
+    WebUser,
+)
 from app.db.session import get_session
 from app.web.auth import (
     create_token,
@@ -50,6 +64,19 @@ class AddEmailIn(BaseModel):
     password: str
 
 
+class ProfileIn(BaseModel):
+    display_name: str | None = None
+
+
+class ChangePasswordIn(BaseModel):
+    old_password: str
+    new_password: str
+
+
+class DeleteAccountIn(BaseModel):
+    confirm: str  # Юзер вводит "удалить" (или email) для подтверждения.
+
+
 class TelegramAuthIn(BaseModel):
     # Accept any extra fields Telegram may send (last_name, photo_url, etc.)
     # so they're included in the hash check string
@@ -71,6 +98,7 @@ def _user_out(user: WebUser, token: str | None = None) -> dict:
         "telegram_id": user.telegram_id,
         "telegram_username": user.telegram_username,
         "telegram_first_name": user.telegram_first_name,
+        "display_name": user.display_name,
         "is_admin": user.is_admin,
     }
     if token:
@@ -218,6 +246,154 @@ async def add_email(
     await session.commit()
     await session.refresh(current_user)
     return _user_out(current_user)
+
+
+# ── Profile (display_name) ───────────────────────────────────────────────────
+
+@router.put("/profile")
+async def update_profile(
+    body: ProfileIn,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Редактируемое отображаемое имя. Пустая строка → null (фронт упадёт
+    на дефолт: telegram_first_name или часть email до @)."""
+    name = (body.display_name or "").strip()
+    current_user.display_name = name or None
+    await session.commit()
+    await session.refresh(current_user)
+    return _user_out(current_user)
+
+
+# ── Change password ──────────────────────────────────────────────────────────
+
+@router.post("/change-password")
+async def change_password(
+    body: ChangePasswordIn,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    if not current_user.password_hash:
+        raise HTTPException(400, "У этого аккаунта нет пароля")
+    if not verify_password(body.old_password, current_user.password_hash):
+        raise HTTPException(401, "Старый пароль неверный")
+    if not body.new_password or len(body.new_password) < 1:
+        raise HTTPException(400, "Новый пароль не может быть пустым")
+    current_user.password_hash = hash_password(body.new_password)
+    await session.commit()
+    return {"ok": True}
+
+
+# ── Remove email (leave TG-only account) ─────────────────────────────────────
+
+@router.post("/remove-email")
+async def remove_email(
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    if not current_user.email:
+        raise HTTPException(400, "У аккаунта и так нет email")
+    if not current_user.telegram_id:
+        raise HTTPException(
+            400, "Нельзя удалить email — это единственный способ входа. Сначала привяжи Telegram."
+        )
+    current_user.email = None
+    current_user.password_hash = None
+    await session.commit()
+    await session.refresh(current_user)
+    return _user_out(current_user)
+
+
+# ── Unlink Telegram (leave email-only account) ───────────────────────────────
+
+@router.post("/unlink-telegram")
+async def unlink_telegram(
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    if not current_user.telegram_id:
+        raise HTTPException(400, "Telegram и так не привязан")
+    if not current_user.email or not current_user.password_hash:
+        raise HTTPException(
+            400, "Нельзя отвязать Telegram — это единственный способ входа. Сначала добавь email и пароль."
+        )
+    current_user.telegram_id = None
+    current_user.telegram_username = None
+    current_user.telegram_first_name = None
+    await session.commit()
+    await session.refresh(current_user)
+    return _user_out(current_user)
+
+
+# ── Delete account ────────────────────────────────────────────────────────────
+
+@router.post("/delete-account")
+async def delete_account(
+    body: DeleteAccountIn,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Удаляет web-юзера и все его данные (state, scores, diary).
+    Бот-данные (Score/User/Answer/etc по telegram_id) НЕ трогаем —
+    они принадлежат боту, и юзер может вернуться через бота."""
+    expected = (current_user.email or "удалить").lower()
+    if (body.confirm or "").strip().lower() not in {expected, "удалить"}:
+        raise HTTPException(400, "Подтверждение не совпало")
+
+    uid = current_user.id
+    # Каскад вручную, т.к. в схеме нет ON DELETE CASCADE.
+    await session.execute(delete(WebDiaryEntry).where(WebDiaryEntry.web_user_id == uid))
+    await session.execute(delete(WebScore).where(WebScore.web_user_id == uid))
+    await session.execute(delete(WebState).where(WebState.web_user_id == uid))
+    await session.execute(delete(WebUser).where(WebUser.id == uid))
+    await session.commit()
+    return {"ok": True}
+
+
+# ── Export ────────────────────────────────────────────────────────────────────
+
+@router.get("/export")
+async def export_data(
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """JSON-дамп всех данных пользователя. Фронт сохраняет как файл."""
+    uid = current_user.id
+
+    state_row = (
+        await session.execute(select(WebState).where(WebState.web_user_id == uid))
+    ).scalar_one_or_none()
+    scores_rows = (
+        await session.execute(select(WebScore).where(WebScore.web_user_id == uid))
+    ).scalars().all()
+    diary_rows = (
+        await session.execute(select(WebDiaryEntry).where(WebDiaryEntry.web_user_id == uid))
+    ).scalars().all()
+
+    return {
+        "exported_at": datetime.utcnow().isoformat(),
+        "user": _user_out(current_user),
+        "state": {
+            "journey": state_row.journey if state_row else None,
+            "history": state_row.history if state_row else None,
+            "updated_at": state_row.updated_at.isoformat() if state_row else None,
+        },
+        "scores": [
+            {"aspect": s.aspect, "value": float(s.value), "updated_at": s.updated_at.isoformat()}
+            for s in scores_rows
+        ],
+        "diary": [
+            {
+                "id": e.id,
+                "text": e.text,
+                "aspect": e.aspect,
+                "source": e.source,
+                "extra": e.extra,
+                "created_at": e.created_at.isoformat(),
+            }
+            for e in diary_rows
+        ],
+    }
 
 
 # ── Me ────────────────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import AspectsView from './components/AspectsView/AspectsView'
 import DiaryView from './components/DiaryView/DiaryView'
 import ProgressView from './components/ProgressView/ProgressView'
 import JourneyView, { DEFAULT_JOURNEY } from './components/JourneyView/JourneyView'
+import SettingsView from './components/SettingsView/SettingsView'
 import LoadingScreen from './components/LoadingScreen/LoadingScreen'
 import AuthModal from './components/Auth/AuthModal'
 import WelcomeScreen from './components/Welcome/WelcomeScreen'
@@ -267,6 +268,7 @@ export default function App() {
             diary={diary}
             onDiaryChange={saveDiary}
             t={t}
+            isAdmin={user?.is_admin === true}
           />
         )}
 
@@ -297,6 +299,18 @@ export default function App() {
             history={history}
             scores={scores}
             t={t}
+          />
+        )}
+
+        {view === 'settings' && (
+          <SettingsView
+            user={user}
+            onUserUpdate={onAuthSuccess}
+            onAccountDeleted={() => {
+              logout()
+              setView('wheel')
+            }}
+            onLogout={logout}
           />
         )}
       </main>

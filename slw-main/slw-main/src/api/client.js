@@ -58,6 +58,41 @@ export async function linkTelegram(tgUser) {
   return request('POST', '/api/auth/link', tgUser)
 }
 
+// Добавить email+пароль к уже существующему TG-аккаунту.
+// Требует токен (юзер должен быть залогинен через TG).
+export async function addEmail(email, password) {
+  return request('POST', '/api/auth/add-email', { email, password })
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+
+export async function updateProfile({ display_name }) {
+  return request('PUT', '/api/auth/profile', { display_name })
+}
+
+export async function changePassword(oldPassword, newPassword) {
+  return request('POST', '/api/auth/change-password', {
+    old_password: oldPassword,
+    new_password: newPassword,
+  })
+}
+
+export async function removeEmail() {
+  return request('POST', '/api/auth/remove-email')
+}
+
+export async function unlinkTelegram() {
+  return request('POST', '/api/auth/unlink-telegram')
+}
+
+export async function deleteAccount(confirm) {
+  return request('POST', '/api/auth/delete-account', { confirm })
+}
+
+export async function exportData() {
+  return request('GET', '/api/auth/export')
+}
+
 export async function fetchMe() {
   return request('GET', '/api/auth/me')
 }

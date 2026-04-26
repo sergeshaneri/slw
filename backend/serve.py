@@ -18,11 +18,20 @@ log = logging.getLogger(__name__)
 
 
 async def apply_ddl() -> None:
-    """Add any missing columns that alembic can't apply due to lock issues."""
+    """Add any missing columns that alembic can't apply due to lock issues.
+
+    Каждая строка соответствует «миграции», которую alembic не катит на Railway.
+    Все ALTER должны быть идемпотентны (`IF NOT EXISTS`), чтобы перезапуски
+    контейнера не падали.
+    """
     engine = create_async_engine(settings.database_url)
     async with engine.connect() as conn:
         await conn.execute(text(
             "ALTER TABLE web_users ADD COLUMN IF NOT EXISTS display_name TEXT"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE web_users "
+            "ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false"
         ))
         await conn.commit()
     await engine.dispose()

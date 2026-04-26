@@ -90,6 +90,7 @@
 .authBlock {
   display: flex;
   align-items: center;
+  gap: 6px;
   margin-left: 12px;
 }
 

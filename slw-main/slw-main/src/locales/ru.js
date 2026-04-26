@@ -9,6 +9,7 @@ export const ru = {
     aspects: '⬡ Аспекты',
     diary: '✎ Дневник',
     progress: '↗ Прогресс',
+    settings: '⚙ Настройки',
   },
   wheel: {
     currentBalance: 'Текущий баланс',

@@ -6,7 +6,9 @@ export default function Header({ view, onViewChange, journeyPendingCount = 0, us
     { id: 'journey', label: t.nav.journey, badge: journeyPendingCount },
     { id: 'aspects', label: t.nav.aspects },
     { id: 'diary', label: t.nav.diary },
-    { id: 'progress', label: t.nav.progress }
+    { id: 'progress', label: t.nav.progress },
+    // Настройки видны только залогиненным юзерам.
+    ...(user ? [{ id: 'settings', label: t.nav.settings }] : []),
   ]
 
   return (
@@ -32,14 +34,26 @@ export default function Header({ view, onViewChange, journeyPendingCount = 0, us
 
       <div className={styles.authBlock}>
         {user ? (
-          <button
-            type="button"
-            onClick={onLogout}
-            className={styles.authBtn}
-            title={user.email ?? user.name ?? 'Профиль'}
-          >
-            {user.name || user.email?.split('@')[0] || 'Профиль'} · выйти
-          </button>
+          <>
+            {!user.email && onLogin && (
+              <button
+                type="button"
+                onClick={onLogin}
+                className={styles.authBtn}
+                title="Добавить email и пароль к аккаунту"
+              >
+                + email
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onLogout}
+              className={styles.authBtn}
+              title={user.email ?? user.telegram_first_name ?? 'Профиль'}
+            >
+              {user.telegram_first_name || user.email?.split('@')[0] || 'Профиль'} · выйти
+            </button>
+          </>
         ) : (
           <button
             type="button"
