@@ -89,8 +89,9 @@ Config: `backend/railway.toml`
 |------|-------------|
 | `backend/serve.py` | Entry point: starts bot + uvicorn together |
 | `backend/app/web/main.py` | FastAPI app, CORS, router registration |
-| `backend/app/web/routes/auth.py` | Auth: register, login, Telegram OAuth, link, me |
+| `backend/app/web/routes/auth.py` | Auth + account settings: register, login, TG OAuth, link, add-email, profile, change-password, remove-email, unlink-tg, delete-account, export, me |
 | `backend/app/web/routes/` | scores, diary, state, sync routes |
+| `backend/app/scripts/promote_admin.py` | One-shot CLI: `python -m app.scripts.promote_admin --email ...` to set `is_admin=true` |
 | `backend/app/db/models.py` | SQLAlchemy models (bot tables + web_users/state/scores/diary) |
 | `backend/app/config.py` | Settings from env vars (bot_token, database_url, secret_key) |
 | `slw-main/slw-main/src/App.jsx` | Root: auth gate, data loading, view routing |
@@ -128,3 +129,54 @@ JWT stored in `localStorage['slw_token']`. Three paths:
 
 Backend change → push to `slw-instruct` → Railway auto-deploys  
 Frontend change → push to `slw-instruct` + `npm run deploy` in `slw-main/slw-main/`
+
+### Schema migrations workflow
+
+**Alembic on Railway is dead** (см. gotcha). Файлы в `alembic/versions/*.py` существуют для документации и локальной разработки, но Railway их не выполняет.
+
+For new columns, the only working path is `serve.py:apply_ddl()`:
+
+```python
+await conn.execute(text(
+    "ALTER TABLE foo ADD COLUMN IF NOT EXISTS bar TEXT"
+))
+```
+
+Все ALTER должны быть идемпотентны (`IF NOT EXISTS`), потому что `apply_ddl()` запускается на каждом старте контейнера. Когда добавляешь новое поле в SQLAlchemy-модель — сразу же добавь соответствующий ALTER в `apply_ddl`. Иначе бэк упадёт, как только код начнёт читать это поле с прода.
+
+**Для новых таблиц / FK / индексов** проверенного пути пока нет: либо psql через Railway dashboard, либо реализовать `CREATE TABLE IF NOT EXISTS` через `apply_ddl`.
+
+### Admin / dev panel
+
+`web_users.is_admin BOOLEAN` — гейт для dev-панели в JourneyView (skip step, autofill survey, fill all skills, jump levels, reset). Видна только в `view='journey'` правый-нижний угол как FAB 🛠.
+
+Поставить флаг:
+```sql
+UPDATE web_users SET is_admin = true WHERE email = '...';
+```
+Или через `python -m app.scripts.promote_admin --email ...` (Railway CLI / Run command).
+
+Фронт читает `user.is_admin` из `/auth/me`. После апдейта на бэке — релогин не нужен, достаточно перезагрузить вкладку.
+
+### Journey content versioning
+
+`slw-main/.../JourneyView/JourneyView.jsx → CONTENT_VERSION` (число). Бампать, когда меняешь L0/L1 markdown-контент так, что старая чат-история юзера ломается под новые тексты.
+
+`migrateState()` сравнивает сохранённый `contentVersion` с текущим. При несовпадении — сбрасывает `messages`, `completedScripts`, `pendingTasks`, но сохраняет XP / streak / stardust / totalCompleted / lastActiveDate.
+
+Без бампа юзер с кэшированным state увидит новые тексты, патченные в старую историю — визуально каша.
+
+### Frontend conventions
+
+- **CSS Modules** — каждый компонент рядом с `.module.css`. Глобальный CSS — только в `index.css` и `App.module.css`.
+- **`?raw` markdown imports** — journey-контент (`bs-l0.md`, `bs-l1.md`, `surveys.md`, `onboarding.md`, `SCRIPT_GUIDELINES.md`) импортируется как сырой текст, парсится модулями `parseScripts.js` / `parseSurveys.js`. **Source of truth — `.md` файлы**, не JS-объекты.
+- **Locale** — `src/locales/ru.js`, проп `t` в компонентах. Только русский, и большая часть текста всё равно захардкожена в JSX. Полноценная i18n далеко.
+- **Storage** — JWT в `localStorage['slw_token']`. Префикс `whl_*` (whl_scores и т.п.) — наследие гостевого режима, сейчас не используется (WelcomeScreen требует логин).
+
+### Hardcoded values worth knowing
+
+- `auth.py:FRONTEND_URL = "https://sergeshaneri.github.io/slw"` — куда редиректит `/telegram-redirect` после OAuth.
+- `auth.py:telegram_start` — `origin` и `return_to` URLs захардкожены.
+- `AuthModal.jsx` — `data-telegram-login="skb_coach_bot"` (username бота для Login Widget).
+
+Если меняешь домен фронта или username бота — все три места надо синхронить.
