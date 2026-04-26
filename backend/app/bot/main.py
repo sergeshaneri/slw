@@ -11,7 +11,7 @@ from telegram.ext import (
 )
 
 from app.bot.fsm import IN_SCRIPT, WAITING_EXERCISE_ACK, WAITING_OPEN_ANSWER, WAITING_SCORE, WAITING_THEORY_NOTE
-from app.bot.handlers.admin import cmd_reload
+from app.bot.handlers.admin import cmd_reload, cmd_reset
 from app.bot.handlers.note import cmd_note
 from app.bot.handlers.profile import cmd_profile, on_profile_resume
 from app.bot.handlers.progress import cmd_progress
@@ -46,6 +46,7 @@ def run() -> None:
     # Global handlers (outside conversation)
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("reload", cmd_reload))
+    app.add_handler(CommandHandler("reset", cmd_reset))
     app.add_handler(CommandHandler("profile", cmd_profile))
     app.add_handler(CommandHandler("note", cmd_note))
     app.add_handler(CommandHandler("progress", cmd_progress))
