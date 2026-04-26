@@ -1,11 +1,17 @@
 from datetime import datetime
 
 from sqlalchemy import select
-from telegram import Update
+from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from app.db.models import User, UserState
 from app.db.session import AsyncSessionLocal
+
+MAIN_KEYBOARD = ReplyKeyboardMarkup(
+    [["Продолжить", "Профиль"]],
+    resize_keyboard=True,
+    one_time_keyboard=False,
+)
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -25,15 +31,18 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             session.add(state)
         else:
             state = await session.get(UserState, tg_user.id)
-            if state:
+            if state is None:
+                state = UserState(user_id=tg_user.id, last_active_at=datetime.utcnow())
+                session.add(state)
+            else:
                 state.last_active_at = datetime.utcnow()
 
         await session.commit()
 
     name = tg_user.first_name or "друг"
     await update.message.reply_text(
-        f"Привет, {name}! 👋\n\n"
-        "Я SLW-коуч — помогу тебе исследовать Соционическое Колесо Баланса.\n\n"
-        "Начнём с Белой Сенсорики (БС) — Уровень 0.\n"
-        "Готов? Напиши /go чтобы начать."
+        f"Привет, {name}!\n\n"
+        "Я СКБ-коуч — помогу тебе исследовать Соционическое Колесо Баланса.\n\n"
+        "Напиши /go чтобы начать путешествие.",
+        reply_markup=MAIN_KEYBOARD,
     )

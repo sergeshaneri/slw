@@ -1,8 +1,10 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, ForeignKey, Integer, Numeric, SmallInteger, Text
-from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMPTZ
+from sqlalchemy import BigInteger, ForeignKey, Integer, Numeric, SmallInteger, Text, TIMESTAMP
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+TZ = TIMESTAMP(timezone=True)
 
 
 class Base(DeclarativeBase):
@@ -16,7 +18,7 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(Text, nullable=True)
     first_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     language_code: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
 
 
 class UserState(Base):
@@ -27,7 +29,7 @@ class UserState(Base):
     current_level: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     current_step_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     streak_days: Mapped[int] = mapped_column(Integer, default=0)
-    last_active_at: Mapped[datetime | None] = mapped_column(TIMESTAMPTZ, nullable=True)
+    last_active_at: Mapped[datetime | None] = mapped_column(TZ, nullable=True)
 
 
 class ScriptStep(Base):
@@ -54,7 +56,7 @@ class Answer(Base):
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
     value_num: Mapped[float | None] = mapped_column(Numeric, nullable=True)
     value_choice: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
 
 
 class DiaryEntry(Base):
@@ -64,8 +66,9 @@ class DiaryEntry(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"))
     text: Mapped[str] = mapped_column(Text)
     aspect: Mapped[str | None] = mapped_column(Text, nullable=True)
-    source: Mapped[str] = mapped_column(Text, default="bot")  # 'bot' / 'web'
-    created_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, default=datetime.utcnow)
+    source: Mapped[str] = mapped_column(Text, default="bot")  # 'bot' / 'web' / 'theory'
+    step_id: Mapped[str | None] = mapped_column(Text, ForeignKey("script_steps.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
 
 
 class Score(Base):
@@ -74,7 +77,7 @@ class Score(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), primary_key=True)
     aspect: Mapped[str] = mapped_column(Text, primary_key=True)
     value: Mapped[float] = mapped_column(Numeric(3, 1))
-    updated_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
 
 
 class Achievement(Base):
@@ -82,4 +85,4 @@ class Achievement(Base):
 
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), primary_key=True)
     code: Mapped[str] = mapped_column(Text, primary_key=True)
-    unlocked_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, default=datetime.utcnow)
+    unlocked_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
