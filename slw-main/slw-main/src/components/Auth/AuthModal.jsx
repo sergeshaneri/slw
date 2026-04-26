@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { login, register, telegramAuth, linkTelegram } from '../../api/client'
+import { login, register, linkTelegram } from '../../api/client'
 import styles from './AuthModal.module.css'
 
 /**
@@ -30,26 +30,33 @@ export default function AuthModal({ onSuccess, onClose, user = null }) {
     script.setAttribute('data-radius', '8')
     script.setAttribute('data-request-access', 'write')
     script.setAttribute('data-userpic', 'false')
-    script.setAttribute('data-onauth', '__slwTgAuth(user)')
+    const apiBase = import.meta.env.VITE_API_URL ?? ''
+    if (user) {
+      // Link flow: existing email account → link Telegram via POST
+      // Keep callback approach since user is already authenticated
+      script.setAttribute('data-onauth', '__slwTgLink(user)')
+      window.__slwTgLink = async (tgUser) => {
+        setError('')
+        setLoading(true)
+        try {
+          const data = await linkTelegram(tgUser)
+          onSuccess(data)
+        } catch (e) {
+          setError(e.message)
+        } finally {
+          setLoading(false)
+        }
+      }
+    } else {
+      // Login flow: redirect-based (works on mobile)
+      script.setAttribute('data-auth-url', `${apiBase}/api/auth/telegram-redirect`)
+    }
     script.async = true
     tgRef.current.appendChild(script)
 
-    // Global callback that Telegram widget calls
-    window.__slwTgAuth = async (tgUser) => {
-      setError('')
-      setLoading(true)
-      try {
-        const action = user ? linkTelegram : telegramAuth
-        const data = await action(tgUser)
-        onSuccess(data)
-      } catch (e) {
-        setError(e.message)
-      } finally {
-        setLoading(false)
-      }
+    return () => {
+      delete window.__slwTgLink
     }
-
-    return () => { delete window.__slwTgAuth }
   }, [user, onSuccess])
 
   async function handleSubmit(e) {

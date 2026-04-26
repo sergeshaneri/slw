@@ -8,7 +8,8 @@ Auth routes:
 """
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +25,8 @@ from app.web.auth import (
 from app.web.deps import get_current_user
 
 router = APIRouter(prefix="/auth")
+
+FRONTEND_URL = "https://sergeshaneri.github.io/slw"
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -60,6 +63,7 @@ def _user_out(user: WebUser, token: str | None = None) -> dict:
         "telegram_id": user.telegram_id,
         "telegram_username": user.telegram_username,
         "telegram_first_name": user.telegram_first_name,
+        "is_admin": user.is_admin,
     }
     if token:
         out["token"] = token
@@ -186,3 +190,44 @@ async def link_telegram(
 @router.get("/me")
 async def me(current_user: WebUser = Depends(get_current_user)) -> dict:
     return _user_out(current_user)
+
+
+# ── Telegram redirect (mobile-friendly auth flow) ────────────────────────────
+# Used with data-auth-url on the Login Widget — Telegram redirects here with
+# auth params in the query string. We verify, create/find user, then redirect
+# back to the frontend with a JWT token in the URL.
+
+@router.get("/telegram-redirect")
+async def telegram_redirect(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> RedirectResponse:
+    params = dict(request.query_params)
+    if not verify_telegram_auth(params):
+        raise HTTPException(400, "Invalid Telegram auth data")
+
+    tg_id = int(params["id"])
+    first_name = params.get("first_name", "")
+    username = params.get("username")
+
+    user = (
+        await session.execute(select(WebUser).where(WebUser.telegram_id == tg_id))
+    ).scalar_one_or_none()
+
+    if not user:
+        user = WebUser(
+            telegram_id=tg_id,
+            telegram_username=username,
+            telegram_first_name=first_name,
+            created_at=datetime.utcnow(),
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+    else:
+        user.telegram_username = username
+        user.telegram_first_name = first_name
+        await session.commit()
+
+    token = create_token(user.id)
+    return RedirectResponse(f"{FRONTEND_URL}?token={token}")

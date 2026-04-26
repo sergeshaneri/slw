@@ -102,4 +102,4 @@ export async function postDiaryEntry({ text, aspect, source = 'web', extra }) {
   return request('POST', '/api/diary', { text, aspect, source, extra })
 }
 
-export { getToken }
+export { getToken, setToken }
