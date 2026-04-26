@@ -17,12 +17,24 @@ _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # ── Passwords ────────────────────────────────────────────────────────────────
 
+def _truncate_for_bcrypt(s: str) -> str:
+    """bcrypt поддерживает максимум 72 байта (UTF-8). Старые версии passlib
+    обрезали тихо, новые — крашатся. Чтобы не зависеть от этого — обрезаем
+    сами. Лимит 72 — стандарт bcrypt."""
+    encoded = s.encode("utf-8")
+    if len(encoded) <= 72:
+        return s
+    # Обрезаем по байтам, потом аккуратно декодим обратно (на случай если
+    # последний байт — половина мультибайтного символа).
+    return encoded[:72].decode("utf-8", errors="ignore")
+
+
 def hash_password(plain: str) -> str:
-    return _pwd.hash(plain)
+    return _pwd.hash(_truncate_for_bcrypt(plain))
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return _pwd.verify(plain, hashed)
+    return _pwd.verify(_truncate_for_bcrypt(plain), hashed)
 
 
 # ── JWT ──────────────────────────────────────────────────────────────────────
