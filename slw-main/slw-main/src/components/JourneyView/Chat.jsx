@@ -4,11 +4,15 @@ import styles from './JourneyView.module.css'
 
 export default function Chat({
   state, accent, chatRef, inputRef, isTyping,
-  inputVal, setInputVal, currentScript, scripts, onAction, onSend,
+  inputVal, setInputVal, currentScript, scripts, resolveScript, onAction, onSend,
   onOpenProfile, onOpenTasks, pendingCount = 0,
   aspectName, planet
 }) {
-  const scriptById = (id) => scripts?.find(s => s.id === id)
+  // Резолвер из props учитывает level, fallback на текущие scripts.
+  const lookup = (m) => {
+    if (resolveScript) return resolveScript(m.scriptId, m.level)
+    return scripts?.find(s => s.id === m.scriptId) ?? null
+  }
 
   return (
     <>
@@ -38,7 +42,7 @@ export default function Chat({
       <div className={styles.chatScroll} ref={chatRef}>
         {state.messages.map(m => {
           if (m.kind === 'script') {
-            const sc = scriptById(m.scriptId)
+            const sc = lookup(m)
             if (!sc) return null
             return <ScriptCard key={m.id} script={sc} />
           }

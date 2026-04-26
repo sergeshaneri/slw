@@ -340,3 +340,35 @@ IDLE
 - заглушка FastAPI `/healthz`
 
 Это ~1 день. После этого — первый script, handlers, FSM.
+
+
+## Рекомендации для параллельной работы над ботом и бэкендом
+
+**Сразу (15 минут):**
+1. Бот в @BotFather: `/newbot` → имя → username `slw_coach_bot` или подобное. Токен в `.env` (`BOT_TOKEN=…`).
+2. Postgres локально через Docker: `docker run -d --name slw-pg -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:16`
+3. Поставь `uv` (быстрая замена pip): `pipx install uv` или скрипт с astral.sh.
+
+**Зависимости в `pyproject.toml`:**
+- `python-telegram-bot[ext]==21.*`
+- `fastapi`, `uvicorn[standard]`
+- `sqlalchemy[asyncio]>=2.0`, `asyncpg`, `alembic`
+- `pydantic-settings`, `sentry-sdk[fastapi]`
+- dev: `pytest`, `pytest-asyncio`, `ruff`, `pyright`
+
+**Скелет:** как в [ARCHITECTURE.md §4](slw-slw-instruct/ARCHITECTURE.md#4-структура-репозитория-после-mvp).
+
+**Порядок:**
+1. День 1: репо + Postgres работает + первая SQLAlchemy-модель `User` + alembic init
+2. День 2: миграция со всеми 7 таблицами из §5; бот отвечает `/start` и создаёт юзера в БД
+3. День 3: FastAPI с `/healthz` + `/api/me`
+4. День 3-4: парсер md (Python-копия моего JS парсера, формат одинаковый — **один `bs-l0.md` читают и web, и бот**)
+5. День 4-7: FSM путешествия в боте
+
+**Чего не делать:**
+- `.env` в гите. Всегда `.env.example` + `.gitignore`.
+- `psycopg2` синхронный. Только `asyncpg` через SQLAlchemy async.
+- Шарить state в памяти между ботом и web. Только через БД.
+- Откладывать миграции «потом сделаю». Делай alembic с первой таблицы.
+
+**Установи pgvector сразу:** `CREATE EXTENSION vector;` в БД при инициализации. Embeddings понадобятся для ИИ-фич, не придётся мигрировать на ходу.

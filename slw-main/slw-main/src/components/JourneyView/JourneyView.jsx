@@ -12,7 +12,10 @@ import styles from './JourneyView.module.css'
 // Версия контента уровня. При несовпадении с сохранённой в state
 // чат-история сбрасывается, чтобы юзер увидел новые тексты с начала
 // (статистика — XP/streak/totalCompleted — сохраняется).
-export const CONTENT_VERSION = 2
+//
+// 3 — добавлен level в script-сообщения (для разрешения коллизий
+// ID между уровнями: T-1 в L0 ≠ T-1 в L1).
+export const CONTENT_VERSION = 3
 
 export const DEFAULT_JOURNEY = {
   screen: 'onboarding',
@@ -105,6 +108,18 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   const aspectIntro = currentJourney?.intro ?? []
   const accent = ASPECT_COLORS[state.currentAspect] ?? '#4cc9f0'
 
+  // Лукап скрипта по {scriptId, level} — нужен в чате для архивных
+  // сообщений: T-1 в L0 ≠ T-1 в L1, ID может повторяться между
+  // уровнями. Без level сообщения из L0 после перехода на L1
+  // показали бы L1-текст.
+  const resolveScript = useCallback((scriptId, level) => {
+    const lvl = level ?? state.currentLevel
+    const lvlScripts = currentJourney?.levels?.[lvl]?.scripts ?? scripts
+    return lvlScripts.find(s => s.id === scriptId) ?? null
+  }, [currentJourney, scripts, state.currentLevel])
+
+  const nextLevel = currentJourney?.levels?.[state.currentLevel + 1] ?? null
+
   // Первый скрол после mount/смены экрана — мгновенный, чтобы юзер
   // сразу видел последние сообщения. Дальше — плавный.
   const isFirstScroll = useRef(true)
@@ -174,11 +189,11 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       currentScriptIndex: index,
       currentScriptId: script.id,
       awaitingInput: null,
-      // Архивируем скрипт в историю чата — чтобы при пролистывании
-      // вверх юзер видел все пройденные карточки.
+      // Архивируем скрипт в историю чата с level — чтобы lookup всегда
+      // находил правильный текст, даже если ID совпадают между уровнями.
       messages: [
         ...s.messages,
-        { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: script.id }
+        { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: script.id, level: s.currentLevel }
       ]
     }))
   }, [scripts, setState])
@@ -211,7 +226,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         currentScriptIndex: 0,
         currentScriptId: scripts[0]?.id ?? null,
         messages: scripts[0]
-          ? [...s.messages, { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: scripts[0].id }]
+          ? [...s.messages, { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: scripts[0].id, level: 0 }]
           : s.messages
       }))
     }
@@ -330,6 +345,25 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setState(DEFAULT_JOURNEY)
   }, [])
 
+  // Переход на следующий уровень. Сохраняет всю историю сообщений
+  // (с level=прошлый), добавляет первый скрипт нового уровня.
+  const handleNextLevel = useCallback(() => {
+    const next = currentJourney?.levels?.[state.currentLevel + 1]
+    if (!next) return
+    const firstScript = next.scripts?.[0]
+    setState(s => ({
+      ...s,
+      currentLevel: s.currentLevel + 1,
+      currentScriptIndex: 0,
+      currentScriptId: firstScript?.id ?? null,
+      screen: 'chat',
+      awaitingInput: null,
+      messages: firstScript
+        ? [...s.messages, { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: firstScript.id, level: s.currentLevel + 1 }]
+        : s.messages
+    }))
+  }, [currentJourney, state.currentLevel])
+
   const goToScreen = useCallback((screen) => {
     setState(s => ({ ...s, screen }))
   }, [setState])
@@ -365,6 +399,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           setInputVal={setInputVal}
           currentScript={currentScript}
           scripts={scripts}
+          resolveScript={resolveScript}
           onAction={handleScriptAction}
           onSend={handleSend}
           onOpenProfile={() => goToScreen('profile')}
@@ -381,6 +416,8 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           accent={accent}
           completeText={currentLevel?.complete?.text ?? ''}
           onProfile={() => goToScreen('profile')}
+          nextLevelTitle={nextLevel?.title}
+          onNextLevel={nextLevel ? handleNextLevel : null}
         />
       )}
 

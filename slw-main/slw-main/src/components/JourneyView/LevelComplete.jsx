@@ -1,6 +1,6 @@
 import styles from './JourneyView.module.css'
 
-export default function LevelComplete({ state, accent, completeText, onProfile }) {
+export default function LevelComplete({ state, accent, completeText, onProfile, nextLevelTitle, onNextLevel }) {
   return (
     <>
       <div className={styles.topbar}>
@@ -35,7 +35,12 @@ export default function LevelComplete({ state, accent, completeText, onProfile }
           </div>
         </div>
 
-        <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`} onClick={onProfile}>
+        {onNextLevel && (
+          <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`} onClick={onNextLevel}>
+            Перейти на «{nextLevelTitle ?? 'следующий уровень'}»
+          </button>
+        )}
+        <button type="button" className={`${styles.btn} ${onNextLevel ? styles.btnGhost : styles.btnPrimary} ${styles.btnFull}`} onClick={onProfile}>
           Посмотреть профиль
         </button>
       </div>

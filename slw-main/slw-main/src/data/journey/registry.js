@@ -1,9 +1,13 @@
 // Реестр путешествий по аспектам.
 //
-// Сейчас доступна только БС (Terra Harmonia) с уровнем 0.
+// Сейчас доступны: БС — уровни 0 и 1.
 // Остальные 7 аспектов — заглушки с пометкой «скоро».
 
-import { BS_ASPECT_INTRO, BS_LEVEL_0_SCRIPTS, BS_LEVEL_0_COMPLETE } from './aspects/bs'
+import {
+  BS_ASPECT_INTRO,
+  BS_LEVEL_0_SCRIPTS, BS_LEVEL_0_COMPLETE,
+  BS_LEVEL_1_SCRIPTS, BS_LEVEL_1_COMPLETE
+} from './aspects/bs'
 import { ASPECT_KEYS, ASPECT_DATA, ASPECT_REALMS, ASPECT_COLORS } from '../aspects'
 
 const PLANETS = {
@@ -27,6 +31,11 @@ export const JOURNEYS = {
         title: 'Первый контакт',
         scripts: BS_LEVEL_0_SCRIPTS,
         complete: BS_LEVEL_0_COMPLETE
+      },
+      1: {
+        title: 'Карта и намерение',
+        scripts: BS_LEVEL_1_SCRIPTS,
+        complete: BS_LEVEL_1_COMPLETE
       }
     }
   }
