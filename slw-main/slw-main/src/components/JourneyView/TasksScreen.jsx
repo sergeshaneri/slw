@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import styles from './JourneyView.module.css'
 
 const TYPE_LABEL = {
@@ -8,7 +9,7 @@ const TYPE_LABEL = {
   reflection: 'Рефлексия'
 }
 
-export default function TasksScreen({ tasks, scripts, accent, onComplete, onDelete, onBack }) {
+export default function TasksScreen({ tasks, scripts, accent, onComplete, onCompleteWithNote, onDelete, onBack }) {
   const items = tasks
     .map(t => ({ task: t, script: scripts.find(s => s.id === t.scriptId) }))
     .filter(x => x.script)
@@ -34,37 +35,100 @@ export default function TasksScreen({ tasks, scripts, accent, onComplete, onDele
         ) : (
           <ul className={styles.tasksList}>
             {items.map(({ task, script }) => (
-              <li key={task.id} className={styles.taskItem}>
-                <div className={styles.taskHead}>
-                  <span className={styles.taskKind}>{TYPE_LABEL[script.type] ?? 'Шаг'}</span>
-                  <span className={`${styles.taskStatus} ${task.status === 'taken' ? styles.taskStatusTaken : styles.taskStatusDeferred}`}>
-                    {task.status === 'taken' ? 'взято' : 'отложено'}
-                  </span>
-                </div>
-                <div className={styles.taskTitle}>{script.title}</div>
-                <div className={styles.taskBody}>{script.text}</div>
-                <div className={styles.taskActions}>
-                  <button
-                    type="button"
-                    className={`${styles.btn} ${styles.btnAccent}`}
-                    onClick={() => onComplete(script)}
-                    style={{ '--accent': accent }}
-                  >
-                    Выполнено
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.btn} ${styles.btnGhost}`}
-                    onClick={() => onDelete(script.id)}
-                  >
-                    Удалить
-                  </button>
-                </div>
-              </li>
+              <TaskItem
+                key={task.id}
+                task={task}
+                script={script}
+                accent={accent}
+                onComplete={onComplete}
+                onCompleteWithNote={onCompleteWithNote}
+                onDelete={onDelete}
+              />
             ))}
           </ul>
         )}
       </div>
     </>
+  )
+}
+
+function TaskItem({ task, script, accent, onComplete, onCompleteWithNote, onDelete }) {
+  const [noteOpen, setNoteOpen] = useState(false)
+  const [noteText, setNoteText] = useState('')
+
+  const handleSaveWithNote = () => {
+    if (!noteText.trim()) return
+    onCompleteWithNote(script, noteText.trim())
+    setNoteText('')
+    setNoteOpen(false)
+  }
+
+  return (
+    <li className={styles.taskItem}>
+      <div className={styles.taskHead}>
+        <span className={styles.taskKind}>{TYPE_LABEL[script.type] ?? 'Шаг'}</span>
+        <span className={`${styles.taskStatus} ${task.status === 'taken' ? styles.taskStatusTaken : styles.taskStatusDeferred}`}>
+          {task.status === 'taken' ? 'взято' : 'отложено'}
+        </span>
+      </div>
+      <div className={styles.taskTitle}>{script.title}</div>
+      <div className={styles.taskBody}>{script.text}</div>
+
+      {!noteOpen ? (
+        <div className={styles.taskActions}>
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnAccent}`}
+            onClick={() => onComplete(script)}
+            style={{ '--accent': accent }}
+          >
+            Выполнено
+          </button>
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnPrimary}`}
+            onClick={() => setNoteOpen(true)}
+            style={{ '--accent': accent }}
+          >
+            Выполнено + записать
+          </button>
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnGhost}`}
+            onClick={() => onDelete(script.id)}
+          >
+            Удалить
+          </button>
+        </div>
+      ) : (
+        <div className={styles.taskNoteForm}>
+          <textarea
+            className={styles.taskNoteTextarea}
+            value={noteText}
+            onChange={e => setNoteText(e.target.value)}
+            placeholder="Что заметил во время выполнения, какие ощущения, инсайты…"
+            autoFocus
+          />
+          <div className={styles.taskNoteActions}>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnPrimary}`}
+              onClick={handleSaveWithNote}
+              disabled={!noteText.trim()}
+              style={{ '--accent': accent }}
+            >
+              Сохранить и закрыть
+            </button>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnGhost}`}
+              onClick={() => { setNoteOpen(false); setNoteText('') }}
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
+    </li>
   )
 }

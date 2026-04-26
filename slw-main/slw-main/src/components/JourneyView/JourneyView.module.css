@@ -841,6 +841,38 @@
 
 .taskActions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.taskNoteForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.taskNoteTextarea {
+  width: 100%;
+  min-height: 100px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.55;
+  resize: vertical;
+  outline: none;
+  transition: border-color .15s;
+}
+
+.taskNoteTextarea:focus { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.taskNoteTextarea::placeholder { color: var(--text-dim); }
+
+.taskNoteActions {
+  display: flex;
   gap: 8px;
 }
 

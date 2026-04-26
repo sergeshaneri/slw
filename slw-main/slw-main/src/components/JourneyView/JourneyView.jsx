@@ -9,6 +9,11 @@ import JourneyProfile from './JourneyProfile'
 import TasksScreen from './TasksScreen'
 import styles from './JourneyView.module.css'
 
+// Версия контента уровня. При несовпадении с сохранённой в state
+// чат-история сбрасывается, чтобы юзер увидел новые тексты с начала
+// (статистика — XP/streak/totalCompleted — сохраняется).
+export const CONTENT_VERSION = 2
+
 export const DEFAULT_JOURNEY = {
   screen: 'onboarding',
   onboardingStep: 0,
@@ -24,7 +29,36 @@ export const DEFAULT_JOURNEY = {
   stardust: 0,
   streak: 0,
   totalCompleted: 0,
-  lastActiveDate: null
+  lastActiveDate: null,
+  contentVersion: CONTENT_VERSION
+}
+
+// Миграция при загрузке: если у юзера сохранён старый контент,
+// сбрасываем чат и счётчик скриптов, но сохраняем XP/streak/dust
+// и pendingTasks (их id всё ещё совпадают со скриптами).
+function migrateState(stored) {
+  if (!stored) return DEFAULT_JOURNEY
+  if (stored.contentVersion === CONTENT_VERSION) {
+    return {
+      ...DEFAULT_JOURNEY,
+      ...stored,
+      messages: stored.messages ?? [],
+      completedScripts: stored.completedScripts ?? [],
+      pendingTasks: stored.pendingTasks ?? []
+    }
+  }
+  // Контент уровня обновился — сбрасываем сценарий, оставляем достижения
+  return {
+    ...DEFAULT_JOURNEY,
+    xp: stored.xp ?? 0,
+    stardust: stored.stardust ?? 0,
+    streak: stored.streak ?? 0,
+    totalCompleted: stored.totalCompleted ?? 0,
+    lastActiveDate: stored.lastActiveDate ?? null,
+    completedScripts: [],
+    pendingTasks: [],
+    contentVersion: CONTENT_VERSION
+  }
 }
 
 const todayStr = () => new Date().toISOString().slice(0, 10)
@@ -41,15 +75,8 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   // Локальный стейт — единственный source of truth.
   // Наружу синхронизируется через useEffect (ниже), чтобы persist-callback
   // не ломал серийные setState в одном хэндлере.
-  // Мердж с DEFAULT_JOURNEY гарантирует, что у старых юзеров в storage
-  // присутствуют все поля (например, pendingTasks мог быть добавлен позже).
-  const [state, setState] = useState(() => ({
-    ...DEFAULT_JOURNEY,
-    ...(extJourney ?? {}),
-    messages: extJourney?.messages ?? [],
-    completedScripts: extJourney?.completedScripts ?? [],
-    pendingTasks: extJourney?.pendingTasks ?? []
-  }))
+  // migrateState учитывает разные версии контента и пропавшие поля.
+  const [state, setState] = useState(() => migrateState(extJourney))
 
   // Стабильная ссылка на текущий persist-callback (он пересоздаётся
   // каждый рендер родителя — через ref эффект-зависимость остаётся чистой).
@@ -227,10 +254,15 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       } else addUserMessage('Позже')
 
       if (isDeferrable && (action === 'done' || action === 'next')) {
+        // Задание уехало в активные — XP даётся только при реальном выполнении
+        // (через TasksScreen или через answer_number / complete_exercise).
         enqueueTask(script, action === 'done' ? 'taken' : 'deferred')
+      } else if ((script.type === 'theory' || script.type === 'word') && action === 'next') {
+        // Чтение теории/слова дня — единственный «терминальный» вариант через next.
+        awardXP(script.xp, script.stardust ?? 0, script.id)
       }
+      // Для reflection skip и любого «next» на отложенных — XP не даём.
 
-      awardXP(script.xp, script.stardust ?? 0, script.id)
       setTimeout(() => deliverScript(state.currentScriptIndex + 1), 600)
     } else if (action === 'answer_number') {
       setState(s => ({ ...s, awaitingInput: 'number' }))
@@ -374,6 +406,24 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           onComplete={(script) => {
             removePending(script.id)
             awardXP(script.xp ?? 0, script.stardust ?? 0, script.id)
+          }}
+          onCompleteWithNote={(script, noteText) => {
+            removePending(script.id)
+            awardXP(script.xp ?? 0, script.stardust ?? 0, script.id)
+            onDiaryChange([
+              {
+                id: Date.now(),
+                date: new Date().toLocaleDateString('ru-RU'),
+                ts: Date.now(),
+                aspect: state.currentAspect,
+                text: noteText,
+                source: 'journey',
+                scriptId: script.id,
+                promptTitle: script.title,
+                prompt: script.text
+              },
+              ...(diary ?? [])
+            ])
           }}
           onDelete={(scriptId) => removePending(scriptId)}
         />
