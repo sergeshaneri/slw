@@ -9,7 +9,7 @@ from app.bot.fsm import IN_SCRIPT, WAITING_EXERCISE_ACK, WAITING_OPEN_ANSWER, WA
 from app.content.loader import Step, first_step, get_step, next_step
 from app.db.models import Answer, DiaryEntry, UserState
 from app.db.session import AsyncSessionLocal
-from app.bot.handlers.start import MAIN_KEYBOARD
+from app.bot.handlers.start import MAIN_KEYBOARD, SCORE_KEYBOARD, REFLECTION_KEYBOARD
 
 TG_MAX = 4000
 
@@ -95,7 +95,7 @@ async def show_step(update: Update, context: ContextTypes.DEFAULT_TYPE, step: St
 
     elif step.kind in QUESTION_KINDS:
         await msg.reply_text(header + body)
-        await msg.reply_text("Введи число от 1 до 10:", reply_markup=MAIN_KEYBOARD)
+        await msg.reply_text("Введи число от 1 до 10:", reply_markup=SCORE_KEYBOARD)
         return WAITING_SCORE
 
     elif step.kind in EXERCISE_KINDS:
@@ -105,7 +105,7 @@ async def show_step(update: Update, context: ContextTypes.DEFAULT_TYPE, step: St
 
     elif step.kind in REFLECTION_KINDS:
         await msg.reply_text(header + body)
-        await msg.reply_text("Напиши свои мысли:", reply_markup=MAIN_KEYBOARD)
+        await msg.reply_text("Напиши свои мысли:", reply_markup=REFLECTION_KEYBOARD)
         return WAITING_OPEN_ANSWER
 
     return IN_SCRIPT
@@ -121,12 +121,10 @@ async def cmd_go(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     state = await _get_state(update.effective_user.id)
     if not state or not state.current_step_id:
-        await update.message.reply_text("Ты ещё не начал. Напиши /go.")
-        return IN_SCRIPT
+        return await cmd_go(update, context)
     step = get_step(state.current_step_id)
     if not step:
-        await update.message.reply_text("Напиши /go чтобы начать.")
-        return IN_SCRIPT
+        return await cmd_go(update, context)
     return await show_step(update, context, step)
 
 
@@ -198,15 +196,6 @@ async def on_score_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return IN_SCRIPT
     return await show_step(update, context, nxt)
 
-
-async def on_continue_in_score(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text("Введи число от 1 до 10, чтобы продолжить.")
-    return WAITING_SCORE
-
-
-async def on_continue_in_open(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text("Напиши свои мысли, чтобы продолжить.")
-    return WAITING_OPEN_ANSWER
 
 
 async def on_note_btn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

@@ -13,6 +13,18 @@ MAIN_KEYBOARD = ReplyKeyboardMarkup(
     one_time_keyboard=False,
 )
 
+SCORE_KEYBOARD = ReplyKeyboardMarkup(
+    [["Ввести оценку", "Профиль"]],
+    resize_keyboard=True,
+    one_time_keyboard=False,
+)
+
+REFLECTION_KEYBOARD = ReplyKeyboardMarkup(
+    [["Написать ответ", "Профиль"]],
+    resize_keyboard=True,
+    one_time_keyboard=False,
+)
+
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     tg_user = update.effective_user

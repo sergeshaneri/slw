@@ -19,8 +19,6 @@ from app.bot.handlers.script import (
     cmd_go,
     cmd_resume,
     on_ack_button,
-    on_continue_in_open,
-    on_continue_in_score,
     on_next_button,
     on_note_btn,
     on_open_answer,
@@ -66,14 +64,12 @@ def run() -> None:
                 CallbackQueryHandler(on_note_btn, pattern=r"^note_btn:"),
             ],
             WAITING_OPEN_ANSWER: [
-                MessageHandler(BTN_CONTINUE & ~filters.COMMAND, on_continue_in_open),
                 MessageHandler(filters.TEXT & ~filters.COMMAND & ~BTN_PROFILE & ~BTN_CONTINUE, on_open_answer),
             ],
             WAITING_EXERCISE_ACK: [
                 CallbackQueryHandler(on_ack_button, pattern=r"^ack:"),
             ],
             WAITING_SCORE: [
-                MessageHandler(BTN_CONTINUE & ~filters.COMMAND, on_continue_in_score),
                 MessageHandler(filters.TEXT & ~filters.COMMAND & ~BTN_PROFILE & ~BTN_CONTINUE, on_score_answer),
             ],
             WAITING_THEORY_NOTE: [
