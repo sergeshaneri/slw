@@ -1,7 +1,8 @@
 import subprocess
 import sys
 
-from sqlalchemy import delete, update
+from sqlalchemy import delete
+from sqlalchemy import update as sa_update
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -35,7 +36,7 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await session.execute(delete(Answer).where(Answer.user_id == user_id))
         await session.execute(delete(DiaryEntry).where(DiaryEntry.user_id == user_id))
         await session.execute(
-            update(UserState).where(UserState.user_id == user_id).values(current_step_id=None)
+            sa_update(UserState).where(UserState.user_id == user_id).values(current_step_id=None)
         )
         await session.commit()
 
