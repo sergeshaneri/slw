@@ -7,6 +7,7 @@ import ProgressView from './components/ProgressView/ProgressView'
 import JourneyView, { DEFAULT_JOURNEY } from './components/JourneyView/JourneyView'
 import LoadingScreen from './components/LoadingScreen/LoadingScreen'
 import AuthModal from './components/Auth/AuthModal'
+import WelcomeScreen from './components/Welcome/WelcomeScreen'
 import { ASPECT_KEYS } from './data/aspects'
 import { ru } from './locales/ru'
 import { useAuth } from './hooks/useAuth'
@@ -215,8 +216,10 @@ export default function App() {
 
   // Пока useAuth проверяет токен — короткий лоадер, чтобы не моргало.
   if (authLoading) return <LoadingScreen text="Загрузка..." />
+  // Незалогиненный юзер — экран приветствия.
+  if (!user) return <WelcomeScreen onAuthSuccess={onAuthSuccess} />
   // Залогиненный юзер ждёт данные с бэка — лоадер.
-  if (user && dataLoading) return <LoadingScreen text={t.loading} />
+  if (dataLoading) return <LoadingScreen text={t.loading} />
 
   return (
     <div className={styles.app}>
