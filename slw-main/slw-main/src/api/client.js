@@ -66,6 +66,12 @@ export function logout() {
   setToken(null)
 }
 
+// ── Sync ──────────────────────────────────────────────────────────────────────
+
+export async function fetchBotState() {
+  return request('GET', '/api/sync/bot-state')
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 export async function fetchState() {

@@ -14,6 +14,7 @@ import {
   fetchState, saveState,
   fetchScores, saveScores as apiSaveScores,
   fetchDiary, postDiaryEntry,
+  fetchBotState,
 } from './api/client'
 import styles from './App.module.css'
 
@@ -66,13 +67,37 @@ export default function App() {
   const loadFromApi = async () => {
     setDataLoading(true)
     try {
-      const [stateRes, scoresRes, diaryRes] = await Promise.all([
+      const [stateRes, scoresRes, diaryRes, botSync] = await Promise.all([
         fetchState(),
         fetchScores(),
         fetchDiary(),
+        fetchBotState().catch(() => null),
       ])
 
-      if (stateRes.journey) setJourney(stateRes.journey)
+      // Bot position: apply aspect/level/streak from bot if Telegram is linked
+      // and web journey is still at default (hasn't been started in web yet)
+      let journeyOverride = stateRes.journey ?? null
+      if (botSync?.linked && botSync.state) {
+        const bs = botSync.state
+        const isWebFresh = !journeyOverride || journeyOverride.screen === 'onboarding'
+        if (isWebFresh && bs.current_aspect) {
+          journeyOverride = {
+            ...(journeyOverride ?? {}),
+            currentAspect: bs.current_aspect,
+            currentLevel: bs.current_level ?? 0,
+            // Sync streak from bot if higher
+            streak: Math.max(journeyOverride?.streak ?? 0, bs.streak_days ?? 0),
+          }
+        } else if (bs.streak_days) {
+          // Always sync streak
+          journeyOverride = {
+            ...(journeyOverride ?? {}),
+            streak: Math.max(journeyOverride?.streak ?? 0, bs.streak_days),
+          }
+        }
+      }
+
+      if (journeyOverride) setJourney(j => ({ ...j, ...journeyOverride }))
       if (stateRes.history) setHistory(stateRes.history)
       if (Object.keys(scoresRes).length > 0) setScores(scoresRes)
 
