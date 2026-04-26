@@ -7,6 +7,8 @@ class Settings(BaseSettings):
 
     bot_token: str
     database_url: str
+    secret_key: str = "change-me-in-production"
+    web_origin: str = "*"          # CORS origin, e.g. https://yourname.github.io
     sentry_dsn: str = ""
     debug: bool = False
 

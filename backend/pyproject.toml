@@ -11,6 +11,9 @@ dependencies = [
     "alembic>=1.13",
     "pydantic-settings>=2.2",
     "sentry-sdk[fastapi]>=2.0",
+    "python-jose[cryptography]>=3.3",
+    "passlib[bcrypt]>=1.7",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]

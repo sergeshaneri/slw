@@ -56,9 +56,10 @@ async def cmd_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             short = e.text[:120] + "…" if len(e.text) > 120 else e.text
             lines.append(f"  • {short}")
 
-    markup = InlineKeyboardMarkup([[
-        InlineKeyboardButton("▶ Продолжить путешествие", callback_data="profile:resume")
-    ]])
+    markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton("▶ Продолжить путешествие", callback_data="profile:resume")],
+        [InlineKeyboardButton("🌐 Открыть на сайте", url="https://sergeshaneri.github.io/slw/")],
+    ])
 
     await update.message.reply_text("\n".join(lines), reply_markup=markup)
 

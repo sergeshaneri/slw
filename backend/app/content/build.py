@@ -3,6 +3,7 @@ CLI: python -m app.content.build
 Reads:
   - slw-main/src/data/journey/onboarding.js       (4 onboarding steps)
   - slw-main/src/data/journey/aspects/bs-l0.md    (BS L0 content)
+  - slw-main/src/data/journey/aspects/bs-l1.md    (BS L1 content)
 Writes app/content/compiled.json.
 """
 import json
@@ -98,7 +99,8 @@ def _make_step(*, id, aspect, level, ord, kind, title, body_md,
     }
 
 
-def _parse_bs_md(path: Path, aspect: str, level: int, start_ord: int) -> list[dict]:
+def _parse_bs_md(path: Path, aspect: str, level: int, start_ord: int,
+                 open_question_prefixes: set[str] | None = None) -> list[dict]:
     text = path.read_text(encoding="utf-8")
     sections = _split_sections(text)
     steps = []
@@ -138,6 +140,11 @@ def _parse_bs_md(path: Path, aspect: str, level: int, start_ord: int) -> list[di
         if not m:
             continue
         sid, kind, title = m.group(1), m.group(2), m.group(3).strip()
+        # В L1 B-шаги — открытый текстовый ответ, не числовой
+        if open_question_prefixes:
+            prefix = re.match(r'^([A-Z]+)', sid)
+            if prefix and prefix.group(1) in open_question_prefixes and kind == "question":
+                kind = "reflection"
         script_count += 1
 
         main_body, fups = _extract_follow_ups(body)
@@ -167,6 +174,12 @@ def build() -> None:
 
     bs_steps = _parse_bs_md(WEB_DATA / "aspects" / "bs-l0.md", "БС", 0, start_ord=10)
     all_steps.extend(bs_steps)
+
+    bs1_steps = _parse_bs_md(
+        WEB_DATA / "aspects" / "bs-l1.md", "БС", 1, start_ord=200,
+        open_question_prefixes={"B"},
+    )
+    all_steps.extend(bs1_steps)
 
     # Assign clean global ord
     all_steps.sort(key=lambda s: s["ord"])

@@ -86,3 +86,52 @@ class Achievement(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), primary_key=True)
     code: Mapped[str] = mapped_column(Text, primary_key=True)
     unlocked_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+# ── Web auth ────────────────────────────────────────────────────────────────
+
+class WebUser(Base):
+    """Identity for web users (email/password or Telegram Login Widget)."""
+    __tablename__ = "web_users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Linked Telegram account (set after "Connect Telegram" flow)
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True, nullable=True)
+    telegram_username: Mapped[str | None] = mapped_column(Text, nullable=True)
+    telegram_first_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class WebState(Base):
+    """Stores the full whl_journey + whl_history JSON blobs for a web user."""
+    __tablename__ = "web_state"
+
+    web_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("web_users.id"), primary_key=True)
+    journey: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    history: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class WebScore(Base):
+    """Aspect scores for web users (mirrors bot's scores table)."""
+    __tablename__ = "web_scores"
+
+    web_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("web_users.id"), primary_key=True)
+    aspect: Mapped[str] = mapped_column(Text, primary_key=True)
+    value: Mapped[float] = mapped_column(Numeric(3, 1))
+    updated_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class WebDiaryEntry(Base):
+    """Diary entries created from the web app."""
+    __tablename__ = "web_diary_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    web_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("web_users.id"))
+    text: Mapped[str] = mapped_column(Text)
+    aspect: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str] = mapped_column(Text, default="web")
+    extra: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # promptTitle, prompt, scriptId, etc.
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
