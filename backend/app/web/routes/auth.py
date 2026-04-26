@@ -409,20 +409,24 @@ async def me(current_user: WebUser = Depends(get_current_user)) -> dict:
 
 @router.get("/telegram-start")
 async def telegram_start() -> RedirectResponse:
+    """Запускает OAuth-редирект через oauth.telegram.org.
+
+    Telegram не позволяет cross-origin `return_to` — фронт на github.io,
+    а Railway на другом домене. Поэтому return_to опускаем и полагаемся
+    на fallback-режим: Telegram редиректит пользователя обратно на
+    `origin` с `#tgAuthResult=BASE64_JSON` в hash. Фронт (useAuth.js)
+    парсит fragment и шлёт POST на /api/auth/telegram.
+
+    `origin` должен включать `/slw/`, чтобы Telegram редиректил на
+    страницу приложения (а не в корень `sergeshaneri.github.io`, где
+    ничего нет). bot's setdomain в BotFather проверяется по host —
+    путь не мешает.
+    """
     bot_id = settings.bot_token.split(":")[0]
-    origin = urllib.parse.quote("https://sergeshaneri.github.io", safe="")
-    return_to = urllib.parse.quote(
-        "https://slw-production.up.railway.app/api/auth/telegram-redirect",
-        safe="",
-    )
-    # No embed=1: that's the iframe-widget mode and falls back to redirecting
-    # the browser to `origin` with #tgAuthResult=... when there's no parent
-    # frame, ignoring return_to. Without it, oauth.telegram.org does a normal
-    # server-side redirect to return_to with auth params as query string.
+    origin = urllib.parse.quote("https://sergeshaneri.github.io/slw/", safe="")
     tg_url = (
         f"https://oauth.telegram.org/auth"
-        f"?bot_id={bot_id}&origin={origin}"
-        f"&return_to={return_to}&request_access=write"
+        f"?bot_id={bot_id}&origin={origin}&request_access=write"
     )
     return RedirectResponse(tg_url)
 
