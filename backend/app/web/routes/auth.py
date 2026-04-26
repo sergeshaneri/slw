@@ -415,10 +415,14 @@ async def telegram_start() -> RedirectResponse:
         "https://slw-production.up.railway.app/api/auth/telegram-redirect",
         safe="",
     )
+    # No embed=1: that's the iframe-widget mode and falls back to redirecting
+    # the browser to `origin` with #tgAuthResult=... when there's no parent
+    # frame, ignoring return_to. Without it, oauth.telegram.org does a normal
+    # server-side redirect to return_to with auth params as query string.
     tg_url = (
         f"https://oauth.telegram.org/auth"
         f"?bot_id={bot_id}&origin={origin}"
-        f"&return_to={return_to}&embed=1&request_access=write"
+        f"&return_to={return_to}&request_access=write"
     )
     return RedirectResponse(tg_url)
 

@@ -6,13 +6,29 @@
  * If it fails (401 / no token) → user is null → show AuthModal.
  */
 import { useState, useEffect, useCallback } from 'react'
-import { fetchMe, logout as apiLogout, getToken, setToken } from '../api/client'
+import { fetchMe, logout as apiLogout, getToken, setToken, telegramAuth } from '../api/client'
 
 export function useAuth() {
   const [user, setUser] = useState(null)        // null = not loaded yet | false = unauthenticated
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Fallback for Telegram widget-mode callback: result arrives as
+    // #tgAuthResult=base64(JSON) in the hash. Decode and exchange for a JWT
+    // via /api/auth/telegram. Normal flow uses ?token= (handled below).
+    const hashMatch = window.location.hash.match(/tgAuthResult=([^&]+)/)
+    if (hashMatch) {
+      try {
+        const tgUser = JSON.parse(atob(decodeURIComponent(hashMatch[1])))
+        window.history.replaceState({}, '', window.location.pathname + window.location.search)
+        telegramAuth(tgUser)
+          .then(setUser)
+          .catch(() => setUser(false))
+          .finally(() => setLoading(false))
+        return
+      } catch { /* bad payload — fall through to normal flow */ }
+    }
+
     // Handle Telegram redirect flow (mobile): ?token=JWT in URL
     const urlParams = new URLSearchParams(window.location.search)
     const urlToken = urlParams.get('token')
