@@ -13,15 +13,20 @@ import styles from './JourneyView.module.css'
 // чат-история сбрасывается, чтобы юзер увидел новые тексты с начала
 // (статистика — XP/streak/totalCompleted — сохраняется).
 //
-// 3 — добавлен level в script-сообщения (для разрешения коллизий
-// ID между уровнями: T-1 в L0 ≠ T-1 в L1).
-export const CONTENT_VERSION = 3
+// 3 — добавлен level в script-sообщения (для разрешения коллизий
+//     ID между уровнями: T-1 в L0 ≠ T-1 в L1).
+// 4 — переписан L1 «Карта и намерение» (25 шагов, 5×5, вопросы
+//     формата B). Параллельно введён mode (core/pool), но он
+//     совместим со старым state через спред DEFAULT_JOURNEY и
+//     сам по себе бампа не требовал.
+export const CONTENT_VERSION = 4
 
 export const DEFAULT_JOURNEY = {
   screen: 'onboarding',
   onboardingStep: 0,
   currentAspect: 'БС',
   currentLevel: 0,
+  mode: 'core',                 // 'core' | 'pool' — какой массив шагов сейчас в игре
   messages: [],
   currentScriptIndex: 0,
   currentScriptId: null,
@@ -104,7 +109,11 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
   const currentJourney = getJourney(state.currentAspect)
   const currentLevel = currentJourney?.levels?.[state.currentLevel]
-  const scripts = currentLevel?.scripts ?? []
+  const coreScripts = currentLevel?.core ?? currentLevel?.scripts ?? []
+  const poolScripts = currentLevel?.pool ?? []
+  // В режиме pool отдаём pool-массив, в core — core. Активная
+  // последовательность шагов крутится только по одному из них.
+  const scripts = state.mode === 'pool' ? poolScripts : coreScripts
   const aspectIntro = currentJourney?.intro ?? []
   const accent = ASPECT_COLORS[state.currentAspect] ?? '#4cc9f0'
 
@@ -112,13 +121,20 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   // сообщений: T-1 в L0 ≠ T-1 в L1, ID может повторяться между
   // уровнями. Без level сообщения из L0 после перехода на L1
   // показали бы L1-текст.
+  // Ищем и в core, и в pool целевого уровня — pool-сообщения
+  // тоже архивируются в общий messages.
   const resolveScript = useCallback((scriptId, level) => {
     const lvl = level ?? state.currentLevel
-    const lvlScripts = currentJourney?.levels?.[lvl]?.scripts ?? scripts
-    return lvlScripts.find(s => s.id === scriptId) ?? null
+    const lvlData = currentJourney?.levels?.[lvl]
+    const inCore = lvlData?.core?.find(s => s.id === scriptId)
+    if (inCore) return inCore
+    const inPool = lvlData?.pool?.find(s => s.id === scriptId)
+    if (inPool) return inPool
+    return scripts.find(s => s.id === scriptId) ?? null
   }, [currentJourney, scripts, state.currentLevel])
 
   const nextLevel = currentJourney?.levels?.[state.currentLevel + 1] ?? null
+  const hasPool = poolScripts.length > 0
 
   // Первый скрол после mount/смены экрана — мгновенный, чтобы юзер
   // сразу видел последние сообщения. Дальше — плавный.
@@ -286,11 +302,11 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       setState(s => ({ ...s, awaitingInput: 'text' }))
       setTimeout(() => inputRef.current?.focus(), 50)
     } else if (action === 'complete_exercise') {
-      addUserMessage('Выполнил')
-      await addBotMessage('Отлично. Каждое маленькое действие — это шаг к большим переменам.', 500)
-      removePending(script.id)
-      awardXP(script.xp, script.stardust ?? 0, script.id)
-      setTimeout(() => deliverScript(state.currentScriptIndex + 1), 600)
+      // Открываем поле для обязательного комментария. XP и переход к
+      // следующему скрипту произойдут после ввода в handleSend
+      // (ветка awaitingInput === 'exercise_note').
+      setState(s => ({ ...s, awaitingInput: 'exercise_note' }))
+      setTimeout(() => inputRef.current?.focus(), 50)
     }
   }, [scripts, state.currentScriptIndex, addBotMessage, addUserMessage, awardXP, deliverScript, enqueueTask, removePending])
 
@@ -319,7 +335,10 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       addUserMessage(val)
       setInputVal('')
       setState(s => ({ ...s, awaitingInput: null }))
-      await addBotMessage('Спасибо за честный ответ. Это важная работа.', 600)
+      // Нейтральная реплика без похвалы за факт ответа (см. §3.6).
+      // Для open-ended вопросов целей и для рефлексий используем одну формулировку.
+      const ack = script?.type === 'question' ? 'Записано в карту.' : 'Записано в дневник.'
+      await addBotMessage(ack, 500)
       // Сайд-эффект: рефлексия → запись в дневник с подписью «на какой вопрос ответ».
       onDiaryChange([
         {
@@ -338,6 +357,30 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       if (script?.id) removePending(script.id)
       awardXP(script?.xp ?? 10, 0, script?.id ?? null)
       setTimeout(() => deliverScript(state.currentScriptIndex + 1), 700)
+    } else if (state.awaitingInput === 'exercise_note') {
+      // Завершение упражнения с обязательным комментарием.
+      // Пустая строка отсекается общим guard'ом в начале handleSend.
+      addUserMessage(val)
+      setInputVal('')
+      setState(s => ({ ...s, awaitingInput: null }))
+      await addBotMessage('Записано в дневник.', 500)
+      onDiaryChange([
+        {
+          id: Date.now(),
+          date: new Date().toLocaleDateString('ru-RU'),
+          ts: Date.now(),
+          aspect: state.currentAspect,
+          text: val,
+          source: 'journey',
+          scriptId: script?.id ?? null,
+          promptTitle: script?.title ?? null,
+          prompt: script?.text ?? null
+        },
+        ...(diary ?? [])
+      ])
+      if (script?.id) removePending(script.id)
+      awardXP(script?.xp ?? 15, script?.stardust ?? 0, script?.id ?? null)
+      setTimeout(() => deliverScript(state.currentScriptIndex + 1), 700)
     }
   }, [inputVal, state.awaitingInput, state.currentScriptIndex, state.currentAspect, scripts, scores, diary, addBotMessage, addUserMessage, awardXP, deliverScript, onDiaryChange, onScoresChange, removePending])
 
@@ -347,13 +390,15 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
   // Переход на следующий уровень. Сохраняет всю историю сообщений
   // (с level=прошлый), добавляет первый скрипт нового уровня.
+  // Сбрасывает mode в 'core' — новый уровень всегда стартует с core.
   const handleNextLevel = useCallback(() => {
     const next = currentJourney?.levels?.[state.currentLevel + 1]
     if (!next) return
-    const firstScript = next.scripts?.[0]
+    const firstScript = (next.core ?? next.scripts ?? [])[0]
     setState(s => ({
       ...s,
       currentLevel: s.currentLevel + 1,
+      mode: 'core',
       currentScriptIndex: 0,
       currentScriptId: firstScript?.id ?? null,
       screen: 'chat',
@@ -363,6 +408,26 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         : s.messages
     }))
   }, [currentJourney, state.currentLevel])
+
+  // Войти в pool текущего уровня — после прохождения core пользователь
+  // выбрал «копать здесь дальше». Сбрасывает индекс и доставляет первый
+  // pool-скрипт. Переход на следующий уровень потом всё ещё доступен —
+  // на levelcomplete после прохождения pool, либо из профиля.
+  const handleStayPool = useCallback(() => {
+    if (poolScripts.length === 0) return
+    const first = poolScripts[0]
+    setState(s => ({
+      ...s,
+      mode: 'pool',
+      currentScriptIndex: 0,
+      currentScriptId: first?.id ?? null,
+      screen: 'chat',
+      awaitingInput: null,
+      messages: first
+        ? [...s.messages, { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: first.id, level: s.currentLevel }]
+        : s.messages
+    }))
+  }, [poolScripts, setState])
 
   const goToScreen = useCallback((screen) => {
     setState(s => ({ ...s, screen }))
@@ -405,7 +470,9 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           onOpenProfile={() => goToScreen('profile')}
           onOpenTasks={() => goToScreen('tasks')}
           pendingCount={state.pendingTasks?.length ?? 0}
-          aspectName={currentJourney ? `Уровень ${state.currentLevel} · ${currentLevel?.title}` : 'Путешествие'}
+          aspectName={currentJourney
+            ? `Уровень ${state.currentLevel} · ${currentLevel?.title}${state.mode === 'pool' ? ' · доп. задания' : ''}`
+            : 'Путешествие'}
           planet={currentJourney?.planet}
         />
       )}
@@ -415,9 +482,15 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           state={state}
           accent={accent}
           completeText={currentLevel?.complete?.text ?? ''}
+          levelTitle={currentLevel?.title}
+          mode={state.mode}
           onProfile={() => goToScreen('profile')}
           nextLevelTitle={nextLevel?.title}
           onNextLevel={nextLevel ? handleNextLevel : null}
+          // Кнопку «копать здесь» показываем только если уровень был
+          // пройден в core-режиме и в этом уровне есть непустой pool.
+          onStayPool={state.mode === 'core' && hasPool ? handleStayPool : null}
+          poolCount={poolScripts.length}
         />
       )}
 
@@ -437,13 +510,11 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       {state.screen === 'tasks' && (
         <TasksScreen
           tasks={state.pendingTasks ?? []}
-          scripts={scripts}
+          // Лукап тасок ищет по scriptId — в задачах могут быть и core,
+          // и pool скрипты, поэтому отдаём объединённый массив.
+          scripts={[...coreScripts, ...poolScripts]}
           accent={accent}
           onBack={() => goToScreen('chat')}
-          onComplete={(script) => {
-            removePending(script.id)
-            awardXP(script.xp ?? 0, script.stardust ?? 0, script.id)
-          }}
           onCompleteWithNote={(script, noteText) => {
             removePending(script.id)
             awardXP(script.xp ?? 0, script.stardust ?? 0, script.id)

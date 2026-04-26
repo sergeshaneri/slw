@@ -9,17 +9,30 @@ export default function ScriptButtons({ script, onAction }) {
           <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => act('next')}>Далее</button>
         </div>
       )
-    case 'question':
+    case 'question': {
+      // Формат A: шкала 1–10 + followUp (есть в скрипте) → числовой ввод.
+      // Формат B: open-ended (followUp нет) → текстовый ввод. См.
+      // SCRIPT_GUIDELINES §4.2.
+      const hasScale = !!script.followUp
       return (
         <div className={styles.btnRow}>
-          <button type="button" className={`${styles.btn} ${styles.btnAccent}`} onClick={() => act('answer_number')}>Ответить (1–10)</button>
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnAccent}`}
+            onClick={() => act(hasScale ? 'answer_number' : 'answer_text')}
+          >
+            {hasScale ? 'Ответить (1–10)' : 'Ответить'}
+          </button>
           <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => act('next')}>Напомнить позже</button>
         </div>
       )
+    }
     case 'exercise':
       return (
         <div className={styles.btnRow}>
-          <button type="button" className={`${styles.btn} ${styles.btnAccent}`} onClick={() => act('complete_exercise')}>Выполнил сейчас</button>
+          {/* «Выполнил + записать» — после нажатия откроется поле для
+              обязательного комментария. См. handleScriptAction. */}
+          <button type="button" className={`${styles.btn} ${styles.btnAccent}`} onClick={() => act('complete_exercise')}>Выполнил + записать</button>
           <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => act('done')}>Взял задание</button>
           <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => act('next')}>Позже</button>
         </div>

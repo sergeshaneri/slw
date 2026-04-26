@@ -73,7 +73,9 @@ export default function Chat({
           <div className={styles.msg}>
             <div className={styles.msgAvatar}>◐</div>
             <div className={`${styles.msgBubble} ${styles.msgHint}`}>
-              {state.awaitingInput === 'number' ? 'Введи число от 1 до 10' : 'Напиши свой ответ'}
+              {state.awaitingInput === 'number' && 'Введи число от 1 до 10'}
+              {state.awaitingInput === 'exercise_note' && 'Кратко опиши, как прошло упражнение'}
+              {state.awaitingInput === 'text' && 'Напиши свой ответ'}
             </div>
           </div>
         )}
@@ -84,7 +86,13 @@ export default function Chat({
           <textarea
             ref={inputRef}
             className={styles.inputField}
-            placeholder={state.awaitingInput === 'number' ? 'Число 1–10…' : 'Твой ответ…'}
+            placeholder={
+              state.awaitingInput === 'number'
+                ? 'Число 1–10…'
+                : state.awaitingInput === 'exercise_note'
+                  ? 'Что вышло…'
+                  : 'Твой ответ…'
+            }
             value={inputVal}
             onChange={e => setInputVal(e.target.value)}
             onKeyDown={e => {

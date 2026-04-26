@@ -84,6 +84,9 @@ export function parseJourneyMd(md) {
       xp: metadata.xp ? parseInt(metadata.xp, 10) : 0
     }
     if (metadata.stardust) script.stardust = parseInt(metadata.stardust, 10)
+    // pool: true — шаг идёт в опциональный пул уровня (см. SCRIPT_GUIDELINES §8).
+    // Любое значение, кроме строго "false", считаем за true.
+    if (metadata.pool && metadata.pool.toLowerCase() !== 'false') script.pool = true
 
     if (followUps.length > 0) {
       script.followUp = (ans) => {

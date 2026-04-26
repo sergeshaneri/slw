@@ -9,7 +9,7 @@ const TYPE_LABEL = {
   reflection: 'Рефлексия'
 }
 
-export default function TasksScreen({ tasks, scripts, accent, onComplete, onCompleteWithNote, onDelete, onBack }) {
+export default function TasksScreen({ tasks, scripts, accent, onCompleteWithNote, onDelete, onBack }) {
   const items = tasks
     .map(t => ({ task: t, script: scripts.find(s => s.id === t.scriptId) }))
     .filter(x => x.script)
@@ -40,7 +40,6 @@ export default function TasksScreen({ tasks, scripts, accent, onComplete, onComp
                 task={task}
                 script={script}
                 accent={accent}
-                onComplete={onComplete}
                 onCompleteWithNote={onCompleteWithNote}
                 onDelete={onDelete}
               />
@@ -52,7 +51,7 @@ export default function TasksScreen({ tasks, scripts, accent, onComplete, onComp
   )
 }
 
-function TaskItem({ task, script, accent, onComplete, onCompleteWithNote, onDelete }) {
+function TaskItem({ task, script, accent, onCompleteWithNote, onDelete }) {
   const [noteOpen, setNoteOpen] = useState(false)
   const [noteText, setNoteText] = useState('')
 
@@ -76,21 +75,15 @@ function TaskItem({ task, script, accent, onComplete, onCompleteWithNote, onDele
 
       {!noteOpen ? (
         <div className={styles.taskActions}>
+          {/* Запись комментария обязательна — кнопка открывает форму
+              с textarea, без записи закрыть нельзя (кроме «Отмена»). */}
           <button
             type="button"
             className={`${styles.btn} ${styles.btnAccent}`}
-            onClick={() => onComplete(script)}
-            style={{ '--accent': accent }}
-          >
-            Выполнено
-          </button>
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnPrimary}`}
             onClick={() => setNoteOpen(true)}
             style={{ '--accent': accent }}
           >
-            Выполнено + записать
+            Выполнить + записать
           </button>
           <button
             type="button"
