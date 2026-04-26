@@ -20,7 +20,7 @@ const FEATURES = [
   },
 ]
 
-export default function WelcomeScreen({ onAuthSuccess }) {
+export default function WelcomeScreen({ onAuthSuccess, onContinueAsGuest }) {
   const [showAuth, setShowAuth] = useState(false)
 
   return (
@@ -35,7 +35,7 @@ export default function WelcomeScreen({ onAuthSuccess }) {
         </p>
 
         <div className={styles.actions}>
-          <button className={styles.btnPrimary} onClick={() => setShowAuth(true)}>
+          <button className={styles.btnPrimary} onClick={onContinueAsGuest}>
             Начать бесплатно
           </button>
           <button className={styles.btnSecondary} onClick={() => setShowAuth(true)}>
@@ -54,7 +54,9 @@ export default function WelcomeScreen({ onAuthSuccess }) {
         ))}
       </div>
 
-      <button className={styles.bottomCta} onClick={() => setShowAuth(true)}>
+      {/* Нижняя CTA уводит сразу в Путешествие. Если юзер не залогинен —
+          App покажет AuthModal на handleViewChange (путешествие гейтится). */}
+      <button className={styles.bottomCta} onClick={onContinueAsGuest}>
         Начать путешествие →
       </button>
 

@@ -53,6 +53,12 @@ export default function App() {
   const [selectedAspect, setSelectedAspect] = useState(null)
   const [dataLoading, setDataLoading] = useState(false)
   const [showAuth, setShowAuth] = useState(false)
+  // welcomeDismissed: гость нажал «Начать бесплатно» и вошёл в приложение
+  // без аутентификации. Запоминаем в localStorage, чтобы при следующем
+  // визите сразу попадал на колесо. Сбрасывается на logout (см. ниже).
+  const [welcomeDismissed, setWelcomeDismissed] = useState(
+    () => localStorage.getItem('welcome_seen') === '1'
+  )
   const t = ru
 
   // Загрузка данных при изменении статуса auth.
@@ -202,6 +208,10 @@ export default function App() {
   const handleAuthSuccess = (userData) => {
     onAuthSuccess(userData)
     setShowAuth(false)
+    // После любого успешного логина — Welcome больше не показываем,
+    // даже если юзер потом разлогинится (у него уже есть прогресс).
+    localStorage.setItem('welcome_seen', '1')
+    setWelcomeDismissed(true)
   }
 
   const handleViewChange = (newView) => {
@@ -217,10 +227,22 @@ export default function App() {
 
   // Пока useAuth проверяет токен — короткий лоадер, чтобы не моргало.
   if (authLoading) return <LoadingScreen text="Загрузка..." />
-  // Незалогиненный юзер — экран приветствия.
-  if (!user) return <WelcomeScreen onAuthSuccess={onAuthSuccess} />
+  // Гость, который ещё не нажал «Начать бесплатно» — экран приветствия.
+  // После клика на «Начать бесплатно» — выпадает в общее приложение
+  // (данные пишутся в localStorage, путешествие гейтится).
+  if (!user && !welcomeDismissed) {
+    return (
+      <WelcomeScreen
+        onAuthSuccess={onAuthSuccess}
+        onContinueAsGuest={() => {
+          localStorage.setItem('welcome_seen', '1')
+          setWelcomeDismissed(true)
+        }}
+      />
+    )
+  }
   // Залогиненный юзер ждёт данные с бэка — лоадер.
-  if (dataLoading) return <LoadingScreen text={t.loading} />
+  if (user && dataLoading) return <LoadingScreen text={t.loading} />
 
   return (
     <div className={styles.app}>
