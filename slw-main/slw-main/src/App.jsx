@@ -9,7 +9,6 @@ import SettingsView from './components/SettingsView/SettingsView'
 import LoadingScreen from './components/LoadingScreen/LoadingScreen'
 import AuthModal from './components/Auth/AuthModal'
 import WelcomeScreen from './components/Welcome/WelcomeScreen'
-import Footer from './components/Footer/Footer'
 import { ASPECT_KEYS } from './data/aspects'
 import { ru } from './locales/ru'
 import { useAuth } from './hooks/useAuth'
@@ -18,7 +17,6 @@ import {
   fetchScores, saveScores as apiSaveScores,
   fetchDiary, postDiaryEntry,
   fetchBotState,
-  fetchEvents, postEvent,
 } from './api/client'
 import styles from './App.module.css'
 
@@ -61,21 +59,6 @@ export default function App() {
   const [welcomeDismissed, setWelcomeDismissed] = useState(
     () => localStorage.getItem('welcome_seen') === '1'
   )
-  // devAdmin: «пасхалочный» админский режим без бэка. Включается кликом по
-  // невидимой точке (см. ProgressView → onToggleDevAdmin). Хранится в
-  // localStorage, переживает logout и новые сессии. ИЛИ-сложение с user.is_admin.
-  const [devAdmin, setDevAdmin] = useState(
-    () => localStorage.getItem('slw_dev_admin') === '1'
-  )
-  const toggleDevAdmin = () => {
-    setDevAdmin(prev => {
-      const next = !prev
-      if (next) localStorage.setItem('slw_dev_admin', '1')
-      else localStorage.removeItem('slw_dev_admin')
-      return next
-    })
-  }
-  const isAdmin = (user?.is_admin === true) || devAdmin
   const t = ru
 
   // Загрузка данных при изменении статуса auth.
@@ -92,12 +75,11 @@ export default function App() {
   const loadFromApi = async () => {
     setDataLoading(true)
     try {
-      const [stateRes, scoresRes, diaryRes, botSync, eventsRes] = await Promise.all([
+      const [stateRes, scoresRes, diaryRes, botSync] = await Promise.all([
         fetchState(),
         fetchScores(),
         fetchDiary(),
         fetchBotState().catch(() => null),
-        fetchEvents(0).catch(() => ({ events: [] })),
       ])
 
       // Bot position: apply aspect/level/streak from bot if Telegram is linked
@@ -119,32 +101,6 @@ export default function App() {
           journeyOverride = {
             ...(journeyOverride ?? {}),
             streak: Math.max(journeyOverride?.streak ?? 0, bs.streak_days),
-          }
-        }
-      }
-
-      // Bot → Web event sync (B1): подтягиваем step_completed события из бота
-      // и обогащаем completedScripts для текущего (currentAspect, currentLevel).
-      // bot эмитит event на каждом advance в TG-чате (см. backend events.py).
-      // Группируем по (aspect, level) — потому что web хранит completedScripts
-      // как короткие ID, scoped per current aspect+level.
-      const botEvents = (eventsRes?.events ?? []).filter(
-        e => e.source === 'bot' && e.type === 'step_completed' && e.short_id
-      )
-      if (botEvents.length > 0) {
-        const aspect = journeyOverride?.currentAspect
-        const level = journeyOverride?.currentLevel ?? 0
-        if (aspect) {
-          const fromBot = botEvents
-            .filter(e => e.aspect === aspect && (e.level ?? 0) === level)
-            .map(e => e.short_id)
-          if (fromBot.length > 0) {
-            const merged = new Set(journeyOverride?.completedScripts ?? [])
-            fromBot.forEach(id => merged.add(id))
-            journeyOverride = {
-              ...(journeyOverride ?? {}),
-              completedScripts: Array.from(merged),
-            }
           }
         }
       }
@@ -222,24 +178,9 @@ export default function App() {
   }
 
   const saveJourney = async (newJourney) => {
-    // Web → Bot sync (B1+): диффим completedScripts. На каждый новый short_id
-    // эмитим step_completed-event — бот подхватит при следующем /go|/resume.
-    const prevCompleted = new Set(journey?.completedScripts ?? [])
-    const newlyCompleted = (newJourney?.completedScripts ?? [])
-      .filter(id => id && !prevCompleted.has(id))
-
     setJourney(newJourney)
     if (user) {
       try { await saveState({ journey: newJourney }) } catch (e) { console.error(e) }
-      if (newlyCompleted.length > 0 && newJourney?.currentAspect) {
-        const aspect = newJourney.currentAspect
-        const level = newJourney.currentLevel ?? 0
-        // Fire-and-forget — не блокируем UI, ошибки только в консоль.
-        newlyCompleted.forEach(short_id => {
-          postEvent({ type: 'step_completed', aspect, level, short_id })
-            .catch(e => console.error('postEvent failed:', e))
-        })
-      }
     } else {
       lsSet(LS.journey, newJourney)
     }
@@ -247,8 +188,7 @@ export default function App() {
 
   const goToJourney = async (screen) => {
     // Путешествие требует авторизации — гостям показываем AuthModal.
-    // Исключение: dev-admin (пасхалка) пускает без логина.
-    if (!user && !devAdmin) {
+    if (!user) {
       setShowAuth(true)
       return
     }
@@ -257,7 +197,7 @@ export default function App() {
   }
 
   const goToBSSurveys = async () => {
-    if (!user && !devAdmin) {
+    if (!user) {
       setShowAuth(true)
       return
     }
@@ -275,7 +215,7 @@ export default function App() {
   }
 
   const handleViewChange = (newView) => {
-    if (newView === 'journey' && !user && !devAdmin) {
+    if (newView === 'journey' && !user) {
       setShowAuth(true)
       return
     }
@@ -350,7 +290,7 @@ export default function App() {
             diary={diary}
             onDiaryChange={saveDiary}
             t={t}
-            isAdmin={isAdmin}
+            isAdmin={user?.is_admin === true}
           />
         )}
 
@@ -381,8 +321,6 @@ export default function App() {
             history={history}
             scores={scores}
             t={t}
-            onToggleDevAdmin={toggleDevAdmin}
-            devAdmin={devAdmin}
           />
         )}
 
@@ -397,8 +335,6 @@ export default function App() {
             onLogout={logout}
           />
         )}
-
-        {view !== 'journey' && <Footer />}
       </main>
     </div>
   )

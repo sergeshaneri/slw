@@ -33,32 +33,6 @@ async def apply_ddl() -> None:
             "ALTER TABLE web_users "
             "ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false"
         ))
-        # journey_events — общий event-лог bot↔web (см. models.JourneyEvent).
-        await conn.execute(text(
-            """
-            CREATE TABLE IF NOT EXISTS journey_events (
-                id           BIGSERIAL PRIMARY KEY,
-                telegram_id  BIGINT,
-                web_user_id  INTEGER,
-                source       TEXT NOT NULL,
-                type         TEXT NOT NULL,
-                aspect       TEXT,
-                level        SMALLINT,
-                short_id     TEXT,
-                step_id      TEXT,
-                payload      JSONB,
-                created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            """
-        ))
-        await conn.execute(text(
-            "CREATE INDEX IF NOT EXISTS journey_events_tg_idx "
-            "ON journey_events (telegram_id, created_at)"
-        ))
-        await conn.execute(text(
-            "CREATE INDEX IF NOT EXISTS journey_events_web_idx "
-            "ON journey_events (web_user_id, created_at)"
-        ))
         await conn.commit()
     await engine.dispose()
 

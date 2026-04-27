@@ -107,19 +107,6 @@ export async function fetchBotState() {
   return request('GET', '/api/sync/bot-state')
 }
 
-// Общий event-лог bot↔web. Возвращает { events, last_id }.
-// `sinceId` позволяет инкрементально подтягивать (пока используем 0 при каждой
-// загрузке — событий немного, всё помещается).
-export async function fetchEvents(sinceId = 0) {
-  return request('GET', `/api/events?since_id=${sinceId}`)
-}
-
-// Web → Bot: фронт пишет событие, бот его подтянет в cmd_go/cmd_resume и
-// сдвинет current_step_id вперёд. Body: { type, aspect, level, short_id }.
-export async function postEvent(event) {
-  return request('POST', '/api/events', event)
-}
-
 // ── State ─────────────────────────────────────────────────────────────────────
 
 export async function fetchState() {
