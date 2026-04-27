@@ -4,6 +4,11 @@ Leaderboard:
   GET /api/leaderboard?limit=20  — топ юзеров по XP
 
 XP = количество завершённых шагов в `journey_events` (`type='step_completed'`).
+Считается **в обоих источниках**:
+  • web — через `journey_events.web_user_id = web_users.id`
+  • bot — через `journey_events.telegram_id = web_users.telegram_id`
+    (бот пишет события только с telegram_id; маппинг через web_users)
+
 Юзеры с приватным профилем (public_profiles.is_public=false) исключаются.
 Юзеры без журнал-событий (нулевой XP) исключаются — иначе пустой список
 свежих регистраций перебивает реальных активных.
@@ -11,7 +16,7 @@ XP = количество завершённых шагов в `journey_events` 
 Эндпоинт публичный (без auth) — это «витрина» приложения.
 """
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import JourneyEvent, PublicProfile, WebUser
@@ -27,32 +32,40 @@ async def get_leaderboard(
 ) -> list:
     limit = max(1, min(limit, 100))
 
-    # Шаг 1: топ user_id по числу step_completed-событий.
-    xp_subq = (
-        select(
-            JourneyEvent.web_user_id.label("uid"),
-            func.count().label("xp"),
-        )
-        .where(
-            JourneyEvent.type == "step_completed",
-            JourneyEvent.web_user_id.is_not(None),
-        )
-        .group_by(JourneyEvent.web_user_id)
-        .subquery()
-    )
+    # JOIN web_users → journey_events по любому из ключей:
+    #   • прямой web_user_id
+    #   • telegram_id (если у юзера привязан TG)
+    # COUNT(DISTINCT id) — на случай если позже event запишется с обоими
+    # полями: не дублируем в счёте.
+    xp_col = func.count(func.distinct(JourneyEvent.id)).label("xp")
 
     rows = (
         await session.execute(
-            select(WebUser, xp_subq.c.xp, PublicProfile)
-            .join(xp_subq, WebUser.id == xp_subq.c.uid)
-            .outerjoin(PublicProfile, PublicProfile.web_user_id == WebUser.id)
-            # Если профиль явно скрыт (is_public=false) — исключаем.
-            # Если профиля нет — пускаем (по умолчанию профиль публичный).
-            .where(
-                (PublicProfile.is_public.is_(None))
-                | (PublicProfile.is_public.is_(True))
+            select(WebUser, xp_col, PublicProfile)
+            .join(
+                JourneyEvent,
+                and_(
+                    JourneyEvent.type == "step_completed",
+                    or_(
+                        JourneyEvent.web_user_id == WebUser.id,
+                        and_(
+                            WebUser.telegram_id.is_not(None),
+                            JourneyEvent.telegram_id == WebUser.telegram_id,
+                        ),
+                    ),
+                ),
             )
-            .order_by(xp_subq.c.xp.desc())
+            .outerjoin(PublicProfile, PublicProfile.web_user_id == WebUser.id)
+            # Скрытые профили исключаем; для юзеров без записи в
+            # public_profiles считаем по умолчанию публичными.
+            .where(
+                or_(
+                    PublicProfile.is_public.is_(None),
+                    PublicProfile.is_public.is_(True),
+                )
+            )
+            .group_by(WebUser.id, PublicProfile.web_user_id)
+            .order_by(xp_col.desc())
             .limit(limit)
         )
     ).all()

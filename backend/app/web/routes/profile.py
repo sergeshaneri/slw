@@ -120,21 +120,27 @@ def _display_name(user: WebUser) -> str:
     return f"user{user.id}"
 
 
-async def _xp(session: AsyncSession, web_user_id: int) -> int:
+async def _xp(session: AsyncSession, user: WebUser) -> int:
     """Серверный XP-эквивалент: количество завершённых шагов в journey_events.
 
-    Берётся ровно то, что просил юзер: «опыт пройденного в веб-чате и по
-    выполненным заданиям». Здесь событие = успешно завершённый шаг
-    (`type='step_completed'`), независимо от того, источник web или bot —
-    оба пишут в этот лог.
+    Считается по обоим ключам:
+      • journey_events.web_user_id = user.id (события от web)
+      • journey_events.telegram_id = user.telegram_id (события от бота)
+    Бот пишет только telegram_id, поэтому без этого OR XP всегда был бы 0
+    у юзеров, проходящих сценарии в TG.
     """
+    from sqlalchemy import and_, or_
+    conditions = [JourneyEvent.web_user_id == user.id]
+    if user.telegram_id:
+        conditions.append(JourneyEvent.telegram_id == user.telegram_id)
     count = (
         await session.execute(
-            select(func.count())
-            .select_from(JourneyEvent)
+            select(func.count(func.distinct(JourneyEvent.id)))
             .where(
-                JourneyEvent.web_user_id == web_user_id,
-                JourneyEvent.type == "step_completed",
+                and_(
+                    JourneyEvent.type == "step_completed",
+                    or_(*conditions),
+                )
             )
         )
     ).scalar_one()
@@ -150,7 +156,7 @@ async def _profile_payload(
     include_private: bool,
 ) -> dict:
     """Сборка JSON-ответа для GET /profile/{id} и GET /profile/me."""
-    xp = await _xp(session, target_user.id)
+    xp = await _xp(session, target_user)
     score_rows = (
         await session.execute(
             select(WebScore).where(WebScore.web_user_id == target_user.id)
