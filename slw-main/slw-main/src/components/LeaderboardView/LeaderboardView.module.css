@@ -1,0 +1,151 @@
+.container {
+  --text: #f1f2f5;
+  --text-soft: #c8cad1;
+  --text-muted: #8f929c;
+  --text-dim: #5f6169;
+  --line: rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.16);
+  --surface: #15161c;
+  --surface-2: #1c1d25;
+  --accent: #b39ddb;
+  --danger: #e57373;
+  color: var(--text);
+  max-width: 760px;
+}
+
+.titleBlock {
+  margin-bottom: 24px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.eyebrow {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+
+.subline {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.muted { color: var(--text-muted); font-size: 13px; }
+
+.error {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background: rgba(229,115,115,0.08);
+  border: 1px solid rgba(229,115,115,0.3);
+  border-radius: 8px;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.empty {
+  background: var(--surface-2);
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  padding: 28px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 50px 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.rowMe {
+  border-color: var(--accent);
+  background: rgba(179,157,219,0.05);
+}
+
+.rank {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-align: center;
+}
+
+.name {
+  background: none;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.name:hover { color: var(--accent); }
+
+.youBadge {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: rgba(179,157,219,0.1);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.focus {
+  display: flex;
+  gap: 4px;
+}
+
+.aspectChip {
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid;
+  border-radius: 12px;
+  padding: 2px 8px;
+}
+
+.xp {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  min-width: 70px;
+  text-align: right;
+}
+
+@media (max-width: 600px) {
+  .row {
+    grid-template-columns: 40px 1fr auto;
+  }
+  .focus { display: none; }
+}

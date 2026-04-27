@@ -7,10 +7,12 @@ export default function Header({ view, onViewChange, journeyPendingCount = 0, us
     { id: 'aspects', label: t.nav.aspects },
     { id: 'diary', label: t.nav.diary },
     { id: 'progress', label: t.nav.progress },
-    // Коуч виден всем; при клике без логина откроется AuthModal
-    // (логика в App.jsx:handleViewChange).
+    // Топ публичный (без auth) — виден всем.
+    { id: 'leaderboard', label: t.nav.leaderboard },
+    // Коуч и Профиль гейтятся в App.jsx:handleViewChange — без логина
+    // откроется AuthModal.
     { id: 'coach', label: t.nav.coach },
-    // Настройки видны только залогиненным юзерам.
+    ...(user ? [{ id: 'profile', label: t.nav.profile }] : []),
     ...(user ? [{ id: 'settings', label: t.nav.settings }] : []),
   ]
 

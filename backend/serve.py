@@ -99,6 +99,61 @@ async def apply_ddl() -> None:
             "but bot+web are up): %s", e
         )
 
+    # public_profiles + aspect_insights + insight_likes — community-фичи.
+    # Та же стратегия: отдельная транзакция, timeout, не ронять сервис.
+    try:
+        async with asyncio.timeout(15):
+            async with engine.connect() as conn:
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS public_profiles (
+                        web_user_id    INTEGER PRIMARY KEY,
+                        bio            TEXT,
+                        focus_aspects  JSONB,
+                        interests      JSONB,
+                        inspirations   JSONB,
+                        goals          JSONB,
+                        is_public      BOOLEAN NOT NULL DEFAULT true,
+                        updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """))
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS aspect_insights (
+                        id            BIGSERIAL PRIMARY KEY,
+                        web_user_id   INTEGER NOT NULL,
+                        aspect        TEXT NOT NULL,
+                        kind          TEXT NOT NULL,
+                        text          TEXT NOT NULL,
+                        is_public     BOOLEAN NOT NULL DEFAULT true,
+                        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS aspect_insights_user_idx "
+                    "ON aspect_insights (web_user_id, created_at DESC)"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS aspect_insights_aspect_idx "
+                    "ON aspect_insights (aspect, created_at DESC)"
+                ))
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS insight_likes (
+                        insight_id   BIGINT NOT NULL,
+                        web_user_id  INTEGER NOT NULL,
+                        created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (insight_id, web_user_id)
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS insight_likes_insight_idx "
+                    "ON insight_likes (insight_id)"
+                ))
+                await conn.commit()
+    except Exception as e:
+        log.warning(
+            "community DDL failed (profile/leaderboard disabled, "
+            "but bot+web are up): %s", e
+        )
+
     await engine.dispose()
 
 

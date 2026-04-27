@@ -10,6 +10,8 @@ export const ru = {
     diary: '✎ Дневник',
     progress: '↗ Прогресс',
     coach: '✦ Коуч',
+    profile: '☆ Профиль',
+    leaderboard: '⚜ Топ',
     settings: '⚙ Настройки',
   },
   wheel: {

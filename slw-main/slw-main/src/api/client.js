@@ -144,6 +144,42 @@ export async function postDiaryEntry({ text, aspect, source = 'web', extra }) {
   return request('POST', '/api/diary', { text, aspect, source, extra })
 }
 
+// ── Profile / community ───────────────────────────────────────────────────────
+
+export async function fetchMyProfile() {
+  return request('GET', '/api/profile/me')
+}
+
+export async function updateMyProfile(patch) {
+  return request('PUT', '/api/profile/me', patch)
+}
+
+export async function fetchPublicProfile(userId) {
+  return request('GET', `/api/profile/${userId}`)
+}
+
+export async function fetchMyInsights() {
+  return request('GET', '/api/profile/me/insights')
+}
+
+export async function postInsight({ aspect, kind = 'insight', text, isPublic = true }) {
+  return request('POST', '/api/profile/insights', {
+    aspect, kind, text, is_public: isPublic,
+  })
+}
+
+export async function deleteInsight(id) {
+  return request('DELETE', `/api/profile/insights/${id}`)
+}
+
+export async function toggleInsightLike(id) {
+  return request('POST', `/api/profile/insights/${id}/like`)
+}
+
+export async function fetchLeaderboard(limit = 20) {
+  return request('GET', `/api/leaderboard?limit=${limit}`)
+}
+
 // ── Coach (AI summon) ─────────────────────────────────────────────────────────
 
 export async function fetchCoachQuota() {

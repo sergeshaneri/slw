@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   updateProfile,
   changePassword,
@@ -6,6 +6,8 @@ import {
   unlinkTelegram,
   deleteAccount,
   exportData,
+  fetchMyProfile,
+  updateMyProfile,
 } from '../../api/client'
 import styles from './SettingsView.module.css'
 
@@ -35,6 +37,7 @@ export default function SettingsView({ user, onUserUpdate, onAccountDeleted, onL
       <h1 className={styles.title}>Настройки</h1>
 
       <ProfileSection user={user} onUserUpdate={onUserUpdate} />
+      <PrivacySection />
       <SecuritySection user={user} onUserUpdate={onUserUpdate} />
       <DataSection user={user} />
       <DangerSection
@@ -113,6 +116,66 @@ function ProfileSection({ user, onUserUpdate }) {
         {msg && <span className={styles.successMsg}>{msg}</span>}
         {err && <span className={styles.errorMsg}>{err}</span>}
       </div>
+    </section>
+  )
+}
+
+// ─── Приватность публичного профиля ───────────────────────────────────────
+
+function PrivacySection() {
+  const [isPublic, setIsPublic] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    fetchMyProfile()
+      .then(p => setIsPublic(p.is_public !== false))
+      .catch(e => setErr(e.message ?? 'Не удалось загрузить'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleToggle = async (e) => {
+    const next = e.target.checked
+    setIsPublic(next)
+    setSaving(true)
+    setErr('')
+    try {
+      await updateMyProfile({ is_public: next })
+    } catch (e) {
+      setIsPublic(!next)
+      setErr(e.message ?? 'Не удалось сохранить')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>Публичный профиль</h2>
+      {loading ? (
+        <div className={styles.hint}>Загрузка…</div>
+      ) : (
+        <>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>
+              <input
+                type="checkbox"
+                checked={!!isPublic}
+                onChange={handleToggle}
+                disabled={saving}
+                style={{ marginRight: 8 }}
+              />
+              Показывать мой профиль другим
+            </span>
+            <span className={styles.hint}>
+              Если выключено — твой профиль не появляется в топе и недоступен по ссылке.
+              Лайки и инсайты других юзеров остаются как были.
+            </span>
+          </label>
+          {err && <div className={styles.errorMsg}>{err}</div>}
+        </>
+      )}
     </section>
   )
 }

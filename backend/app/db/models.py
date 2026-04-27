@@ -186,3 +186,62 @@ class CoachCall(Base):
     tokens_out: Mapped[int | None] = mapped_column(Integer, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+# ── Public profile / community ──────────────────────────────────────────────
+# Профиль для публичной странички и лидерборда. По умолчанию is_public=true.
+# inspirations / goals хранятся как JSONB-массивы — проще, чем нормализовать
+# в отдельные таблицы.
+
+class PublicProfile(Base):
+    __tablename__ = "public_profiles"
+
+    web_user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("web_users.id"), primary_key=True
+    )
+    bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Список аспектов (1-3) на которых юзер сейчас фокусируется.
+    # Например ["БС", "ЧИ"]. Валидация на стороне роута.
+    focus_aspects: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # Свободные теги: "финансы", "дизайн", "спорт" и т.п.
+    interests: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # Карточки вдохновения: [{type, title, note, aspect?}].
+    # type ∈ {film, book, music, activity, person, other}.
+    inspirations: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # Список из ≤3 коротких целей.
+    goals: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # Опт-ин скрыть профиль и не появляться в лидерборде.
+    is_public: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    updated_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class AspectInsight(Base):
+    """Инсайт или рекомендация юзера по конкретному аспекту.
+    Другие могут лайкать (см. InsightLike). Видны только если юзер публичный
+    и `is_public` инсайта = true.
+    """
+    __tablename__ = "aspect_insights"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    web_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("web_users.id"))
+    aspect: Mapped[str] = mapped_column(Text)               # 'БС'/'ЧИ'/...
+    kind: Mapped[str] = mapped_column(Text)                 # 'insight' | 'recommendation'
+    text: Mapped[str] = mapped_column(Text)
+    is_public: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class InsightLike(Base):
+    __tablename__ = "insight_likes"
+
+    insight_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("aspect_insights.id"), primary_key=True
+    )
+    web_user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("web_users.id"), primary_key=True
+    )
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)

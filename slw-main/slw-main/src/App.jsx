@@ -6,12 +6,16 @@ import DiaryView from './components/DiaryView/DiaryView'
 import ProgressView from './components/ProgressView/ProgressView'
 import JourneyView, { DEFAULT_JOURNEY } from './components/JourneyView/JourneyView'
 import CoachView from './components/CoachView/CoachView'
+import ProfileView from './components/ProfileView/ProfileView'
+import PublicProfileView from './components/PublicProfileView/PublicProfileView'
+import LeaderboardView from './components/LeaderboardView/LeaderboardView'
 import SettingsView from './components/SettingsView/SettingsView'
 import LoadingScreen from './components/LoadingScreen/LoadingScreen'
 import AuthModal from './components/Auth/AuthModal'
 import WelcomeScreen from './components/Welcome/WelcomeScreen'
 import Footer from './components/Footer/Footer'
 import { ASPECT_KEYS } from './data/aspects'
+import { getJourney } from './data/journey/registry'
 import { ru } from './locales/ru'
 import { useAuth } from './hooks/useAuth'
 import {
@@ -54,6 +58,8 @@ export default function App() {
   const [diary, setDiary] = useState([])
   const [journey, setJourney] = useState(DEFAULT_JOURNEY)
   const [selectedAspect, setSelectedAspect] = useState(null)
+  // Чей публичный профиль смотрим (id WebUser). null — не открыт.
+  const [viewingProfileId, setViewingProfileId] = useState(null)
   const [dataLoading, setDataLoading] = useState(false)
   const [showAuth, setShowAuth] = useState(false)
   // welcomeDismissed: гость нажал «Начать бесплатно» и вошёл в приложение
@@ -110,22 +116,56 @@ export default function App() {
         fetchEvents(0).catch(() => ({ events: [] })),
       ])
 
-      // Bot position: apply aspect/level/streak from bot if Telegram is linked
-      // and web journey is still at default (hasn't been started in web yet)
+      // Bot position: подтягиваем aspect/level/streak из бота при каждой загрузке.
+      //   • currentAspect — переносим только если веб ещё на онбординге
+      //     (не хотим перезаписывать активную ветку вебом, если бот и веб
+      //     гуляют по разным аспектам).
+      //   • currentLevel — всегда `Math.max(web, bot)`. Если юзер пробежал
+      //     L0 в боте, веб на следующей загрузке должен шагнуть на L1, а
+      //     не залипнуть на старте L0. При фактическом скачке сбрасываем
+      //     currentScriptIndex/Id и подкладываем первый шаг нового уровня
+      //     в messages — чтобы чат не оказался пустым.
+      //   • streak — всегда max.
       let journeyOverride = stateRes.journey ?? null
       if (botSync?.linked && botSync.state) {
         const bs = botSync.state
         const isWebFresh = !journeyOverride || journeyOverride.screen === 'onboarding'
+
         if (isWebFresh && bs.current_aspect) {
           journeyOverride = {
             ...(journeyOverride ?? {}),
             currentAspect: bs.current_aspect,
-            currentLevel: bs.current_level ?? 0,
-            // Sync streak from bot if higher
-            streak: Math.max(journeyOverride?.streak ?? 0, bs.streak_days ?? 0),
           }
-        } else if (bs.streak_days) {
-          // Always sync streak
+        }
+
+        const botLevel = bs.current_level ?? 0
+        const webLevel = journeyOverride?.currentLevel ?? 0
+        if (botLevel > webLevel) {
+          const aspect = journeyOverride?.currentAspect ?? bs.current_aspect ?? 'БС'
+          const nextLevelData = getJourney(aspect)?.levels?.[botLevel]
+          const firstScript = (nextLevelData?.core ?? nextLevelData?.scripts ?? [])[0]
+          journeyOverride = {
+            ...(journeyOverride ?? {}),
+            currentLevel: botLevel,
+            currentScriptIndex: 0,
+            currentScriptId: firstScript?.id ?? null,
+            awaitingInput: null,
+            messages: firstScript
+              ? [
+                  ...(journeyOverride?.messages ?? []),
+                  {
+                    id: Date.now() + Math.random(),
+                    role: 'bot',
+                    kind: 'script',
+                    scriptId: firstScript.id,
+                    level: botLevel,
+                  },
+                ]
+              : (journeyOverride?.messages ?? []),
+          }
+        }
+
+        if (bs.streak_days) {
           journeyOverride = {
             ...(journeyOverride ?? {}),
             streak: Math.max(journeyOverride?.streak ?? 0, bs.streak_days),
@@ -134,17 +174,17 @@ export default function App() {
       }
 
       // Bot → Web events: дописываем в journey.completedScripts шаги, которые
-      // юзер прошёл в TG-боте, scoped под текущий (currentAspect, currentLevel).
+      // юзер прошёл в TG-боте. Фильтруем по аспекту, но НЕ по level — иначе
+      // после скачка веба на L1 ачивки L0 (T-1, B-1, U-1) пропадают.
       // Web хранит short_id (`T-1`/`intro-1`) — бэк уже отдаёт распарсенные.
       const botEvents = (eventsRes?.events ?? []).filter(
         e => e.source === 'bot' && e.type === 'step_completed' && e.short_id
       )
       if (botEvents.length > 0) {
         const aspect = journeyOverride?.currentAspect
-        const level = journeyOverride?.currentLevel ?? 0
         if (aspect) {
           const fromBot = botEvents
-            .filter(e => e.aspect === aspect && (e.level ?? 0) === level)
+            .filter(e => e.aspect === aspect)
             .map(e => e.short_id)
           if (fromBot.length > 0) {
             const merged = new Set(journeyOverride?.completedScripts ?? [])
@@ -276,14 +316,20 @@ export default function App() {
       setShowAuth(true)
       return
     }
-    // Коуч требует авторизации — бэк всё равно отобьёт без JWT,
+    // Коуч и Профиль требуют авторизации — бэк всё равно отобьёт без JWT,
     // но проверяем здесь чтобы не показывать пустой экран с ошибкой.
-    if (newView === 'coach' && !user) {
+    if ((newView === 'coach' || newView === 'profile') && !user) {
       setShowAuth(true)
       return
     }
     setView(newView)
     setSelectedAspect(null)
+    setViewingProfileId(null)
+  }
+
+  const openPublicProfile = (userId) => {
+    setViewingProfileId(userId)
+    setView('public-profile')
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -388,6 +434,28 @@ export default function App() {
             onDiaryChange={saveDiary}
             journey={journey}
             onJourneyChange={saveJourney}
+          />
+        )}
+
+        {view === 'profile' && user && (
+          <ProfileView onOpenPublicProfile={openPublicProfile} />
+        )}
+
+        {view === 'public-profile' && viewingProfileId && (
+          <PublicProfileView
+            userId={viewingProfileId}
+            currentUserId={user?.id}
+            onBack={() => {
+              setViewingProfileId(null)
+              setView('leaderboard')
+            }}
+          />
+        )}
+
+        {view === 'leaderboard' && (
+          <LeaderboardView
+            currentUserId={user?.id}
+            onOpenPublicProfile={openPublicProfile}
           />
         )}
 
