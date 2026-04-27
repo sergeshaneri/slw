@@ -16,7 +16,7 @@ export default function ScriptCard({ script }) {
       <div className={styles.scriptHeader}>
         <span className={styles.scriptGlyph}>{cfg.glyph}</span>
         <span className={styles.scriptLabel}>{cfg.label}</span>
-        <span className={styles.scriptId}>{script.id}</span>
+
       </div>
       <div className={styles.scriptTitle}>{script.title}</div>
       <div className={styles.scriptBody}>{script.text}</div>
