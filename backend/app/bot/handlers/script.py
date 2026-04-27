@@ -6,6 +6,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from app.bot.fsm import IN_SCRIPT, WAITING_OPEN_ANSWER, WAITING_SCORE, WAITING_THEORY_NOTE
+from app.bot.handlers.events import emit_step_completed, pull_web_progress
 from app.content.loader import Step, first_step, get_step, next_step
 from app.db.models import Answer, DiaryEntry, UserState
 from app.db.session import AsyncSessionLocal
@@ -13,6 +14,16 @@ from app.bot.handlers.start import (
     MAIN_KEYBOARD, NEXT_KEYBOARD, NEXT_INSIGHT_KEYBOARD,
     ACK_KEYBOARD, SCORE_KEYBOARD, REFLECTION_KEYBOARD,
 )
+
+
+async def _mark_completed(user_id: int, step_id: str | None) -> None:
+    """Перед переходом на следующий шаг помечаем текущий пройденным
+    в общем event-логе. Web подтянет это в свой completedScripts."""
+    if not step_id:
+        return
+    step = get_step(step_id)
+    if step:
+        await emit_step_completed(user_id, step)
 
 TG_MAX = 4000
 
@@ -101,6 +112,9 @@ async def show_step(update: Update, context: ContextTypes.DEFAULT_TYPE, step: St
 
 
 async def cmd_go(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    # Если юзер ушёл вперёд в web — подтягиваем его прогресс перед стартом,
+    # чтобы бот не показывал шаг, который web уже отметил пройденным.
+    await pull_web_progress(update.effective_user.id)
     state = await _get_state(update.effective_user.id)
     step = get_step(state.current_step_id) if state and state.current_step_id else first_step()
     await update.message.reply_text("Поехали!")
@@ -108,6 +122,7 @@ async def cmd_go(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await pull_web_progress(update.effective_user.id)
     state = await _get_state(update.effective_user.id)
     if not state or not state.current_step_id:
         return await cmd_go(update, context)
@@ -120,6 +135,7 @@ async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def on_next_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     state = await _get_state(update.effective_user.id)
     step_id = state.current_step_id if state else None
+    await _mark_completed(update.effective_user.id, step_id)
     nxt = next_step(step_id) if step_id else None
     if nxt is None:
         await update.message.reply_text("Путешествие завершено!", reply_markup=MAIN_KEYBOARD)
@@ -132,6 +148,7 @@ async def on_ack_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     step_id = state.current_step_id if state else None
     if step_id:
         await _save_answer(update.effective_user.id, step_id, "exercise_ack", text="ack")
+    await _mark_completed(update.effective_user.id, step_id)
     await update.message.reply_text("Записал!", reply_markup=MAIN_KEYBOARD)
     nxt = next_step(step_id) if step_id else None
     if nxt is None:
@@ -152,6 +169,7 @@ async def on_open_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     step_id = state.current_step_id if state else None
     if step_id:
         await _save_answer(update.effective_user.id, step_id, "reflection", text=update.message.text)
+    await _mark_completed(update.effective_user.id, step_id)
     await update.message.reply_text("Записал.", reply_markup=MAIN_KEYBOARD)
 
     nxt = next_step(step_id) if step_id else None
@@ -180,6 +198,7 @@ async def on_score_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             fu_text = step.get_follow_up_text(val)
             if fu_text:
                 await update.message.reply_text(_strip_md(fu_text))
+    await _mark_completed(update.effective_user.id, step_id)
 
     nxt = next_step(step_id) if step_id else None
     if nxt is None:

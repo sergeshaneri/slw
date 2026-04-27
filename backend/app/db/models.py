@@ -144,3 +144,29 @@ class WebDiaryEntry(Base):
     source: Mapped[str] = mapped_column(Text, default="web")
     extra: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # promptTitle, prompt, scriptId, etc.
     created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+# ── Sync layer ──────────────────────────────────────────────────────────────
+# Общий event-лог между ботом и веб-приложением. Bot пишет события про каждый
+# пройденный шаг (`source='bot'`); web подтягивает их при загрузке и
+# восстанавливает прогресс (completedScripts, currentAspect/Level) для своего
+# JSON-блоба `web_state.journey`. Поля `aspect`/`level`/`short_id` — уже
+# распарсенный bot-id (например, `бс-L0-T-1` → aspect='БС', level=0,
+# short_id='T-1'), потому что web хранит ID в коротком формате.
+
+class JourneyEvent(Base):
+    __tablename__ = "journey_events"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    # Один из двух идентификаторов будет заполнен. telegram_id — ключ соединения
+    # с bot-слоем; web_user_id — для web-юзеров без линкованной TG.
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    web_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source: Mapped[str] = mapped_column(Text)            # 'bot' | 'web'
+    type: Mapped[str] = mapped_column(Text)              # 'step_completed' | 'answer_given' | ...
+    aspect: Mapped[str | None] = mapped_column(Text, nullable=True)
+    level: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    short_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    step_id: Mapped[str | None] = mapped_column(Text, nullable=True)  # full bot-id для отладки
+    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)

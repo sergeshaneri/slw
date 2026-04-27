@@ -90,7 +90,10 @@ Config: `backend/railway.toml`
 | `backend/serve.py` | Entry point: starts bot + uvicorn together |
 | `backend/app/web/main.py` | FastAPI app, CORS, router registration |
 | `backend/app/web/routes/auth.py` | Auth + account settings: register, login, TG OAuth, link, add-email, profile, change-password, remove-email, unlink-tg, delete-account, export, me |
-| `backend/app/web/routes/` | scores, diary, state, sync routes |
+| `backend/app/web/routes/` | scores, diary, state, sync, events routes |
+| `backend/app/web/routes/events.py` | GET `/api/events?since_id=N` — общий event-лог bot↔web (см. ниже) |
+| `backend/app/bot/handlers/events.py` | `emit_step_completed(tg_id, step)` — bot пишет в `journey_events` на каждом advance |
+| `backend/app/scripts/backfill_events.py` | Одноразовый бэкфилл прошлого TG-прогресса в `journey_events` |
 | `backend/app/scripts/promote_admin.py` | One-shot CLI: `python -m app.scripts.promote_admin --email ...` to set `is_admin=true` |
 | `backend/app/db/models.py` | SQLAlchemy models (bot tables + web_users/state/scores/diary) |
 | `backend/app/config.py` | Settings from env vars (bot_token, database_url, secret_key) |
@@ -111,9 +114,36 @@ JWT stored in `localStorage['slw_token']`. Three paths:
 ### DB schema (two layers)
 
 **Bot tables** (Telegram users): `users`, `user_state`, `scores`, `diary_entries`, `answers`, `script_steps`, `achievements`  
-**Web tables** (web users): `web_users`, `web_state`, `web_scores`, `web_diary_entries`
+**Web tables** (web users): `web_users`, `web_state`, `web_scores`, `web_diary_entries`  
+**Sync layer**: `journey_events` — общий event-лог между ботом и веб-приложением (см. ниже).
 
 `web_users.telegram_id` links the two layers. Sync endpoints merge data at query time.
+
+### Sync layer: journey_events (B1)
+
+Bot и web — две почти независимые игры с одним и тем же скриптом. Чтобы прогресс из TG доезжал в web, bot эмитит события в `journey_events`:
+
+| Поле | Что |
+|------|-----|
+| `telegram_id` / `web_user_id` | Один из двух (для bot всегда tg_id; для web — web_user_id если TG не залинкован) |
+| `source` | `'bot'` \| `'web'` |
+| `type` | `'step_completed'` (пока единственный тип) |
+| `aspect`, `level`, `short_id` | Уже распарсенный bot-id: `бс-L0-T-1` → aspect='БС', level=0, short_id='T-1' |
+| `step_id` | Полный bot-id, для отладки |
+
+**Bot пишет** в `app.bot.handlers.script.py` через `_mark_completed()` → `emit_step_completed()` перед каждым `next_step()` (next/ack/score/open_answer handlers).
+
+**Web читает** в `App.jsx:loadFromApi` через `fetchEvents(0)` и обогащает `journey.completedScripts` для текущего `(currentAspect, currentLevel)`.
+
+**Web пишет** в `App.jsx:saveJourney` — диффим `completedScripts` против предыдущего, на каждый новый short_id POST `/api/events` (`source='web'`, fire-and-forget).
+
+**Bot читает** через `pull_web_progress(telegram_id)` в `cmd_go`/`cmd_resume` (только entry-points, не в mid-flow handler-ах). Логика: находим самый поздний web-`step_completed` по `ord`; если он позже текущего шага бота — двигаем `user_state.current_step_id` на следующий за ним. **Только эти две команды** триггерят подтяжку — кнопки "Далее"/числовые ответы в TG продолжают работать с тем шагом, на котором бот уже стоял (чтобы не сбивать середину разговора).
+
+**ID-форматы** разные: bot хранит `бс-L0-T-1` / `онбординг-intro-1`, web хранит `T-1` / `intro-1`. Конверсия — strip префиксов `<aspect.lower()>-` и `L<level>-` (см. `_short_id` в `events.py` и `backfill_events.py` — два места, синхронить).
+
+**Бэкфилл**: `python -m app.scripts.backfill_events [--telegram-id N | --dry-run]` — для каждого юзера с `user_state.current_step_id` эмитит events для всех шагов с меньшим `ord`. Идемпотентный (удаляет старые `step_completed` перед заливкой).
+
+**Что НЕ синхронизируется** (B1+ ограничения): сообщения чата (web-чат и TG-чат остаются разными хранилищами), ответы юзера (`answers` живут только в bot-таблице, в web не уходят), уведомления (отдельный тип event-а будет позже). Это слой над текущим `/api/sync/bot-state` — он остаётся для синка позиции/streak.
 
 ### Known gotchas
 
