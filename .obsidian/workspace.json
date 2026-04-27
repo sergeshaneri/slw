@@ -279,12 +279,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Si/псих черты БС.md",
+                "file": "Ti/скб БЛ гем флэш.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "псих черты БС"
+              "title": "скб БЛ гем флэш"
             }
           },
           {
@@ -437,13 +437,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Si/псих черты БС.md",
+                "file": "Ti/скб БЛ гем флэш.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of псих черты БС"
+              "title": "Outline of скб БЛ гем флэш"
             }
           }
         ],
@@ -466,12 +466,15 @@
   },
   "active": "92a19c41146fd2e4",
   "lastOpenFiles": [
-    "Si/план навыков.md",
-    "Si/псих черты БС.md",
-    "скб бл гем про.md",
-    "Ti/скб БЛ гем флэш.md",
     "Ti/черновое бл.md",
+    "Ti/скб БЛ гем флэш.md",
     "Ti/план от gemini.md",
+    "Si/вопросы для оценки навыков БС.md",
+    "Si/псих черты БС.md",
+    "Si/список навыков БС.md",
+    "ARCHITECTURE.md",
+    "Si/план навыков.md",
+    "Ti/скб бл гем про.md",
     "Ti",
     "slw-main/slw-main/src/components/AspectsView/blocks.js",
     "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_3/theory.md",
@@ -491,9 +494,6 @@
     "Si/Si_skills/_archive/d4_skill_04_mind_body_spirit_WRONG/level_3/mastery_criteria.md",
     "Si/Si_skills/_archive/d4_skill_04_mind_body_spirit_WRONG/level_3/actions.md",
     "Si/Si_skills/_archive/d4_skill_04_mind_body_spirit_WRONG/level_2/theory.md",
-    "Si/Si_skills/_archive/d4_skill_04_mind_body_spirit_WRONG/level_2/practices.md",
-    "Si/Si_skills/_archive/d4_skill_04_mind_body_spirit_WRONG/level_2/mastery_criteria.md",
-    "Si/Si_skills/_archive/d4_skill_04_mind_body_spirit_WRONG/level_2/actions.md",
     "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_3",
     "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_2",
     "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_1",
