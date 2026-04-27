@@ -18,7 +18,7 @@ import {
   fetchScores, saveScores as apiSaveScores,
   fetchDiary, postDiaryEntry,
   fetchBotState,
-  fetchEvents, postEvent,
+  fetchEvents, postEvent, backfillEvents,
 } from './api/client'
 import styles from './App.module.css'
 
@@ -92,6 +92,19 @@ export default function App() {
   const loadFromApi = async () => {
     setDataLoading(true)
     try {
+      // Один раз на юзера: материализуем его прошлый TG-прогресс в
+      // journey_events (Railway не даёт ввести команду — startCommand
+      // залочен через railway.toml). Гейт — localStorage flag.
+      // Идемпотентен на сервере, но дёргаем единожды чтобы не плодить
+      // запросы. Только если TG залинкован, иначе бэкфиллить нечего.
+      const backfillKey = `slw_events_backfilled_${user.id}`
+      if (user.telegram_id && !localStorage.getItem(backfillKey)) {
+        try {
+          await backfillEvents()
+          localStorage.setItem(backfillKey, '1')
+        } catch (e) { console.error('backfill failed:', e) }
+      }
+
       const [stateRes, scoresRes, diaryRes, botSync, eventsRes] = await Promise.all([
         fetchState(),
         fetchScores(),

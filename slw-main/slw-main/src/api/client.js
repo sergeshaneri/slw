@@ -120,6 +120,13 @@ export async function postEvent(event) {
   return request('POST', '/api/events', event)
 }
 
+// Одноразовый бэкфилл прошлого TG-прогресса в journey_events.
+// Идемпотентен — удаляет старые `step_completed` перед заливкой.
+// Нужен, потому что Railway-CLI команды залочены через railway.toml.
+export async function backfillEvents() {
+  return request('POST', '/api/events/backfill')
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 export async function fetchState() {
