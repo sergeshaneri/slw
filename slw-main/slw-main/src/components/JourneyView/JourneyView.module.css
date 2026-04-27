@@ -1622,3 +1622,282 @@
 @media (max-width: 480px) {
   .skillsBtn { padding: 5px 10px; font-size: 11px; gap: 5px; }
 }
+
+/* ─── SkillDetail ─────────────────────────────────────────────────────── */
+
+.skillDetailIntro {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin: 0;
+  padding: 14px 16px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 50%, var(--line));
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-radius: 0 8px 8px 0;
+}
+
+.skillDetailEmpty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.skillDetailEmptyTitle {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.skillDetailEmptyText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.skillDetailReturn {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.skillLevelCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.skillLevelLocked {
+  opacity: 0.55;
+  background: var(--surface);
+}
+
+.skillLevelHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.skillLevelBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+.skillLevelLockedTag {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.skillLevelLockedText {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.skillLevelEssence {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.skillTraits {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 560px) {
+  .skillTraits { grid-template-columns: 1fr; }
+}
+
+.skillTrait {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.skillTraitGift {
+  border-color: color-mix(in srgb, #6cd99e 35%, var(--line));
+  background: color-mix(in srgb, #6cd99e 6%, var(--surface));
+}
+
+.skillTraitShadow {
+  border-color: color-mix(in srgb, #b07d5a 35%, var(--line));
+  background: color-mix(in srgb, #b07d5a 6%, var(--surface));
+}
+
+.skillTraitLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.skillTraitTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.skillTraitDesc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.skillHowBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+  border-radius: 100px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background .15s, transform .1s;
+}
+
+.skillHowBtn:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.skillHowBtn:active { transform: scale(0.97); }
+
+.skillHowChevron {
+  font-size: 11px;
+}
+
+.skillHow {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 4px;
+  animation: skillHowFade .22s ease-out;
+}
+
+@keyframes skillHowFade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.skillHowSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skillHowSectionTitle {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.skillHowList {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skillHowItem {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.skillHowPractices {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skillHowPractice {
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.skillHowPracticeName {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.skillHowPracticeDesc {
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ─── SkillTree row with detail button ───────────────────────────────── */
+
+.treeSkillRow {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.treeSkillRow .treeSkill {
+  flex: 1;
+  min-width: 0;
+}
+
+.treeSkillInfoBtn {
+  flex-shrink: 0;
+  width: 36px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background .15s, transform .1s;
+}
+
+.treeSkillInfoBtn:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.treeSkillInfoBtn:active { transform: scale(0.95); }

@@ -5,6 +5,7 @@ Reads:
   - slw-main/src/data/journey/aspects/bs-l0.md    (BS L0 content)
   - slw-main/src/data/journey/aspects/bs-l1.md    (BS L1 content)
   - slw-main/src/data/journey/aspects/bs-l2.md    (BS L2 content)
+  - slw-main/src/data/journey/aspects/bs-l3.md    (BS L3 content, в работе)
 Writes app/content/compiled.json.
 """
 import json
@@ -192,6 +193,12 @@ def build() -> None:
         open_question_prefixes={"B"},
     )
     all_steps.extend(bs2_steps)
+
+    bs3_steps = _parse_bs_md(
+        WEB_DATA / "aspects" / "bs-l3.md", "БС", 3, start_ord=600,
+        open_question_prefixes={"B"},
+    )
+    all_steps.extend(bs3_steps)
 
     # Assign clean global ord
     all_steps.sort(key=lambda s: s["ord"])

@@ -35,7 +35,7 @@ function statusFor(skillState) {
   return { kind: 'light', avg: skillState.result }
 }
 
-export default function SkillTree({ accent, skills, onClose, onStartSkill }) {
+export default function SkillTree({ accent, skills, onClose, onStartSkill, onOpenSkillDetail }) {
   const bsScore = calcBSScoreFromSkills(skills)
   const progress = getSkillProgress(skills)
 
@@ -121,8 +121,9 @@ export default function SkillTree({ accent, skills, onClose, onStartSkill }) {
                       st.kind === 'light'  ? styles.treeSkillLight :
                       st.kind === 'draft'  ? styles.treeSkillDraft :
                       ''
+                    const hasPasses = st.kind === 'light' || st.kind === 'medium' || st.kind === 'full'
                     return (
-                      <li key={skill.id}>
+                      <li key={skill.id} className={styles.treeSkillRow}>
                         <button
                           type="button"
                           className={`${styles.treeSkill} ${cls}`}
@@ -137,6 +138,17 @@ export default function SkillTree({ accent, skills, onClose, onStartSkill }) {
                             {st.kind === 'draft'  && `${st.mode === 'full' ? 'полный' : 'короткий'} · продолжить`}
                           </span>
                         </button>
+                        {hasPasses && onOpenSkillDetail && (
+                          <button
+                            type="button"
+                            className={styles.treeSkillInfoBtn}
+                            onClick={() => onOpenSkillDetail(skill.id)}
+                            aria-label={`Детальный разбор: ${skill.name}`}
+                            title="Что развиваешь и как"
+                          >
+                            ⓘ
+                          </button>
+                        )}
                       </li>
                     )
                   })}

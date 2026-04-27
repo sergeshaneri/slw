@@ -14,11 +14,13 @@ import bsL0Md from './bs-l0.md?raw'
 import bsL0SurveysMd from './bs-l0-surveys.md?raw'
 import bsL1Md from './bs-l1.md?raw'
 import bsL2Md from './bs-l2.md?raw'
+import bsL3Md from './bs-l3.md?raw'
 
 const l0 = parseJourneyMd(bsL0Md)
 const l0Surveys = parseJourneyMd(bsL0SurveysMd)
 const l1 = parseJourneyMd(bsL1Md)
 const l2 = parseJourneyMd(bsL2Md)
+const l3 = parseJourneyMd(bsL3Md)
 
 // Survey-шаги идут «по очереди» через 4 архетипа, чтобы пользователь
 // видел разные ветки навыков, а не сидел 12 анкет подряд по Целителю.
@@ -69,3 +71,6 @@ export const BS_LEVEL_1_COMPLETE = l1.complete ?? { text: 'Уровень про
 
 export const BS_LEVEL_2_CORE = l2.scripts
 export const BS_LEVEL_2_COMPLETE = l2.complete ?? { text: 'Уровень пройден.' }
+
+export const BS_LEVEL_3_CORE = l3.scripts
+export const BS_LEVEL_3_COMPLETE = l3.complete ?? { text: 'Уровень пройден.' }
