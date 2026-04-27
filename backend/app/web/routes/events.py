@@ -98,23 +98,3 @@ async def post_event(
     ))
     await session.commit()
     return {"ok": True}
-
-
-@router.post("/backfill")
-async def backfill_my_progress(
-    current_user: WebUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
-) -> dict:
-    """Материализовать прошлый прогресс из bot-таблиц (`user_state`) в
-    `journey_events`. Идемпотентен: удаляет существующие `step_completed`
-    события перед заливкой. Нужен, потому что startCommand на Railway
-    залочен через railway.toml (см. CLAUDE.md gotcha) и `python -m
-    app.scripts.backfill_events` нельзя дёрнуть с дашборда — этот endpoint
-    делает то же самое для запросившего юзера.
-    """
-    if not current_user.telegram_id:
-        return {"backfilled": 0, "skipped": "no_telegram"}
-    # Импорт внутри, чтобы избежать кросс-модульного цикла на старте.
-    from app.scripts.backfill_events import _backfill_user
-    count = await _backfill_user(session, current_user.telegram_id, dry_run=False)
-    return {"backfilled": count, "telegram_id": current_user.telegram_id}
