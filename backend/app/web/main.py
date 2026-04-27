@@ -7,7 +7,9 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.web.routes.auth import router as auth_router
+from app.web.routes.coach import router as coach_router
 from app.web.routes.diary import router as diary_router
+from app.web.routes.events import router as events_router
 from app.web.routes.me import router as me_router
 from app.web.routes.scores import router as scores_router
 from app.web.routes.state import router as state_router
@@ -44,6 +46,8 @@ app.include_router(state_router, prefix="/api")
 app.include_router(scores_router, prefix="/api")
 app.include_router(diary_router, prefix="/api")
 app.include_router(sync_router, prefix="/api")
+app.include_router(events_router, prefix="/api")
+app.include_router(coach_router, prefix="/api")
 
 
 @app.get("/healthz")

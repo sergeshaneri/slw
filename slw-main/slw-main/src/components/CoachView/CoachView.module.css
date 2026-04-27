@@ -1,0 +1,329 @@
+.container {
+  --text: #f1f2f5;
+  --text-soft: #c8cad1;
+  --text-muted: #8f929c;
+  --text-dim: #5f6169;
+  --line: rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.16);
+  --surface: #15161c;
+  --surface-2: #1c1d25;
+  --accent: #b39ddb;
+  --accent-strong: #d6bcfa;
+  --danger: #e57373;
+  color: var(--text);
+  max-width: 760px;
+}
+
+.titleBlock {
+  margin-bottom: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.eyebrow {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.title {
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  margin: 0;
+  color: var(--text);
+}
+
+/* ── Квота / стардаст ─────────────────────────────────── */
+
+.quotaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.quotaBadge { letter-spacing: 0.02em; }
+.stardust { color: var(--accent); }
+
+/* ── Composer ─────────────────────────────────────────── */
+
+.composer {
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.hint {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  background: rgba(179,157,219,0.05);
+  border-left: 2px solid var(--accent);
+  border-radius: 4px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.select {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color .15s;
+}
+
+.select:focus { border-color: var(--line-strong); }
+
+.textarea {
+  width: 100%;
+  min-height: 140px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.55;
+  resize: vertical;
+  outline: none;
+  transition: border-color .15s;
+  box-sizing: border-box;
+}
+
+.textarea:focus { border-color: var(--line-strong); }
+.textarea:disabled { opacity: 0.6; }
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.callButton {
+  background: var(--accent);
+  border: none;
+  color: #1a1622;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background .15s, opacity .15s;
+}
+
+.callButton:hover:not(:disabled) { background: var(--accent-strong); }
+.callButton:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.stardustButton {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background .15s, opacity .15s;
+}
+
+.stardustButton:hover:not(:disabled) { background: rgba(179,157,219,0.1); }
+.stardustButton:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(229,115,115,0.08);
+  border: 1px solid rgba(229,115,115,0.3);
+  border-radius: 8px;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+/* ── Ответ коуча ──────────────────────────────────────── */
+
+.response {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 24px;
+}
+
+.responseHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.responseLabel {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.responseAspect {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.responseText {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.saveButton {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+
+.saveButton:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.saveButton:disabled { opacity: 0.6; cursor: default; }
+
+/* ── История ──────────────────────────────────────────── */
+
+.historyBlock { margin-top: 8px; }
+
+.historyToggle {
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: color .15s, border-color .15s;
+}
+
+.historyToggle:hover {
+  color: var(--text-soft);
+  border-color: var(--line-strong);
+}
+
+.historyList {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.historyItem {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.historyHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 13px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.historyDate { color: var(--text-dim); flex-shrink: 0; }
+.historyAspect { font-weight: 600; flex-shrink: 0; }
+.historyPaid { color: var(--accent); flex-shrink: 0; }
+.historyError {
+  color: var(--danger);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  flex-shrink: 0;
+}
+
+.historyPrompt {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-muted);
+}
+
+.historyBody {
+  padding: 0 14px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.historyPromptFull {
+  color: var(--text-muted);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.historyResponse {
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.historyErrorText {
+  color: var(--danger);
+  font-family: monospace;
+  font-size: 12px;
+  padding: 8px;
+  background: rgba(229,115,115,0.05);
+  border-radius: 6px;
+}

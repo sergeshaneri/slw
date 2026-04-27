@@ -16,6 +16,7 @@ export default function AdminPanel({
   onSkipStep,
   onFillSurvey,
   onFillAllSkills,
+  onOpenSkillsEditor,
   onJumpLevel,
   onReset,
   aspect = 'БС'
@@ -73,6 +74,17 @@ export default function AdminPanel({
           >
             ✦ Fill all skills 7/10
           </button>
+
+          {onOpenSkillsEditor && (
+            <button
+              type="button"
+              className={styles.btn}
+              onClick={() => { onOpenSkillsEditor(); setOpen(false) }}
+              title="Список навыков с per-skill контролем (значение, глубина)"
+            >
+              ⚙ Настроить навыки…
+            </button>
+          )}
 
           <div className={styles.section}>Уровень</div>
           <div className={styles.levelRow}>

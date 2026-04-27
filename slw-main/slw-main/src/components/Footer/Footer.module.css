@@ -1,0 +1,60 @@
+.footer {
+  margin-top: 48px;
+  padding: 32px 0 18px;
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 28px;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  background: radial-gradient(
+    ellipse 65% 90% at 50% 100%,
+    rgba(157, 78, 221, 0.12) 0%,
+    rgba(157, 78, 221, 0.04) 45%,
+    transparent 75%
+  );
+}
+
+/* Тонкая разделительная линия — не сплошная, а градиентная,
+   гаснет к краям, чтобы не спорить с фоном страницы. */
+.footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(157, 78, 221, 0.35),
+    transparent
+  );
+}
+
+.link {
+  color: #a8a8b8;
+  text-decoration: none;
+  transition: color 0.2s, text-shadow 0.2s;
+  position: relative;
+}
+
+.link:hover {
+  color: #c77dff;
+  text-shadow: 0 0 16px rgba(157, 78, 221, 0.55);
+}
+
+@media (max-width: 540px) {
+  .footer {
+    gap: 8px 18px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 24px 0 14px;
+  }
+  .footer::before {
+    left: 15%;
+    right: 15%;
+  }
+}

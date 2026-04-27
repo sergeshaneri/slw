@@ -9,6 +9,7 @@ export const ru = {
     aspects: '⬡ Аспекты',
     diary: '✎ Дневник',
     progress: '↗ Прогресс',
+    coach: '✦ Коуч',
     settings: '⚙ Настройки',
   },
   wheel: {

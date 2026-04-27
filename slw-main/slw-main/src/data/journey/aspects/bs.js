@@ -1,41 +1,33 @@
 // Путешествие по аспекту БС (Белая Сенсорика) — планета Terra Harmonia.
 //
-// Источник истины — `bs-l*.md`. Vite импортирует их как сырой текст
-// через `?raw`, парсер `parseScripts.js` раскручивает в массив
-// объектов. Все правки контента делаются в md, не здесь.
+// Источник истины — `bs-l*.md` (core-сценарий уровня) и
+// `bs-l0-surveys.md` (33 анкеты по навыкам). Vite импортирует их как
+// сырой текст через `?raw`, парсер `parseScripts.js` раскручивает в
+// массив объектов. Все правки контента делаются в md, не здесь.
 //
-// Каждый уровень делится на core (основной маршрут) и pool
-// (опциональные шаги, помеченные `pool: true` в md). См.
-// `SCRIPT_GUIDELINES.md` §8.
+// Уровни идут линейным core-маршрутом. Анкеты лежат отдельно от L0
+// и доступны только через дерево навыков (Колесо БС), не из L0-чата.
 
 import { parseJourneyMd } from '../parseScripts'
 import { SKILL_TO_ARCHETYPE, ARCHETYPE_KEYS } from '../skills/tree'
 import bsL0Md from './bs-l0.md?raw'
+import bsL0SurveysMd from './bs-l0-surveys.md?raw'
 import bsL1Md from './bs-l1.md?raw'
 
 const l0 = parseJourneyMd(bsL0Md)
+const l0Surveys = parseJourneyMd(bsL0SurveysMd)
 const l1 = parseJourneyMd(bsL1Md)
 
-const splitCorePool = (scripts) => ({
-  core: scripts.filter(s => !s.pool),
-  pool: scripts.filter(s => s.pool)
-})
-
-// Pool анкет (type='survey') для L0 идёт «по очереди» через 4 архетипа,
-// чтобы пользователь видел разные ветки навыков, а не сидел 12 анкет
-// подряд по Целителю. Не-survey шаги pool (если будут) сохраняются в
-// исходном порядке и идут после анкет.
-function interleaveSurveysByArchetype(poolScripts) {
-  const surveys = poolScripts.filter(s => s.type === 'survey')
-  const others = poolScripts.filter(s => s.type !== 'survey')
-
-  // Группируем survey-шаги по архетипу из tree.js.
+// Survey-шаги идут «по очереди» через 4 архетипа, чтобы пользователь
+// видел разные ветки навыков, а не сидел 12 анкет подряд по Целителю.
+function interleaveSurveysByArchetype(surveys) {
   const buckets = {}
   for (const key of ARCHETYPE_KEYS) buckets[key] = []
+  const others = []
   for (const s of surveys) {
     const arche = SKILL_TO_ARCHETYPE[s.skill]
     if (arche && buckets[arche]) buckets[arche].push(s)
-    else others.push(s)  // если skill не размечен — кладём в хвост
+    else others.push(s)
   }
 
   // Round-robin: на каждом круге берём по одному из каждого ведра,
@@ -59,10 +51,6 @@ function interleaveSurveysByArchetype(poolScripts) {
   return [...interleaved, ...others]
 }
 
-const l0Split = splitCorePool(l0.scripts)
-l0Split.pool = interleaveSurveysByArchetype(l0Split.pool)
-const l1Split = splitCorePool(l1.scripts)
-
 // «intro» в md превращается в массив с id='intro-1', 'intro-2', …
 // Журнал ожидает id вида 'bs-intro-N', поэтому переименуем.
 export const BS_ASPECT_INTRO = l0.intro.map((entry, i) => ({
@@ -70,10 +58,9 @@ export const BS_ASPECT_INTRO = l0.intro.map((entry, i) => ({
   id: `bs-intro-${i + 1}`
 }))
 
-export const BS_LEVEL_0_CORE = l0Split.core
-export const BS_LEVEL_0_POOL = l0Split.pool
+export const BS_LEVEL_0_CORE = l0.scripts
+export const BS_LEVEL_0_SURVEYS = interleaveSurveysByArchetype(l0Surveys.scripts)
 export const BS_LEVEL_0_COMPLETE = l0.complete ?? { text: 'Уровень пройден.' }
 
-export const BS_LEVEL_1_CORE = l1Split.core
-export const BS_LEVEL_1_POOL = l1Split.pool
+export const BS_LEVEL_1_CORE = l1.scripts
 export const BS_LEVEL_1_COMPLETE = l1.complete ?? { text: 'Уровень пройден.' }

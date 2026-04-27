@@ -107,6 +107,13 @@ export async function fetchBotState() {
   return request('GET', '/api/sync/bot-state')
 }
 
+// Bot → Web event-лог. На первом хите (если у юзера TG залинкован) бэк сам
+// материализует прошлый прогресс из user_state. Возвращает { events, last_id }.
+// Любая ошибка — на стороне фронта ловим через .catch и продолжаем без events.
+export async function fetchEvents(sinceId = 0) {
+  return request('GET', `/api/events?since_id=${sinceId}`)
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 export async function fetchState() {
@@ -135,6 +142,24 @@ export async function fetchDiary() {
 
 export async function postDiaryEntry({ text, aspect, source = 'web', extra }) {
   return request('POST', '/api/diary', { text, aspect, source, extra })
+}
+
+// ── Coach (AI summon) ─────────────────────────────────────────────────────────
+
+export async function fetchCoachQuota() {
+  return request('GET', '/api/coach/quota')
+}
+
+export async function summonCoach({ prompt, focusAspect = null, payWithStardust = false }) {
+  return request('POST', '/api/coach/summon', {
+    prompt,
+    focus_aspect: focusAspect,
+    pay_with_stardust: payWithStardust,
+  })
+}
+
+export async function fetchCoachHistory(limit = 20) {
+  return request('GET', `/api/coach/history?limit=${limit}`)
 }
 
 export { getToken, setToken }

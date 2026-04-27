@@ -17,6 +17,7 @@ dependencies = [
     # до 72 байт, а bcrypt 4.x теперь строго это проверяет и крашится.
     "bcrypt<4.0",
     "python-multipart>=0.0.9",
+    "openai>=1.50",
 ]
 
 [project.optional-dependencies]

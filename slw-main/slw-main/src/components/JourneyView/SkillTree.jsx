@@ -1,39 +1,38 @@
 import { useState } from 'react'
 import {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE,
-  calcArchetypeAvg, calcBSScoreFromSkills, getSkillProgress
+  calcArchetypeAvg, calcBSScoreFromSkills, getSkillProgress,
+  getCompletedPasses
 } from '../../data/journey/skills'
 import styles from './JourneyView.module.css'
 
 // Меню веток талантов: 4 архетипа, под каждым — список навыков.
-// Можно выбрать любой навык для оценки. Статус навыка:
-//   completedAt → «пройден» + avg
-//   draft       → «в процессе (X/15)»
-//   ничего      → «не оценено»
+// Прогрессивная анкета: каждый навык можно пройти за 1, 2 или 3 прохода
+// по 5 утверждений. Статус навыка:
+//   passes=0      → «оценить» (idle)
+//   passes=1      → «light · 1/3 · продолжить»
+//   passes=2      → «medium · 2/3 · продолжить»
+//   passes=3      → «full · {avg}/10» (done)
+//   draft         → «продолжить с того же места»
 //
-// Клик по навыку запускает анкету (через onStartSkill). Если есть
-// draft — анкета продолжится с прежнего места.
-
-function answeredCountInDraft(draft, totalNeeded = 15) {
-  if (!draft?.answers) return 0
-  let count = 0
-  for (const arr of Object.values(draft.answers)) {
-    if (Array.isArray(arr)) {
-      for (const v of arr) if (Number.isFinite(v)) count++
-    }
-  }
-  return Math.min(count, totalNeeded)
-}
+// Клик по навыку запускает следующий проход (или продолжает draft).
 
 function statusFor(skillState) {
   if (!skillState) return { kind: 'idle' }
-  if (Number.isFinite(skillState.result)) {
-    return { kind: 'done', avg: skillState.result }
-  }
   if (skillState.draft) {
-    return { kind: 'draft', answered: answeredCountInDraft(skillState.draft) }
+    const d = skillState.draft
+    return {
+      kind: 'draft',
+      mode: d.mode ?? 'short',
+      startPass: d.startPass ?? d.pass ?? 1,
+      stepIndex: d.stepIndex ?? d.blockIndex ?? 0,
+    }
   }
-  return { kind: 'idle' }
+  const passes = getCompletedPasses(skillState)
+  if (passes === 0) return { kind: 'idle' }
+  if (passes >= 3) return { kind: 'full', avg: skillState.result }
+  if (passes === 2) return { kind: 'medium', avg: skillState.result }
+  return { kind: 'light', avg: skillState.result }
 }
 
 export default function SkillTree({ accent, skills, onClose, onStartSkill }) {
@@ -58,11 +57,12 @@ export default function SkillTree({ accent, skills, onClose, onStartSkill }) {
       <div className={styles.treeHeader}>
         <button
           type="button"
-          className={styles.surveyClose}
+          className={styles.treeBackBtn}
           onClick={onClose}
-          aria-label="Назад в чат"
+          aria-label="Назад в путешествие"
         >
-          ←
+          <span aria-hidden="true">←</span>
+          <span>Путешествие</span>
         </button>
         <div className={styles.treeHeaderTitleBlock}>
           <div className={styles.treeHeaderTitle}>Навыки БС</div>
@@ -115,20 +115,26 @@ export default function SkillTree({ accent, skills, onClose, onStartSkill }) {
                 <ul className={styles.treeSkillList}>
                   {skillsInBranch.map(skill => {
                     const st = statusFor(skills?.[skill.id])
+                    const cls =
+                      st.kind === 'full'   ? styles.treeSkillDone :
+                      st.kind === 'medium' ? styles.treeSkillMedium :
+                      st.kind === 'light'  ? styles.treeSkillLight :
+                      st.kind === 'draft'  ? styles.treeSkillDraft :
+                      ''
                     return (
                       <li key={skill.id}>
                         <button
                           type="button"
-                          className={`${styles.treeSkill} ${
-                            st.kind === 'done' ? styles.treeSkillDone : ''
-                          } ${st.kind === 'draft' ? styles.treeSkillDraft : ''}`}
+                          className={`${styles.treeSkill} ${cls}`}
                           onClick={() => onStartSkill(skill.id)}
                         >
                           <span className={styles.treeSkillName}>{skill.name}</span>
                           <span className={styles.treeSkillStatus}>
-                            {st.kind === 'done' && `${st.avg.toFixed(1)}/10`}
-                            {st.kind === 'draft' && `${st.answered}/15 · продолжить`}
-                            {st.kind === 'idle' && 'оценить'}
+                            {st.kind === 'idle'   && 'оценить'}
+                            {st.kind === 'light'  && `${st.avg.toFixed(1)}/10 · 1/3 · углубить`}
+                            {st.kind === 'medium' && `${st.avg.toFixed(1)}/10 · 2/3 · углубить`}
+                            {st.kind === 'full'   && `${st.avg.toFixed(1)}/10 · полная`}
+                            {st.kind === 'draft'  && `${st.mode === 'full' ? 'полный' : 'короткий'} · продолжить`}
                           </span>
                         </button>
                       </li>

@@ -4,30 +4,265 @@ import {
 } from '../../data/journey/skills'
 import styles from './BSWheel.module.css'
 
-// Мини-колесо БС с разбивкой по 4 архетипам.
-// Появляется на странице аспекта БС в Аспектах.
+// Колесо БС — реальное колесо баланса.
 //
-// Источник данных — journey.skills:
-//   { [skillId]: { result, blocks, completedAt, answers } }
+// Принципы:
+//   • Заливка каждого квадранта = avg по архетипу (длина лепестка = avg/10*R).
+//   • Звёздочки внутри квадранта = пройденные анкеты в архетипе. Радиус —
+//     только в пределах закрашенной области.
+//   • Chrome (украшения) per-архетип: каждый квадрант эволюционирует
+//     ИНДИВИДУАЛЬНО при 1 / 3 / 6 / max завершённых в его ветке.
+//   • Глобальные украшения (двойной ring, центральный pulse, общий corona)
+//     включаются по min-стадии — т.е. колесо на уровне X только когда
+//     ВСЕ архетипы достигли X.
 //
-// Расчёт:
-//   archetype_score = avg(skill.result для всех навыков ветки)
-//   bs_score        = avg(archetype_score для веток с хоть одной анкетой)
-//
-// Если ни одной анкеты не пройдено — показываем заглушку с CTA.
+// Стадии per-архетип:
+//   pre       — 0 анкет в архетипе
+//   light     — 1+
+//   medium    — 3+
+//   strong    — 6+
+//   masterful — все навыки архетипа пройдены
 
-export default function BSWheel({ skills, color, onContinueSurveys }) {
+const CX = 160
+const CY = 160
+const R_INNER = 32
+const R_OUTER = 130
+const R_AVAILABLE = R_OUTER - R_INNER
+
+const QUADRANT_ORDER = ['healer', 'aesthete', 'hedonist', 'keeper']
+
+const ARCHETYPE_COLORS = {
+  healer:   '#7dc975',
+  aesthete: '#9eb6e8',
+  hedonist: '#dec98a',
+  keeper:   '#e0a3a3',
+}
+
+const STAGE_ORDER = ['pre', 'light', 'medium', 'strong', 'masterful']
+
+function getArcheStage(completed, total) {
+  if (completed >= total && total > 0) return 'masterful'
+  if (completed >= 6) return 'strong'
+  if (completed >= 3) return 'medium'
+  if (completed >= 1) return 'light'
+  return 'pre'
+}
+
+// Полярные координаты в SVG-системе. Угол 0° = верх, по часовой.
+function polar(angleDeg, radius) {
+  const a = (angleDeg - 90) * (Math.PI / 180)
+  return { x: CX + radius * Math.cos(a), y: CY + radius * Math.sin(a) }
+}
+
+// Path для клина.
+function wedgePath(angleStart, angleEnd, rInner, rOuter) {
+  const p1 = polar(angleStart, rInner)
+  const p2 = polar(angleStart, rOuter)
+  const p3 = polar(angleEnd, rOuter)
+  const p4 = polar(angleEnd, rInner)
+  const largeArc = (angleEnd - angleStart) > 180 ? 1 : 0
+  return [
+    `M ${p1.x} ${p1.y}`,
+    `L ${p2.x} ${p2.y}`,
+    `A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${p3.x} ${p3.y}`,
+    `L ${p4.x} ${p4.y}`,
+    `A ${rInner} ${rInner} 0 ${largeArc} 0 ${p1.x} ${p1.y}`,
+    `Z`,
+  ].join(' ')
+}
+
+// Path для дуги (только внешняя кривая, без замыкания).
+function arcPath(angleStart, angleEnd, radius) {
+  const p1 = polar(angleStart, radius)
+  const p2 = polar(angleEnd, radius)
+  const largeArc = (angleEnd - angleStart) > 180 ? 1 : 0
+  return `M ${p1.x} ${p1.y} A ${radius} ${radius} 0 ${largeArc} 1 ${p2.x} ${p2.y}`
+}
+
+function seedFromString(s) {
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
+}
+function makeRng(seed) {
+  let s = seed
+  return () => {
+    s = Math.imul(s ^ (s >>> 16), 2246822507)
+    s = Math.imul(s ^ (s >>> 13), 3266489909)
+    s = (s ^ (s >>> 16)) >>> 0
+    return s / 4294967296
+  }
+}
+
+function Star({ x, y, size = 2.6, opacity = 0.9 }) {
+  const s = size
+  const t = s * 0.22
+  return (
+    <g transform={`translate(${x} ${y})`} opacity={opacity}>
+      <circle r={s * 1.5} fill="white" opacity={0.08} />
+      <path
+        d={`M 0 ${-s} L ${t} ${-t} L ${s} 0 L ${t} ${t} L 0 ${s} L ${-t} ${t} L ${-s} 0 L ${-t} ${-t} Z`}
+        fill="white"
+      />
+    </g>
+  )
+}
+
+function CoronaDots({ count, radius, color, size = 1.5, opacity = 0.7, startAngle = 0, sweepAngle = 360 }) {
+  const dots = []
+  for (let i = 0; i < count; i++) {
+    const angle = startAngle + (i / count) * sweepAngle
+    const p = polar(angle, radius)
+    dots.push(
+      <circle
+        key={i}
+        cx={p.x} cy={p.y} r={size}
+        fill={color}
+        opacity={opacity}
+      />
+    )
+  }
+  return <g>{dots}</g>
+}
+
+// Микро-зарубки на внешнем ring per archetype — одна на каждую пройденную анкету.
+function TallyMarks({ qi, count, total, radius, length = 4, opacity = 0.55, color = 'currentColor' }) {
+  if (count === 0) return null
+  const lines = []
+  // Распределяем равномерно в углах квадранта (с padding).
+  const pad = 6
+  for (let i = 0; i < count; i++) {
+    const angleFrac = total === 1 ? 0.5 : pad / 90 + (i / (total - 1)) * ((90 - 2 * pad) / 90)
+    const angle = qi * 90 + angleFrac * 90
+    const p1 = polar(angle, radius - length / 2)
+    const p2 = polar(angle, radius + length / 2)
+    lines.push(
+      <line
+        key={i}
+        x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
+        stroke={color}
+        strokeOpacity={opacity}
+        strokeWidth={1.4}
+      />
+    )
+  }
+  return <g>{lines}</g>
+}
+
+// Корона-дуга для конкретного квадранта (medium+ архетип).
+function QuadrantCorona({ qi, color, dots = 5, radius, size = 1.6, opacity = 0.65 }) {
+  const startA = qi * 90 + 8
+  const endA = qi * 90 + 82
+  const elements = []
+  for (let i = 0; i < dots; i++) {
+    const t = dots === 1 ? 0.5 : i / (dots - 1)
+    const angle = startA + t * (endA - startA)
+    const p = polar(angle, radius)
+    elements.push(
+      <circle
+        key={i}
+        cx={p.x} cy={p.y} r={size}
+        fill={color}
+        opacity={opacity}
+      />
+    )
+  }
+  return <g>{elements}</g>
+}
+
+// Декоративные жемчужины-«драгоценности» в углах квадрантов (между ними).
+// Появляются на разных стадиях глобального прогресса.
+function CompassMarks({ globalStage, radius, color = 'currentColor' }) {
+  if (globalStage === 'pre') return null
+  const size =
+    globalStage === 'masterful' ? 3.2 :
+    globalStage === 'strong'    ? 2.6 :
+    globalStage === 'medium'    ? 2.2 : 1.6
+  const opacity =
+    globalStage === 'masterful' ? 0.85 :
+    globalStage === 'strong'    ? 0.7 :
+    globalStage === 'medium'    ? 0.55 : 0.4
+
+  const elements = []
+  for (let i = 0; i < 4; i++) {
+    const angle = i * 90
+    const p = polar(angle, radius)
+    elements.push(
+      <g key={i} transform={`translate(${p.x} ${p.y})`}>
+        <circle r={size} fill={color} opacity={opacity} />
+        {globalStage !== 'light' && (
+          <circle r={size + 2} fill="none" stroke={color} strokeOpacity={opacity * 0.5} strokeWidth={0.7} />
+        )}
+        {(globalStage === 'strong' || globalStage === 'masterful') && (
+          <circle r={size + 4.5} fill="none" stroke={color} strokeOpacity={opacity * 0.3} strokeWidth={0.5} />
+        )}
+      </g>
+    )
+  }
+  return <g>{elements}</g>
+}
+
+// Ажурный pattern на масterful-стадии — арки между жемчужинами.
+function MasterfulArcs({ radius, color = 'currentColor' }) {
+  const elements = []
+  for (let i = 0; i < 4; i++) {
+    const startA = i * 90 + 6
+    const endA = i * 90 + 84
+    elements.push(
+      <path
+        key={i}
+        d={arcPath(startA, endA, radius)}
+        fill="none"
+        stroke={color}
+        strokeOpacity={0.5}
+        strokeWidth={0.8}
+        strokeDasharray="2 3"
+      />
+    )
+  }
+  return <g>{elements}</g>
+}
+
+export default function BSWheel({ skills, color, onContinueSurveys, isLocked = false }) {
   const bsScore = calcBSScoreFromSkills(skills)
   const progress = getSkillProgress(skills)
-  const isEmpty = progress.completed === 0
-  const hasMore = progress.remaining > 0
+
+  // Per-архетип состояние.
+  const archeStates = QUADRANT_ORDER.map((key, qi) => {
+    const branch = SKILL_TREE[key] ?? []
+    const total = branch.length
+    const completedSkills = branch.filter(s => Number.isFinite(skills?.[s.id]?.result))
+    const completed = completedSkills.length
+    const avg = calcArchetypeAvg(skills, key)
+    const stage = getArcheStage(completed, total)
+    return { key, qi, branch, total, completed, completedSkills, avg, stage }
+  })
+
+  // Глобальная стадия = минимум по всем архетипам.
+  const globalStageIdx = Math.min(...archeStates.map(a => STAGE_ORDER.indexOf(a.stage)))
+  const globalStage = STAGE_ORDER[globalStageIdx]
+
+  const showDoubleRing  = globalStageIdx >= STAGE_ORDER.indexOf('medium')
+  const showInnerDetail = globalStageIdx >= STAGE_ORDER.indexOf('medium')
+  const showInnerRing   = globalStageIdx >= STAGE_ORDER.indexOf('strong')
+  const showMasterArcs  = globalStageIdx >= STAGE_ORDER.indexOf('strong')
+  const showPulse       = globalStage === 'masterful'
+  const showBigBadge    = globalStage === 'masterful'
+  const showGlow        = globalStageIdx >= STAGE_ORDER.indexOf('strong')
+
+  const stageLabel = isLocked
+    ? 'Пройди уровень 1, чтобы открыть оценку навыков'
+    : 'Изучай свои навыки контакта с телом для эволюции колеса'
 
   return (
     <section className={styles.wheel} style={{ '--accent': color }}>
       <header className={styles.wheelHeader}>
         <div className={styles.wheelTitleBlock}>
           <span className={styles.wheelEyebrow}>Колесо БС</span>
-          <h2 className={styles.wheelTitle}>Самооценка по 4 архетипам</h2>
+          <h2 className={styles.wheelTitle}>Самооценка по архетипам</h2>
         </div>
         <div className={styles.wheelStat}>
           <div className={styles.wheelStatVal}>
@@ -38,70 +273,352 @@ export default function BSWheel({ skills, color, onContinueSurveys }) {
         </div>
       </header>
 
-      {isEmpty ? (
-        <div className={styles.wheelEmpty}>
-          <p>Колесо пока пустое. Пройди анкеты по 33 навыкам БС — каждая добавит точку самооценки. По мере прохождения колесо наполняется реальной разбивкой по архетипам.</p>
-          {onContinueSurveys && (
-            <button
-              type="button"
-              className={styles.wheelCta}
-              onClick={onContinueSurveys}
-            >
-              Начать анкеты →
-            </button>
+      <div className={styles.stageBadge}>{stageLabel}</div>
+
+      <div className={`${styles.svgWrap} ${styles[`stage_${globalStage}`]} ${isLocked ? styles.lockedSvg : ''}`}>
+        <svg
+          viewBox="0 0 320 320"
+          xmlns="http://www.w3.org/2000/svg"
+          className={`${styles.svg} ${showPulse ? styles.svgPulse : ''}`}
+        >
+          {/* Подложка квадрантов — насыщенность зависит от индивидуальной стадии. */}
+          {archeStates.map(({ key, qi, stage }) => {
+            const opacity =
+              stage === 'masterful' ? 0.18 :
+              stage === 'strong'    ? 0.13 :
+              stage === 'medium'    ? 0.10 :
+              stage === 'light'     ? 0.08 : 0.05
+            return (
+              <path
+                key={`bg-${key}`}
+                d={wedgePath(qi * 90, qi * 90 + 90, R_INNER, R_OUTER + 4)}
+                fill={ARCHETYPE_COLORS[key]}
+                opacity={opacity}
+              />
+            )
+          })}
+
+          {/* Per-quadrant glow на strong+ — мягкое сияние под закрашенной частью. */}
+          {archeStates.map(({ key, qi, avg, stage }) => {
+            if (!Number.isFinite(avg)) return null
+            if (stage !== 'strong' && stage !== 'masterful') return null
+            const length = R_INNER + (avg / 10) * R_AVAILABLE
+            return (
+              <path
+                key={`glow-${key}`}
+                d={wedgePath(qi * 90 + 1.5, qi * 90 + 88.5, R_INNER, length)}
+                fill={ARCHETYPE_COLORS[key]}
+                opacity={0.25}
+                filter={`blur(6px)`}
+              />
+            )
+          })}
+
+          {/* Заливка квадрантов по avg архетипа — всегда яркая. */}
+          {archeStates.map(({ key, qi, avg }) => {
+            if (!Number.isFinite(avg)) return null
+            const length = R_INNER + (avg / 10) * R_AVAILABLE
+            return (
+              <path
+                key={`sector-${key}`}
+                d={wedgePath(qi * 90 + 1.5, qi * 90 + 88.5, R_INNER, length)}
+                fill={ARCHETYPE_COLORS[key]}
+                opacity={0.92}
+              />
+            )
+          })}
+
+          {/* Звёздочки внутри закрашенной части */}
+          {archeStates.map(({ key, qi, avg, completedSkills, stage }) => {
+            if (completedSkills.length === 0 || !Number.isFinite(avg)) return null
+            const filledOuter = R_INNER + (avg / 10) * R_AVAILABLE
+            const innerR = R_INNER + 4
+            const outerR = Math.max(innerR + 2, filledOuter - 4)
+            return (
+              <g key={`stars-${key}`} className={stage === 'masterful' ? styles.starsTwinkle : ''}>
+                {completedSkills.map((skill) => {
+                  const rng = makeRng(seedFromString(skill.id))
+                  const angleFrac = 0.06 + rng() * 0.88
+                  const angle = qi * 90 + angleFrac * 90
+                  const radFrac = 0.1 + rng() * 0.8
+                  const radius = innerR + radFrac * (outerR - innerR)
+                  const p = polar(angle, radius)
+                  const baseSize = filledOuter - R_INNER < 25 ? 1.6 : 2.4
+                  const size = baseSize + rng() * 1.2
+                  const opacity = 0.65 + rng() * 0.3
+                  return <Star key={skill.id} x={p.x} y={p.y} size={size} opacity={opacity} />
+                })}
+              </g>
+            )
+          })}
+
+          {/* Per-quadrant corona-dots на medium+ архетипе */}
+          {archeStates.map(({ key, qi, stage, completed, total }) => {
+            if (stage === 'pre' || stage === 'light') return null
+            const dots = stage === 'masterful' ? 9 : stage === 'strong' ? 7 : 5
+            const radius = R_OUTER + 7
+            return (
+              <QuadrantCorona
+                key={`corona-${key}`}
+                qi={qi}
+                color={ARCHETYPE_COLORS[key]}
+                dots={dots}
+                radius={radius}
+                size={stage === 'masterful' ? 1.8 : 1.4}
+                opacity={stage === 'masterful' ? 0.85 : stage === 'strong' ? 0.7 : 0.55}
+              />
+            )
+          })}
+
+          {/* Per-quadrant tally marks на внешнем ring — одна полоска на пройденную анкету.
+              Цвет архетипа, тонкая. Видны всегда (от 1 завершённой). */}
+          {archeStates.map(({ key, qi, completed, total }) => (
+            <TallyMarks
+              key={`tally-${key}`}
+              qi={qi}
+              count={completed}
+              total={total}
+              radius={R_OUTER + 4}
+              length={5}
+              color={ARCHETYPE_COLORS[key]}
+              opacity={0.85}
+            />
+          ))}
+
+          {/* Внутренние арки внутри секторов на strong+ — добавляют слой деталей */}
+          {archeStates.map(({ key, qi, avg, stage }) => {
+            if (stage !== 'strong' && stage !== 'masterful') return null
+            if (!Number.isFinite(avg)) return null
+            const length = R_INNER + (avg / 10) * R_AVAILABLE
+            // Тонкая дуга на середине высоты сектора.
+            const arcR = R_INNER + (length - R_INNER) * 0.55
+            return (
+              <path
+                key={`inner-arc-${key}`}
+                d={arcPath(qi * 90 + 12, qi * 90 + 78, arcR)}
+                fill="none"
+                stroke="white"
+                strokeOpacity={0.18}
+                strokeWidth={0.8}
+              />
+            )
+          })}
+
+          {/* Outer ring — всегда. Динамически меняет толщину. */}
+          <circle
+            cx={CX} cy={CY} r={R_OUTER + 4}
+            fill="none"
+            stroke="currentColor"
+            strokeOpacity={
+              globalStage === 'masterful' ? 0.75 :
+              globalStage === 'strong'    ? 0.6 :
+              globalStage === 'medium'    ? 0.5 :
+              globalStage === 'light'     ? 0.45 : 0.4
+            }
+            strokeWidth={globalStage === 'pre' ? 1.2 : 1.6}
+          />
+          {showDoubleRing && (
+            <circle
+              cx={CX} cy={CY} r={R_OUTER + 9}
+              fill="none"
+              stroke="currentColor"
+              strokeOpacity={globalStage === 'masterful' ? 0.5 : 0.32}
+              strokeWidth={0.9}
+            />
           )}
-          <p className={styles.wheelEmptyHint}>Всего {progress.total} анкет, 5 блоков × 3 утверждения в каждой.</p>
-        </div>
-      ) : (
-        <>
-          <div className={styles.wheelArches}>
-            {ARCHETYPE_KEYS.map(key => {
-              const arche = ARCHETYPES[key]
-              const avg = calcArchetypeAvg(skills, key)
-              const skillsInBranch = SKILL_TREE[key] ?? []
-              const completed = skillsInBranch.filter(s => Number.isFinite(skills?.[s.id]?.result)).length
-              const total = skillsInBranch.length
-              const pct = Number.isFinite(avg) ? (avg / 10) * 100 : 0
+          {globalStage === 'masterful' && (
+            <circle
+              cx={CX} cy={CY} r={R_OUTER + 16}
+              fill="none"
+              stroke="currentColor"
+              strokeOpacity={0.35}
+              strokeWidth={0.8}
+              strokeDasharray="2 5"
+            />
+          )}
+
+          {/* Жемчужины-компас в углах квадрантов */}
+          <CompassMarks globalStage={globalStage} radius={R_OUTER + (showDoubleRing ? 9 : 4)} />
+
+          {/* Декоративные арки между квадрантами на strong+ */}
+          {showMasterArcs && (
+            <MasterfulArcs radius={R_OUTER + 12} />
+          )}
+
+          {/* Спицы между квадрантами — на strong+ только если все архетипы strong+;
+              иначе остаются обычные separators. */}
+          {globalStageIdx >= STAGE_ORDER.indexOf('strong') ? (
+            QUADRANT_ORDER.map((_, qi) => {
+              const angle = qi * 90
+              const p1 = polar(angle, R_INNER + 2)
+              const p2 = polar(angle, R_OUTER + 12)
               return (
-                <div key={key} className={styles.arche}>
-                  <div className={styles.archeHead}>
-                    <div className={styles.archeTitleBlock}>
-                      <span className={styles.archeGlyph}>{arche.glyph}</span>
-                      <span className={styles.archeName}>{arche.name}</span>
-                    </div>
-                    <span className={styles.archeAvg}>
-                      {Number.isFinite(avg) ? avg.toFixed(1) : '—'}
-                      <span className={styles.archeAvgTotal}>/10</span>
-                    </span>
-                  </div>
-                  <div className={styles.archeBar}>
-                    <div className={styles.archeBarFill} style={{ width: `${pct}%` }} />
-                  </div>
-                  <div className={styles.archeFoot}>
-                    <span className={styles.archeSub}>{arche.subtitle}</span>
-                    <span className={styles.archeProgress}>{completed} / {total}</span>
-                  </div>
-                </div>
+                <line
+                  key={`spoke-${qi}`}
+                  x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
+                  stroke="currentColor"
+                  strokeOpacity={0.6}
+                  strokeWidth={1.5}
+                />
               )
-            })}
-          </div>
-
-          <div className={styles.wheelFoot}>
-            Пройдено {progress.completed} из {progress.total} анкет.
-            {progress.remaining > 0 && ` Осталось ${progress.remaining}.`}
-          </div>
-
-          {hasMore && onContinueSurveys && (
-            <button
-              type="button"
-              className={styles.wheelCta}
-              onClick={onContinueSurveys}
-            >
-              Продолжить анкеты · {progress.remaining} →
-            </button>
+            })
+          ) : (
+            QUADRANT_ORDER.map((_, qi) => {
+              const angle = qi * 90
+              const p1 = polar(angle, R_INNER + 2)
+              const p2 = polar(angle, R_OUTER + 4)
+              return (
+                <line
+                  key={`sep-${qi}`}
+                  x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
+                  stroke="currentColor"
+                  strokeOpacity={
+                    globalStage === 'medium' ? 0.4 :
+                    globalStage === 'light'  ? 0.3 : 0.22
+                  }
+                  strokeWidth={1}
+                />
+              )
+            })
           )}
-        </>
+
+          {/* Внутренние концентры у центра — на medium+ */}
+          {showInnerDetail && (
+            <>
+              <circle
+                cx={CX} cy={CY} r={R_INNER + 8}
+                fill="none"
+                stroke="currentColor"
+                strokeOpacity={0.18}
+                strokeWidth={0.6}
+                strokeDasharray="1 2"
+              />
+            </>
+          )}
+
+          {/* Inner ring around centre — на strong+ */}
+          {showInnerRing && (
+            <circle
+              cx={CX} cy={CY} r={R_INNER + 5}
+              fill="none"
+              stroke="currentColor"
+              strokeOpacity={0.4}
+              strokeWidth={1}
+            />
+          )}
+
+          {/* Center disk + текст */}
+          <circle
+            cx={CX} cy={CY} r={showBigBadge ? R_INNER + 2 : R_INNER - 2}
+            fill="var(--surface-2, #1c1d25)"
+            stroke="currentColor"
+            strokeOpacity={
+              globalStage === 'masterful' ? 0.75 :
+              globalStage === 'strong'    ? 0.6 : 0.5
+            }
+            strokeWidth={1.2}
+            className={showGlow ? styles.centerGlow : ''}
+          />
+          <text
+            x={CX} y={showBigBadge ? CY - 4 : CY - 2}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="currentColor"
+            fontSize={showBigBadge ? 17 : 14}
+            fontWeight="700"
+          >
+            {Number.isFinite(bsScore) ? bsScore.toFixed(1) : '—'}
+          </text>
+          <text
+            x={CX} y={showBigBadge ? CY + 12 : CY + 11}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="currentColor"
+            fontSize={showBigBadge ? 9 : 8}
+            opacity={0.65}
+            letterSpacing="0.1em"
+          >
+            БС
+          </text>
+
+          {/* Glyphs архетипов снаружи — всегда */}
+          {archeStates.map(({ key, qi, stage }) => {
+            const arche = ARCHETYPES[key]
+            const midAngle = qi * 90 + 45
+            const farOut = stage === 'masterful' || stage === 'strong'
+            const pos = polar(midAngle, R_OUTER + (farOut ? 30 : 22))
+            const fontSize =
+              stage === 'masterful' ? 18 :
+              stage === 'strong'    ? 16 :
+              stage === 'medium'    ? 15 :
+              stage === 'light'     ? 14 : 13
+            return (
+              <text
+                key={`glyph-${key}`}
+                x={pos.x} y={pos.y}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill={ARCHETYPE_COLORS[key]}
+                fontSize={fontSize}
+                opacity={
+                  stage === 'pre'   ? 0.6 :
+                  stage === 'light' ? 0.85 : 0.95
+                }
+              >
+                {arche.glyph}
+              </text>
+            )
+          })}
+        </svg>
+      </div>
+
+      {/* CTA — скрыто, пока заблокировано (L0 не пройден). */}
+      {!isLocked && progress.remaining > 0 && onContinueSurveys && (
+        <button
+          type="button"
+          className={styles.wheelCta}
+          onClick={onContinueSurveys}
+        >
+          {progress.completed === 0
+            ? 'Начать оценивать →'
+            : `Продолжить · ${progress.remaining} осталось →`}
+        </button>
       )}
+      {!isLocked && progress.remaining === 0 && onContinueSurveys && (
+        <button
+          type="button"
+          className={styles.wheelCta}
+          onClick={onContinueSurveys}
+        >
+          Пересмотреть навыки →
+        </button>
+      )}
+
+      {/* Текстовая разбивка по архетипам — теперь со стадией. */}
+      <div className={styles.archetypeRow}>
+        {archeStates.map(({ key, avg, completed, total, stage }) => {
+          const arche = ARCHETYPES[key]
+          const stageGlyph =
+            stage === 'masterful' ? '★' :
+            stage === 'strong'    ? '✸' :
+            stage === 'medium'    ? '◍' :
+            stage === 'light'     ? '◌' : '♢'
+          return (
+            <div key={key} className={styles.archetype}>
+              <span
+                className={styles.archetypeGlyph}
+                style={{ color: ARCHETYPE_COLORS[key] }}
+              >
+                {arche.glyph}
+              </span>
+              <span className={styles.archetypeName}>{arche.name}</span>
+              <span className={styles.archetypeMeta}>
+                {Number.isFinite(avg) ? `${avg.toFixed(1)}` : '—'} · {stageGlyph} {completed}/{total}
+              </span>
+            </div>
+          )
+        })}
+      </div>
     </section>
   )
 }

@@ -107,13 +107,14 @@ function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSe
         onBack={() => onAspectSelect(null)}
       />
 
-      {/* Мини-колесо БС с разбивкой по 4 архетипам — только на странице БС.
-          Для остальных аспектов появится позже, когда напишем для них анкеты. */}
+      {/* Колесо БС с разбивкой по 4 архетипам — только на странице БС.
+          Заблокировано до прохождения L0 (currentLevel >= 1). */}
       {aspect === 'БС' && (
         <BSWheel
           skills={journey?.skills ?? {}}
           color={color}
           onContinueSurveys={onGoToBSSurveys}
+          isLocked={(journey?.currentLevel ?? 0) < 1}
         />
       )}
 
@@ -373,7 +374,6 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
                   value={noteText}
                   onChange={e => setNoteText(e.target.value)}
                   placeholder="Что отзывается, что хочется попробовать, какие ассоциации…"
-                  autoFocus
                 />
                 <div className={styles.noteFormActions}>
                   <button

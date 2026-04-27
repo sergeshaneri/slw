@@ -3,13 +3,14 @@
 // Сейчас доступны: БС — уровни 0 и 1.
 // Остальные 7 аспектов — заглушки с пометкой «скоро».
 //
-// Каждый уровень содержит core (обязательный маршрут) и pool
-// (опциональные шаги, доступны после прохождения core).
+// Уровень состоит из core-сценария (массив скриптов в линейной
+// последовательности) и опционально `surveys` — анкеты по навыкам
+// аспекта, доступные параллельно через дерево навыков (Колесо).
 
 import {
   BS_ASPECT_INTRO,
-  BS_LEVEL_0_CORE, BS_LEVEL_0_POOL, BS_LEVEL_0_COMPLETE,
-  BS_LEVEL_1_CORE, BS_LEVEL_1_POOL, BS_LEVEL_1_COMPLETE
+  BS_LEVEL_0_CORE, BS_LEVEL_0_SURVEYS, BS_LEVEL_0_COMPLETE,
+  BS_LEVEL_1_CORE, BS_LEVEL_1_COMPLETE
 } from './aspects/bs'
 import { ASPECT_KEYS, ASPECT_DATA, ASPECT_REALMS, ASPECT_COLORS } from '../aspects'
 
@@ -33,7 +34,7 @@ export const JOURNEYS = {
       0: {
         title: 'Первый контакт',
         core: BS_LEVEL_0_CORE,
-        pool: BS_LEVEL_0_POOL,
+        surveys: BS_LEVEL_0_SURVEYS,
         complete: BS_LEVEL_0_COMPLETE,
         // Алиас для совместимости с местами, которые читали `scripts` напрямую.
         scripts: BS_LEVEL_0_CORE
@@ -41,7 +42,6 @@ export const JOURNEYS = {
       1: {
         title: 'Карта и намерение',
         core: BS_LEVEL_1_CORE,
-        pool: BS_LEVEL_1_POOL,
         complete: BS_LEVEL_1_COMPLETE,
         scripts: BS_LEVEL_1_CORE
       }

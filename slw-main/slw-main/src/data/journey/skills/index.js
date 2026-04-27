@@ -5,16 +5,21 @@
 //   - `surveys.md` (копия Si-исходника) — текст 33 анкет.
 //   - `parseSurveys.js` — парсер.
 //
-// Этот модуль экспортирует:
-//   - SURVEYS — мапа skillId → survey-объект (id, name, archetype, blocks).
-//   - getSurvey(skillId)
-//   - calcSurveyResult(answers) — расчёт средних по 15 ответам:
-//       block_avg → skill_avg.
-//   - calcArchetypeAvg(skills, archetypeKey)
-//   - calcBSScoreFromSkills(skills) — общая оценка БС из самооценок навыков.
+// Прогрессивная анкета:
+//   В каждом блоке 3 утверждения. Юзер может пройти за 1, 2 или 3 «прохода»
+//   по 5 утверждений. Pass=1 — берём первое утверждение из каждого блока,
+//   pass=2 — второе, pass=3 — третье. После N проходов средние пересчитываются
+//   по фактически имеющимся ответам (не по нулевым).
 //
 // `skills` — объект из state journey:
-//   { [skillId]: { result: number, blocks: { [blockKey]: number }, completedAt } }
+//   { [skillId]: {
+//       result: number,
+//       blocks: { [blockKey]: number },
+//       answers: { [blockKey]: [n1, n2?, n3?] },  // длина 1..3
+//       passes: 1 | 2 | 3,
+//       insights: [{ text, completedAt, pass }],
+//       completedAt: number
+//   } }
 
 import { parseSurveys } from './parseSurveys'
 import surveysMd from './surveys.md?raw'
@@ -36,11 +41,11 @@ export function getSurvey(skillId) {
 }
 
 // Считает средние блоков и общую среднюю по навыку.
-// answers — { [blockKey]: number[] } (3 числа в каждом блоке, шкала 1-10).
+// answers — { [blockKey]: number[] } (1..3 числа в каждом блоке, шкала 1-10).
 // Возвращает { blocks: { [blockKey]: avg }, skill: avg }.
-// avg по блоку — среднее 3 утверждений.
-// avg по навыку — среднее 5 средних блоков (НЕ среднее 15 утверждений
-// напрямую, чтобы каждый блок весил одинаково — это и просил юзер).
+// avg по блоку — среднее имеющихся утверждений (1, 2 или 3).
+// avg по навыку — среднее 5 средних блоков (каждый блок весит одинаково).
+// Если в блоке нет ответов — он не учитывается в skill avg.
 export function calcSurveyResult(answers) {
   const blocks = {}
   const blockAvgs = []
@@ -57,6 +62,76 @@ export function calcSurveyResult(answers) {
     ? blockAvgs.reduce((s, n) => s + n, 0) / blockAvgs.length
     : null
   return { blocks, skill }
+}
+
+// Сколько проходов уже сделано по навыку.
+// passes = max длина массива ответов по всем блокам (если есть answers),
+// иначе stored passes (для обратной совместимости).
+export function getCompletedPasses(skillEntry) {
+  if (!skillEntry) return 0
+  if (Number.isFinite(skillEntry.passes)) return skillEntry.passes
+  // Fallback: вычисляем по answers (на случай миграции старых записей).
+  const answers = skillEntry.answers ?? {}
+  let max = 0
+  for (const key of SURVEY_BLOCK_KEYS) {
+    const arr = answers[key] ?? []
+    const len = arr.filter(n => Number.isFinite(n)).length
+    if (len > max) max = len
+  }
+  return max
+}
+
+// Какой будет следующий проход (1, 2 или 3). Возвращает 0 если все 3 пройдены
+// (для UI «больше нечего проходить»).
+export function getNextPass(skillEntry) {
+  const done = getCompletedPasses(skillEntry)
+  return done >= 3 ? 0 : done + 1
+}
+
+// Глубина навыка для UI. 'idle' = ничего не пройдено, 'light' = 1 проход,
+// 'medium' = 2 прохода, 'full' = 3. Используется в SkillTree, BSWheel.
+export function getSkillDepth(skillEntry) {
+  const passes = getCompletedPasses(skillEntry)
+  if (passes === 0) return 'idle'
+  if (passes === 1) return 'light'
+  if (passes === 2) return 'medium'
+  return 'full'
+}
+
+// Возвращает 5 утверждений для конкретного прохода — по одному из каждого
+// блока, индекс утверждения = pass - 1.
+// Возвращает [{blockKey, statement, statementIndex, pass}], всегда 5 элементов
+// (если в блоке меньше 3 утверждений — возьмём последнее существующее).
+export function getStatementsForPass(survey, pass) {
+  if (!survey || !pass) return []
+  const stmtIndex = Math.max(0, Math.min(2, pass - 1))
+  const out = []
+  for (const blockKey of SURVEY_BLOCK_KEYS) {
+    const arr = survey.blocks?.[blockKey] ?? []
+    if (arr.length === 0) continue
+    const idx = Math.min(stmtIndex, arr.length - 1)
+    out.push({ blockKey, statement: arr[idx], statementIndex: idx, pass })
+  }
+  return out
+}
+
+// Возвращает все утверждения от startPass до endPass включительно — для
+// «полного» режима. На startPass=1, endPass=3 → 15 утверждений.
+// Сначала идут все 5 утверждений pass-1, потом pass-2, потом pass-3.
+export function getStatementsForFullRange(survey, startPass, endPass = 3) {
+  if (!survey) return []
+  const out = []
+  for (let p = startPass; p <= endPass; p++) {
+    out.push(...getStatementsForPass(survey, p))
+  }
+  return out
+}
+
+// Универсальный билдер: вернёт нужный список утверждений по mode/startPass.
+// mode: 'short' = только startPass; 'full' = от startPass до 3.
+export function buildSurveyStatements(survey, mode, startPass) {
+  if (mode === 'full') return getStatementsForFullRange(survey, startPass, 3)
+  return getStatementsForPass(survey, startPass)
 }
 
 // Среднее по архетипу. skills — мапа state.skills.

@@ -144,3 +144,45 @@ class WebDiaryEntry(Base):
     source: Mapped[str] = mapped_column(Text, default="web")
     extra: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # promptTitle, prompt, scriptId, etc.
     created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+# ── Sync layer ──────────────────────────────────────────────────────────────
+# Bot → Web event-лог. Бот пишет step_completed на каждом advance; web
+# подтягивает и обогащает свой completedScripts. См. CLAUDE.md "Sync layer".
+# Поля aspect/level/short_id — уже распарсенный bot-id для прямого матча с
+# web-форматом (см. content.loader.short_id_for).
+
+class JourneyEvent(Base):
+    __tablename__ = "journey_events"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    web_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source: Mapped[str] = mapped_column(Text)            # 'bot' | 'web'
+    type: Mapped[str] = mapped_column(Text)              # 'step_completed' пока единственный
+    aspect: Mapped[str | None] = mapped_column(Text, nullable=True)
+    level: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    short_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    step_id: Mapped[str | None] = mapped_column(Text, nullable=True)  # full bot-id for debugging
+    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+# ── AI coach summon ─────────────────────────────────────────────────────────
+# Каждый вызов ИИ-коуча. Используется для квоты (count today) и для UI-истории.
+
+class CoachCall(Base):
+    __tablename__ = "coach_calls"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    web_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("web_users.id"))
+    prompt: Mapped[str] = mapped_column(Text)
+    response: Mapped[str | None] = mapped_column(Text, nullable=True)
+    focus_aspect: Mapped[str | None] = mapped_column(Text, nullable=True)
+    paid_with_stardust: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    tokens_in: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tokens_out: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)

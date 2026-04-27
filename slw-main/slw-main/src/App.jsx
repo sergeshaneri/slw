@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Header from './components/Header/Header'
 import WheelView from './components/WheelView/WheelView'
 import AspectsView from './components/AspectsView/AspectsView'
 import DiaryView from './components/DiaryView/DiaryView'
 import ProgressView from './components/ProgressView/ProgressView'
 import JourneyView, { DEFAULT_JOURNEY } from './components/JourneyView/JourneyView'
+import CoachView from './components/CoachView/CoachView'
 import SettingsView from './components/SettingsView/SettingsView'
 import LoadingScreen from './components/LoadingScreen/LoadingScreen'
 import AuthModal from './components/Auth/AuthModal'
 import WelcomeScreen from './components/Welcome/WelcomeScreen'
+import Footer from './components/Footer/Footer'
 import { ASPECT_KEYS } from './data/aspects'
 import { ru } from './locales/ru'
 import { useAuth } from './hooks/useAuth'
@@ -17,6 +19,7 @@ import {
   fetchScores, saveScores as apiSaveScores,
   fetchDiary, postDiaryEntry,
   fetchBotState,
+  fetchEvents,
 } from './api/client'
 import styles from './App.module.css'
 
@@ -59,7 +62,31 @@ export default function App() {
   const [welcomeDismissed, setWelcomeDismissed] = useState(
     () => localStorage.getItem('welcome_seen') === '1'
   )
+  // devAdmin: «пасхалочный» админский режим без бэка. Включается кликом по
+  // невидимой точке (см. ProgressView → onToggleDevAdmin). Хранится в
+  // localStorage, переживает logout и новые сессии. ИЛИ-сложение с user.is_admin.
+  const [devAdmin, setDevAdmin] = useState(
+    () => localStorage.getItem('slw_dev_admin') === '1'
+  )
+  const toggleDevAdmin = () => {
+    setDevAdmin(prev => {
+      const next = !prev
+      if (next) localStorage.setItem('slw_dev_admin', '1')
+      else localStorage.removeItem('slw_dev_admin')
+      return next
+    })
+  }
+  const isAdmin = (user?.is_admin === true) || devAdmin
   const t = ru
+
+  // Скроллим `.main` наверх при смене view или selectedAspect.
+  // Без этого позиция сохраняется и страница может оказаться на середине/внизу.
+  // Чат (journey) сам управляет скроллом — его не трогаем.
+  const mainRef = useRef(null)
+  useEffect(() => {
+    if (view === 'journey') return
+    if (mainRef.current) mainRef.current.scrollTop = 0
+  }, [view, selectedAspect])
 
   // Загрузка данных при изменении статуса auth.
   // Залогинен → API. Гость → localStorage.
@@ -75,11 +102,12 @@ export default function App() {
   const loadFromApi = async () => {
     setDataLoading(true)
     try {
-      const [stateRes, scoresRes, diaryRes, botSync] = await Promise.all([
+      const [stateRes, scoresRes, diaryRes, botSync, eventsRes] = await Promise.all([
         fetchState(),
         fetchScores(),
         fetchDiary(),
         fetchBotState().catch(() => null),
+        fetchEvents(0).catch(() => ({ events: [] })),
       ])
 
       // Bot position: apply aspect/level/streak from bot if Telegram is linked
@@ -101,6 +129,30 @@ export default function App() {
           journeyOverride = {
             ...(journeyOverride ?? {}),
             streak: Math.max(journeyOverride?.streak ?? 0, bs.streak_days),
+          }
+        }
+      }
+
+      // Bot → Web events: дописываем в journey.completedScripts шаги, которые
+      // юзер прошёл в TG-боте, scoped под текущий (currentAspect, currentLevel).
+      // Web хранит short_id (`T-1`/`intro-1`) — бэк уже отдаёт распарсенные.
+      const botEvents = (eventsRes?.events ?? []).filter(
+        e => e.source === 'bot' && e.type === 'step_completed' && e.short_id
+      )
+      if (botEvents.length > 0) {
+        const aspect = journeyOverride?.currentAspect
+        const level = journeyOverride?.currentLevel ?? 0
+        if (aspect) {
+          const fromBot = botEvents
+            .filter(e => e.aspect === aspect && (e.level ?? 0) === level)
+            .map(e => e.short_id)
+          if (fromBot.length > 0) {
+            const merged = new Set(journeyOverride?.completedScripts ?? [])
+            fromBot.forEach(id => merged.add(id))
+            journeyOverride = {
+              ...(journeyOverride ?? {}),
+              completedScripts: Array.from(merged),
+            }
           }
         }
       }
@@ -188,7 +240,8 @@ export default function App() {
 
   const goToJourney = async (screen) => {
     // Путешествие требует авторизации — гостям показываем AuthModal.
-    if (!user) {
+    // Исключение: dev-admin (пасхалка) пускает без логина.
+    if (!user && !devAdmin) {
       setShowAuth(true)
       return
     }
@@ -197,8 +250,12 @@ export default function App() {
   }
 
   const goToBSSurveys = async () => {
-    if (!user) {
+    if (!user && !devAdmin) {
       setShowAuth(true)
+      return
+    }
+    // L0 должен быть пройден (currentLevel >= 1). Админу можно всегда.
+    if (!isAdmin && (journey?.currentLevel ?? 0) < 1) {
       return
     }
     await saveJourney({ ...journey, currentAspect: 'БС', screen: 'skill-tree', awaitingInput: null })
@@ -215,7 +272,13 @@ export default function App() {
   }
 
   const handleViewChange = (newView) => {
-    if (newView === 'journey' && !user) {
+    if (newView === 'journey' && !user && !devAdmin) {
+      setShowAuth(true)
+      return
+    }
+    // Коуч требует авторизации — бэк всё равно отобьёт без JWT,
+    // но проверяем здесь чтобы не показывать пустой экран с ошибкой.
+    if (newView === 'coach' && !user) {
       setShowAuth(true)
       return
     }
@@ -264,7 +327,10 @@ export default function App() {
         />
       )}
 
-      <main className={view === 'journey' ? styles.mainJourney : styles.main}>
+      <main
+        ref={mainRef}
+        className={view === 'journey' ? styles.mainJourney : styles.main}
+      >
         {view === 'wheel' && (
           <WheelView
             scores={scores}
@@ -290,7 +356,7 @@ export default function App() {
             diary={diary}
             onDiaryChange={saveDiary}
             t={t}
-            isAdmin={user?.is_admin === true}
+            isAdmin={isAdmin}
           />
         )}
 
@@ -316,11 +382,22 @@ export default function App() {
           />
         )}
 
+        {view === 'coach' && (
+          <CoachView
+            diary={diary}
+            onDiaryChange={saveDiary}
+            journey={journey}
+            onJourneyChange={saveJourney}
+          />
+        )}
+
         {view === 'progress' && (
           <ProgressView
             history={history}
             scores={scores}
             t={t}
+            onToggleDevAdmin={toggleDevAdmin}
+            devAdmin={devAdmin}
           />
         )}
 
@@ -335,6 +412,8 @@ export default function App() {
             onLogout={logout}
           />
         )}
+
+        {view !== 'journey' && <Footer />}
       </main>
     </div>
   )
