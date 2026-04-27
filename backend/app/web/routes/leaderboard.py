@@ -3,26 +3,39 @@ Leaderboard:
 
   GET /api/leaderboard?limit=20  — топ юзеров по XP
 
-XP = количество завершённых шагов в `journey_events` (`type='step_completed'`).
-Считается **в обоих источниках**:
-  • web — через `journey_events.web_user_id = web_users.id`
-  • bot — через `journey_events.telegram_id = web_users.telegram_id`
-    (бот пишет события только с telegram_id; маппинг через web_users)
+XP считается из двух источников и берётся MAX:
+  1. journey_events (`type='step_completed'`):
+       • events.web_user_id = web_users.id (события от web — пока не пишутся)
+       • events.telegram_id = web_users.telegram_id (события от бота)
+  2. web_state.journey -> 'completedScripts' (массив short_id, фронт его
+     обновляет и при прохождении в вебе, и при подтягивании bot-events).
+
+Зачем MAX, а не сумма: фронт мерджит bot-events в completedScripts при
+каждой загрузке, поэтому списки часто пересекаются — суммирование завысит.
 
 Юзеры с приватным профилем (public_profiles.is_public=false) исключаются.
-Юзеры без журнал-событий (нулевой XP) исключаются — иначе пустой список
-свежих регистраций перебивает реальных активных.
+Юзеры с XP=0 в топ не попадают — иначе свежие регистрации перебивают
+реальных активных.
 
 Эндпоинт публичный (без auth) — это «витрина» приложения.
 """
 from fastapi import APIRouter, Depends
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import JourneyEvent, PublicProfile, WebUser
+from app.db.models import JourneyEvent, PublicProfile, WebState, WebUser
 from app.db.session import get_session
 
 router = APIRouter()
+
+
+def _scripts_count(journey: object) -> int:
+    if not isinstance(journey, dict):
+        return 0
+    cs = journey.get("completedScripts")
+    if isinstance(cs, list):
+        return len(cs)
+    return 0
 
 
 @router.get("/leaderboard")
@@ -32,46 +45,68 @@ async def get_leaderboard(
 ) -> list:
     limit = max(1, min(limit, 100))
 
-    # JOIN web_users → journey_events по любому из ключей:
-    #   • прямой web_user_id
-    #   • telegram_id (если у юзера привязан TG)
-    # COUNT(DISTINCT id) — на случай если позже event запишется с обоими
-    # полями: не дублируем в счёте.
-    xp_col = func.count(func.distinct(JourneyEvent.id)).label("xp")
-
-    rows = (
+    # Все юзеры с не-скрытым профилем (нет записи в public_profiles
+    # = по умолчанию публичный).
+    users_rows = (
         await session.execute(
-            select(WebUser, xp_col, PublicProfile)
-            .join(
-                JourneyEvent,
-                and_(
-                    JourneyEvent.type == "step_completed",
-                    or_(
-                        JourneyEvent.web_user_id == WebUser.id,
-                        and_(
-                            WebUser.telegram_id.is_not(None),
-                            JourneyEvent.telegram_id == WebUser.telegram_id,
-                        ),
-                    ),
-                ),
-            )
+            select(WebUser, PublicProfile)
             .outerjoin(PublicProfile, PublicProfile.web_user_id == WebUser.id)
-            # Скрытые профили исключаем; для юзеров без записи в
-            # public_profiles считаем по умолчанию публичными.
             .where(
                 or_(
                     PublicProfile.is_public.is_(None),
                     PublicProfile.is_public.is_(True),
                 )
             )
-            .group_by(WebUser.id, PublicProfile.web_user_id)
-            .order_by(xp_col.desc())
-            .limit(limit)
         )
     ).all()
 
+    # Bulk-счётчики событий, чтобы не делать N запросов.
+    tg_counts: dict[int, int] = {
+        int(tid): int(c)
+        for tid, c in (
+            await session.execute(
+                select(JourneyEvent.telegram_id, func.count())
+                .where(
+                    JourneyEvent.type == "step_completed",
+                    JourneyEvent.telegram_id.is_not(None),
+                )
+                .group_by(JourneyEvent.telegram_id)
+            )
+        ).all()
+    }
+    web_counts: dict[int, int] = {
+        int(wid): int(c)
+        for wid, c in (
+            await session.execute(
+                select(JourneyEvent.web_user_id, func.count())
+                .where(
+                    JourneyEvent.type == "step_completed",
+                    JourneyEvent.web_user_id.is_not(None),
+                )
+                .group_by(JourneyEvent.web_user_id)
+            )
+        ).all()
+    }
+
+    # web_state.journey для всех — нужен completedScripts.length.
+    state_rows = (await session.execute(select(WebState))).scalars().all()
+    state_map = {s.web_user_id: s.journey for s in state_rows}
+
+    items = []
+    for user, profile in users_rows:
+        events_xp = web_counts.get(user.id, 0)
+        if user.telegram_id:
+            events_xp += tg_counts.get(user.telegram_id, 0)
+        scripts_xp = _scripts_count(state_map.get(user.id))
+        xp = max(events_xp, scripts_xp)
+        if xp > 0:
+            items.append((user, profile, xp))
+
+    items.sort(key=lambda t: t[2], reverse=True)
+    items = items[:limit]
+
     out = []
-    for rank, (user, xp, profile) in enumerate(rows, start=1):
+    for rank, (user, profile, xp) in enumerate(items, start=1):
         display_name = (
             user.display_name
             or user.telegram_first_name
@@ -82,7 +117,7 @@ async def get_leaderboard(
             "rank": rank,
             "user_id": user.id,
             "display_name": display_name,
-            "xp": int(xp),
+            "xp": xp,
             "focus_aspects": focus,
         })
     return out

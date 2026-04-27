@@ -26,6 +26,7 @@ from app.db.models import (
     JourneyEvent,
     PublicProfile,
     WebScore,
+    WebState,
     WebUser,
 )
 from app.db.session import get_session
@@ -121,19 +122,23 @@ def _display_name(user: WebUser) -> str:
 
 
 async def _xp(session: AsyncSession, user: WebUser) -> int:
-    """Серверный XP-эквивалент: количество завершённых шагов в journey_events.
+    """Серверный XP-эквивалент: MAX между journey_events и completedScripts.
 
-    Считается по обоим ключам:
-      • journey_events.web_user_id = user.id (события от web)
-      • journey_events.telegram_id = user.telegram_id (события от бота)
-    Бот пишет только telegram_id, поэтому без этого OR XP всегда был бы 0
-    у юзеров, проходящих сценарии в TG.
+    Источники:
+      1. journey_events.web_user_id == user.id (события от веба — пока никто
+         не пишет, заготовка)
+      2. journey_events.telegram_id == user.telegram_id (события от бота)
+      3. web_state.journey -> 'completedScripts' (массив id шагов, веб-чат
+         туда дописывает; фронт также мерджит туда bot-события).
+
+    Берём MAX (а не SUM): фронт уже мерджит bot-events в completedScripts,
+    поэтому суммирование задвоит. См. также leaderboard.py.
     """
     from sqlalchemy import and_, or_
     conditions = [JourneyEvent.web_user_id == user.id]
     if user.telegram_id:
         conditions.append(JourneyEvent.telegram_id == user.telegram_id)
-    count = (
+    events_xp = int((
         await session.execute(
             select(func.count(func.distinct(JourneyEvent.id)))
             .where(
@@ -143,8 +148,16 @@ async def _xp(session: AsyncSession, user: WebUser) -> int:
                 )
             )
         )
-    ).scalar_one()
-    return int(count)
+    ).scalar_one())
+
+    state = await session.get(WebState, user.id)
+    scripts_xp = 0
+    if state and isinstance(state.journey, dict):
+        cs = state.journey.get("completedScripts")
+        if isinstance(cs, list):
+            scripts_xp = len(cs)
+
+    return max(events_xp, scripts_xp)
 
 
 async def _profile_payload(
