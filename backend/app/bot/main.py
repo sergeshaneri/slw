@@ -80,6 +80,11 @@ def build() -> "Application":
             ],
         },
         fallbacks=[
+            # /go и /resume — также fallback, чтобы юзер мог рестартануть
+            # из любого состояния (например, после /reset, который чистит
+            # БД но не FSM-состояние диалога).
+            CommandHandler("go", cmd_go),
+            CommandHandler("resume", cmd_resume),
             CommandHandler("start", cmd_start),
             CommandHandler("note", cmd_note),
             CommandHandler("profile", cmd_profile),

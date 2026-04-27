@@ -80,6 +80,14 @@ export function getBlockItems(block, data) {
         label: p.name,
         text: `${p.name}\n\n${p.desc}`
       }))
+    case 'titledList': {
+      const items = data[field] || []
+      return items.map((p, i) => ({
+        id: `${blockId}-${i}`,
+        label: p.name,
+        text: `${p.name}\n\n${p.desc}`
+      }))
+    }
     case 'archetypePath':
       return (data.archetypePath ?? []).map((p, i) => ({
         id: `${blockId}-${i}`,
@@ -196,6 +204,24 @@ export const BLOCKS = [
     kind: 'assessment',
     has: d => d.selfAssessment?.length > 0
   },
+  {
+    id: 'historicalFigures',
+    level: 1,
+    title: 'Известные личности',
+    lead: 'Двадцать фигур из истории — десять зрелых проявлений и десять теневых.',
+    kind: 'titledList',
+    field: 'historicalFigures',
+    has: d => d.historicalFigures?.length > 0
+  },
+  {
+    id: 'art',
+    level: 1,
+    title: 'Искусство',
+    lead: 'Книги, фильмы, картины и музыка, в которых живёт сенсорная природа аспекта.',
+    kind: 'titledList',
+    field: 'art',
+    has: d => d.art?.length > 0
+  },
 
   // ── Уровень 2 ─────────────────────────────────────────────
   {
@@ -247,6 +273,24 @@ export const BLOCKS = [
     kind: 'practices',
     has: d => d.practices?.length > 0
   },
+  {
+    id: 'myths',
+    level: 2,
+    title: 'Мифы и Боги',
+    lead: 'Мифологические образы и архетипы, в которых проступает аспект.',
+    kind: 'titledList',
+    field: 'myths',
+    has: d => d.myths?.length > 0
+  },
+  {
+    id: 'quotes',
+    level: 2,
+    title: 'Цитаты',
+    lead: 'Подборка цитат — каждая с короткой привязкой к теме аспекта.',
+    kind: 'titledList',
+    field: 'quotes',
+    has: d => d.quotes?.length > 0
+  },
 
   // ── Уровень 3 ─────────────────────────────────────────────
   {
@@ -281,5 +325,23 @@ export const BLOCKS = [
     lead: 'Как аспект живёт в теле — в тени и в даре.',
     kind: 'somatic',
     has: d => !!d.somatic
+  },
+  {
+    id: 'culturalDifferences',
+    level: 3,
+    title: 'Культурные отличия',
+    lead: 'Как аспект преломляется в разных культурах — японской, французской, русской.',
+    kind: 'numberedList',
+    field: 'culturalDifferences',
+    has: d => d.culturalDifferences?.length > 0
+  },
+  {
+    id: 'childRaising',
+    level: 3,
+    title: 'Как привить ребёнку',
+    lead: 'Практические пункты по передаче ценностей аспекта детям через действия и среду.',
+    kind: 'titledList',
+    field: 'childRaising',
+    has: d => d.childRaising?.length > 0
   }
 ]

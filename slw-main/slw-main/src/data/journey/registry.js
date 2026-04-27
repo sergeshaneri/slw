@@ -1,6 +1,6 @@
 // Реестр путешествий по аспектам.
 //
-// Сейчас доступны: БС — уровни 0 и 1.
+// Сейчас доступны: БС — уровни 0, 1 и 2.
 // Остальные 7 аспектов — заглушки с пометкой «скоро».
 //
 // Уровень состоит из core-сценария (массив скриптов в линейной
@@ -10,7 +10,8 @@
 import {
   BS_ASPECT_INTRO,
   BS_LEVEL_0_CORE, BS_LEVEL_0_SURVEYS, BS_LEVEL_0_COMPLETE,
-  BS_LEVEL_1_CORE, BS_LEVEL_1_COMPLETE
+  BS_LEVEL_1_CORE, BS_LEVEL_1_COMPLETE,
+  BS_LEVEL_2_CORE, BS_LEVEL_2_COMPLETE
 } from './aspects/bs'
 import { ASPECT_KEYS, ASPECT_DATA, ASPECT_REALMS, ASPECT_COLORS } from '../aspects'
 
@@ -44,6 +45,12 @@ export const JOURNEYS = {
         core: BS_LEVEL_1_CORE,
         complete: BS_LEVEL_1_COMPLETE,
         scripts: BS_LEVEL_1_CORE
+      },
+      2: {
+        title: 'Системы заботы',
+        core: BS_LEVEL_2_CORE,
+        complete: BS_LEVEL_2_COMPLETE,
+        scripts: BS_LEVEL_2_CORE
       }
     }
   }

@@ -524,6 +524,13 @@ function BlockBody({ block, data, color }) {
         <PracticeItem key={i} name={p.name} desc={p.desc} color={color} index={i + 1} />
       ))
 
+    case 'titledList': {
+      const items = data[field] || []
+      return items.map((p, i) => (
+        <PracticeItem key={i} name={p.name} desc={p.desc} color={color} index={i + 1} />
+      ))
+    }
+
     case 'archetypePath':
       return (
         <div className={styles.pathList}>

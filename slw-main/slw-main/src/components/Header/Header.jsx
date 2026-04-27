@@ -12,8 +12,8 @@ export default function Header({ view, onViewChange, journeyPendingCount = 0, us
     // Коуч и Профиль гейтятся в App.jsx:handleViewChange — без логина
     // откроется AuthModal.
     { id: 'coach', label: t.nav.coach },
+    // Настройки переехали внутрь страницы Профиля.
     ...(user ? [{ id: 'profile', label: t.nav.profile }] : []),
-    ...(user ? [{ id: 'settings', label: t.nav.settings }] : []),
   ]
 
   return (

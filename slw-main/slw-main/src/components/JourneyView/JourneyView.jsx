@@ -42,7 +42,12 @@ import styles from './JourneyView.module.css'
 //     Концепция `pool`/`mode` удалена. Старый state с mode='pool'
 //     или индексом в pool — мигрируется со сбросом messages/
 //     completedScripts/pendingTasks. state.skills сохраняется.
-export const CONTENT_VERSION = 6
+// 7 — добавлен L2 БС «Системы заботы»: 40 шагов core (8×5),
+//     вопросы формата B (open-text). Также прошлись по L0/L1
+//     и переименовали несколько шагов (Аудит комфорта → Что меня
+//     окружает, и т.п.), убрали ID-метки из тела скриптов,
+//     перевели «или проговорить» в обязательное «Запиши ответы».
+export const CONTENT_VERSION = 7
 
 export const DEFAULT_JOURNEY = {
   screen: 'onboarding',

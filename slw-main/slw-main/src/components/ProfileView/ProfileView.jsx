@@ -22,7 +22,7 @@ const KIND_LABEL = {
   recommendation: 'рекомендация',
 }
 
-export default function ProfileView({ onOpenPublicProfile }) {
+export default function ProfileView({ onOpenPublicProfile, onOpenSettings }) {
   const [profile, setProfile] = useState(null)
   const [busy, setBusy] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -164,7 +164,7 @@ export default function ProfileView({ onOpenPublicProfile }) {
           XP: {profile.xp}
           {profile.is_public ? null : ' · 🔒 скрыт от других'}
         </div>
-        <div className={styles.subline}>
+        <div className={styles.headerActions}>
           <button
             type="button"
             className={styles.linkBtn}
@@ -172,6 +172,15 @@ export default function ProfileView({ onOpenPublicProfile }) {
           >
             Посмотреть как видят другие →
           </button>
+          {onOpenSettings && (
+            <button
+              type="button"
+              className={styles.settingsBtn}
+              onClick={() => onOpenSettings()}
+            >
+              ⚙ Настройки
+            </button>
+          )}
         </div>
       </div>
 

@@ -11,8 +11,13 @@ async def cmd_progress(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     async with AsyncSessionLocal() as session:
         scores = (await session.execute(select(Score).where(Score.user_id == user_id))).scalars().all()
 
+        # Считаем все шаги БС по всем уровням сразу.
         total_steps = (await session.execute(
-            select(func.count()).select_from(ScriptStep).where(ScriptStep.aspect == "БС", ScriptStep.level == 0)
+            select(func.count()).select_from(ScriptStep).where(ScriptStep.aspect == "БС")
+        )).scalar_one()
+
+        max_level = (await session.execute(
+            select(func.max(ScriptStep.level)).select_from(ScriptStep).where(ScriptStep.aspect == "БС")
         )).scalar_one()
 
         done_steps = (await session.execute(
@@ -24,7 +29,8 @@ async def cmd_progress(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     pct = int(done_steps / total_steps * 100) if total_steps else 0
-    lines = [f"Прогресс БС L0: {done_steps}/{total_steps} шагов ({pct}%)\n"]
+    level_range = f"уровни 0–{max_level}" if max_level and max_level > 0 else "уровень 0"
+    lines = [f"Прогресс БС ({level_range}): {done_steps}/{total_steps} шагов ({pct}%)\n"]
     for s in scores:
         lines.append(f"{s.aspect}: {s.value}/10")
 

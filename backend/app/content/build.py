@@ -4,6 +4,7 @@ Reads:
   - slw-main/src/data/journey/onboarding.js       (4 onboarding steps)
   - slw-main/src/data/journey/aspects/bs-l0.md    (BS L0 content)
   - slw-main/src/data/journey/aspects/bs-l1.md    (BS L1 content)
+  - slw-main/src/data/journey/aspects/bs-l2.md    (BS L2 content)
 Writes app/content/compiled.json.
 """
 import json
@@ -172,7 +173,12 @@ def build() -> None:
     ob_steps = _parse_bs_md(WEB_DATA / "onboarding.md", "onboarding", 0, start_ord=1)
     all_steps.extend(ob_steps)
 
-    bs_steps = _parse_bs_md(WEB_DATA / "aspects" / "bs-l0.md", "БС", 0, start_ord=10)
+    # B-1/2/3 на уровне 0 теперь open-text (без шкалы и followUp),
+    # как и на L1+. Помечаем префикс B → reflection.
+    bs_steps = _parse_bs_md(
+        WEB_DATA / "aspects" / "bs-l0.md", "БС", 0, start_ord=10,
+        open_question_prefixes={"B"},
+    )
     all_steps.extend(bs_steps)
 
     bs1_steps = _parse_bs_md(
@@ -180,6 +186,12 @@ def build() -> None:
         open_question_prefixes={"B"},
     )
     all_steps.extend(bs1_steps)
+
+    bs2_steps = _parse_bs_md(
+        WEB_DATA / "aspects" / "bs-l2.md", "БС", 2, start_ord=400,
+        open_question_prefixes={"B"},
+    )
+    all_steps.extend(bs2_steps)
 
     # Assign clean global ord
     all_steps.sort(key=lambda s: s["ord"])

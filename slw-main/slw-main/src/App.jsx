@@ -438,7 +438,10 @@ export default function App() {
         )}
 
         {view === 'profile' && user && (
-          <ProfileView onOpenPublicProfile={openPublicProfile} />
+          <ProfileView
+            onOpenPublicProfile={openPublicProfile}
+            onOpenSettings={() => handleViewChange('settings')}
+          />
         )}
 
         {view === 'public-profile' && viewingProfileId && (
