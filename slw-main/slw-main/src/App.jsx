@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Header from './components/Header/Header'
 import WheelView from './components/WheelView/WheelView'
 import AspectsView from './components/AspectsView/AspectsView'
@@ -76,6 +76,15 @@ export default function App() {
   }
   const isAdmin = (user?.is_admin === true) || devAdmin
   const t = ru
+
+  // Скроллим `.main` наверх при смене view или selectedAspect.
+  // Без этого позиция сохраняется и страница может оказаться на середине/внизу.
+  // Чат (journey) сам управляет скроллом — его не трогаем.
+  const mainRef = useRef(null)
+  useEffect(() => {
+    if (view === 'journey') return
+    if (mainRef.current) mainRef.current.scrollTop = 0
+  }, [view, selectedAspect])
 
   // Загрузка данных при изменении статуса auth.
   // Залогинен → API. Гость → localStorage.
@@ -281,7 +290,10 @@ export default function App() {
         />
       )}
 
-      <main className={view === 'journey' ? styles.mainJourney : styles.main}>
+      <main
+        ref={mainRef}
+        className={view === 'journey' ? styles.mainJourney : styles.main}
+      >
         {view === 'wheel' && (
           <WheelView
             scores={scores}

@@ -2,15 +2,24 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { ASPECT_COLORS } from '../../data/aspects'
 import { ONBOARDING } from '../../data/journey/onboarding'
 import { getJourney } from '../../data/journey/registry'
-import { getSurvey, calcSurveyResult, calcBSScoreFromSkills, getSkillProgress, findFirstUnansweredSurveyIndex, ALL_SKILL_IDS, SURVEY_BLOCK_KEYS, SURVEYS } from '../../data/journey/skills'
+import {
+  getSurvey, calcSurveyResult, calcBSScoreFromSkills, getSkillProgress,
+  findFirstUnansweredSurveyIndex, ALL_SKILL_IDS, SURVEY_BLOCK_KEYS, SURVEYS,
+  getNextPass, getStatementsForPass, getStatementsForFullRange,
+  buildSurveyStatements, getCompletedPasses,
+  ARCHETYPE_KEYS, SKILL_TREE
+} from '../../data/journey/skills'
 import Onboarding from './Onboarding'
 import Chat from './Chat'
 import LevelComplete from './LevelComplete'
 import JourneyProfile from './JourneyProfile'
 import TasksScreen from './TasksScreen'
 import SurveyScreen from './SurveyScreen'
+import SurveyChoice from './SurveyChoice'
+import SurveyInsight from './SurveyInsight'
 import SkillTree from './SkillTree'
 import AdminPanel from './AdminPanel'
+import AdminSkillsEditor from './AdminSkillsEditor'
 import styles from './JourneyView.module.css'
 
 // Версия контента уровня. При несовпадении с сохранённой в state
@@ -23,7 +32,11 @@ import styles from './JourneyView.module.css'
 //     формата B). Параллельно введён mode (core/pool), но он
 //     совместим со старым state через спред DEFAULT_JOURNEY и
 //     сам по себе бампа не требовал.
-export const CONTENT_VERSION = 4
+// 5 — прогрессивная анкета (5 вопросов × 3 прохода вместо 15 за
+//     раз). state.skills[id] получил поля passes, insights[].
+//     activeSurvey получил pass. Старые записи мигрируем в
+//     migrateState (passes вычисляется по answers).
+export const CONTENT_VERSION = 5
 
 export const DEFAULT_JOURNEY = {
   screen: 'onboarding',
@@ -51,6 +64,36 @@ export const DEFAULT_JOURNEY = {
   contentVersion: CONTENT_VERSION
 }
 
+// Миграция skills-записей со старого формата (без passes/insights) на новый.
+// Старые записи: { result, blocks, completedAt, answers? }.
+// Новые: + passes (вычисляется по answers), + insights: [].
+function migrateSkills(skills) {
+  if (!skills || typeof skills !== 'object') return {}
+  const out = {}
+  for (const [id, entry] of Object.entries(skills)) {
+    if (!entry) continue
+    // passes уже есть — оставляем как есть.
+    if (Number.isFinite(entry.passes)) {
+      out[id] = { ...entry, insights: entry.insights ?? [] }
+      continue
+    }
+    // Вычисляем passes по answers (max длина массива).
+    let passes = 0
+    if (entry.answers) {
+      for (const k of SURVEY_BLOCK_KEYS) {
+        const arr = entry.answers[k] ?? []
+        const len = arr.filter(n => Number.isFinite(n)).length
+        if (len > passes) passes = len
+      }
+    } else if (Number.isFinite(entry.result)) {
+      // У старых записей нет answers, но есть result — считаем как полную (3).
+      passes = 3
+    }
+    out[id] = { ...entry, passes, insights: entry.insights ?? [] }
+  }
+  return out
+}
+
 // Миграция при загрузке: если у юзера сохранён старый контент,
 // сбрасываем чат и счётчик скриптов, но сохраняем XP/streak/dust
 // и pendingTasks (их id всё ещё совпадают со скриптами).
@@ -63,11 +106,12 @@ function migrateState(stored) {
       messages: stored.messages ?? [],
       completedScripts: stored.completedScripts ?? [],
       pendingTasks: stored.pendingTasks ?? [],
-      skills: stored.skills ?? {},
+      skills: migrateSkills(stored.skills),
       activeSurvey: stored.activeSurvey ?? null
     }
   }
-  // Контент уровня обновился — сбрасываем сценарий, оставляем достижения
+  // Контент уровня обновился — сбрасываем сценарий, оставляем достижения и
+  // skills (юзер их прошёл, нечестно сбрасывать).
   return {
     ...DEFAULT_JOURNEY,
     xp: stored.xp ?? 0,
@@ -77,6 +121,7 @@ function migrateState(stored) {
     lastActiveDate: stored.lastActiveDate ?? null,
     completedScripts: [],
     pendingTasks: [],
+    skills: migrateSkills(stored.skills),
     contentVersion: CONTENT_VERSION
   }
 }
@@ -454,72 +499,68 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   }, [poolScripts, setState])
 
   // ─── Анкета навыков (survey) ─────────────────────────────────
-  // Шаг анкеты. Принимает оценку (1-10) для текущего утверждения,
-  // двигается дальше; на последнем — вызывает handleSurveyComplete.
+  // Режимы:
+  //   mode='short' — 5 утверждений (один pass)
+  //   mode='full'  — все оставшиеся утверждения (от startPass до 3)
+  //
+  // activeSurvey:
+  //   { skillId, scriptId, mode, startPass, stepIndex, answers }
+  //
+  // Список утверждений вычисляется через buildSurveyStatements(survey, mode, startPass).
+  // stepIndex итерирует по этому списку. Когда stepIndex >= statements.length —
+  // конец сессии, переход на survey-insight.
   const handleSurveyAnswer = useCallback((value) => {
     setState(s => {
       const active = s.activeSurvey
       if (!active) return s
       const survey = getSurvey(active.skillId)
       if (!survey) return s
-      const blockKeys = Object.keys(survey.blocks)
-      const currentBlock = blockKeys[active.blockIndex]
-      const currentBlockArr = survey.blocks[currentBlock] ?? []
-      const prevAnswers = active.answers[currentBlock] ?? []
-      const nextBlockAnswers = [...prevAnswers]
-      nextBlockAnswers[active.statementIndex] = value
-      const nextAnswers = { ...active.answers, [currentBlock]: nextBlockAnswers }
+      const stmts = buildSurveyStatements(survey, active.mode ?? 'short', active.startPass ?? 1)
+      const current = stmts[active.stepIndex ?? 0]
+      if (!current) return s
 
-      // Двигаемся: дальше в блоке → следующий блок → финиш.
-      let nextStatementIndex = active.statementIndex + 1
-      let nextBlockIndex = active.blockIndex
-      if (nextStatementIndex >= currentBlockArr.length) {
-        nextStatementIndex = 0
-        nextBlockIndex = active.blockIndex + 1
-      }
+      const prevAnswers = active.answers?.[current.blockKey] ?? []
+      const nextBlockAnswers = [...prevAnswers]
+      nextBlockAnswers[current.statementIndex] = value
+      const nextAnswers = { ...active.answers, [current.blockKey]: nextBlockAnswers }
 
       return {
         ...s,
         activeSurvey: {
           ...active,
           answers: nextAnswers,
-          blockIndex: nextBlockIndex,
-          statementIndex: nextStatementIndex
+          stepIndex: (active.stepIndex ?? 0) + 1
         }
       }
     })
   }, [setState])
 
-  // Назад на одно утверждение (если пользователь хочет переоценить).
+  // Назад на одно утверждение (внутри текущей сессии).
   const handleSurveyBack = useCallback(() => {
     setState(s => {
       const active = s.activeSurvey
       if (!active) return s
-      const survey = getSurvey(active.skillId)
-      if (!survey) return s
-      let prevStatement = active.statementIndex - 1
-      let prevBlock = active.blockIndex
-      if (prevStatement < 0) {
-        prevBlock = Math.max(0, prevBlock - 1)
-        const blockKeys = Object.keys(survey.blocks)
-        const prevBlockKey = blockKeys[prevBlock]
-        const prevBlockArr = survey.blocks[prevBlockKey] ?? []
-        prevStatement = Math.max(0, prevBlockArr.length - 1)
-      }
       return {
         ...s,
         activeSurvey: {
           ...active,
-          blockIndex: prevBlock,
-          statementIndex: prevStatement
+          stepIndex: Math.max(0, (active.stepIndex ?? 0) - 1)
         }
       }
     })
   }, [setState])
 
-  // Завершение анкеты: считаем средние, кладём в state.skills,
-  // пишем в дневник, выдаём XP, доставляем следующий pool-скрипт.
-  const handleSurveyComplete = useCallback(async () => {
+  // Конец прохода (5 утверждений отвечены): переключаемся на экран
+  // обязательного инсайта. Здесь НЕ пишем в state.skills и не выдаём XP —
+  // это делает handleSurveyInsight после ввода рефлексии.
+  const handleSurveyComplete = useCallback(() => {
+    setState(s => ({ ...s, screen: 'survey-insight' }))
+  }, [setState])
+
+  // Юзер написал инсайт и нажал «Сохранить».
+  // Считаем средние по всем накопленным ответам, пишем skill, апдейтим
+  // passes по фактической длине массивов в answers.
+  const handleSurveyInsight = useCallback((insightText) => {
     const active = state.activeSurvey
     if (!active) return
     const survey = getSurvey(active.skillId)
@@ -528,93 +569,112 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     const result = calcSurveyResult(active.answers)
     const completedAt = Date.now()
 
-    // 1. Сохраняем в state.skills + закрываем активную анкету,
-    //    возвращаемся в чат.
-    const newSkills = {
-      ...state.skills,
-      [active.skillId]: {
-        result: result.skill,
-        blocks: result.blocks,
-        completedAt,
-        // Сохраняем сами ответы — для последующего отображения в дневнике.
-        answers: active.answers
-      }
+    // Фактическое число проходов = max длина массивов ответов по блокам.
+    let actualPasses = 0
+    for (const k of SURVEY_BLOCK_KEYS) {
+      const arr = active.answers?.[k] ?? []
+      const len = arr.filter(n => Number.isFinite(n)).length
+      if (len > actualPasses) actualPasses = len
     }
+    actualPasses = Math.min(3, actualPasses)
+
+    const prev = state.skills?.[active.skillId] ?? {}
+    const wasPasses = prev.passes ?? 0
+    const newSkillEntry = {
+      ...prev,
+      result: result.skill,
+      blocks: result.blocks,
+      answers: active.answers,
+      passes: actualPasses,
+      completedAt,
+      insights: [
+        ...(prev.insights ?? []),
+        { text: insightText, completedAt, mode: active.mode, pass: actualPasses }
+      ],
+      draft: undefined
+    }
+    delete newSkillEntry.draft
+
+    const newSkills = { ...state.skills, [active.skillId]: newSkillEntry }
+
     setState(s => ({
       ...s,
       skills: newSkills,
       activeSurvey: null,
-      screen: 'chat'
+      screen: 'skill-tree'
     }))
 
-    // 1.5 Пересчитываем общую оценку БС в колесе баланса.
-    // Многоступенчатое усреднение: блоки → навык → архетип → БС.
     const bsScore = calcBSScoreFromSkills(newSkills)
     if (Number.isFinite(bsScore)) {
       onScoresChange({ ...scores, БС: Math.round(bsScore) })
     }
 
-    // 2. Запись в дневник со всеми 15 ответами одной записью.
+    // Запись в дневник.
     const script = scripts.find(sc => sc.id === active.scriptId)
+    const sessionLabel =
+      active.mode === 'full'
+        ? `полный проход с ${active.startPass} до 3 (${actualPasses}/3 после сессии)`
+        : `проход ${actualPasses}/3 (короткий)`
     onDiaryChange([
       {
         id: completedAt,
         date: new Date().toLocaleDateString('ru-RU'),
         ts: completedAt,
         aspect: state.currentAspect,
-        text: `Анкета: ${survey.name}. Средняя оценка ${result.skill?.toFixed(1) ?? '—'}/10.`,
+        text: `Анкета: ${survey.name} · ${sessionLabel}. Средняя ${result.skill?.toFixed(1) ?? '—'}/10. Инсайт: ${insightText}`,
         source: 'journey-survey',
         scriptId: active.scriptId,
         skillId: active.skillId,
         promptTitle: script?.title ?? survey.name,
         prompt: script?.text ?? null,
-        // Полные данные для раскрытия в дневнике.
+        insight: insightText,
         survey: {
           name: survey.name,
           archetype: survey.archetype,
           blocks: survey.blocks,
           answers: active.answers,
           blockAvgs: result.blocks,
-          skillAvg: result.skill
+          skillAvg: result.skill,
+          pass: actualPasses,
+          mode: active.mode
         }
       },
       ...(diary ?? [])
     ])
 
-    // 3. XP + следующий pool-скрипт.
-    if (script) {
-      removePending(script.id)
-      awardXP(script.xp ?? 30, script.stardust ?? 0, script.id)
-    }
-    setTimeout(() => deliverScript(state.currentScriptIndex + 1), 700)
-  }, [state.activeSurvey, state.currentAspect, state.currentScriptIndex, state.skills, scripts, scores, diary, onDiaryChange, onScoresChange, awardXP, deliverScript, removePending, setState])
+    // XP: 15 за короткий, 30 за финал (когда дошли до passes=3).
+    // Если за одну сессию подняли с 0 до 3 (full с pass=1) — даём 30 как финал.
+    const wentToFinal = wasPasses < 3 && actualPasses === 3
+    const xp = wentToFinal ? 30 : 15
+    if (script) removePending(script.id)
+    awardXP(xp, wentToFinal ? (script?.stardust ?? 0) : 0, script?.id ?? null)
+  }, [state.activeSurvey, state.currentAspect, state.skills, scripts, scores, diary, onDiaryChange, onScoresChange, awardXP, removePending, setState])
 
-  // Отмена анкеты — сохраняем текущий прогресс как draft в state.skills,
-  // чтобы при возврате к этому навыку пользователь продолжил с того же
-  // места. Если ответов ещё нет — драфт не пишем (нечего сохранять).
+  // Отмена анкеты или инсайта — сохраняем текущий прогресс как draft.
   const handleSurveyCancel = useCallback(() => {
     setState(s => {
       const active = s.activeSurvey
-      if (!active) return { ...s, screen: 'chat' }
+      if (!active) return { ...s, screen: 'skill-tree' }
       const hasAnyAnswer = Object.values(active.answers ?? {}).some(arr =>
         Array.isArray(arr) && arr.some(n => Number.isFinite(n))
       )
       if (!hasAnyAnswer) {
-        return { ...s, activeSurvey: null, screen: 'chat' }
+        return { ...s, activeSurvey: null, screen: 'skill-tree' }
       }
       const prevSkill = s.skills?.[active.skillId] ?? {}
       return {
         ...s,
         activeSurvey: null,
-        screen: 'chat',
+        screen: 'skill-tree',
         skills: {
           ...s.skills,
           [active.skillId]: {
             ...prevSkill,
             draft: {
+              mode: active.mode ?? 'short',
+              startPass: active.startPass ?? 1,
+              stepIndex: active.stepIndex ?? 0,
               answers: active.answers,
-              blockIndex: active.blockIndex,
-              statementIndex: active.statementIndex
             }
           }
         }
@@ -628,18 +688,46 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setState(s => ({ ...s, screen: 'skill-tree' }))
   }, [setState])
 
-  // Запустить анкету по конкретному skillId (из дерева). Если есть
-  // draft (юзер прерывал ранее) — продолжаем с того же места.
-  // Также синхронизируем journey-state с pool L0, чтобы handleSurveyComplete
-  // потом мог перейти к следующему скрипту через deliverScript.
+  // Тык на навык в дереве:
+  //   - Если passes=3 → ничего не делаем.
+  //   - Если есть draft (юзер прерывал) → сразу продолжаем с того же места.
+  //   - Иначе → открываем экран выбора режима (short / full).
   const handleStartSkillSurvey = useCallback((skillId) => {
     const journeyData = getJourney('БС')
     const pool = journeyData?.levels?.[0]?.pool ?? []
     const idx = pool.findIndex(s => s.type === 'survey' && s.skill === skillId)
     if (idx === -1) return
     const target = pool[idx]
-    const draft = state.skills?.[skillId]?.draft
+    const skillEntry = state.skills?.[skillId]
+    const draft = skillEntry?.draft
 
+    if (draft) {
+      // Продолжаем как было — без выбора.
+      setState(s => ({
+        ...s,
+        currentAspect: 'БС',
+        currentLevel: 0,
+        mode: 'pool',
+        currentScriptIndex: idx,
+        currentScriptId: target.id,
+        screen: 'survey',
+        awaitingInput: null,
+        activeSurvey: {
+          scriptId: target.id,
+          skillId,
+          mode: draft.mode ?? 'short',
+          startPass: draft.startPass ?? 1,
+          stepIndex: draft.stepIndex ?? 0,
+          answers: draft.answers ?? {},
+        },
+      }))
+      return
+    }
+
+    if (getNextPass(skillEntry) === 0) return  // всё пройдено
+
+    // Открываем экран выбора. activeSurvey временно хранит skillId/scriptId,
+    // mode выберется на следующем шаге.
     setState(s => ({
       ...s,
       currentAspect: 'БС',
@@ -647,13 +735,34 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       mode: 'pool',
       currentScriptIndex: idx,
       currentScriptId: target.id,
-      screen: 'survey',
+      screen: 'survey-choice',
       awaitingInput: null,
-      activeSurvey: draft
-        ? { scriptId: target.id, skillId, ...draft }
-        : { scriptId: target.id, skillId, blockIndex: 0, statementIndex: 0, answers: {} }
+      activeSurvey: { scriptId: target.id, skillId },  // mode появится после choose
     }))
   }, [state.skills, setState])
+
+  // Юзер выбрал режим в SurveyChoice. Стартуем активную анкету.
+  const handleChooseSurveyMode = useCallback((mode) => {
+    setState(s => {
+      const active = s.activeSurvey
+      if (!active) return s
+      const skillEntry = s.skills?.[active.skillId]
+      const startPass = getNextPass(skillEntry) || 1
+      return {
+        ...s,
+        screen: 'survey',
+        activeSurvey: {
+          ...active,
+          mode,
+          startPass,
+          stepIndex: 0,
+          // Накопленные ответы предыдущих проходов сохраняем, чтобы в новых
+          // слотах писать дальше.
+          answers: skillEntry?.answers ?? {},
+        },
+      }
+    })
+  }, [setState])
 
   const goToScreen = useCallback((screen) => {
     setState(s => ({ ...s, screen }))
@@ -669,33 +778,34 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setTimeout(() => deliverScript(state.currentScriptIndex + 1), 50)
   }, [deliverScript, state.currentScriptIndex])
 
-  // 2. Заполнить активную анкету. Все ответы = 7. Выставляем blockIndex
-  //    за конец, SurveyScreen.useEffect триггерит handleSurveyComplete,
-  //    который дальше всё штатно — записывает skill, пересчитывает БС,
-  //    переходит к следующему скрипту.
+  // 2. Заполнить активную анкету. Все утверждения текущей сессии = 7.
+  //    Сдвигаем stepIndex за конец → SurveyScreen.useEffect → survey-insight.
   const handleAdminFillSurvey = useCallback(() => {
     setState(s => {
       if (!s.activeSurvey) return s
       const survey = SURVEYS[s.activeSurvey.skillId]
       if (!survey) return s
-      const answers = {}
-      const orderedKeys = SURVEY_BLOCK_KEYS.filter(k => (survey.blocks[k] ?? []).length > 0)
-      for (const key of orderedKeys) {
-        answers[key] = survey.blocks[key].map(() => 7)
+      const mode = s.activeSurvey.mode ?? 'short'
+      const startPass = s.activeSurvey.startPass ?? 1
+      const stmts = buildSurveyStatements(survey, mode, startPass)
+      const answers = { ...(s.activeSurvey.answers ?? {}) }
+      for (const stm of stmts) {
+        const arr = answers[stm.blockKey] ? [...answers[stm.blockKey]] : []
+        arr[stm.statementIndex] = 7
+        answers[stm.blockKey] = arr
       }
       return {
         ...s,
         activeSurvey: {
           ...s.activeSurvey,
           answers,
-          blockIndex: orderedKeys.length,
-          statementIndex: 0
-        }
+          stepIndex: stmts.length,
+        },
       }
     })
   }, [setState])
 
-  // 3. Заполнить все 33 навыка по 7/10. Считаем, что blocks тоже = 7.
+  // 3. Заполнить все 33 навыка по 7/10 (полностью все 3 прохода).
   //    Сразу пересчитываем БС.
   const handleAdminFillAllSkills = useCallback(() => {
     const completedAt = Date.now()
@@ -713,10 +823,17 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           }
         }
       } else {
-        // На случай, если анкеты нет — только агрегаты, без массивов ответов.
         for (const key of SURVEY_BLOCK_KEYS) blocks[key] = 7
       }
-      newSkills[skillId] = { result: 7, blocks, completedAt, answers, _admin: true }
+      newSkills[skillId] = {
+        result: 7,
+        blocks,
+        completedAt,
+        answers,
+        passes: 3,
+        insights: [],
+        _admin: true
+      }
     }
     setState(s => ({ ...s, skills: newSkills }))
     const bs = calcBSScoreFromSkills(newSkills)
@@ -750,6 +867,54 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   const handleAdminReset = useCallback(() => {
     setState(DEFAULT_JOURNEY)
   }, [setState])
+
+  // 6. Открыть гранулярный редактор навыков.
+  const handleOpenSkillsEditor = useCallback(() => {
+    setState(s => ({ ...s, screen: 'admin-skills' }))
+  }, [setState])
+
+  // 7. Применить правки из редактора. edits = { [skillId]: { enabled, value, passes } }
+  //    enabled=true  → перезаписываем skillId на новые значения
+  //    enabled=false → удаляем skillId из state.skills (если есть)
+  const handleAdminApplyEdits = useCallback((edits) => {
+    const completedAt = Date.now()
+    const newSkills = { ...(state.skills ?? {}) }
+    for (const [id, e] of Object.entries(edits ?? {})) {
+      if (!e?.enabled) {
+        // Disabled — удаляем navыk если был.
+        if (newSkills[id]) delete newSkills[id]
+        continue
+      }
+      const survey = SURVEYS[id]
+      const blocks = {}
+      const answers = {}
+      if (survey) {
+        for (const k of SURVEY_BLOCK_KEYS) {
+          const arr = survey.blocks[k] ?? []
+          if (arr.length > 0) {
+            blocks[k] = e.value
+            answers[k] = arr.slice(0, e.passes).map(() => e.value)
+          }
+        }
+      } else {
+        for (const k of SURVEY_BLOCK_KEYS) blocks[k] = e.value
+      }
+      newSkills[id] = {
+        result: e.value,
+        blocks,
+        answers,
+        passes: e.passes,
+        insights: [],
+        completedAt,
+        _admin: true,
+      }
+    }
+    setState(s => ({ ...s, skills: newSkills, screen: 'skill-tree' }))
+    const bs = calcBSScoreFromSkills(newSkills)
+    if (Number.isFinite(bs)) {
+      onScoresChange({ ...scores, БС: Math.round(bs) })
+    }
+  }, [state.skills, scores, onScoresChange, setState])
 
   const currentScript = scripts[state.currentScriptIndex]
   const progressPct = scripts.length > 0
@@ -836,10 +1001,29 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         <SkillTree
           accent={accent}
           skills={state.skills ?? {}}
-          onClose={() => goToScreen('chat')}
+          onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
           onStartSkill={handleStartSkillSurvey}
         />
       )}
+
+      {state.screen === 'survey-choice' && state.activeSurvey && (() => {
+        // Найдём имя навыка для заголовка.
+        let name = state.activeSurvey.skillId
+        for (const arche of ARCHETYPE_KEYS) {
+          const found = (SKILL_TREE[arche] ?? []).find(s => s.id === state.activeSurvey.skillId)
+          if (found) { name = found.name; break }
+        }
+        return (
+          <SurveyChoice
+            skillId={state.activeSurvey.skillId}
+            skillName={name}
+            skillEntry={state.skills?.[state.activeSurvey.skillId]}
+            accent={accent}
+            onChoose={handleChooseSurveyMode}
+            onCancel={() => goToScreen('skill-tree')}
+          />
+        )
+      })()}
 
       {state.screen === 'survey' && state.activeSurvey && (
         <SurveyScreen
@@ -849,6 +1033,23 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           onBack={handleSurveyBack}
           onComplete={handleSurveyComplete}
           onCancel={handleSurveyCancel}
+        />
+      )}
+
+      {state.screen === 'survey-insight' && state.activeSurvey && (
+        <SurveyInsight
+          activeSurvey={state.activeSurvey}
+          accent={accent}
+          onSave={handleSurveyInsight}
+          onCancel={handleSurveyCancel}
+        />
+      )}
+
+      {state.screen === 'admin-skills' && isAdmin && (
+        <AdminSkillsEditor
+          skills={state.skills ?? {}}
+          onApply={handleAdminApplyEdits}
+          onClose={() => goToScreen('skill-tree')}
         />
       )}
 
@@ -891,6 +1092,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           onSkipStep={handleAdminSkipStep}
           onFillSurvey={handleAdminFillSurvey}
           onFillAllSkills={handleAdminFillAllSkills}
+          onOpenSkillsEditor={handleOpenSkillsEditor}
           onJumpLevel={handleAdminJumpLevel}
           onReset={handleAdminReset}
         />

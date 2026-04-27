@@ -4,7 +4,7 @@ export const ASPECT_COLORS = {
   ЧЭ: '#c77dff',
   БЭ: '#e0aaff',
   ЧС: '#5e60ce',
-  БС: '#4cc9f0',
+  БС: '#a8d97b',
   ЧИ: '#4895ef',
   БИ: '#3a86ff'
 }

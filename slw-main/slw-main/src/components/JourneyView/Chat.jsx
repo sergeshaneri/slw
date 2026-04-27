@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import ScriptCard from './ScriptCard'
 import ScriptButtons from './ScriptButtons'
+import Slider from './Slider'
 import styles from './JourneyView.module.css'
 
 export default function Chat({
@@ -15,6 +17,23 @@ export default function Chat({
     return scripts?.find(s => s.id === m.scriptId) ?? null
   }
 
+  // Локальный стейт ползунка для awaitingInput='number'. Сбрасывается на 5
+  // каждый раз, когда новый шаг просит число.
+  const [sliderVal, setSliderVal] = useState(5)
+  useEffect(() => {
+    if (state.awaitingInput === 'number') setSliderVal(5)
+  }, [state.awaitingInput, currentScript?.id])
+
+  const handleSendNumber = () => {
+    // Передаём через inputVal — handleSend в JourneyView парсит inputVal.
+    setInputVal(String(sliderVal))
+    // Микро-задержка чтобы setInputVal успел применить значение в стейт.
+    setTimeout(onSend, 0)
+  }
+
+  const isNumber = state.awaitingInput === 'number'
+  const isText = state.awaitingInput === 'text' || state.awaitingInput === 'exercise_note'
+
   return (
     <>
       <div className={styles.topbar}>
@@ -26,7 +45,6 @@ export default function Chat({
           <div className={styles.topbarSub}>{aspectName}</div>
         </div>
         <div className={styles.topbarStats}>
-          {/* Кнопка дерева навыков — показываем, пока есть непройденные. */}
           {surveyRemaining > 0 && onGoToSurveys && (
             <button
               type="button"
@@ -87,7 +105,7 @@ export default function Chat({
           <div className={styles.msg}>
             <div className={styles.msgAvatar}>◐</div>
             <div className={`${styles.msgBubble} ${styles.msgHint}`}>
-              {state.awaitingInput === 'number' && 'Введи число от 1 до 10'}
+              {isNumber && 'Поставь оценку от 1 до 10'}
               {state.awaitingInput === 'exercise_note' && 'Кратко опиши, как прошло упражнение'}
               {state.awaitingInput === 'text' && 'Напиши свой ответ'}
             </div>
@@ -95,17 +113,30 @@ export default function Chat({
         )}
       </div>
 
-      {state.awaitingInput && (
+      {/* Числовой ввод — слайдер вместо textarea */}
+      {isNumber && (
+        <div className={styles.numberInputArea}>
+          <Slider value={sliderVal} onChange={setSliderVal} />
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`}
+            onClick={handleSendNumber}
+          >
+            Ответить · {sliderVal}/10
+          </button>
+        </div>
+      )}
+
+      {/* Текстовый ввод — старый textarea */}
+      {isText && (
         <div className={styles.inputArea}>
           <textarea
             ref={inputRef}
             className={styles.inputField}
             placeholder={
-              state.awaitingInput === 'number'
-                ? 'Число 1–10…'
-                : state.awaitingInput === 'exercise_note'
-                  ? 'Что вышло…'
-                  : 'Твой ответ…'
+              state.awaitingInput === 'exercise_note'
+                ? 'Что вышло…'
+                : 'Твой ответ…'
             }
             value={inputVal}
             onChange={e => setInputVal(e.target.value)}

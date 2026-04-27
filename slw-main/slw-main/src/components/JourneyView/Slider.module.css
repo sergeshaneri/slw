@@ -1,0 +1,100 @@
+/* Slider 1-10 — переиспользуемый компонент. */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+
+.valueRow {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.valueNum {
+  font-size: 56px;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
+  text-shadow: 0 0 30px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.valueTotal {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-muted, rgba(255,255,255,0.55));
+  margin-left: 4px;
+}
+
+.sliderWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+.slider {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    var(--accent) calc((var(--val, 50)) * 1%),
+    var(--line, rgba(255,255,255,0.08)) calc((var(--val, 50)) * 1%),
+    var(--line, rgba(255,255,255,0.08)) 100%
+  );
+  border-radius: 100px;
+  outline: none;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--surface, #15161c);
+  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--accent), 0 0 16px color-mix(in srgb, var(--accent) 60%, transparent);
+  transition: transform .12s;
+}
+
+.slider::-webkit-slider-thumb:hover { transform: scale(1.1); }
+.slider::-webkit-slider-thumb:active { transform: scale(0.95); }
+
+.slider::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--surface, #15161c);
+  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--accent), 0 0 16px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.slider::-moz-range-track {
+  height: 8px;
+  background: var(--line, rgba(255,255,255,0.08));
+  border-radius: 100px;
+}
+
+.slider::-moz-range-progress {
+  height: 8px;
+  background: var(--accent);
+  border-radius: 100px;
+}
+
+.ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted, rgba(255,255,255,0.55));
+  font-variant-numeric: tabular-nums;
+  padding: 0 4px;
+}

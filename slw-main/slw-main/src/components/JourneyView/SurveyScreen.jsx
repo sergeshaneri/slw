@@ -1,72 +1,53 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getSurvey, SURVEY_BLOCKS, SURVEY_BLOCK_KEYS } from '../../data/journey/skills'
+import { getSurvey, buildSurveyStatements, SURVEY_BLOCKS } from '../../data/journey/skills'
+import Slider from './Slider'
 import styles from './JourneyView.module.css'
 
-// Поэтапная анкета навыка. Один шаг = одно утверждение со шкалой 1–10.
+// Поэтапная анкета навыка.
 //
-// Жизненный цикл:
-//   1. JourneyView устанавливает screen='survey' + activeSurvey.
-//   2. SurveyScreen рендерит текущее утверждение (blockIndex, statementIndex).
-//   3. onAnswer(value) — записывает ответ, двигает индексы.
-//   4. Когда blockIndex выходит за границы blockKeys — состояние «закончено»,
-//      useEffect вызывает onComplete (в JourneyView запись в state.skills,
-//      diary, XP, переход в чат).
+// activeSurvey:
+//   { skillId, scriptId, mode: 'short'|'full', startPass: 1..3,
+//     stepIndex: 0..N-1, answers: {block: [n1, n2?, n3?]} }
+//
+// Список утверждений вычисляется через buildSurveyStatements:
+//   short → 5 утверждений (только startPass)
+//   full  → все утверждения от startPass до 3 (5/10/15)
 export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, onComplete, onCancel }) {
   const survey = getSurvey(activeSurvey.skillId)
+  const mode = activeSurvey.mode ?? 'short'
+  const startPass = activeSurvey.startPass ?? 1
 
-  // Подсчёты текущей позиции и общего числа утверждений.
-  const { isFinished, statement, blockKey, blockName, total, passed } = useMemo(() => {
-    if (!survey) {
-      return { isFinished: true, statement: '', blockKey: null, blockName: '', total: 0, passed: 0 }
-    }
-    // Считаем только блоки, для которых анкета содержит утверждения.
-    const orderedKeys = SURVEY_BLOCK_KEYS.filter(k => (survey.blocks[k] ?? []).length > 0)
-    const finished = activeSurvey.blockIndex >= orderedKeys.length
-    if (finished) {
-      const sum = orderedKeys.reduce((s, k) => s + survey.blocks[k].length, 0)
-      return { isFinished: true, statement: '', blockKey: null, blockName: '', total: sum, passed: sum }
-    }
-    const bk = orderedKeys[activeSurvey.blockIndex]
-    const blockArr = survey.blocks[bk] ?? []
-    const stmt = blockArr[activeSurvey.statementIndex] ?? ''
-    const blockMeta = SURVEY_BLOCKS.find(b => b.id === bk)
-    const passedCount = orderedKeys
-      .slice(0, activeSurvey.blockIndex)
-      .reduce((s, k) => s + (survey.blocks[k]?.length ?? 0), 0) + activeSurvey.statementIndex
-    const totalCount = orderedKeys.reduce((s, k) => s + (survey.blocks[k]?.length ?? 0), 0)
-    return {
-      isFinished: false,
-      statement: stmt,
-      blockKey: bk,
-      blockName: blockMeta?.name ?? '',
-      total: totalCount,
-      passed: passedCount
-    }
-  }, [survey, activeSurvey.blockIndex, activeSurvey.statementIndex])
+  const stmts = useMemo(
+    () => survey ? buildSurveyStatements(survey, mode, startPass) : [],
+    [survey, mode, startPass]
+  )
 
-  // Когда анкета пройдена — отдаём наверх. JourneyView сделает setState,
-  // SurveyScreen размонтируется (screen перейдёт в 'chat').
+  const total = stmts.length
+  const idx = activeSurvey.stepIndex ?? 0
+  const isFinished = idx >= total
+
+  const current = stmts[idx]
+  const blockKey = current?.blockKey ?? null
+  const statement = current?.statement ?? ''
+  const statementIndex = current?.statementIndex ?? 0
+  const currentPass = current?.pass ?? startPass
+  const blockName = SURVEY_BLOCKS.find(b => b.id === blockKey)?.name ?? ''
+
   useEffect(() => {
-    if (isFinished && survey) {
-      onComplete()
-    }
+    if (isFinished && survey) onComplete()
   }, [isFinished, survey, onComplete])
 
-  // Локальный стейт ползунка — сбрасывается при смене утверждения.
-  // Если пользователь возвращается назад к уже отвеченному — показываем
-  // его прежний ответ; иначе стартовое значение 5 (нейтральная середина).
   const prevAnswer = blockKey
-    ? activeSurvey.answers?.[blockKey]?.[activeSurvey.statementIndex]
+    ? activeSurvey.answers?.[blockKey]?.[statementIndex]
     : null
   const initialValue = Number.isFinite(prevAnswer) ? prevAnswer : 5
   const [value, setValue] = useState(initialValue)
   useEffect(() => {
     setValue(initialValue)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSurvey.blockIndex, activeSurvey.statementIndex])
+  }, [idx])
 
   if (!survey) {
-    // Теоретически возможно, если в md указан skill, которого нет в SURVEYS.
     return (
       <div className={styles.surveyShell}>
         <div className={styles.surveyHeader}>
@@ -75,13 +56,18 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
         </div>
         <div className={styles.surveyBody}>
           <p>Не удалось загрузить анкету для навыка <code>{activeSurvey.skillId}</code>.</p>
-          <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={onCancel}>Назад в чат</button>
+          <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={onCancel}>Назад</button>
         </div>
       </div>
     )
   }
 
-  if (isFinished) return null  // ждём, пока useEffect завершит анкету
+  if (isFinished) return null
+
+  const sessionLabel =
+    mode === 'full'
+      ? `Полный · проход ${currentPass}/3`
+      : `Короткий · проход ${currentPass}/3`
 
   return (
     <div className={styles.surveyShell} style={{ '--accent': accent }}>
@@ -89,14 +75,14 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
         <button type="button" className={styles.surveyClose} onClick={onCancel} aria-label="Прервать">✕</button>
         <div className={styles.surveyTitleBlock}>
           <div className={styles.surveyTitle}>{survey.name}</div>
-          <div className={styles.surveySub}>{blockName} · {passed + 1} из {total}</div>
+          <div className={styles.surveySub}>{sessionLabel} · {blockName} · {idx + 1} из {total}</div>
         </div>
       </div>
 
       <div className={styles.surveyProgress}>
         <div
           className={styles.surveyProgressFill}
-          style={{ width: `${total > 0 ? Math.round(((passed + 1) / total) * 100) : 0}%` }}
+          style={{ width: `${total > 0 ? Math.round(((idx + 1) / total) * 100) : 0}%` }}
         />
       </div>
 
@@ -105,36 +91,14 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
 
         <div className={styles.surveyHint}>Оцени по шкале от 1 (совсем не про меня) до 10 (полностью про меня)</div>
 
-        <div className={styles.surveyValue}>
-          <span className={styles.surveyValueNum}>{value}</span>
-          <span className={styles.surveyValueTotal}>/10</span>
-        </div>
-
-        <div className={styles.surveySliderWrap}>
-          <input
-            type="range"
-            min="1"
-            max="10"
-            step="1"
-            value={value}
-            onChange={e => setValue(parseInt(e.target.value, 10))}
-            className={styles.surveySlider}
-            // --val 0..100 — для градиентной заливки трека до бегунка.
-            style={{ '--val': ((value - 1) / 9) * 100 }}
-            aria-label="Оценка"
-          />
-          <div className={styles.surveySliderEnds}>
-            <span>1</span>
-            <span>10</span>
-          </div>
-        </div>
+        <Slider value={value} onChange={setValue} />
 
         <div className={styles.surveyActions}>
           <button
             type="button"
             className={`${styles.btn} ${styles.btnGhost}`}
             onClick={onBack}
-            disabled={passed === 0}
+            disabled={idx === 0}
           >
             ← Назад
           </button>

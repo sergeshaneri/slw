@@ -2,7 +2,47 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContai
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
 import styles from './ProgressView.module.css'
 
-export default function ProgressView({ history, scores, t }) {
+// Пасхалка: клик по «ь» в слове «увидеть» (в no-data сообщении) — toggle
+// dev-admin режима. Hit-area чуть расширена padding'ом, и preventDefault
+// на pointerdown — чтобы не выделялось текстом при тапе.
+function NoDataWithEgg({ text, onToggleDevAdmin }) {
+  const idx = text.indexOf('ь')
+  if (idx === -1 || !onToggleDevAdmin) {
+    return <>{text}</>
+  }
+  const handleClick = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onToggleDevAdmin()
+  }
+  return (
+    <>
+      {text.slice(0, idx)}
+      <span
+        role="button"
+        tabIndex={0}
+        onClick={handleClick}
+        onPointerDown={e => e.preventDefault()}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onToggleDevAdmin()
+          }
+        }}
+        style={{
+          display: 'inline-block',
+          padding: '0 2px',
+          cursor: 'default',
+          userSelect: 'none',
+        }}
+        aria-hidden="true"
+      >ь</span>
+      {text.slice(idx + 1)}
+    </>
+  )
+}
+
+export default function ProgressView({ history, scores, t, onToggleDevAdmin, devAdmin = false }) {
   const chartData = history.map(h => {
     const obj = { date: h.date }
     ASPECT_KEYS.forEach(key => obj[key] = h.scores[key])
@@ -16,7 +56,21 @@ export default function ProgressView({ history, scores, t }) {
           <span className={styles.eyebrow}>Прогресс</span>
           <h1 className={styles.title}>{t.progress.title}</h1>
         </div>
-        <div className={styles.noData}>{t.progress.noData}</div>
+        <div className={styles.noData}>
+          <NoDataWithEgg text={t.progress.noData} onToggleDevAdmin={onToggleDevAdmin} />
+          {devAdmin && (
+            <div style={{
+              marginTop: 18,
+              fontSize: 11,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: '#ff9933',
+              opacity: 0.85,
+            }}>
+              🛠 dev-admin: ON · кликни «ь» чтобы выключить
+            </div>
+          )}
+        </div>
       </div>
     )
   }

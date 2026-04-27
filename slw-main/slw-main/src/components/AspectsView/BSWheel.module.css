@@ -1,6 +1,6 @@
 .wheel {
   margin: 16px 0 24px;
-  padding: 20px 22px;
+  padding: 22px 22px 24px;
   background: linear-gradient(
     135deg,
     color-mix(in srgb, var(--accent) 8%, var(--surface-2)),
@@ -15,7 +15,7 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 8px;
 }
 
 .wheelTitleBlock { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -68,115 +68,86 @@
   margin-top: 2px;
 }
 
-.wheelEmpty {
-  font-size: 13px;
-  color: var(--text-muted);
-  line-height: 1.55;
-  padding: 12px 0 4px;
-}
+/* Бейдж стадии — явный индикатор текущей «униформы» колеса. */
 
-.wheelEmpty p { margin: 0 0 8px; }
-
-.wheelEmptyHint { font-size: 12px; color: var(--text-dim); }
-
-.wheelArches {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.arche { display: flex; flex-direction: column; gap: 6px; }
-
-.archeHead {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.archeTitleBlock { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-
-.archeGlyph {
-  font-size: 14px;
-  color: var(--accent);
-  opacity: 0.9;
-  flex-shrink: 0;
-}
-
-.archeName {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.archeAvg {
-  font-size: 16px;
+.stageBadge {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 11px;
   font-weight: 700;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 80%, white);
+  opacity: 0.85;
 }
 
-.archeAvgTotal {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  margin-left: 1px;
-}
+/* SVG-колесо. */
 
-.archeBar {
-  height: 6px;
-  background: var(--line);
-  border-radius: 100px;
-  overflow: hidden;
-}
-
-.archeBarFill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, transparent));
-  border-radius: 100px;
-  transition: width .4s ease;
-  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 50%, transparent);
-}
-
-.archeFoot {
+.svgWrap {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
+  justify-content: center;
+  padding: 8px 0 6px;
+  color: var(--accent);
 }
 
-.archeSub {
-  color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
+.svg {
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  display: block;
+  overflow: visible;
 }
 
-.archeProgress {
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
+/* Колесо всегда яркое — глобально не приглушаем.
+   Стадии выражаются через отдельные SVG-слои (corona, spokes, pulse),
+   а не через opacity всего рисунка. */
+.stage_pre .svg,
+.stage_light .svg   {
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 18%, transparent));
 }
+.stage_medium .svg  {
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 28%, transparent));
+}
+.stage_strong .svg  {
+  filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) 40%, transparent));
+}
+.stage_masterful .svg {
+  filter: drop-shadow(0 0 22px color-mix(in srgb, var(--accent) 55%, transparent));
+}
+
+/* Центральная кнопка glow на strong+. */
+.centerGlow {
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 70%, transparent));
+}
+
+/* Pulsing outer-ring для masterful. */
+.svgPulse {
+  animation: wheelPulse 4s infinite ease-in-out;
+}
+
+@keyframes wheelPulse {
+  0%, 100% { filter: drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 45%, transparent)); }
+  50%      { filter: drop-shadow(0 0 28px color-mix(in srgb, var(--accent) 65%, transparent)); }
+}
+
+/* Звёздочки-вспышки слегка мерцают на стадии masterful. */
+.starsTwinkle {
+  animation: starsTwinkle 3s infinite ease-in-out;
+}
+
+@keyframes starsTwinkle {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.7; }
+}
+
+/* Footer + CTA. */
 
 .wheelFoot {
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
+  margin-top: 8px;
   font-size: 12px;
   color: var(--text-muted);
   text-align: center;
-}
-
-@media (max-width: 480px) {
-  .wheel { padding: 16px 16px; }
-  .wheelStatVal { font-size: 24px; }
-  .wheelTitle { font-size: 15px; }
 }
 
 .wheelCta {
@@ -198,3 +169,50 @@
 }
 
 .wheelCta:active { transform: scale(0.98); }
+
+/* Мелкая текстовая разбивка по архетипам внизу. */
+
+.archetypeRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 14px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.archetype {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  min-width: 0;
+}
+
+.archetypeGlyph {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.archetypeName {
+  flex: 1;
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.archetypeMeta {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .wheel { padding: 16px 14px 18px; }
+  .wheelStatVal { font-size: 24px; }
+  .wheelTitle { font-size: 15px; }
+  .archetypeRow { grid-template-columns: 1fr; }
+}
