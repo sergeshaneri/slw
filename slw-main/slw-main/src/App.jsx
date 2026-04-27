@@ -9,6 +9,7 @@ import SettingsView from './components/SettingsView/SettingsView'
 import LoadingScreen from './components/LoadingScreen/LoadingScreen'
 import AuthModal from './components/Auth/AuthModal'
 import WelcomeScreen from './components/Welcome/WelcomeScreen'
+import Footer from './components/Footer/Footer'
 import { ASPECT_KEYS } from './data/aspects'
 import { ru } from './locales/ru'
 import { useAuth } from './hooks/useAuth'
@@ -59,6 +60,21 @@ export default function App() {
   const [welcomeDismissed, setWelcomeDismissed] = useState(
     () => localStorage.getItem('welcome_seen') === '1'
   )
+  // devAdmin: «пасхалочный» админский режим без бэка. Включается кликом по
+  // невидимой точке (см. ProgressView → onToggleDevAdmin). Хранится в
+  // localStorage, переживает logout и новые сессии. ИЛИ-сложение с user.is_admin.
+  const [devAdmin, setDevAdmin] = useState(
+    () => localStorage.getItem('slw_dev_admin') === '1'
+  )
+  const toggleDevAdmin = () => {
+    setDevAdmin(prev => {
+      const next = !prev
+      if (next) localStorage.setItem('slw_dev_admin', '1')
+      else localStorage.removeItem('slw_dev_admin')
+      return next
+    })
+  }
+  const isAdmin = (user?.is_admin === true) || devAdmin
   const t = ru
 
   // Загрузка данных при изменении статуса auth.
@@ -188,7 +204,8 @@ export default function App() {
 
   const goToJourney = async (screen) => {
     // Путешествие требует авторизации — гостям показываем AuthModal.
-    if (!user) {
+    // Исключение: dev-admin (пасхалка) пускает без логина.
+    if (!user && !devAdmin) {
       setShowAuth(true)
       return
     }
@@ -197,7 +214,7 @@ export default function App() {
   }
 
   const goToBSSurveys = async () => {
-    if (!user) {
+    if (!user && !devAdmin) {
       setShowAuth(true)
       return
     }
@@ -215,7 +232,7 @@ export default function App() {
   }
 
   const handleViewChange = (newView) => {
-    if (newView === 'journey' && !user) {
+    if (newView === 'journey' && !user && !devAdmin) {
       setShowAuth(true)
       return
     }
@@ -290,7 +307,7 @@ export default function App() {
             diary={diary}
             onDiaryChange={saveDiary}
             t={t}
-            isAdmin={user?.is_admin === true}
+            isAdmin={isAdmin}
           />
         )}
 
@@ -321,6 +338,8 @@ export default function App() {
             history={history}
             scores={scores}
             t={t}
+            onToggleDevAdmin={toggleDevAdmin}
+            devAdmin={devAdmin}
           />
         )}
 
@@ -335,6 +354,8 @@ export default function App() {
             onLogout={logout}
           />
         )}
+
+        {view !== 'journey' && <Footer />}
       </main>
     </div>
   )
