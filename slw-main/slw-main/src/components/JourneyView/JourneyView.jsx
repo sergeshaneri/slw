@@ -36,14 +36,19 @@ import styles from './JourneyView.module.css'
 //     раз). state.skills[id] получил поля passes, insights[].
 //     activeSurvey получил pass. Старые записи мигрируем в
 //     migrateState (passes вычисляется по answers).
-export const CONTENT_VERSION = 5
+// 6 — анкеты вынесены из L0-чата (33 SURV-шага → отдельный
+//     bs-l0-surveys.md, видны только через дерево навыков). B-1/2/3
+//     перешли на open-text без слайдера, исчезли followUp-блоки.
+//     Концепция `pool`/`mode` удалена. Старый state с mode='pool'
+//     или индексом в pool — мигрируется со сбросом messages/
+//     completedScripts/pendingTasks. state.skills сохраняется.
+export const CONTENT_VERSION = 6
 
 export const DEFAULT_JOURNEY = {
   screen: 'onboarding',
   onboardingStep: 0,
   currentAspect: 'БС',
   currentLevel: 0,
-  mode: 'core',                 // 'core' | 'pool' — какой массив шагов сейчас в игре
   messages: [],
   currentScriptIndex: 0,
   currentScriptId: null,
@@ -95,23 +100,30 @@ function migrateSkills(skills) {
 }
 
 // Миграция при загрузке: если у юзера сохранён старый контент,
-// сбрасываем чат и счётчик скриптов, но сохраняем XP/streak/dust
-// и pendingTasks (их id всё ещё совпадают со скриптами).
+// сбрасываем чат и счётчик скриптов, но сохраняем XP/streak/dust.
+// state.skills сохраняем всегда — анкеты, уже пройденные юзером,
+// потерять было бы нечестно.
+//
+// Старое поле `mode` ('core'|'pool') v5 удаляется из приходящего
+// state — концепция pool ушла в v6, scripts теперь всегда core.
 function migrateState(stored) {
   if (!stored) return DEFAULT_JOURNEY
   if (stored.contentVersion === CONTENT_VERSION) {
+    // eslint-disable-next-line no-unused-vars
+    const { mode, ...rest } = stored
     return {
       ...DEFAULT_JOURNEY,
-      ...stored,
-      messages: stored.messages ?? [],
-      completedScripts: stored.completedScripts ?? [],
-      pendingTasks: stored.pendingTasks ?? [],
-      skills: migrateSkills(stored.skills),
-      activeSurvey: stored.activeSurvey ?? null
+      ...rest,
+      messages: rest.messages ?? [],
+      completedScripts: rest.completedScripts ?? [],
+      pendingTasks: rest.pendingTasks ?? [],
+      skills: migrateSkills(rest.skills),
+      activeSurvey: rest.activeSurvey ?? null
     }
   }
   // Контент уровня обновился — сбрасываем сценарий, оставляем достижения и
-  // skills (юзер их прошёл, нечестно сбрасывать).
+  // skills (юзер их прошёл, нечестно сбрасывать). activeSurvey тоже
+  // переносим — юзер с незавершённой анкетой продолжит с того же места.
   return {
     ...DEFAULT_JOURNEY,
     xp: stored.xp ?? 0,
@@ -122,6 +134,7 @@ function migrateState(stored) {
     completedScripts: [],
     pendingTasks: [],
     skills: migrateSkills(stored.skills),
+    activeSurvey: stored.activeSurvey ?? null,
     contentVersion: CONTENT_VERSION
   }
 }
@@ -166,32 +179,27 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
   const currentJourney = getJourney(state.currentAspect)
   const currentLevel = currentJourney?.levels?.[state.currentLevel]
-  const coreScripts = currentLevel?.core ?? currentLevel?.scripts ?? []
-  const poolScripts = currentLevel?.pool ?? []
-  // В режиме pool отдаём pool-массив, в core — core. Активная
-  // последовательность шагов крутится только по одному из них.
-  const scripts = state.mode === 'pool' ? poolScripts : coreScripts
+  // Linear core-маршрут уровня. Анкеты (currentLevel.surveys) живут
+  // отдельно, доступны только через дерево навыков, не из chat-ленты.
+  const scripts = currentLevel?.core ?? currentLevel?.scripts ?? []
   const aspectIntro = currentJourney?.intro ?? []
   const accent = ASPECT_COLORS[state.currentAspect] ?? '#4cc9f0'
 
   // Лукап скрипта по {scriptId, level} — нужен в чате для архивных
   // сообщений: T-1 в L0 ≠ T-1 в L1, ID может повторяться между
-  // уровнями. Без level сообщения из L0 после перехода на L1
-  // показали бы L1-текст.
-  // Ищем и в core, и в pool целевого уровня — pool-сообщения
-  // тоже архивируются в общий messages.
+  // уровнями. Дополнительный fallback в surveys целевого уровня —
+  // на случай чтения старых state с архивными SURV-сообщениями (v5).
   const resolveScript = useCallback((scriptId, level) => {
     const lvl = level ?? state.currentLevel
     const lvlData = currentJourney?.levels?.[lvl]
     const inCore = lvlData?.core?.find(s => s.id === scriptId)
     if (inCore) return inCore
-    const inPool = lvlData?.pool?.find(s => s.id === scriptId)
-    if (inPool) return inPool
+    const inSurveys = lvlData?.surveys?.find(s => s.id === scriptId)
+    if (inSurveys) return inSurveys
     return scripts.find(s => s.id === scriptId) ?? null
   }, [currentJourney, scripts, state.currentLevel])
 
   const nextLevel = currentJourney?.levels?.[state.currentLevel + 1] ?? null
-  const hasPool = poolScripts.length > 0
 
   // Первый скрол после mount/смены экрана — мгновенный, чтобы юзер
   // сразу видел последние сообщения. Дальше — плавный.
@@ -459,7 +467,6 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
   // Переход на следующий уровень. Сохраняет всю историю сообщений
   // (с level=прошлый), добавляет первый скрипт нового уровня.
-  // Сбрасывает mode в 'core' — новый уровень всегда стартует с core.
   const handleNextLevel = useCallback(() => {
     const next = currentJourney?.levels?.[state.currentLevel + 1]
     if (!next) return
@@ -467,7 +474,6 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setState(s => ({
       ...s,
       currentLevel: s.currentLevel + 1,
-      mode: 'core',
       currentScriptIndex: 0,
       currentScriptId: firstScript?.id ?? null,
       screen: 'chat',
@@ -477,26 +483,6 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         : s.messages
     }))
   }, [currentJourney, state.currentLevel])
-
-  // Войти в pool текущего уровня — после прохождения core пользователь
-  // выбрал «копать здесь дальше». Сбрасывает индекс и доставляет первый
-  // pool-скрипт. Переход на следующий уровень потом всё ещё доступен —
-  // на levelcomplete после прохождения pool, либо из профиля.
-  const handleStayPool = useCallback(() => {
-    if (poolScripts.length === 0) return
-    const first = poolScripts[0]
-    setState(s => ({
-      ...s,
-      mode: 'pool',
-      currentScriptIndex: 0,
-      currentScriptId: first?.id ?? null,
-      screen: 'chat',
-      awaitingInput: null,
-      messages: first
-        ? [...s.messages, { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: first.id, level: s.currentLevel }]
-        : s.messages
-    }))
-  }, [poolScripts, setState])
 
   // ─── Анкета навыков (survey) ─────────────────────────────────
   // Режимы:
@@ -683,7 +669,9 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   }, [setState])
 
   // Открыть меню «Дерево навыков» — выбор любого навыка для оценки
-  // вручную, с видимым прогрессом по веткам.
+  // вручную, с видимым прогрессом по веткам. Доступно с момента, когда
+  // юзер дошёл до экрана LevelComplete L0 («Открыть Колесо БС») —
+  // gate здесь лояльный, фактическая блокировка на UI-уровне.
   const handleOpenSkillTree = useCallback(() => {
     setState(s => ({ ...s, screen: 'skill-tree' }))
   }, [setState])
@@ -692,24 +680,23 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   //   - Если passes=3 → ничего не делаем.
   //   - Если есть draft (юзер прерывал) → сразу продолжаем с того же места.
   //   - Иначе → открываем экран выбора режима (short / full).
+  // Анкета лежит в currentLevel.surveys (отдельный массив, не в core-чате).
   const handleStartSkillSurvey = useCallback((skillId) => {
     const journeyData = getJourney('БС')
-    const pool = journeyData?.levels?.[0]?.pool ?? []
-    const idx = pool.findIndex(s => s.type === 'survey' && s.skill === skillId)
+    const surveys = journeyData?.levels?.[0]?.surveys ?? []
+    const idx = surveys.findIndex(s => s.type === 'survey' && s.skill === skillId)
     if (idx === -1) return
-    const target = pool[idx]
+    const target = surveys[idx]
     const skillEntry = state.skills?.[skillId]
     const draft = skillEntry?.draft
 
     if (draft) {
-      // Продолжаем как было — без выбора.
+      // Продолжаем как было — без выбора. currentScriptId не трогаем:
+      // он нужен для chat-flow (core-шагов), а survey-id в нём только
+      // путает resolveScript при возврате в чат.
       setState(s => ({
         ...s,
         currentAspect: 'БС',
-        currentLevel: 0,
-        mode: 'pool',
-        currentScriptIndex: idx,
-        currentScriptId: target.id,
         screen: 'survey',
         awaitingInput: null,
         activeSurvey: {
@@ -731,10 +718,6 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setState(s => ({
       ...s,
       currentAspect: 'БС',
-      currentLevel: 0,
-      mode: 'pool',
-      currentScriptIndex: idx,
-      currentScriptId: target.id,
       screen: 'survey-choice',
       awaitingInput: null,
       activeSurvey: { scriptId: target.id, skillId },  // mode появится после choose
@@ -842,8 +825,8 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     }
   }, [scores, onScoresChange, setState])
 
-  // 4. Прыжок на конкретный уровень. Сбрасываем core-индекс, mode='core',
-  //    подаём первый скрипт в чат. Если уровня нет — no-op.
+  // 4. Прыжок на конкретный уровень. Сбрасываем core-индекс, подаём
+  //    первый скрипт в чат. Если уровня нет — no-op.
   const handleAdminJumpLevel = useCallback((targetLevel) => {
     const lvlData = currentJourney?.levels?.[targetLevel]
     if (!lvlData) return
@@ -851,7 +834,6 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setState(s => ({
       ...s,
       currentLevel: targetLevel,
-      mode: 'core',
       screen: 'chat',
       currentScriptIndex: 0,
       currentScriptId: first?.id ?? null,
@@ -953,10 +935,15 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           onOpenProfile={() => goToScreen('profile')}
           onOpenTasks={() => goToScreen('tasks')}
           onGoToSurveys={handleOpenSkillTree}
-          surveyRemaining={getSkillProgress(state.skills ?? {}).remaining}
+          // Пилюля «Оценить навыки» появляется только после L0 (или для админа).
+          surveyRemaining={
+            (isAdmin || (state.currentLevel ?? 0) >= 1)
+              ? getSkillProgress(state.skills ?? {}).remaining
+              : 0
+          }
           pendingCount={state.pendingTasks?.length ?? 0}
           aspectName={currentJourney
-            ? `Уровень ${state.currentLevel} · ${currentLevel?.title}${state.mode === 'pool' ? ' · доп. задания' : ''}`
+            ? `Уровень ${state.currentLevel} · ${currentLevel?.title}`
             : 'Путешествие'}
           planet={currentJourney?.planet}
         />
@@ -968,19 +955,16 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           accent={accent}
           completeText={currentLevel?.complete?.text ?? ''}
           levelTitle={currentLevel?.title}
-          mode={state.mode}
           onProfile={() => goToScreen('profile')}
           nextLevelTitle={nextLevel?.title}
           onNextLevel={nextLevel ? handleNextLevel : null}
-          // На L0 pool — только анкеты навыков. Кнопка после core ведёт
-          // в дерево навыков (выбор любого), а не на первый шаг pool в
-          // чате. Логика handleStayPool остаётся для будущих уровней.
-          onStayPool={
-            state.mode === 'core' && hasPool
-              ? (state.currentLevel === 0 ? handleOpenSkillTree : handleStayPool)
+          // На L0 после прохождения core — primary CTA «Открыть Колесо БС»
+          // (skill-tree). На L1+ нет skill-tree → кнопка не показывается.
+          onOpenWheel={
+            state.currentLevel === 0 && (currentLevel?.surveys?.length ?? 0) > 0
+              ? handleOpenSkillTree
               : null
           }
-          poolCount={poolScripts.length}
         />
       )}
 
@@ -992,7 +976,45 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           progressPct={progressPct}
           levelTitle={currentLevel?.title}
           planet={currentJourney?.planet}
-          onContinue={() => goToScreen(state.currentScriptIndex >= scripts.length ? 'levelcomplete' : 'chat')}
+          // Возврат в чат должен очистить активную анкету: иначе её
+          // SURV-script-карточка всплывает в chat-ленте через resolveScript
+          // (который теперь fallback-ит в currentLevel.surveys), и юзер
+          // вместо чата видит заглушку «Анкета по навыку БС…».
+          // Прогресс анкеты сохраняем как draft в state.skills, чтобы юзер
+          // мог продолжить с того же места из дерева навыков.
+          onContinue={() => {
+            setState(s => {
+              let nextSkills = s.skills
+              const active = s.activeSurvey
+              if (active) {
+                const hasAnyAnswer = Object.values(active.answers ?? {}).some(arr =>
+                  Array.isArray(arr) && arr.some(n => Number.isFinite(n))
+                )
+                if (hasAnyAnswer) {
+                  const prevSkill = s.skills?.[active.skillId] ?? {}
+                  nextSkills = {
+                    ...s.skills,
+                    [active.skillId]: {
+                      ...prevSkill,
+                      draft: {
+                        mode: active.mode ?? 'short',
+                        startPass: active.startPass ?? 1,
+                        stepIndex: active.stepIndex ?? 0,
+                        answers: active.answers,
+                      }
+                    }
+                  }
+                }
+              }
+              return {
+                ...s,
+                skills: nextSkills,
+                activeSurvey: null,
+                awaitingInput: null,
+                screen: s.currentScriptIndex >= scripts.length ? 'levelcomplete' : 'chat',
+              }
+            })
+          }}
           onReset={handleReset}
         />
       )}
@@ -1056,9 +1078,9 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       {state.screen === 'tasks' && (
         <TasksScreen
           tasks={state.pendingTasks ?? []}
-          // Лукап тасок ищет по scriptId — в задачах могут быть и core,
-          // и pool скрипты, поэтому отдаём объединённый массив.
-          scripts={[...coreScripts, ...poolScripts]}
+          // Лукап тасок ищет по scriptId — в задачах могут быть core-скрипты
+          // и survey-шаги (отложенные анкеты).
+          scripts={[...scripts, ...(currentLevel?.surveys ?? [])]}
           accent={accent}
           onBack={() => goToScreen('chat')}
           onCompleteWithNote={(script, noteText) => {

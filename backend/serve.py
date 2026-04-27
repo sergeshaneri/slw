@@ -69,6 +69,36 @@ async def apply_ddl() -> None:
             "but bot+web are up): %s", e
         )
 
+    # coach_calls — таблица для логов ИИ-вызовов. Та же стратегия:
+    # отдельная транзакция, timeout, не валим сервис если упало.
+    try:
+        async with asyncio.timeout(15):
+            async with engine.connect() as conn:
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS coach_calls (
+                        id                 BIGSERIAL PRIMARY KEY,
+                        web_user_id        INTEGER NOT NULL,
+                        prompt             TEXT NOT NULL,
+                        response           TEXT,
+                        focus_aspect       TEXT,
+                        paid_with_stardust BOOLEAN NOT NULL DEFAULT false,
+                        tokens_in          INTEGER,
+                        tokens_out         INTEGER,
+                        error              TEXT,
+                        created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS coach_calls_user_idx "
+                    "ON coach_calls (web_user_id, created_at DESC)"
+                ))
+                await conn.commit()
+    except Exception as e:
+        log.warning(
+            "coach_calls DDL failed (AI summon disabled, "
+            "but bot+web are up): %s", e
+        )
+
     await engine.dispose()
 
 

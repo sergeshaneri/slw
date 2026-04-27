@@ -144,4 +144,22 @@ export async function postDiaryEntry({ text, aspect, source = 'web', extra }) {
   return request('POST', '/api/diary', { text, aspect, source, extra })
 }
 
+// ── Coach (AI summon) ─────────────────────────────────────────────────────────
+
+export async function fetchCoachQuota() {
+  return request('GET', '/api/coach/quota')
+}
+
+export async function summonCoach({ prompt, focusAspect = null, payWithStardust = false }) {
+  return request('POST', '/api/coach/summon', {
+    prompt,
+    focus_aspect: focusAspect,
+    pay_with_stardust: payWithStardust,
+  })
+}
+
+export async function fetchCoachHistory(limit = 20) {
+  return request('GET', `/api/coach/history?limit=${limit}`)
+}
+
 export { getToken, setToken }

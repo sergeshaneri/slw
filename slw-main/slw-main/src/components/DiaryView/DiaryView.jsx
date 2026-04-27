@@ -8,7 +8,8 @@ const SOURCE_LABEL = {
   'journey-question': 'вопрос путешествия',
   'journey-survey': 'анкета навыка',
   aspect: 'из аспекта',
-  'aspect-item': 'к фрагменту'
+  'aspect-item': 'к фрагменту',
+  coach: 'от ИИ-коуча',
 }
 
 export default function DiaryView({ diary, onDiaryChange, t }) {

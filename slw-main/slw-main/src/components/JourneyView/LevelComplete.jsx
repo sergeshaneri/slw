@@ -4,24 +4,11 @@ export default function LevelComplete({
   state, accent,
   completeText,
   levelTitle,
-  mode = 'core',
   onProfile,
   nextLevelTitle, onNextLevel,
-  onStayPool, poolCount = 0
+  onOpenWheel
 }) {
   const levelNum = state.currentLevel ?? 0
-  const isPoolFinished = mode === 'pool'
-
-  // Заголовки и подписи зависят от того, что юзер только что закончил.
-  // Core: «Уровень N пройден» + «Первый контакт установлен» (или
-  // оригинальный сабтайтл уровня).
-  // Pool: «Дополнительные задания пройдены» — pool кончился.
-  const title = isPoolFinished
-    ? 'Дополнительные задания пройдены'
-    : `Уровень ${levelNum} пройден`
-  const subtitle = isPoolFinished
-    ? `${levelTitle ?? 'Уровень'} — пул исчерпан`
-    : (levelNum === 0 ? 'Первый контакт установлен' : (levelTitle ?? ''))
 
   return (
     <>
@@ -29,14 +16,14 @@ export default function LevelComplete({
         <div className={styles.avatar}><span className={styles.avatarGlyph}>◐</span></div>
         <div className={styles.topbarInfo}>
           <div className={styles.topbarTitle}>Terra Harmonia</div>
-          <div className={styles.topbarSub}>{isPoolFinished ? 'Пул пройден' : 'Уровень завершён'}</div>
+          <div className={styles.topbarSub}>Уровень завершён</div>
         </div>
       </div>
 
       <div className={styles.lcScreen}>
         <div className={styles.lcGlow} aria-hidden="true">★</div>
-        <div className={styles.lcTitle}>{title}</div>
-        <div className={styles.lcSubtitle}>{subtitle}</div>
+        <div className={styles.lcTitle}>{`Уровень ${levelNum} пройден`}</div>
+        <div className={styles.lcSubtitle}>{levelNum === 0 ? 'Первый контакт установлен' : (levelTitle ?? '')}</div>
 
         <div className={styles.lcCard}>
           <div className={styles.lcText}>{completeText}</div>
@@ -57,23 +44,22 @@ export default function LevelComplete({
           </div>
         </div>
 
-        {/* На L0 после core логичный следующий шаг — проанализировать
-            себя по навыкам БС (заполнить колесо самооценкой). Кнопка
-            ведёт на дерево навыков (выбор любого), не сразу на анкету. */}
-        {onStayPool && (
+        {/* Primary CTA на L0 — открыть Колесо БС (дерево навыков).
+            Анкеты — параллельный путь, не блокируют переход на L1. */}
+        {onOpenWheel && (
           <button
             type="button"
             className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`}
-            onClick={onStayPool}
+            onClick={onOpenWheel}
           >
-            Проанализировать себя по навыкам БС
+            Открыть Колесо БС
           </button>
         )}
 
         {onNextLevel && (
           <button
             type="button"
-            className={`${styles.btn} ${onStayPool ? styles.btnGhost : styles.btnPrimary} ${styles.btnFull}`}
+            className={`${styles.btn} ${onOpenWheel ? styles.btnGhost : styles.btnPrimary} ${styles.btnFull}`}
             onClick={onNextLevel}
           >
             Перейти на «{nextLevelTitle ?? 'следующий уровень'}»
@@ -82,7 +68,7 @@ export default function LevelComplete({
 
         <button
           type="button"
-          className={`${styles.btn} ${(onNextLevel || onStayPool) ? styles.btnGhost : styles.btnPrimary} ${styles.btnFull}`}
+          className={`${styles.btn} ${(onNextLevel || onOpenWheel) ? styles.btnGhost : styles.btnPrimary} ${styles.btnFull}`}
           onClick={onProfile}
         >
           Посмотреть профиль

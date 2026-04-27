@@ -5,6 +5,7 @@ import AspectsView from './components/AspectsView/AspectsView'
 import DiaryView from './components/DiaryView/DiaryView'
 import ProgressView from './components/ProgressView/ProgressView'
 import JourneyView, { DEFAULT_JOURNEY } from './components/JourneyView/JourneyView'
+import CoachView from './components/CoachView/CoachView'
 import SettingsView from './components/SettingsView/SettingsView'
 import LoadingScreen from './components/LoadingScreen/LoadingScreen'
 import AuthModal from './components/Auth/AuthModal'
@@ -253,6 +254,10 @@ export default function App() {
       setShowAuth(true)
       return
     }
+    // L0 должен быть пройден (currentLevel >= 1). Админу можно всегда.
+    if (!isAdmin && (journey?.currentLevel ?? 0) < 1) {
+      return
+    }
     await saveJourney({ ...journey, currentAspect: 'БС', screen: 'skill-tree', awaitingInput: null })
     setView('journey')
   }
@@ -268,6 +273,12 @@ export default function App() {
 
   const handleViewChange = (newView) => {
     if (newView === 'journey' && !user && !devAdmin) {
+      setShowAuth(true)
+      return
+    }
+    // Коуч требует авторизации — бэк всё равно отобьёт без JWT,
+    // но проверяем здесь чтобы не показывать пустой экран с ошибкой.
+    if (newView === 'coach' && !user) {
       setShowAuth(true)
       return
     }
@@ -368,6 +379,15 @@ export default function App() {
             diary={diary}
             onDiaryChange={saveDiary}
             t={t}
+          />
+        )}
+
+        {view === 'coach' && (
+          <CoachView
+            diary={diary}
+            onDiaryChange={saveDiary}
+            journey={journey}
+            onJourneyChange={saveJourney}
           />
         )}
 

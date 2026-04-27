@@ -166,3 +166,23 @@ class JourneyEvent(Base):
     step_id: Mapped[str | None] = mapped_column(Text, nullable=True)  # full bot-id for debugging
     payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+# ── AI coach summon ─────────────────────────────────────────────────────────
+# Каждый вызов ИИ-коуча. Используется для квоты (count today) и для UI-истории.
+
+class CoachCall(Base):
+    __tablename__ = "coach_calls"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    web_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("web_users.id"))
+    prompt: Mapped[str] = mapped_column(Text)
+    response: Mapped[str | None] = mapped_column(Text, nullable=True)
+    focus_aspect: Mapped[str | None] = mapped_column(Text, nullable=True)
+    paid_with_stardust: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    tokens_in: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tokens_out: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)

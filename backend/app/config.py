@@ -12,6 +12,17 @@ class Settings(BaseSettings):
     sentry_dsn: str = ""
     debug: bool = False
 
+    # ── LLM (AI coach summon) ────────────────────────────────────────────────
+    # Провайдер выбирается через env. По умолчанию "stub" — echo-ответ без
+    # сети, чтобы фича работала на свежем деплое без ключа.
+    # Поддерживается "openrouter" — OpenAI-совместимый шлюз с доступом к
+    # бесплатным моделям. SDK тот же `openai`, base_url = openrouter.ai/api/v1.
+    llm_provider: str = "stub"
+    openrouter_api_key: str = ""
+    llm_model: str = "meta-llama/llama-3.1-8b-instruct:free"
+    # OpenRouter требует HTTP-Referer от приложений; ставим домен фронта.
+    app_url: str = "https://sergeshaneri.github.io/slw"
+
     @field_validator("database_url", mode="before")
     @classmethod
     def fix_db_url(cls, v: str) -> str:

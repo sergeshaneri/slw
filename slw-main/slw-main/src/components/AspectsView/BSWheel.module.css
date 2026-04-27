@@ -126,6 +126,13 @@
   animation: wheelPulse 4s infinite ease-in-out;
 }
 
+/* Заблокированное состояние (до прохождения L0) — приглушено. */
+.lockedSvg {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+  pointer-events: none;
+}
+
 @keyframes wheelPulse {
   0%, 100% { filter: drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 45%, transparent)); }
   50%      { filter: drop-shadow(0 0 28px color-mix(in srgb, var(--accent) 65%, transparent)); }

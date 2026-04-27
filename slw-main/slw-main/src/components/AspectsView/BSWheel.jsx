@@ -226,7 +226,7 @@ function MasterfulArcs({ radius, color = 'currentColor' }) {
   return <g>{elements}</g>
 }
 
-export default function BSWheel({ skills, color, onContinueSurveys }) {
+export default function BSWheel({ skills, color, onContinueSurveys, isLocked = false }) {
   const bsScore = calcBSScoreFromSkills(skills)
   const progress = getSkillProgress(skills)
 
@@ -253,12 +253,9 @@ export default function BSWheel({ skills, color, onContinueSurveys }) {
   const showBigBadge    = globalStage === 'masterful'
   const showGlow        = globalStageIdx >= STAGE_ORDER.indexOf('strong')
 
-  const stageLabel =
-    globalStage === 'pre'       ? `♢ контур · нужна 1 в каждом архетипе для роста`
-  : globalStage === 'light'     ? `◌ просыпается · нужно 3 в каждом для следующего`
-  : globalStage === 'medium'    ? `◍ корона · нужно 6 в каждом для сияния`
-  : globalStage === 'strong'    ? `✸ полное сияние · до мастерства осталось`
-  :                               `★ мастерство · ${progress.completed}/${progress.total}`
+  const stageLabel = isLocked
+    ? 'Пройди уровень 1, чтобы открыть оценку навыков'
+    : 'Изучай свои навыки контакта с телом для эволюции колеса'
 
   return (
     <section className={styles.wheel} style={{ '--accent': color }}>
@@ -278,7 +275,7 @@ export default function BSWheel({ skills, color, onContinueSurveys }) {
 
       <div className={styles.stageBadge}>{stageLabel}</div>
 
-      <div className={`${styles.svgWrap} ${styles[`stage_${globalStage}`]}`}>
+      <div className={`${styles.svgWrap} ${styles[`stage_${globalStage}`]} ${isLocked ? styles.lockedSvg : ''}`}>
         <svg
           viewBox="0 0 320 320"
           xmlns="http://www.w3.org/2000/svg"
@@ -575,8 +572,8 @@ export default function BSWheel({ skills, color, onContinueSurveys }) {
         </svg>
       </div>
 
-      {/* CTA */}
-      {progress.remaining > 0 && onContinueSurveys && (
+      {/* CTA — скрыто, пока заблокировано (L0 не пройден). */}
+      {!isLocked && progress.remaining > 0 && onContinueSurveys && (
         <button
           type="button"
           className={styles.wheelCta}
@@ -587,7 +584,7 @@ export default function BSWheel({ skills, color, onContinueSurveys }) {
             : `Продолжить · ${progress.remaining} осталось →`}
         </button>
       )}
-      {progress.remaining === 0 && onContinueSurveys && (
+      {!isLocked && progress.remaining === 0 && onContinueSurveys && (
         <button
           type="button"
           className={styles.wheelCta}
