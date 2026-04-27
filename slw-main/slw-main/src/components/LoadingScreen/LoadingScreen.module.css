@@ -1,14 +1,184 @@
+/* Полноэкранный лоадер — встречает пользователя при первой загрузке. */
+
 .container {
-  background: #0A0A0F;
-  min-height: 100vh;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 26px;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(123, 44, 191, 0.22), transparent 55%),
+    radial-gradient(circle at 50% 62%, rgba(76, 201, 240, 0.10), transparent 60%),
+    #0A0A0F;
+  overflow: hidden;
+  animation: lsFadeIn 0.5s ease-out;
 }
 
+@keyframes lsFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Большое размытое свечение за колесом. */
+.glow {
+  position: absolute;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(157, 78, 221, 0.32) 0%,
+    rgba(76, 201, 240, 0.12) 40%,
+    transparent 70%
+  );
+  filter: blur(36px);
+  pointer-events: none;
+  animation: lsGlowPulse 4.5s ease-in-out infinite;
+}
+
+@keyframes lsGlowPulse {
+  0%, 100% { transform: scale(1);   opacity: 0.7; }
+  50%      { transform: scale(1.08); opacity: 1;   }
+}
+
+.stage {
+  position: relative;
+  z-index: 1;
+  width: 220px;
+  height: 220px;
+}
+
+.wheel {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+/* Контурные кольца. */
+.ring {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.10);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.ringInner {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.05);
+  stroke-width: 1;
+}
+
+/* Группа спиц вращается целиком. */
+.spokes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lsSpin 7s linear infinite;
+}
+
+@keyframes lsSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Каждая спица пульсирует со своей задержкой → бегущая волна. */
+.spoke {
+  animation: lsSpokeFade 1.6s ease-in-out infinite;
+}
+
+@keyframes lsSpokeFade {
+  0%, 100% { opacity: 0.22; }
+  50%      { opacity: 1; }
+}
+
+/* Точки на концах — синхронно со спицами, чуть резче. */
+.dot {
+  animation: lsDotPulse 1.6s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes lsDotPulse {
+  0%, 100% { transform: scale(0.8); opacity: 0.4; }
+  50%      { transform: scale(1.2); opacity: 1;   }
+}
+
+/* Центральная точка — яркая, дышащая. */
+.core {
+  fill: #ffffff;
+  filter: drop-shadow(0 0 10px rgba(199, 125, 255, 0.85));
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lsCorePulse 1.8s ease-in-out infinite;
+}
+
+@keyframes lsCorePulse {
+  0%, 100% { transform: scale(1);   opacity: 0.9; }
+  50%      { transform: scale(1.4); opacity: 1;   }
+}
+
+/* Заголовок. */
+.brand {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  user-select: none;
+}
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  font-weight: 700;
+  background: linear-gradient(90deg, #9d4edd 0%, #c77dff 50%, #4cc9f0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 6px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 300;
+  letter-spacing: 2px;
+  color: #f1f2f5;
+}
+
+/* Бегущая нижняя надпись «загрузка...». */
 .text {
-  color: #9d4edd;
+  position: relative;
+  z-index: 1;
   font-family: monospace;
-  font-size: 14px;
-  letter-spacing: 4px;
+  font-size: 11px;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  color: rgba(199, 125, 255, 0.75);
+  animation: lsTextBlink 1.6s ease-in-out infinite;
+}
+
+@keyframes lsTextBlink {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1;   }
+}
+
+/* Узкие экраны — слегка сжать. */
+@media (max-width: 480px) {
+  .stage  { width: 180px; height: 180px; }
+  .glow   { width: 380px; height: 380px; }
+  .title  { font-size: 18px; letter-spacing: 1.5px; }
+  .eyebrow { letter-spacing: 4px; }
+}
+
+/* Уважение к prefers-reduced-motion: убираем циклические анимации. */
+@media (prefers-reduced-motion: reduce) {
+  .glow,
+  .spokes,
+  .spoke,
+  .dot,
+  .core,
+  .text {
+    animation: none;
+  }
 }

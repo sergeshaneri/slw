@@ -18,6 +18,7 @@ import SurveyScreen from './SurveyScreen'
 import SurveyChoice from './SurveyChoice'
 import SurveyInsight from './SurveyInsight'
 import SkillTree from './SkillTree'
+import SkillDetail from './SkillDetail'
 import AdminPanel from './AdminPanel'
 import AdminSkillsEditor from './AdminSkillsEditor'
 import styles from './JourneyView.module.css'
@@ -66,6 +67,8 @@ export const DEFAULT_JOURNEY = {
   // Активная анкета (если открыт screen='survey').
   // activeSurvey = { scriptId, skillId, blockIndex, statementIndex, answers: { [blockKey]: number[] } }
   activeSurvey: null,
+  // Навык, открытый в детальном просмотре (screen='skill-detail').
+  skillDetailId: null,
   xp: 0,
   stardust: 0,
   streak: 0,
@@ -548,6 +551,13 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setState(s => ({ ...s, screen: 'survey-insight' }))
   }, [setState])
 
+  // Открыть детальный разбор навыка (черты + практики + действия).
+  // Доступен из дерева навыков для пройденных навыков и автоматически —
+  // сразу после прохождения анкеты (см. handleSurveyInsight).
+  const handleOpenSkillDetail = useCallback((skillId) => {
+    setState(s => ({ ...s, skillDetailId: skillId, screen: 'skill-detail' }))
+  }, [setState])
+
   // Юзер написал инсайт и нажал «Сохранить».
   // Считаем средние по всем накопленным ответам, пишем skill, апдейтим
   // passes по фактической длине массивов в answers.
@@ -592,7 +602,8 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       ...s,
       skills: newSkills,
       activeSurvey: null,
-      screen: 'skill-tree'
+      skillDetailId: active.skillId,
+      screen: 'skill-detail'
     }))
 
     const bsScore = calcBSScoreFromSkills(newSkills)
@@ -633,10 +644,11 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       ...(diary ?? [])
     ])
 
-    // XP: 15 за короткий, 30 за финал (когда дошли до passes=3).
-    // Если за одну сессию подняли с 0 до 3 (full с pass=1) — даём 30 как финал.
+    // XP: 10 за каждый закрытый проход. Большой опрос = 3 прохода = 30,
+    // три мини-прохода по очереди = 10+10+10 = те же 30.
+    // Stardust по-прежнему только на финальном проходе (passes=3).
     const wentToFinal = wasPasses < 3 && actualPasses === 3
-    const xp = wentToFinal ? 30 : 15
+    const xp = (actualPasses - wasPasses) * 10
     if (script) removePending(script.id)
     awardXP(xp, wentToFinal ? (script?.stardust ?? 0) : 0, script?.id ?? null)
   }, [state.activeSurvey, state.currentAspect, state.skills, scripts, scores, diary, onDiaryChange, onScoresChange, awardXP, removePending, setState])
@@ -1030,6 +1042,16 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           skills={state.skills ?? {}}
           onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
           onStartSkill={handleStartSkillSurvey}
+          onOpenSkillDetail={handleOpenSkillDetail}
+        />
+      )}
+
+      {state.screen === 'skill-detail' && state.skillDetailId && (
+        <SkillDetail
+          skillId={state.skillDetailId}
+          currentLevel={state.currentLevel ?? 0}
+          accent={accent}
+          onClose={() => goToScreen('skill-tree')}
         />
       )}
 
