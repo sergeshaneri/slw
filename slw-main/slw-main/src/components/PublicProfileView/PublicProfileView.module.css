@@ -307,33 +307,75 @@
   font-weight: 600;
 }
 
-.likeBtn {
-  margin-left: auto;
+.reactionRow {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.reactionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   background: transparent;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
   color: var(--text-muted);
   font: inherit;
   font-size: 13px;
-  padding: 4px 12px;
+  padding: 4px 10px;
   border-radius: 14px;
   cursor: pointer;
-  transition: color .15s, background .15s, border-color .15s;
+  transition: color .15s, background .15s, border-color .15s, transform .12s;
 }
 
-.likeBtn:hover:not(:disabled) {
+.reactionBtn:hover:not(:disabled) {
   color: var(--accent);
   border-color: var(--accent);
+  transform: translateY(-1px);
 }
 
-.likeBtnActive {
+.reactionBtnActive {
   color: var(--accent);
   border-color: var(--accent);
-  background: rgba(179,157,219,0.08);
+  background: rgba(179,157,219,0.1);
 }
 
-.likeBtn:disabled {
+.reactionBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.reactionEmoji { font-size: 14px; line-height: 1; }
+.reactionCount { font-variant-numeric: tabular-nums; }
+
+/* ── Achievements ─────────────────────────────────────── */
+
+.achievementsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.achievementBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(179,157,219,0.06);
+  border: 1px solid rgba(179,157,219,0.35);
+  border-radius: 999px;
+  padding: 6px 14px 6px 10px;
+  font-size: 13px;
+}
+
+.achievementBadgeIcon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.achievementBadgeTitle {
+  color: var(--text);
+  font-weight: 500;
 }
 
 .insightText {

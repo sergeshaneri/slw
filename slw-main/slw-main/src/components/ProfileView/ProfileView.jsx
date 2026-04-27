@@ -349,6 +349,12 @@ export default function ProfileView({ onOpenPublicProfile, onOpenSettings }) {
         )}
       </div>
 
+      {/* ── Achievements ────────────────────────── */}
+      <AchievementsSection
+        unlocked={profile.achievements ?? []}
+        catalog={profile.achievements_catalog ?? []}
+      />
+
       {/* ── Insights ────────────────────────────── */}
       <Section label="Мои инсайты и рекомендации">
         <div className={styles.muted}>
@@ -441,5 +447,33 @@ function Section({ label, children }) {
       <div className={styles.sectionLabel}>{label}</div>
       {children}
     </section>
+  )
+}
+
+function AchievementsSection({ unlocked, catalog }) {
+  const unlockedCodes = new Set(unlocked.map(a => a.code))
+  const total = catalog.length
+  const got = unlocked.length
+  return (
+    <Section label={`Достижения · ${got}/${total}`}>
+      <div className={styles.achievementsGrid}>
+        {catalog.map(a => {
+          const isUnlocked = unlockedCodes.has(a.code)
+          return (
+            <div
+              key={a.code}
+              className={`${styles.achievement} ${isUnlocked ? styles.achievementUnlocked : styles.achievementLocked}`}
+              title={a.desc}
+            >
+              <div className={styles.achievementIcon}>{isUnlocked ? a.icon : '🔒'}</div>
+              <div className={styles.achievementBody}>
+                <div className={styles.achievementTitle}>{a.title}</div>
+                <div className={styles.achievementDesc}>{a.desc}</div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </Section>
   )
 }

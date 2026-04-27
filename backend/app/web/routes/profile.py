@@ -1,30 +1,36 @@
 """
-Public profile + insights:
+Public profile + insights + achievements:
 
-  GET    /api/profile/me                — мой профиль (full, с приватной частью)
-  PUT    /api/profile/me                — обновить мой профиль
-  GET    /api/profile/{user_id}         — публичный профиль чужого юзера
-  GET    /api/profile/me/insights       — мои инсайты (включая приватные)
-  POST   /api/profile/insights          — создать инсайт
-  DELETE /api/profile/insights/{id}     — удалить свой инсайт
-  POST   /api/profile/insights/{id}/like — лайкнуть/анлайкнуть (toggle)
+  GET    /api/profile/me                  — мой профиль (full)
+  PUT    /api/profile/me                  — обновить
+  GET    /api/profile/{user_id}           — публичный профиль чужого юзера
+  GET    /api/profile/me/insights         — мои инсайты (вкл. приватные)
+  POST   /api/profile/insights            — создать инсайт
+  DELETE /api/profile/insights/{id}       — удалить свой инсайт
+  POST   /api/profile/insights/{id}/react — поставить реакцию (heart/thanks/aha/fire)
 
 Профиль создаётся lazy: первый PUT делает upsert, GET до этого момента
 возвращает пустой дефолт. Это не ломает регистрацию и не требует миграции
 существующих юзеров.
+
+Ачивки начисляются автоматически на каждом GET /me — это просто
+(не требует event-handlers по всему коду) и идемпотентно (INSERT IGNORE).
 """
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
     AspectInsight,
+    CoachCall,
     InsightLike,
     JourneyEvent,
     PublicProfile,
+    WebAchievement,
     WebScore,
     WebState,
     WebUser,
@@ -37,6 +43,39 @@ router = APIRouter()
 ASPECT_KEYS = ["БС", "БЭ", "БЛ", "БИ", "ЧС", "ЧЭ", "ЧЛ", "ЧИ"]
 INSIGHT_KINDS = {"insight", "recommendation"}
 INSPIRATION_TYPES = {"film", "book", "music", "activity", "person", "other"}
+
+REACTION_TYPES = {"heart", "thanks", "aha", "fire"}
+
+# ── Каталог ачивок ──────────────────────────────────────────────────────────
+# Метаданные живут здесь, в БД хранится только факт (web_achievements.code).
+# Каждая ачивка — запись `{title, icon, desc, check}`. `check` принимает
+# контекст (xp, streak, insights_count, likes_received, coach_calls,
+# scored_aspects) и возвращает bool.
+
+ACHIEVEMENT_CATALOG: dict[str, dict] = {
+    "first_step":    {"title": "Первый шаг",    "icon": "🚶", "desc": "Прошёл первый шаг путешествия",
+                      "check": lambda c: c["xp"] >= 1},
+    "xp_10":         {"title": "Десятка",       "icon": "⚜",  "desc": "Накопил 10 XP",
+                      "check": lambda c: c["xp"] >= 10},
+    "xp_50":         {"title": "Полсотни",      "icon": "🏅", "desc": "Накопил 50 XP",
+                      "check": lambda c: c["xp"] >= 50},
+    "xp_100":        {"title": "Сотня",         "icon": "🏆", "desc": "Накопил 100 XP",
+                      "check": lambda c: c["xp"] >= 100},
+    "streak_7":      {"title": "Неделя огня",   "icon": "🔥", "desc": "Стрик 7 дней",
+                      "check": lambda c: c["streak"] >= 7},
+    "streak_30":     {"title": "Месяц огня",    "icon": "🌋", "desc": "Стрик 30 дней",
+                      "check": lambda c: c["streak"] >= 30},
+    "first_insight": {"title": "Первый инсайт", "icon": "💡", "desc": "Опубликовал первый инсайт",
+                      "check": lambda c: c["insights_count"] >= 1},
+    "five_insights": {"title": "Мысль течёт",   "icon": "🧠", "desc": "5 опубликованных инсайтов",
+                      "check": lambda c: c["insights_count"] >= 5},
+    "liked_by_5":    {"title": "Резонанс",      "icon": "✨", "desc": "5 реакций на твои инсайты",
+                      "check": lambda c: c["likes_received"] >= 5},
+    "first_coach":   {"title": "Зов коуча",     "icon": "🤖", "desc": "Первый ИИ-вызов",
+                      "check": lambda c: c["coach_calls"] >= 1},
+    "polymath":      {"title": "Полиглот",      "icon": "🌐", "desc": "Оценил все 8 аспектов",
+                      "check": lambda c: c["scored_aspects"] >= 8},
+}
 
 
 # ── Schemas ─────────────────────────────────────────────────────────────────
@@ -160,6 +199,146 @@ async def _xp(session: AsyncSession, user: WebUser) -> int:
     return max(events_xp, scripts_xp)
 
 
+async def _streak(session: AsyncSession, user: WebUser) -> int:
+    """Стрик: бот-тир приоритетнее, fallback на journey-state."""
+    if user.telegram_id:
+        from app.db.models import UserState
+        row = await session.get(UserState, user.telegram_id)
+        if row and row.streak_days:
+            return int(row.streak_days)
+    state = await session.get(WebState, user.id)
+    if state and isinstance(state.journey, dict):
+        s = state.journey.get("streak") or state.journey.get("streakDays")
+        if isinstance(s, (int, float)):
+            return int(s)
+    return 0
+
+
+async def _check_and_grant_achievements(session: AsyncSession, user: WebUser) -> list[str]:
+    """Пересчитывает условия ачивок и вставляет недостающие (idempotent).
+    Возвращает список кодов уже разблокированных ачивок (после апдейта).
+    Только для своего профиля — иначе бесплатно «начислил» бы себе чужие.
+    """
+    # Контекст для check-функций.
+    xp = await _xp(session, user)
+    streak = await _streak(session, user)
+    insights_count = int((
+        await session.execute(
+            select(func.count())
+            .select_from(AspectInsight)
+            .where(AspectInsight.web_user_id == user.id)
+        )
+    ).scalar_one())
+    likes_received = int((
+        await session.execute(
+            select(func.count())
+            .select_from(InsightLike)
+            .join(AspectInsight, AspectInsight.id == InsightLike.insight_id)
+            .where(AspectInsight.web_user_id == user.id)
+        )
+    ).scalar_one())
+    coach_calls = int((
+        await session.execute(
+            select(func.count())
+            .select_from(CoachCall)
+            .where(CoachCall.web_user_id == user.id, CoachCall.error.is_(None))
+        )
+    ).scalar_one())
+    scored_aspects = int((
+        await session.execute(
+            select(func.count(func.distinct(WebScore.aspect)))
+            .where(WebScore.web_user_id == user.id)
+        )
+    ).scalar_one())
+
+    ctx = {
+        "xp": xp, "streak": streak, "insights_count": insights_count,
+        "likes_received": likes_received, "coach_calls": coach_calls,
+        "scored_aspects": scored_aspects,
+    }
+
+    # Уже разблокированные.
+    have = set((
+        await session.execute(
+            select(WebAchievement.code).where(WebAchievement.web_user_id == user.id)
+        )
+    ).scalars().all())
+
+    # Что заслужено по текущему контексту.
+    earned = {
+        code for code, meta in ACHIEVEMENT_CATALOG.items() if meta["check"](ctx)
+    }
+
+    new_codes = earned - have
+    for code in new_codes:
+        # ON CONFLICT DO NOTHING на случай гонки (несколько одновременных GET).
+        stmt = pg_insert(WebAchievement).values(
+            web_user_id=user.id, code=code,
+        ).on_conflict_do_nothing(index_elements=["web_user_id", "code"])
+        await session.execute(stmt)
+    if new_codes:
+        await session.commit()
+
+    return sorted(have | earned)
+
+
+async def _achievements_payload(session: AsyncSession, codes: list[str]) -> list[dict]:
+    """Превращает коды в список объектов с метаданными + датой разблокировки."""
+    if not codes:
+        return []
+    # Подтянем даты unlocked_at.
+    # Один запрос только для нужных кодов нам не критичен — берём всё за юзера.
+    return [
+        {
+            "code": code,
+            "title": ACHIEVEMENT_CATALOG[code]["title"],
+            "icon": ACHIEVEMENT_CATALOG[code]["icon"],
+            "desc": ACHIEVEMENT_CATALOG[code]["desc"],
+        }
+        for code in codes
+        if code in ACHIEVEMENT_CATALOG
+    ]
+
+
+async def _reactions_for_insights(
+    session: AsyncSession,
+    insight_ids: list[int],
+    viewer_user: WebUser | None,
+) -> tuple[dict[int, dict[str, int]], dict[int, str | None]]:
+    """Для группы инсайтов возвращает:
+      - reactions[insight_id][reaction_type] = count
+      - my_reaction[insight_id] = type|None (что выбрал viewer)
+    """
+    reactions: dict[int, dict[str, int]] = {}
+    if not insight_ids:
+        return reactions, {}
+
+    rows = (
+        await session.execute(
+            select(InsightLike.insight_id, InsightLike.reaction, func.count())
+            .where(InsightLike.insight_id.in_(insight_ids))
+            .group_by(InsightLike.insight_id, InsightLike.reaction)
+        )
+    ).all()
+    for iid, rtype, cnt in rows:
+        reactions.setdefault(int(iid), {})[rtype or "heart"] = int(cnt)
+
+    my_reaction: dict[int, str | None] = {iid: None for iid in insight_ids}
+    if viewer_user is not None:
+        my_rows = (
+            await session.execute(
+                select(InsightLike.insight_id, InsightLike.reaction)
+                .where(
+                    InsightLike.insight_id.in_(insight_ids),
+                    InsightLike.web_user_id == viewer_user.id,
+                )
+            )
+        ).all()
+        for iid, rtype in my_rows:
+            my_reaction[int(iid)] = rtype or "heart"
+    return reactions, my_reaction
+
+
 async def _profile_payload(
     session: AsyncSession,
     target_user: WebUser,
@@ -167,8 +346,13 @@ async def _profile_payload(
     viewer_user: WebUser | None,
     *,
     include_private: bool,
+    grant_achievements: bool = False,
 ) -> dict:
-    """Сборка JSON-ответа для GET /profile/{id} и GET /profile/me."""
+    """Сборка JSON-ответа для GET /profile/{id} и GET /profile/me.
+
+    grant_achievements=True — пересчитывает и начисляет ачивки.
+    Применяется только когда target_user == viewer_user (свой профиль).
+    """
     xp = await _xp(session, target_user)
     score_rows = (
         await session.execute(
@@ -189,40 +373,35 @@ async def _profile_payload(
     insights_payload = []
     if insights_rows:
         ids = [r.id for r in insights_rows]
-        # Счётчики лайков одним запросом.
-        like_counts_rows = (
-            await session.execute(
-                select(InsightLike.insight_id, func.count())
-                .where(InsightLike.insight_id.in_(ids))
-                .group_by(InsightLike.insight_id)
-            )
-        ).all()
-        like_counts = {iid: int(c) for iid, c in like_counts_rows}
-        # Лайкнул ли viewer.
-        liked_by_viewer: set[int] = set()
-        if viewer_user is not None:
-            liked_rows = (
-                await session.execute(
-                    select(InsightLike.insight_id)
-                    .where(
-                        InsightLike.insight_id.in_(ids),
-                        InsightLike.web_user_id == viewer_user.id,
-                    )
-                )
-            ).scalars().all()
-            liked_by_viewer = set(int(x) for x in liked_rows)
-
+        reactions_map, my_reaction_map = await _reactions_for_insights(
+            session, ids, viewer_user
+        )
         for r in insights_rows:
+            r_counts = reactions_map.get(r.id, {})
             insights_payload.append({
                 "id": r.id,
                 "aspect": r.aspect,
                 "kind": r.kind,
                 "text": r.text,
                 "is_public": r.is_public,
-                "likes": like_counts.get(r.id, 0),
-                "liked_by_me": r.id in liked_by_viewer,
+                "reactions": r_counts,
+                "likes": sum(r_counts.values()),  # back-compat для старого фронта
+                "my_reaction": my_reaction_map.get(r.id),
+                "liked_by_me": my_reaction_map.get(r.id) is not None,
                 "created_at": r.created_at.isoformat(),
             })
+
+    # Ачивки.
+    if grant_achievements:
+        codes = await _check_and_grant_achievements(session, target_user)
+    else:
+        codes = sorted((
+            await session.execute(
+                select(WebAchievement.code)
+                .where(WebAchievement.web_user_id == target_user.id)
+            )
+        ).scalars().all())
+    achievements = await _achievements_payload(session, codes)
 
     return {
         "user_id": target_user.id,
@@ -236,6 +415,17 @@ async def _profile_payload(
         "xp": xp,
         "scores": scores,
         "insights": insights_payload,
+        "achievements": achievements,
+        # Полный каталог — чтобы фронт мог показать «запертые» ачивки.
+        "achievements_catalog": [
+            {
+                "code": code,
+                "title": meta["title"],
+                "icon": meta["icon"],
+                "desc": meta["desc"],
+            }
+            for code, meta in ACHIEVEMENT_CATALOG.items()
+        ],
     }
 
 
@@ -248,7 +438,8 @@ async def get_my_profile(
 ) -> dict:
     profile = await session.get(PublicProfile, current_user.id)
     return await _profile_payload(
-        session, current_user, profile, current_user, include_private=True
+        session, current_user, profile, current_user,
+        include_private=True, grant_achievements=True,
     )
 
 
@@ -282,7 +473,8 @@ async def update_my_profile(
     await session.commit()
     await session.refresh(profile)
     return await _profile_payload(
-        session, current_user, profile, current_user, include_private=True
+        session, current_user, profile, current_user,
+        include_private=True, grant_achievements=True,
     )
 
 
@@ -324,14 +516,7 @@ async def get_my_insights(
         return []
 
     ids = [r.id for r in rows]
-    like_counts_rows = (
-        await session.execute(
-            select(InsightLike.insight_id, func.count())
-            .where(InsightLike.insight_id.in_(ids))
-            .group_by(InsightLike.insight_id)
-        )
-    ).all()
-    like_counts = {iid: int(c) for iid, c in like_counts_rows}
+    reactions_map, _ = await _reactions_for_insights(session, ids, viewer_user=None)
     return [
         {
             "id": r.id,
@@ -339,8 +524,10 @@ async def get_my_insights(
             "kind": r.kind,
             "text": r.text,
             "is_public": r.is_public,
-            "likes": like_counts.get(r.id, 0),
-            "liked_by_me": False,  # это «свои», лайкать самому себе нельзя
+            "reactions": reactions_map.get(r.id, {}),
+            "likes": sum(reactions_map.get(r.id, {}).values()),
+            "my_reaction": None,  # свои инсайты — реакции от себя нельзя
+            "liked_by_me": False,
             "created_at": r.created_at.isoformat(),
         }
         for r in rows
@@ -377,7 +564,9 @@ async def post_insight(
         "kind": insight.kind,
         "text": insight.text,
         "is_public": insight.is_public,
+        "reactions": {},
         "likes": 0,
+        "my_reaction": None,
         "liked_by_me": False,
         "created_at": insight.created_at.isoformat(),
     }
@@ -399,17 +588,30 @@ async def delete_insight(
     return {"ok": True}
 
 
-@router.post("/profile/insights/{insight_id}/like")
-async def toggle_like(
+class ReactionIn(BaseModel):
+    reaction: str = "heart"
+
+
+@router.post("/profile/insights/{insight_id}/react")
+async def react_to_insight(
     insight_id: int,
+    body: ReactionIn,
     current_user: WebUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
+    """Поставить реакцию на инсайт. Семантика:
+      - если у юзера ещё нет реакции — добавляем
+      - если такая же реакция уже стоит — снимаем (toggle off)
+      - если стоит другая — заменяем на новую
+    """
+    if body.reaction not in REACTION_TYPES:
+        raise HTTPException(status_code=400, detail=f"Unknown reaction; allowed: {sorted(REACTION_TYPES)}")
+
     insight = await session.get(AspectInsight, insight_id)
     if not insight or insight.is_public is False:
         raise HTTPException(status_code=404, detail="Insight not found")
     if insight.web_user_id == current_user.id:
-        raise HTTPException(status_code=400, detail="Cannot like your own insight")
+        raise HTTPException(status_code=400, detail="Cannot react to your own insight")
 
     existing = (
         await session.execute(
@@ -420,19 +622,48 @@ async def toggle_like(
         )
     ).scalar_one_or_none()
 
-    if existing:
+    my_reaction: str | None
+    if existing is None:
+        session.add(InsightLike(
+            insight_id=insight_id,
+            web_user_id=current_user.id,
+            reaction=body.reaction,
+        ))
+        my_reaction = body.reaction
+    elif (existing.reaction or "heart") == body.reaction:
         await session.delete(existing)
-        liked = False
+        my_reaction = None
     else:
-        session.add(InsightLike(insight_id=insight_id, web_user_id=current_user.id))
-        liked = True
+        existing.reaction = body.reaction
+        my_reaction = body.reaction
     await session.commit()
 
-    total = (
+    # Сводка по всем типам.
+    rows = (
         await session.execute(
-            select(func.count())
-            .select_from(InsightLike)
+            select(InsightLike.reaction, func.count())
             .where(InsightLike.insight_id == insight_id)
+            .group_by(InsightLike.reaction)
         )
-    ).scalar_one()
-    return {"liked": liked, "likes": int(total)}
+    ).all()
+    reactions = {(r or "heart"): int(c) for r, c in rows}
+    return {
+        "my_reaction": my_reaction,
+        "reactions": reactions,
+        "total": sum(reactions.values()),
+    }
+
+
+# Back-compat: старый клиент бьёт в /like — делаем алиас на heart-реакцию.
+@router.post("/profile/insights/{insight_id}/like")
+async def toggle_like_compat(
+    insight_id: int,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    return await react_to_insight(
+        insight_id=insight_id,
+        body=ReactionIn(reaction="heart"),
+        current_user=current_user,
+        session=session,
+    )

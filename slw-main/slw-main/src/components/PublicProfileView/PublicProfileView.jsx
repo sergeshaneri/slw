@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
-import { fetchPublicProfile, toggleInsightLike } from '../../api/client'
+import { fetchPublicProfile, reactToInsight } from '../../api/client'
 import styles from './PublicProfileView.module.css'
 
 const KIND_LABEL = {
@@ -16,6 +16,13 @@ const INSPIRATION_TYPE_LABEL = {
   person: '👤',
   other: '✦',
 }
+
+const REACTIONS = [
+  { type: 'heart',  emoji: '♥', title: 'нравится' },
+  { type: 'thanks', emoji: '🙏', title: 'спасибо' },
+  { type: 'aha',    emoji: '💡', title: 'осенило' },
+  { type: 'fire',   emoji: '🔥', title: 'топ' },
+]
 
 export default function PublicProfileView({ userId, currentUserId, onBack }) {
   const [profile, setProfile] = useState(null)
@@ -36,17 +43,25 @@ export default function PublicProfileView({ userId, currentUserId, onBack }) {
       .finally(() => setBusy(false))
   }, [userId])
 
-  const handleLike = async (insightId) => {
+  const handleReact = async (insightId, reaction) => {
     try {
-      const { liked, likes } = await toggleInsightLike(insightId)
+      const { my_reaction, reactions, total } = await reactToInsight(insightId, reaction)
       setProfile(p => ({
         ...p,
         insights: (p.insights ?? []).map(i =>
-          i.id === insightId ? { ...i, liked_by_me: liked, likes } : i
+          i.id === insightId
+            ? {
+                ...i,
+                my_reaction,
+                liked_by_me: my_reaction !== null,
+                reactions,
+                likes: total,
+              }
+            : i
         ),
       }))
     } catch (e) {
-      setError(e.message ?? 'Не удалось поставить лайк')
+      setError(e.message ?? 'Не удалось поставить реакцию')
     }
   }
 
@@ -150,6 +165,19 @@ export default function PublicProfileView({ userId, currentUserId, onBack }) {
         </Section>
       )}
 
+      {(profile.achievements ?? []).length > 0 && (
+        <Section label={`Достижения · ${profile.achievements.length}`}>
+          <div className={styles.achievementsRow}>
+            {profile.achievements.map(a => (
+              <div key={a.code} className={styles.achievementBadge} title={a.desc}>
+                <span className={styles.achievementBadgeIcon}>{a.icon}</span>
+                <span className={styles.achievementBadgeTitle}>{a.title}</span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
       {sortedScores.length > 0 && (
         <Section label="Оценки по аспектам">
           <div className={styles.scoresList}>
@@ -189,17 +217,27 @@ export default function PublicProfileView({ userId, currentUserId, onBack }) {
                     {ins.aspect} · {ASPECT_DATA[ins.aspect]?.name ?? ''}
                   </span>
                   <span className={styles.insightKind}>{KIND_LABEL[ins.kind] ?? ins.kind}</span>
-                  <button
-                    type="button"
-                    className={`${styles.likeBtn} ${ins.liked_by_me ? styles.likeBtnActive : ''}`}
-                    onClick={() => handleLike(ins.id)}
-                    disabled={isMe}
-                    title={isMe ? 'Нельзя лайкать свои инсайты' : ''}
-                  >
-                    {ins.liked_by_me ? '♥' : '♡'} {ins.likes}
-                  </button>
                 </div>
                 <div className={styles.insightText}>{ins.text}</div>
+                <div className={styles.reactionRow}>
+                  {REACTIONS.map(r => {
+                    const count = ins.reactions?.[r.type] ?? 0
+                    const isActive = ins.my_reaction === r.type
+                    return (
+                      <button
+                        key={r.type}
+                        type="button"
+                        className={`${styles.reactionBtn} ${isActive ? styles.reactionBtnActive : ''}`}
+                        onClick={() => handleReact(ins.id, r.type)}
+                        disabled={isMe}
+                        title={isMe ? 'Нельзя реагировать на свои инсайты' : r.title}
+                      >
+                        <span className={styles.reactionEmoji}>{r.emoji}</span>
+                        {count > 0 && <span className={styles.reactionCount}>{count}</span>}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             ))}
           </div>

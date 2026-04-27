@@ -236,6 +236,15 @@ class AspectInsight(Base):
 
 
 class InsightLike(Base):
+    """Реакция юзера на инсайт. Один юзер — одна реакция за раз
+    (можно сменить тип, но не «оставить две»). Тип хранится в `reaction`:
+      heart   — ♥ нравится
+      thanks  — 🙏 спасибо
+      aha     — 💡 осенило
+      fire    — 🔥 топ
+    PK по (insight_id, web_user_id) — гарантия одной реакции от юзера.
+    Имя таблицы оставлено `insight_likes` ради миграционной совместимости.
+    """
     __tablename__ = "insight_likes"
 
     insight_id: Mapped[int] = mapped_column(
@@ -244,4 +253,20 @@ class InsightLike(Base):
     web_user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("web_users.id"), primary_key=True
     )
+    reaction: Mapped[str] = mapped_column(
+        Text, nullable=False, default="heart", server_default="heart"
+    )
     created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class WebAchievement(Base):
+    """Бейджи юзера. Метаданные кода (title/icon/desc) живут в
+    `app.web.routes.profile.ACHIEVEMENT_CATALOG` — БД хранит только факт.
+    """
+    __tablename__ = "web_achievements"
+
+    web_user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("web_users.id"), primary_key=True
+    )
+    code: Mapped[str] = mapped_column(Text, primary_key=True)
+    unlocked_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)

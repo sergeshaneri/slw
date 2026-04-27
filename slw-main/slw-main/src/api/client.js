@@ -176,6 +176,10 @@ export async function toggleInsightLike(id) {
   return request('POST', `/api/profile/insights/${id}/like`)
 }
 
+export async function reactToInsight(id, reaction = 'heart') {
+  return request('POST', `/api/profile/insights/${id}/react`, { reaction })
+}
+
 export async function fetchLeaderboard(limit = 20) {
   return request('GET', `/api/leaderboard?limit=${limit}`)
 }

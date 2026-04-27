@@ -154,6 +154,30 @@ async def apply_ddl() -> None:
             "but bot+web are up): %s", e
         )
 
+    # web_achievements + расширение insight_likes до реакций.
+    # ALTER ADD COLUMN идемпотентен (IF NOT EXISTS).
+    try:
+        async with asyncio.timeout(15):
+            async with engine.connect() as conn:
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS web_achievements (
+                        web_user_id  INTEGER NOT NULL,
+                        code         TEXT NOT NULL,
+                        unlocked_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (web_user_id, code)
+                    )
+                """))
+                await conn.execute(text(
+                    "ALTER TABLE insight_likes "
+                    "ADD COLUMN IF NOT EXISTS reaction TEXT NOT NULL DEFAULT 'heart'"
+                ))
+                await conn.commit()
+    except Exception as e:
+        log.warning(
+            "achievements/reactions DDL failed (features may be limited, "
+            "but bot+web are up): %s", e
+        )
+
     await engine.dispose()
 
 
