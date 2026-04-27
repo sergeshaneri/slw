@@ -75,3 +75,22 @@ def next_step(current_id: str) -> Step | None:
 
 def first_step() -> Step:
     return load_steps()[0]
+
+
+def short_id_for(step: Step) -> str:
+    """`бс-L0-T-1` → `T-1`; `бс-intro-1` → `intro-1`; `onboarding-intro-1` → `intro-1`.
+
+    Bot хранит ID в полном формате (с aspect+level в префиксе), web хранит
+    в коротком (только `T-1` / `intro-1` scoped per current aspect+level).
+    Эта функция делает преобразование bot → web. Лежит здесь, в
+    нейтральном модуле, чтобы и web-роуты, и bot-хендлеры могли её
+    импортировать без кросс-package зависимостей.
+    """
+    s = step.id
+    aspect_lower = (step.aspect or "").lower()
+    if aspect_lower and s.startswith(f"{aspect_lower}-"):
+        s = s[len(aspect_lower) + 1:]
+    level_prefix = f"L{step.level}-"
+    if s.startswith(level_prefix):
+        s = s[len(level_prefix):]
+    return s

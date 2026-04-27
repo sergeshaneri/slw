@@ -18,6 +18,7 @@ import {
   fetchScores, saveScores as apiSaveScores,
   fetchDiary, postDiaryEntry,
   fetchBotState,
+  fetchEvents,
 } from './api/client'
 import styles from './App.module.css'
 
@@ -100,11 +101,12 @@ export default function App() {
   const loadFromApi = async () => {
     setDataLoading(true)
     try {
-      const [stateRes, scoresRes, diaryRes, botSync] = await Promise.all([
+      const [stateRes, scoresRes, diaryRes, botSync, eventsRes] = await Promise.all([
         fetchState(),
         fetchScores(),
         fetchDiary(),
         fetchBotState().catch(() => null),
+        fetchEvents(0).catch(() => ({ events: [] })),
       ])
 
       // Bot position: apply aspect/level/streak from bot if Telegram is linked
@@ -126,6 +128,30 @@ export default function App() {
           journeyOverride = {
             ...(journeyOverride ?? {}),
             streak: Math.max(journeyOverride?.streak ?? 0, bs.streak_days),
+          }
+        }
+      }
+
+      // Bot → Web events: дописываем в journey.completedScripts шаги, которые
+      // юзер прошёл в TG-боте, scoped под текущий (currentAspect, currentLevel).
+      // Web хранит short_id (`T-1`/`intro-1`) — бэк уже отдаёт распарсенные.
+      const botEvents = (eventsRes?.events ?? []).filter(
+        e => e.source === 'bot' && e.type === 'step_completed' && e.short_id
+      )
+      if (botEvents.length > 0) {
+        const aspect = journeyOverride?.currentAspect
+        const level = journeyOverride?.currentLevel ?? 0
+        if (aspect) {
+          const fromBot = botEvents
+            .filter(e => e.aspect === aspect && (e.level ?? 0) === level)
+            .map(e => e.short_id)
+          if (fromBot.length > 0) {
+            const merged = new Set(journeyOverride?.completedScripts ?? [])
+            fromBot.forEach(id => merged.add(id))
+            journeyOverride = {
+              ...(journeyOverride ?? {}),
+              completedScripts: Array.from(merged),
+            }
           }
         }
       }

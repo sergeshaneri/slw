@@ -34,6 +34,41 @@ async def apply_ddl() -> None:
             "ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false"
         ))
         await conn.commit()
+
+    # journey_events — НОВАЯ таблица. Изолируем от ALTER-ов выше: отдельная
+    # транзакция, try/except + 15-секундный timeout. Если CREATE TABLE как-то
+    # повиснет под PgBouncer'ом (см. CLAUDE.md gotcha про Alembic) — логируем,
+    # фичу sync events отключаем, но bot+web всё равно стартуют. Лучше так,
+    # чем уронить весь сервис.
+    try:
+        async with asyncio.timeout(15):
+            async with engine.connect() as conn:
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS journey_events (
+                        id           BIGSERIAL PRIMARY KEY,
+                        telegram_id  BIGINT,
+                        web_user_id  INTEGER,
+                        source       TEXT NOT NULL,
+                        type         TEXT NOT NULL,
+                        aspect       TEXT,
+                        level        SMALLINT,
+                        short_id     TEXT,
+                        step_id      TEXT,
+                        payload      JSONB,
+                        created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS journey_events_tg_idx "
+                    "ON journey_events (telegram_id, created_at)"
+                ))
+                await conn.commit()
+    except Exception as e:
+        log.warning(
+            "journey_events DDL failed (sync events disabled, "
+            "but bot+web are up): %s", e
+        )
+
     await engine.dispose()
 
 

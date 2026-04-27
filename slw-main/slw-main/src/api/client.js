@@ -107,6 +107,13 @@ export async function fetchBotState() {
   return request('GET', '/api/sync/bot-state')
 }
 
+// Bot → Web event-лог. На первом хите (если у юзера TG залинкован) бэк сам
+// материализует прошлый прогресс из user_state. Возвращает { events, last_id }.
+// Любая ошибка — на стороне фронта ловим через .catch и продолжаем без events.
+export async function fetchEvents(sinceId = 0) {
+  return request('GET', `/api/events?since_id=${sinceId}`)
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 export async function fetchState() {
