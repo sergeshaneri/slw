@@ -22,6 +22,9 @@ def get_llm_client() -> LLMClient:
         # Импорт ленивый: openai SDK подтянется только когда реально нужен.
         from app.llm.openrouter import OpenRouterClient
         _cached = OpenRouterClient()
+    elif provider == "mistral":
+        from app.llm.mistral import MistralClient
+        _cached = MistralClient()
     else:
         _cached = StubLLMClient()
     return _cached

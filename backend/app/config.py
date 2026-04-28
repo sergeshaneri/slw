@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     # бесплатным моделям. SDK тот же `openai`, base_url = openrouter.ai/api/v1.
     llm_provider: str = "stub"
     openrouter_api_key: str = ""
+    mistral_api_key: str = ""
     llm_model: str = "meta-llama/llama-3.1-8b-instruct:free"
     # OpenRouter требует HTTP-Referer от приложений; ставим домен фронта.
     app_url: str = "https://sergeshaneri.github.io/slw"

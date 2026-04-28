@@ -16,6 +16,10 @@ class StubLLMClient:
             "  LLM_PROVIDER=openrouter\n"
             "  OPENROUTER_API_KEY=<ключ>\n"
             "  LLM_MODEL=meta-llama/llama-3.1-8b-instruct:free\n\n"
+            "Или для Mistral:\n"
+            "  LLM_PROVIDER=mistral\n"
+            "  MISTRAL_API_KEY=<ключ>\n"
+            "  LLM_MODEL=mistral-small-latest\n\n"
             f"---\nДлина system-промта: {len(system)} символов\n"
             f"Длина user-блока: {len(user)} символов"
         )
