@@ -6,12 +6,15 @@ Mistral предоставляет Chat Completions API, полностью со
 API ключ: https://console.mistral.ai/
 Документация: https://docs.mistral.ai/getting-started/quickstart/
 """
+import logging
+
 from openai import AsyncOpenAI
 
 from app.config import settings
 from app.llm.base import LLMResponse
 
 
+logger = logging.getLogger(__name__)
 _BASE_URL = "https://api.mistral.ai/v1"
 
 
@@ -28,14 +31,18 @@ class MistralClient:
         )
 
     async def complete(self, system: str, user: str, max_tokens: int = 1024) -> LLMResponse:
-        resp = await self._client.chat.completions.create(
-            model=settings.llm_model,
-            max_tokens=max_tokens,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-        )
+        try:
+            resp = await self._client.chat.completions.create(
+                model=settings.llm_model,
+                max_tokens=max_tokens,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            )
+        except Exception as exc:
+            logger.error(f"Mistral API error (model={settings.llm_model}): {type(exc).__name__}: {exc}")
+            raise
         choice = resp.choices[0].message.content or ""
         usage = resp.usage
         return LLMResponse(
