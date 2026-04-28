@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
     AspectInsight,
+    Bookmark,
     CoachCall,
     InsightLike,
     JourneyEvent,
@@ -526,6 +527,21 @@ async def _profile_payload(
         reactions_map, my_reaction_map, my_comment_map = await _reactions_for_insights(
             session, ids, viewer_user
         )
+        # Закладки viewer'а на эти инсайты.
+        bookmarked_set: set[int] = set()
+        if viewer_user is not None:
+            bm_rows = (
+                await session.execute(
+                    select(Bookmark.target_id)
+                    .where(
+                        Bookmark.web_user_id == viewer_user.id,
+                        Bookmark.kind == "insight",
+                        Bookmark.target_id.in_(ids),
+                    )
+                )
+            ).scalars().all()
+            bookmarked_set = set(int(x) for x in bm_rows)
+
         for r in insights_rows:
             r_counts = reactions_map.get(r.id, {})
             insights_payload.append({
@@ -539,6 +555,7 @@ async def _profile_payload(
                 "my_reaction": my_reaction_map.get(r.id),
                 "my_comment": my_comment_map.get(r.id),
                 "liked_by_me": my_reaction_map.get(r.id) is not None,
+                "bookmarked_by_me": r.id in bookmarked_set,
                 "created_at": r.created_at.isoformat(),
             })
 

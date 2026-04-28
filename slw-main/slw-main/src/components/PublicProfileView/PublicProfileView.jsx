@@ -5,6 +5,8 @@ import {
   reactToInsightWithComment,
   followUser,
   unfollowUser,
+  bookmarkInsight,
+  unbookmarkInsight,
 } from '../../api/client'
 import ReactorsList from './ReactorsList'
 import Heatmap from '../Heatmap/Heatmap'
@@ -73,6 +75,21 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
       }))
     } catch (e) {
       setError(e.message ?? 'Не удалось поставить реакцию')
+    }
+  }
+
+  const handleBookmark = async (insightId, current) => {
+    try {
+      if (current) await unbookmarkInsight(insightId)
+      else await bookmarkInsight(insightId)
+      setProfile(p => ({
+        ...p,
+        insights: (p.insights ?? []).map(i =>
+          i.id === insightId ? { ...i, bookmarked_by_me: !current } : i
+        ),
+      }))
+    } catch (e) {
+      setError(e.message ?? 'Не удалось')
     }
   }
 
@@ -289,6 +306,14 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
                       </button>
                     )
                   })}
+                  <button
+                    type="button"
+                    className={`${styles.reactionBtn} ${ins.bookmarked_by_me ? styles.reactionBtnActive : ''}`}
+                    onClick={() => handleBookmark(ins.id, ins.bookmarked_by_me)}
+                    title={ins.bookmarked_by_me ? 'В закладках' : 'Сохранить в закладки'}
+                  >
+                    {ins.bookmarked_by_me ? '🔖' : '☆'}
+                  </button>
                 </div>
                 {!isMe && ins.my_reaction && (
                   <ReactionCommentInput

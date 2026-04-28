@@ -25,6 +25,7 @@ export default function Header({
     // откроется AuthModal.
     { id: 'coach', label: t.nav.coach },
     ...(user ? [{ id: 'dm', label: t.nav.dm }] : []),
+    ...(user ? [{ id: 'search', label: t.nav.search }] : []),
     // Настройки переехали внутрь страницы Профиля.
     ...(user ? [{ id: 'profile', label: t.nav.profile }] : []),
   ]

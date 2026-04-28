@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.web.routes.auth import router as auth_router
+from app.web.routes.bookmarks import router as bookmarks_router
 from app.web.routes.coach import router as coach_router
 from app.web.routes.diary import router as diary_router
 from app.web.routes.dm import router as dm_router
@@ -18,6 +19,7 @@ from app.web.routes.me import router as me_router
 from app.web.routes.notifications import router as notifications_router
 from app.web.routes.profile import router as profile_router
 from app.web.routes.scores import router as scores_router
+from app.web.routes.search import router as search_router
 from app.web.routes.state import router as state_router
 from app.web.routes.streak import router as streak_router
 from app.web.routes.sync import router as sync_router
@@ -62,6 +64,8 @@ app.include_router(notifications_router, prefix="/api")
 app.include_router(dm_router, prefix="/api")
 app.include_router(habits_router, prefix="/api")
 app.include_router(streak_router, prefix="/api")
+app.include_router(bookmarks_router, prefix="/api")
+app.include_router(search_router, prefix="/api")
 
 
 @app.get("/healthz")

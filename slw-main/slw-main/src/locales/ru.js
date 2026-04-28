@@ -13,6 +13,7 @@ export const ru = {
     profile: '☆ Профиль',
     leaderboard: '⚜ Топ',
     dm: '✉ Сообщения',
+    search: '🔍 Поиск',
     settings: '⚙ Настройки',
   },
   wheel: {

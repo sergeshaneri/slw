@@ -294,8 +294,11 @@ class Subscription(Base):
 
 
 class AspectMessage(Base):
-    """Сообщение в чате холла аспекта.
-    Простой лог: aspect + автор + текст + created_at. Polling 1 раз в 5 сек.
+    """Сообщение в чате холла аспекта. Расширен под Q&A:
+      kind: 'message' (обычный чат) | 'question' (вопрос) | 'answer' (ответ)
+      parent_id: для answer — ссылка на question
+      is_best: пометка «лучший ответ» (только на answer); ставит автор вопроса
+    Polling 1 раз в 5 сек.
     """
     __tablename__ = "aspect_messages"
 
@@ -303,6 +306,28 @@ class AspectMessage(Base):
     aspect: Mapped[str] = mapped_column(Text)               # 'БС'/'ЧИ'/...
     web_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("web_users.id"))
     text: Mapped[str] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(
+        Text, nullable=False, default="message", server_default="message"
+    )
+    parent_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    is_best: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class Bookmark(Base):
+    """Закладка юзера на сущность («сохранить себе»).
+    kind = 'insight' | 'message' (пока только insight).
+    PK по (user, kind, target_id) даёт идемпотентность.
+    """
+    __tablename__ = "bookmarks"
+
+    web_user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("web_users.id"), primary_key=True
+    )
+    kind: Mapped[str] = mapped_column(Text, primary_key=True)
+    target_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
 
 

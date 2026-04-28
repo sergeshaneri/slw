@@ -11,6 +11,8 @@ import {
   activateShield,
   fetchMyHabits,
   clearHabit,
+  fetchMyBookmarks,
+  unbookmarkInsight,
 } from '../../api/client'
 import ReactorsList from '../PublicProfileView/ReactorsList'
 import Heatmap from '../Heatmap/Heatmap'
@@ -500,6 +502,9 @@ export default function ProfileView({
       {/* ── Мои выбранные практики ──────────────── */}
       <MyHabitsSection />
 
+      {/* ── Закладки ─────────────────────────── */}
+      <MyBookmarksSection onOpenProfile={onOpenPublicProfile} />
+
       {/* ── Heatmap активности ──────────────────── */}
       <Section label="Активность за полгода">
         <Heatmap userId={profile.user_id} days={180} />
@@ -779,6 +784,75 @@ function MyHabitsSection() {
           ))}
         </ul>
       )}
+    </Section>
+  )
+}
+
+function MyBookmarksSection({ onOpenProfile }) {
+  const [items, setItems] = useState([])
+  const [busy, setBusy] = useState(true)
+  const [error, setError] = useState(null)
+
+  const reload = async () => {
+    setBusy(true)
+    try {
+      setItems(await fetchMyBookmarks())
+    } catch (e) {
+      setError(e.message ?? 'Не удалось загрузить')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  useEffect(() => { reload() }, [])
+
+  const handleRemove = async (id) => {
+    try {
+      await unbookmarkInsight(id)
+      setItems(prev => prev.filter(b => !(b.kind === 'insight' && b.target_id === id)))
+    } catch (e) {
+      setError(e.message ?? 'Не удалось')
+    }
+  }
+
+  return (
+    <Section label={`Мои закладки · ${items.length}`}>
+      {busy && <div className={styles.muted}>Загружаем…</div>}
+      {error && <div className={styles.error}>{error}</div>}
+      {!busy && items.length === 0 && (
+        <div className={styles.muted}>
+          Нажми 🔖 на чужом инсайте — он сохранится сюда «себе на память».
+        </div>
+      )}
+      <div className={styles.insightList}>
+        {items.map((b) => (
+          <div key={`${b.kind}-${b.target_id}-${b.saved_at}`} className={styles.insightCard}>
+            <div className={styles.insightHead}>
+              <span className={styles.insightAspect}>{b.aspect ?? '—'}</span>
+              {b.available && b.display_name && (
+                <button
+                  type="button"
+                  className={styles.linkBtn}
+                  onClick={() => onOpenProfile?.(b.user_id)}
+                >
+                  {b.avatar || '🧑'} {b.display_name}
+                </button>
+              )}
+              <button
+                type="button"
+                className={styles.btnRemove}
+                onClick={() => handleRemove(b.target_id)}
+                title="Убрать из закладок"
+              >
+                ×
+              </button>
+            </div>
+            <div className={styles.insightText}>
+              {b.available ? b.text : <em className={styles.muted}>Инсайт стал недоступен (удалён или скрыт)</em>}
+            </div>
+          </div>
+        ))}
+      </div>
     </Section>
   )
 }

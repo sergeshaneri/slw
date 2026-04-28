@@ -324,6 +324,47 @@ async def apply_ddl() -> None:
     except Exception as e:
         log.warning("user_streaks/user_habits DDL failed: %s", e)
 
+    # Q&A в холле + закладки.
+    try:
+        async with asyncio.timeout(15):
+            async with engine.connect() as conn:
+                await conn.execute(text(
+                    "ALTER TABLE aspect_messages "
+                    "ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'message'"
+                ))
+                await conn.execute(text(
+                    "ALTER TABLE aspect_messages "
+                    "ADD COLUMN IF NOT EXISTS parent_id BIGINT"
+                ))
+                await conn.execute(text(
+                    "ALTER TABLE aspect_messages "
+                    "ADD COLUMN IF NOT EXISTS is_best BOOLEAN NOT NULL DEFAULT false"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS aspect_messages_kind_idx "
+                    "ON aspect_messages (aspect, kind, id DESC)"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS aspect_messages_parent_idx "
+                    "ON aspect_messages (parent_id)"
+                ))
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS bookmarks (
+                        web_user_id  INTEGER NOT NULL,
+                        kind         TEXT NOT NULL,
+                        target_id    BIGINT NOT NULL,
+                        created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (web_user_id, kind, target_id)
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS bookmarks_user_idx "
+                    "ON bookmarks (web_user_id, kind, created_at DESC)"
+                ))
+                await conn.commit()
+    except Exception as e:
+        log.warning("Q&A/bookmarks DDL failed: %s", e)
+
     await engine.dispose()
 
 

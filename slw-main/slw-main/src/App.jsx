@@ -11,6 +11,7 @@ import PublicProfileView from './components/PublicProfileView/PublicProfileView'
 import LeaderboardView from './components/LeaderboardView/LeaderboardView'
 import HallView from './components/HallView/HallView'
 import DMView from './components/DMView/DMView'
+import SearchView from './components/SearchView/SearchView'
 import SettingsView from './components/SettingsView/SettingsView'
 import AchievementToast from './components/Toast/AchievementToast'
 import { fetchMyProfile } from './api/client'
@@ -371,7 +372,7 @@ export default function App() {
     }
     // Коуч и Профиль требуют авторизации — бэк всё равно отобьёт без JWT,
     // но проверяем здесь чтобы не показывать пустой экран с ошибкой.
-    if ((newView === 'coach' || newView === 'profile') && !user) {
+    if ((newView === 'coach' || newView === 'profile' || newView === 'search') && !user) {
       setShowAuth(true)
       return
     }
@@ -586,6 +587,10 @@ export default function App() {
             currentUserId={user.id}
             onOpenProfile={openPublicProfile}
           />
+        )}
+
+        {view === 'search' && user && (
+          <SearchView onOpenProfile={openPublicProfile} />
         )}
 
         {view === 'public-profile' && viewingProfileId && (

@@ -23,7 +23,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import (
     AspectInsight,
     AspectMessage,
+    Bookmark,
     InsightLike,
+    Notification,
     PublicProfile,
     WebScore,
     WebUser,
@@ -58,6 +60,14 @@ def _display_name(user: WebUser) -> str:
 
 class MessageIn(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
+
+
+class QuestionIn(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class AnswerIn(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
 
 
 # ── Сводка для вкладки «Обзор» ──────────────────────────────────────────────
@@ -223,7 +233,11 @@ async def get_messages(
         select(AspectMessage, WebUser, PublicProfile)
         .join(WebUser, WebUser.id == AspectMessage.web_user_id)
         .outerjoin(PublicProfile, PublicProfile.web_user_id == WebUser.id)
-        .where(AspectMessage.aspect == aspect)
+        .where(
+            AspectMessage.aspect == aspect,
+            # Чат показывает только обычные сообщения, без вопросов/ответов.
+            AspectMessage.kind == "message",
+        )
     )
     if since_id > 0:
         # При polling возвращаем только новые сообщения (id > since_id).
@@ -379,6 +393,19 @@ async def get_insights_feed(
     my_reaction_map = {int(iid): (rtype or "heart") for iid, rtype, _ in my_rows}
     my_comment_map = {int(iid): comment for iid, _, comment in my_rows}
 
+    # Закладки текущего юзера на эти инсайты.
+    bm_rows = (
+        await session.execute(
+            select(Bookmark.target_id)
+            .where(
+                Bookmark.web_user_id == current_user.id,
+                Bookmark.kind == "insight",
+                Bookmark.target_id.in_(ids),
+            )
+        )
+    ).scalars().all()
+    bookmarked_set = set(int(x) for x in bm_rows)
+
     out = []
     for ins, u, pp in rows:
         r_counts = reactions_map.get(ins.id, {})
@@ -395,6 +422,7 @@ async def get_insights_feed(
             "likes": sum(r_counts.values()),
             "my_reaction": my_reaction_map.get(ins.id),
             "my_comment": my_comment_map.get(ins.id),
+            "bookmarked_by_me": ins.id in bookmarked_set,
             "created_at": ins.created_at.isoformat(),
         })
 
@@ -522,3 +550,260 @@ async def get_inspirations(
                 })
     # Без сортировки — пока возвращаем как есть. Применяем cap.
     return out[:limit]
+
+
+# ── Q&A в холле ─────────────────────────────────────────────────────────────
+
+def _msg_to_dict(m: AspectMessage, user: WebUser, pp: PublicProfile | None, current_id: int) -> dict:
+    return {
+        "id": m.id,
+        "text": m.text,
+        "kind": m.kind,
+        "parent_id": m.parent_id,
+        "is_best": bool(m.is_best),
+        "user_id": user.id,
+        "display_name": _display_name(user),
+        "avatar": (pp.avatar if pp else None),
+        "is_mine": user.id == current_id,
+        "created_at": m.created_at.isoformat(),
+    }
+
+
+@router.get("/hall/{aspect}/questions")
+async def list_questions(
+    aspect: str,
+    limit: int = 30,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list:
+    """Список вопросов холла + счётчик ответов на каждом."""
+    aspect = _validate_aspect(aspect)
+    limit = max(1, min(limit, 100))
+
+    rows = (
+        await session.execute(
+            select(AspectMessage, WebUser, PublicProfile)
+            .join(WebUser, WebUser.id == AspectMessage.web_user_id)
+            .outerjoin(PublicProfile, PublicProfile.web_user_id == WebUser.id)
+            .where(
+                AspectMessage.aspect == aspect,
+                AspectMessage.kind == "question",
+            )
+            .order_by(AspectMessage.id.desc())
+            .limit(limit)
+        )
+    ).all()
+    if not rows:
+        return []
+
+    qids = [m.id for m, _, _ in rows]
+    # Счётчики ответов одним запросом.
+    answer_counts = dict(
+        (await session.execute(
+            select(AspectMessage.parent_id, func.count())
+            .where(
+                AspectMessage.kind == "answer",
+                AspectMessage.parent_id.in_(qids),
+            )
+            .group_by(AspectMessage.parent_id)
+        )).all()
+    )
+    # Признак «есть лучший ответ».
+    has_best_rows = (
+        await session.execute(
+            select(AspectMessage.parent_id.distinct())
+            .where(
+                AspectMessage.kind == "answer",
+                AspectMessage.parent_id.in_(qids),
+                AspectMessage.is_best.is_(True),
+            )
+        )
+    ).scalars().all()
+    has_best = set(int(x) for x in has_best_rows)
+
+    out = []
+    for m, u, pp in rows:
+        out.append({
+            **_msg_to_dict(m, u, pp, current_user.id),
+            "answers_count": int(answer_counts.get(m.id, 0)),
+            "has_best_answer": m.id in has_best,
+        })
+    return out
+
+
+@router.get("/hall/{aspect}/questions/{question_id}")
+async def get_question(
+    aspect: str,
+    question_id: int,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Вопрос + все ответы. Лучший ответ выводим первым."""
+    aspect = _validate_aspect(aspect)
+    q_row = (
+        await session.execute(
+            select(AspectMessage, WebUser, PublicProfile)
+            .join(WebUser, WebUser.id == AspectMessage.web_user_id)
+            .outerjoin(PublicProfile, PublicProfile.web_user_id == WebUser.id)
+            .where(
+                AspectMessage.id == question_id,
+                AspectMessage.aspect == aspect,
+                AspectMessage.kind == "question",
+            )
+        )
+    ).first()
+    if not q_row:
+        raise HTTPException(status_code=404, detail="Question not found")
+    qm, qu, qpp = q_row
+
+    answer_rows = (
+        await session.execute(
+            select(AspectMessage, WebUser, PublicProfile)
+            .join(WebUser, WebUser.id == AspectMessage.web_user_id)
+            .outerjoin(PublicProfile, PublicProfile.web_user_id == WebUser.id)
+            .where(
+                AspectMessage.kind == "answer",
+                AspectMessage.parent_id == question_id,
+            )
+            .order_by(AspectMessage.is_best.desc(), AspectMessage.id.asc())
+        )
+    ).all()
+
+    return {
+        "question": _msg_to_dict(qm, qu, qpp, current_user.id),
+        "answers": [_msg_to_dict(m, u, pp, current_user.id) for m, u, pp in answer_rows],
+    }
+
+
+@router.post("/hall/{aspect}/questions")
+async def post_question(
+    aspect: str,
+    body: QuestionIn,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    aspect = _validate_aspect(aspect)
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is empty")
+
+    msg = AspectMessage(
+        aspect=aspect,
+        web_user_id=current_user.id,
+        text=text[:2000],
+        kind="question",
+    )
+    session.add(msg)
+    # Уведомляем активных писателей холла.
+    await notify_hall_writers(
+        session,
+        aspect=aspect,
+        new_message_id=0,  # placeholder; не критично
+        actor_id=current_user.id,
+        actor_name=_display_name(current_user),
+        text_preview=f"❓ {text}",
+    )
+    await bump_streak(session, current_user.id)
+    await session.commit()
+    await session.refresh(msg)
+    pp = await session.get(PublicProfile, current_user.id)
+    return _msg_to_dict(msg, current_user, pp, current_user.id) | {
+        "answers_count": 0,
+        "has_best_answer": False,
+    }
+
+
+@router.post("/hall/{aspect}/questions/{question_id}/answer")
+async def post_answer(
+    aspect: str,
+    question_id: int,
+    body: AnswerIn,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    aspect = _validate_aspect(aspect)
+    question = await session.get(AspectMessage, question_id)
+    if not question or question.aspect != aspect or question.kind != "question":
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is empty")
+
+    msg = AspectMessage(
+        aspect=aspect,
+        web_user_id=current_user.id,
+        text=text[:4000],
+        kind="answer",
+        parent_id=question_id,
+    )
+    session.add(msg)
+
+    # Уведомляем автора вопроса (если это не он сам).
+    if question.web_user_id != current_user.id:
+        session.add(Notification(
+            web_user_id=question.web_user_id,
+            type="hall_reply",
+            payload={
+                "aspect": aspect,
+                "question_id": question_id,
+                "actor_id": current_user.id,
+                "actor_name": _display_name(current_user),
+                "preview": text[:160],
+                "kind": "answer",
+            },
+        ))
+    await bump_streak(session, current_user.id)
+    await session.commit()
+    await session.refresh(msg)
+    pp = await session.get(PublicProfile, current_user.id)
+    return _msg_to_dict(msg, current_user, pp, current_user.id)
+
+
+@router.post("/hall/{aspect}/questions/{question_id}/answers/{answer_id}/best")
+async def mark_best_answer(
+    aspect: str,
+    question_id: int,
+    answer_id: int,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    aspect = _validate_aspect(aspect)
+    question = await session.get(AspectMessage, question_id)
+    if not question or question.aspect != aspect or question.kind != "question":
+        raise HTTPException(status_code=404, detail="Question not found")
+    if question.web_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only question author can mark best answer")
+    answer = await session.get(AspectMessage, answer_id)
+    if not answer or answer.kind != "answer" or answer.parent_id != question_id:
+        raise HTTPException(status_code=404, detail="Answer not found")
+
+    # Снимаем флаг с других ответов на этот вопрос.
+    from sqlalchemy import update
+    await session.execute(
+        update(AspectMessage)
+        .where(
+            AspectMessage.parent_id == question_id,
+            AspectMessage.kind == "answer",
+        )
+        .values(is_best=False)
+    )
+    answer.is_best = True
+
+    # Уведомляем автора лучшего ответа.
+    if answer.web_user_id != current_user.id:
+        session.add(Notification(
+            web_user_id=answer.web_user_id,
+            type="hall_reply",
+            payload={
+                "aspect": aspect,
+                "question_id": question_id,
+                "actor_id": current_user.id,
+                "actor_name": _display_name(current_user),
+                "preview": "Твой ответ помечен лучшим ✨",
+                "kind": "best_answer",
+            },
+        ))
+
+    await session.commit()
+    return {"answer_id": answer_id, "is_best": True}

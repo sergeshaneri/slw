@@ -323,6 +323,49 @@ export async function activateShield() {
   return request('POST', '/api/streak/shield', { pay_with_stardust: true })
 }
 
+// ── Q&A в холле ──────────────────────────────────────────────────────────
+
+export async function fetchHallQuestions(aspect, limit = 30) {
+  return request('GET', `/api/hall/${encodeURIComponent(aspect)}/questions?limit=${limit}`)
+}
+
+export async function fetchHallQuestion(aspect, questionId) {
+  return request('GET', `/api/hall/${encodeURIComponent(aspect)}/questions/${questionId}`)
+}
+
+export async function postHallQuestion(aspect, text) {
+  return request('POST', `/api/hall/${encodeURIComponent(aspect)}/questions`, { text })
+}
+
+export async function postHallAnswer(aspect, questionId, text) {
+  return request('POST', `/api/hall/${encodeURIComponent(aspect)}/questions/${questionId}/answer`, { text })
+}
+
+export async function markBestAnswer(aspect, questionId, answerId) {
+  return request('POST', `/api/hall/${encodeURIComponent(aspect)}/questions/${questionId}/answers/${answerId}/best`)
+}
+
+// ── Закладки ─────────────────────────────────────────────────────────────
+
+export async function fetchMyBookmarks() {
+  return request('GET', '/api/bookmarks')
+}
+
+export async function bookmarkInsight(insightId) {
+  return request('POST', `/api/bookmarks/insight/${insightId}`)
+}
+
+export async function unbookmarkInsight(insightId) {
+  return request('DELETE', `/api/bookmarks/insight/${insightId}`)
+}
+
+// ── Поиск ────────────────────────────────────────────────────────────────
+
+export async function searchAll(q, scope = 'all', limit = 20) {
+  const url = `/api/search?q=${encodeURIComponent(q)}&scope=${scope}&limit=${limit}`
+  return request('GET', url)
+}
+
 export async function reactToInsight(id, reaction = 'heart') {
   return request('POST', `/api/profile/insights/${id}/react`, { reaction })
 }

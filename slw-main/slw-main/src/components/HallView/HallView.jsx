@@ -14,12 +14,20 @@ import {
   fetchHabitsToday,
   tickHabit,
   untickHabit,
+  fetchHallQuestions,
+  fetchHallQuestion,
+  postHallQuestion,
+  postHallAnswer,
+  markBestAnswer,
+  bookmarkInsight,
+  unbookmarkInsight,
 } from '../../api/client'
 import styles from './HallView.module.css'
 
 const TABS = [
   { id: 'overview',  label: 'Обзор' },
   { id: 'chat',      label: 'Чат' },
+  { id: 'questions', label: 'Вопросы' },
   { id: 'insights',  label: 'Инсайты' },
   { id: 'community', label: 'Сообщество' },
 ]
@@ -79,6 +87,9 @@ export default function HallView({ aspect, currentUserId, onBack, onOpenProfile 
       )}
       {tab === 'chat' && (
         <ChatTab aspect={aspect} currentUserId={currentUserId} onOpenProfile={onOpenProfile} />
+      )}
+      {tab === 'questions' && (
+        <QuestionsTab aspect={aspect} currentUserId={currentUserId} onOpenProfile={onOpenProfile} />
       )}
       {tab === 'insights' && (
         <InsightsTab aspect={aspect} currentUserId={currentUserId} onOpenProfile={onOpenProfile} />
@@ -378,6 +389,18 @@ function InsightsTab({ aspect, currentUserId, onOpenProfile }) {
     }
   }
 
+  const handleBookmark = async (insightId, current) => {
+    try {
+      if (current) await unbookmarkInsight(insightId)
+      else await bookmarkInsight(insightId)
+      setItems(prev => prev.map(i =>
+        i.id === insightId ? { ...i, bookmarked_by_me: !current } : i
+      ))
+    } catch (e) {
+      setError(e.message ?? 'Не удалось')
+    }
+  }
+
   return (
     <div className={styles.tabBody}>
       <Section label="Опубликовать в холл">
@@ -462,6 +485,14 @@ function InsightsTab({ aspect, currentUserId, onOpenProfile }) {
                   </button>
                 )
               })}
+              <button
+                type="button"
+                className={`${styles.reactionBtn} ${ins.bookmarked_by_me ? styles.reactionBtnActive : ''}`}
+                onClick={() => handleBookmark(ins.id, ins.bookmarked_by_me)}
+                title={ins.bookmarked_by_me ? 'В закладках' : 'Сохранить в закладки'}
+              >
+                {ins.bookmarked_by_me ? '🔖' : '☆'}
+              </button>
             </div>
           </div>
         ))}
@@ -589,6 +620,225 @@ function CommunityTab({ aspect, content, currentUserId, onOpenProfile }) {
 }
 
 // ── Subcomponents ───────────────────────────────────────────────────────────
+
+function QuestionsTab({ aspect, currentUserId, onOpenProfile }) {
+  const [list, setList] = useState([])
+  const [openId, setOpenId] = useState(null)
+  const [thread, setThread] = useState(null)
+  const [busy, setBusy] = useState(true)
+  const [posting, setPosting] = useState(false)
+  const [error, setError] = useState(null)
+  const [askText, setAskText] = useState('')
+  const [answerText, setAnswerText] = useState('')
+
+  const reloadList = async () => {
+    setBusy(true)
+    try {
+      setList(await fetchHallQuestions(aspect, 50))
+    } catch (e) {
+      setError(e.message ?? 'Не удалось загрузить вопросы')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  useEffect(() => { reloadList() /* eslint-disable-next-line */ }, [aspect])
+
+  useEffect(() => {
+    if (!openId) { setThread(null); return }
+    fetchHallQuestion(aspect, openId)
+      .then(setThread)
+      .catch(e => setError(e.message ?? 'Не удалось'))
+  }, [aspect, openId])
+
+  const handleAsk = async () => {
+    const t = askText.trim()
+    if (!t) return
+    setPosting(true)
+    setError(null)
+    try {
+      await postHallQuestion(aspect, t)
+      setAskText('')
+      reloadList()
+    } catch (e) {
+      setError(e.message ?? 'Не удалось')
+    } finally {
+      setPosting(false)
+    }
+  }
+
+  const handleAnswer = async () => {
+    const t = answerText.trim()
+    if (!t || !openId) return
+    setPosting(true)
+    setError(null)
+    try {
+      await postHallAnswer(aspect, openId, t)
+      setAnswerText('')
+      const fresh = await fetchHallQuestion(aspect, openId)
+      setThread(fresh)
+      reloadList()
+    } catch (e) {
+      setError(e.message ?? 'Не удалось')
+    } finally {
+      setPosting(false)
+    }
+  }
+
+  const handleMarkBest = async (answerId) => {
+    if (!openId) return
+    try {
+      await markBestAnswer(aspect, openId, answerId)
+      const fresh = await fetchHallQuestion(aspect, openId)
+      setThread(fresh)
+      reloadList()
+    } catch (e) {
+      setError(e.message ?? 'Не удалось')
+    }
+  }
+
+  if (openId && thread) {
+    const isQuestionAuthor = thread.question.user_id === currentUserId
+    return (
+      <div className={styles.tabBody}>
+        <button
+          type="button"
+          className={styles.sortBtn}
+          onClick={() => { setOpenId(null); setThread(null) }}
+        >
+          ← к вопросам
+        </button>
+
+        {error && <div className={styles.error}>{error}</div>}
+
+        <Section label="Вопрос">
+          <div className={styles.insightHead}>
+            <span className={styles.insightAvatar}>{thread.question.avatar || '🧑'}</span>
+            <button
+              type="button"
+              className={styles.previewName}
+              onClick={() => onOpenProfile?.(thread.question.user_id)}
+            >
+              {thread.question.display_name}
+            </button>
+            <span className={styles.muted}>{formatDate(thread.question.created_at)}</span>
+          </div>
+          <div className={styles.insightText}>❓ {thread.question.text}</div>
+        </Section>
+
+        <Section label={`Ответы · ${thread.answers.length}`}>
+          {thread.answers.length === 0 && (
+            <div className={styles.muted}>Пока ответов нет — будь первым.</div>
+          )}
+          <div className={styles.insightList}>
+            {thread.answers.map(a => (
+              <div
+                key={a.id}
+                className={styles.insightCard}
+                style={a.is_best ? { borderColor: 'var(--accent)', background: 'rgba(179,157,219,0.05)' } : undefined}
+              >
+                <div className={styles.insightHead}>
+                  {a.is_best && <span style={{ color: 'var(--accent)', fontWeight: 700 }}>✨ ЛУЧШИЙ</span>}
+                  <span className={styles.insightAvatar}>{a.avatar || '🧑'}</span>
+                  <button
+                    type="button"
+                    className={styles.previewName}
+                    onClick={() => onOpenProfile?.(a.user_id)}
+                  >
+                    {a.display_name}
+                  </button>
+                  <span className={styles.muted}>{formatDate(a.created_at)}</span>
+                  {isQuestionAuthor && !a.is_best && (
+                    <button
+                      type="button"
+                      className={styles.sortBtn}
+                      onClick={() => handleMarkBest(a.id)}
+                    >
+                      пометить лучшим
+                    </button>
+                  )}
+                </div>
+                <div className={styles.insightText}>{a.text}</div>
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        <Section label="Твой ответ">
+          <textarea
+            className={styles.textarea}
+            value={answerText}
+            onChange={e => setAnswerText(e.target.value)}
+            placeholder="Поделись опытом по этому вопросу…"
+            maxLength={4000}
+          />
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            onClick={handleAnswer}
+            disabled={posting || !answerText.trim()}
+          >
+            {posting ? 'Отправка…' : 'Ответить'}
+          </button>
+        </Section>
+      </div>
+    )
+  }
+
+  return (
+    <div className={styles.tabBody}>
+      <Section label="Задать вопрос холлу">
+        <textarea
+          className={styles.textarea}
+          value={askText}
+          onChange={e => setAskText(e.target.value)}
+          placeholder="Что хочешь спросить у тех, кто тоже работает с этим аспектом?"
+          maxLength={2000}
+        />
+        <button
+          type="button"
+          className={styles.btnPrimary}
+          onClick={handleAsk}
+          disabled={posting || !askText.trim()}
+        >
+          {posting ? 'Отправка…' : '❓ Задать вопрос'}
+        </button>
+      </Section>
+
+      {error && <div className={styles.error}>{error}</div>}
+      {busy && <div className={styles.muted}>Загружаем…</div>}
+
+      {!busy && list.length === 0 && (
+        <div className={styles.muted}>Пока никто не задавал вопросов в этом холле. Будь первым.</div>
+      )}
+
+      <div className={styles.insightList}>
+        {list.map(q => (
+          <button
+            key={q.id}
+            type="button"
+            className={styles.insightCard}
+            style={{ textAlign: 'left', cursor: 'pointer', background: 'transparent', border: '1px solid var(--line)', font: 'inherit', color: 'var(--text)', display: 'block', width: '100%' }}
+            onClick={() => setOpenId(q.id)}
+          >
+            <div className={styles.insightHead}>
+              <span style={{ color: 'var(--accent)' }}>❓</span>
+              <span className={styles.insightAvatar}>{q.avatar || '🧑'}</span>
+              <span className={styles.previewName} style={{ pointerEvents: 'none' }}>
+                {q.display_name}
+              </span>
+              <span className={styles.muted}>{formatDate(q.created_at)}</span>
+              <span className={styles.muted} style={{ marginLeft: 'auto' }}>
+                {q.answers_count} {q.has_best_answer ? '· ✨' : ''}
+              </span>
+            </div>
+            <div className={styles.insightText}>{q.text}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function HabitTickButton({ aspect }) {
   const [busy, setBusy] = useState(false)
