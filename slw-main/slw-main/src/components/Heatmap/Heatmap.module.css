@@ -1,0 +1,70 @@
+.wrap {
+  --cell: 12px;
+  --gap: 3px;
+  --level-0: rgba(255,255,255,0.04);
+  --level-1: rgba(179,157,219,0.18);
+  --level-2: rgba(179,157,219,0.4);
+  --level-3: rgba(179,157,219,0.65);
+  --level-4: rgba(214,188,250,0.95);
+  color: #c8cad1;
+  font-size: 12px;
+}
+
+.header {
+  margin-bottom: 8px;
+  color: #8f929c;
+  font-size: 12px;
+}
+
+.grid {
+  display: flex;
+  gap: var(--gap);
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.week {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.cell {
+  width: var(--cell);
+  height: var(--cell);
+  border-radius: 2px;
+  background: var(--level-0);
+  flex-shrink: 0;
+}
+
+.empty {
+  width: var(--cell);
+  height: var(--cell);
+  flex-shrink: 0;
+  visibility: hidden;
+}
+
+.cell[data-level="1"] { background: var(--level-1); }
+.cell[data-level="2"] { background: var(--level-2); }
+.cell[data-level="3"] { background: var(--level-3); }
+.cell[data-level="4"] { background: var(--level-4); }
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: #5f6169;
+}
+
+.legend > .cell {
+  pointer-events: none;
+}
+
+.loading,
+.error {
+  color: #8f929c;
+  font-size: 13px;
+  padding: 10px 0;
+}

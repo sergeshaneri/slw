@@ -14,11 +14,13 @@ AI coach summon:
 """
 from datetime import datetime, timezone
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.db.models import (
     CoachCall,
     DiaryEntry,
@@ -315,6 +317,59 @@ async def summon(
         "remaining_today": max(daily_limit - new_used, 0),
         "daily_limit": daily_limit,
     }
+
+
+# ── Diagnostic ──────────────────────────────────────────────────────────────
+
+@router.get("/coach/_diag")
+async def diag(current_user: WebUser = Depends(get_current_user)) -> dict:
+    """Probe LLM provider directly с httpx (без openai SDK).
+
+    Если /coach/summon валится с "Connection error." — этот эндпоинт скажет
+    точно: TCP коннект, TLS-handshake, DNS, или ответ от Mistral. Только
+    залогиненым.
+    """
+    provider = (settings.llm_provider or "stub").lower()
+    info: dict = {
+        "provider": provider,
+        "model": settings.llm_model,
+        "has_mistral_key": bool(settings.mistral_api_key),
+        "has_openrouter_key": bool(settings.openrouter_api_key),
+    }
+    if provider != "mistral":
+        info["note"] = "diag только для provider=mistral, остальное не проверяю"
+        return info
+
+    # Mistral GET /v1/models — лёгкий аутентифицированный пробинг.
+    key = (settings.mistral_api_key or "").strip().strip('"').strip("'")
+    info["key_len"] = len(key)
+    info["key_prefix"] = key[:6] + "…" if key else None
+    url = "https://api.mistral.ai/v1/models"
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.get(url, headers={"Authorization": f"Bearer {key}"})
+        info["http_status"] = resp.status_code
+        # Мы не светим список моделей в ответ — только наличие имени модели.
+        try:
+            data = resp.json()
+            ids = [m.get("id") for m in (data.get("data") or [])]
+            info["model_in_list"] = settings.llm_model in ids
+            info["models_total"] = len(ids)
+            if not info["model_in_list"]:
+                # Покажем 5 первых, чтобы юзер увидел что-то валидное.
+                info["models_sample"] = ids[:5]
+            if resp.status_code >= 400:
+                info["body"] = resp.text[:500]
+        except Exception as parse_exc:
+            info["parse_error"] = f"{type(parse_exc).__name__}: {parse_exc}"
+            info["body"] = resp.text[:500]
+    except Exception as exc:
+        # DNS/TLS/connect-фейлы здесь.
+        info["error"] = f"{type(exc).__name__}: {exc}"
+        cur = exc.__cause__ or exc.__context__
+        if cur is not None:
+            info["caused_by"] = f"{type(cur).__name__}: {cur}"
+    return info
 
 
 # ── History ─────────────────────────────────────────────────────────────────
