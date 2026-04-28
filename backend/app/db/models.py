@@ -291,3 +291,16 @@ class Subscription(Base):
         Integer, ForeignKey("web_users.id"), primary_key=True
     )
     created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class AspectMessage(Base):
+    """Сообщение в чате холла аспекта.
+    Простой лог: aspect + автор + текст + created_at. Polling 1 раз в 5 сек.
+    """
+    __tablename__ = "aspect_messages"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    aspect: Mapped[str] = mapped_column(Text)               # 'БС'/'ЧИ'/...
+    web_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("web_users.id"))
+    text: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)

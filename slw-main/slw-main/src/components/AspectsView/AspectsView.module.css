@@ -282,6 +282,25 @@
   text-align: right;
 }
 
+.hallBtn {
+  margin-top: 8px;
+  background: transparent;
+  border: 1px solid;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s, transform .12s;
+}
+
+.hallBtn:hover {
+  background: rgba(255,255,255,0.04);
+  transform: translateY(-1px);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    3. ОГЛАВЛЕНИЕ
 ═══════════════════════════════════════════════════════════════════════ */

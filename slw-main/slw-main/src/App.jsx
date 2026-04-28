@@ -9,6 +9,7 @@ import CoachView from './components/CoachView/CoachView'
 import ProfileView from './components/ProfileView/ProfileView'
 import PublicProfileView from './components/PublicProfileView/PublicProfileView'
 import LeaderboardView from './components/LeaderboardView/LeaderboardView'
+import HallView from './components/HallView/HallView'
 import SettingsView from './components/SettingsView/SettingsView'
 import AchievementToast from './components/Toast/AchievementToast'
 import { fetchMyProfile } from './api/client'
@@ -62,6 +63,8 @@ export default function App() {
   const [selectedAspect, setSelectedAspect] = useState(null)
   // Чей публичный профиль смотрим (id WebUser). null — не открыт.
   const [viewingProfileId, setViewingProfileId] = useState(null)
+  // В каком холле сейчас юзер (ключ аспекта). null — не в холле.
+  const [hallAspect, setHallAspect] = useState(null)
   // Очередь тостов (новые ачивки и т.п.). Каждый { id, icon, title, desc, kind, stardust }.
   const [toasts, setToasts] = useState([])
   const [dataLoading, setDataLoading] = useState(false)
@@ -124,13 +127,46 @@ export default function App() {
       //   • currentAspect — переносим только если веб ещё на онбординге
       //     (не хотим перезаписывать активную ветку вебом, если бот и веб
       //     гуляют по разным аспектам).
-      //   • currentLevel — всегда `Math.max(web, bot)`. Если юзер пробежал
-      //     L0 в боте, веб на следующей загрузке должен шагнуть на L1, а
-      //     не залипнуть на старте L0. При фактическом скачке сбрасываем
-      //     currentScriptIndex/Id и подкладываем первый шаг нового уровня
-      //     в messages — чтобы чат не оказался пустым.
-      //   • streak — всегда max.
+      //   • currentLevel (per-aspect) — всегда `Math.max(web, bot)`. Если
+      //     юзер пробежал L0 в боте, веб на следующей загрузке должен
+      //     шагнуть на L1, а не залипнуть на старте L0. При фактическом
+      //     скачке сбрасываем currentScriptIndex/Id и подкладываем первый
+      //     шаг нового уровня в messages — чтобы чат не оказался пустым.
+      //   • streak — всегда max (глобал).
+      //
+      // Per-aspect поля (currentLevel/messages/...) живут в
+      // journeyOverride.aspects[aspect], поэтому пишем туда. migrateState
+      // на стороне JourneyView дополнительно умеет «всосать» legacy-плоские
+      // поля, но мы их больше не отправляем — формируем сразу новой формой.
       let journeyOverride = stateRes.journey ?? null
+
+      const readAspectFolder = (jo, aspect) => {
+        if (!jo) return null
+        if (jo.aspects && jo.aspects[aspect]) return jo.aspects[aspect]
+        // Старый плоский state с бэка — читаем поля как есть.
+        return {
+          currentLevel: jo.currentLevel,
+          currentScriptIndex: jo.currentScriptIndex,
+          currentScriptId: jo.currentScriptId,
+          awaitingInput: jo.awaitingInput,
+          messages: jo.messages,
+          completedScripts: jo.completedScripts,
+          pendingTasks: jo.pendingTasks,
+        }
+      }
+
+      const writeAspectFolder = (jo, aspect, patch) => {
+        const base = jo ?? {}
+        const prevFolder = readAspectFolder(base, aspect) ?? {}
+        return {
+          ...base,
+          aspects: {
+            ...(base.aspects ?? {}),
+            [aspect]: { ...prevFolder, ...patch },
+          },
+        }
+      }
+
       if (botSync?.linked && botSync.state) {
         const bs = botSync.state
         const isWebFresh = !journeyOverride || journeyOverride.screen === 'onboarding'
@@ -143,20 +179,20 @@ export default function App() {
         }
 
         const botLevel = bs.current_level ?? 0
-        const webLevel = journeyOverride?.currentLevel ?? 0
+        const targetAspect = journeyOverride?.currentAspect ?? bs.current_aspect ?? 'БС'
+        const targetFolder = readAspectFolder(journeyOverride, targetAspect) ?? {}
+        const webLevel = targetFolder.currentLevel ?? 0
         if (botLevel > webLevel) {
-          const aspect = journeyOverride?.currentAspect ?? bs.current_aspect ?? 'БС'
-          const nextLevelData = getJourney(aspect)?.levels?.[botLevel]
+          const nextLevelData = getJourney(targetAspect)?.levels?.[botLevel]
           const firstScript = (nextLevelData?.core ?? nextLevelData?.scripts ?? [])[0]
-          journeyOverride = {
-            ...(journeyOverride ?? {}),
+          journeyOverride = writeAspectFolder(journeyOverride, targetAspect, {
             currentLevel: botLevel,
             currentScriptIndex: 0,
             currentScriptId: firstScript?.id ?? null,
             awaitingInput: null,
             messages: firstScript
               ? [
-                  ...(journeyOverride?.messages ?? []),
+                  ...(targetFolder.messages ?? []),
                   {
                     id: Date.now() + Math.random(),
                     role: 'bot',
@@ -165,8 +201,8 @@ export default function App() {
                     level: botLevel,
                   },
                 ]
-              : (journeyOverride?.messages ?? []),
-          }
+              : (targetFolder.messages ?? []),
+          })
         }
 
         if (bs.streak_days) {
@@ -191,12 +227,12 @@ export default function App() {
             .filter(e => e.aspect === aspect)
             .map(e => e.short_id)
           if (fromBot.length > 0) {
-            const merged = new Set(journeyOverride?.completedScripts ?? [])
+            const folder = readAspectFolder(journeyOverride, aspect) ?? {}
+            const merged = new Set(folder.completedScripts ?? [])
             fromBot.forEach(id => merged.add(id))
-            journeyOverride = {
-              ...(journeyOverride ?? {}),
+            journeyOverride = writeAspectFolder(journeyOverride, aspect, {
               completedScripts: Array.from(merged),
-            }
+            })
           }
         }
       }
@@ -299,10 +335,20 @@ export default function App() {
       return
     }
     // L0 должен быть пройден (currentLevel >= 1). Админу можно всегда.
-    if (!isAdmin && (journey?.currentLevel ?? 0) < 1) {
+    // currentLevel и awaitingInput теперь живут в journey.aspects[aspect].
+    const bsFolder = journey?.aspects?.['БС'] ?? {}
+    if (!isAdmin && (bsFolder.currentLevel ?? 0) < 1) {
       return
     }
-    await saveJourney({ ...journey, currentAspect: 'БС', screen: 'skill-tree', awaitingInput: null })
+    await saveJourney({
+      ...journey,
+      currentAspect: 'БС',
+      screen: 'skill-tree',
+      aspects: {
+        ...(journey?.aspects ?? {}),
+        'БС': { ...bsFolder, awaitingInput: null },
+      },
+    })
     setView('journey')
   }
 
@@ -329,11 +375,21 @@ export default function App() {
     setView(newView)
     setSelectedAspect(null)
     setViewingProfileId(null)
+    setHallAspect(null)
   }
 
   const openPublicProfile = (userId) => {
     setViewingProfileId(userId)
     setView('public-profile')
+  }
+
+  const enterHall = (aspect) => {
+    if (!user) {
+      setShowAuth(true)
+      return
+    }
+    setHallAspect(aspect)
+    setView('hall')
   }
 
   const dismissToast = (id) => {
@@ -422,7 +478,7 @@ export default function App() {
       <Header
         view={view}
         onViewChange={handleViewChange}
-        journeyPendingCount={journey?.pendingTasks?.length ?? 0}
+        journeyPendingCount={journey?.aspects?.[journey?.currentAspect]?.pendingTasks?.length ?? 0}
         user={user}
         onLogin={() => setShowAuth(true)}
         onLogout={logout}
@@ -480,6 +536,7 @@ export default function App() {
             onDiaryChange={saveDiary}
             journey={journey}
             onGoToBSSurveys={goToBSSurveys}
+            onEnterHall={enterHall}
             t={t}
           />
         )}
@@ -524,6 +581,18 @@ export default function App() {
           <LeaderboardView
             currentUserId={user?.id}
             onOpenPublicProfile={openPublicProfile}
+          />
+        )}
+
+        {view === 'hall' && hallAspect && user && (
+          <HallView
+            aspect={hallAspect}
+            currentUserId={user?.id}
+            onBack={() => {
+              setHallAspect(null)
+              setView('aspects')
+            }}
+            onOpenProfile={openPublicProfile}
           />
         )}
 

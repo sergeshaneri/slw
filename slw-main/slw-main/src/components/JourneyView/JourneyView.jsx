@@ -202,9 +202,18 @@ function migrateState(stored) {
     if (!aspects[currentAspect]) {
       aspects[currentAspect] = { ...DEFAULT_ASPECT_STATE }
     }
+    // Сбрасываем legacy-плоские поля наверх, чтобы не плодить мусор в
+    // сохранённом state (теперь они живут только в aspects).
+    // eslint-disable-next-line no-unused-vars
+    const {
+      currentLevel: _l, currentScriptIndex: _i, currentScriptId: _id,
+      awaitingInput: _ai, messages: _m, completedScripts: _cs, pendingTasks: _pt,
+      mode: _mode,
+      ...rest
+    } = stored
     return {
       ...DEFAULT_JOURNEY,
-      ...stored,
+      ...rest,
       aspects,
       currentAspect,
       skills: migrateSkills(stored.skills),
@@ -405,38 +414,42 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       addUserMessage(aspectIntro[1]?.button || 'Далее')
       await addBotMessage(aspectIntro[1]?.text ?? '...', 700)
       awardXP(aspectIntro[1]?.xp ?? 10, 0, 'aspect-intro')
-      setState(s => ({
-        ...s,
-        screen: 'chat',
-        onboardingStep: 6,
-        currentScriptIndex: 0,
-        currentScriptId: scripts[0]?.id ?? null,
-        messages: scripts[0]
-          ? [...s.messages, { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: scripts[0].id, level: 0 }]
-          : s.messages
-      }))
+      setState(s => updateAspect(
+        { ...s, screen: 'chat', onboardingStep: 6 },
+        cur => ({
+          ...cur,
+          currentScriptIndex: 0,
+          currentScriptId: scripts[0]?.id ?? null,
+          messages: scripts[0]
+            ? [...cur.messages, { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: scripts[0].id, level: 0 }]
+            : cur.messages
+        })
+      ))
     }
   }, [state.onboardingStep, aspectIntro, scripts, addBotMessage, addUserMessage, awardXP, setState])
 
   // Помещаем задание в очередь активных (без дублей по scriptId).
   const enqueueTask = useCallback((script, status) => {
-    setState(s => ({
-      ...s,
+    setState(s => updateAspect(s, cur => ({
+      ...cur,
       pendingTasks: [
-        ...(s.pendingTasks ?? []).filter(t => t.scriptId !== script.id),
+        ...(cur.pendingTasks ?? []).filter(t => t.scriptId !== script.id),
         {
           id: `${script.id}-${Date.now()}`,
           scriptId: script.id,
-          aspect: state.currentAspect,
+          aspect: s.currentAspect,
           addedAt: Date.now(),
           status
         }
       ]
-    }))
-  }, [state.currentAspect])
+    })))
+  }, [])
 
   const removePending = useCallback((scriptId) => {
-    setState(s => ({ ...s, pendingTasks: (s.pendingTasks ?? []).filter(t => t.scriptId !== scriptId) }))
+    setState(s => updateAspect(s, cur => ({
+      ...cur,
+      pendingTasks: (cur.pendingTasks ?? []).filter(t => t.scriptId !== scriptId)
+    })))
   }, [])
 
   // ─── Действия в чате ─────────────────────────────────────────
@@ -464,18 +477,18 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       }
       // Для reflection skip и любого «next» на отложенных — XP не даём.
 
-      setTimeout(() => deliverScript(state.currentScriptIndex + 1), 600)
+      setTimeout(() => deliverScript(a.currentScriptIndex + 1), 600)
     } else if (action === 'answer_number') {
-      setState(s => ({ ...s, awaitingInput: 'number' }))
+      setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: 'number' })))
       setTimeout(() => inputRef.current?.focus(), 50)
     } else if (action === 'answer_text') {
-      setState(s => ({ ...s, awaitingInput: 'text' }))
+      setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: 'text' })))
       setTimeout(() => inputRef.current?.focus(), 50)
     } else if (action === 'complete_exercise') {
       // Открываем поле для обязательного комментария. XP и переход к
       // следующему скрипту произойдут после ввода в handleSend
       // (ветка awaitingInput === 'exercise_note').
-      setState(s => ({ ...s, awaitingInput: 'exercise_note' }))
+      setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: 'exercise_note' })))
       setTimeout(() => inputRef.current?.focus(), 50)
     } else if (action === 'start_survey') {
       // Запуск анкеты. Переходим на отдельный экран с поэтапным UI.
@@ -490,14 +503,14 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           : { scriptId: script.id, skillId: script.skill, blockIndex: 0, statementIndex: 0, answers: {} }
       }))
     }
-  }, [scripts, state.currentScriptIndex, addBotMessage, addUserMessage, awardXP, deliverScript, enqueueTask, removePending])
+  }, [scripts, a.currentScriptIndex, state.skills, addBotMessage, addUserMessage, awardXP, deliverScript, enqueueTask, removePending])
 
   // ─── Ввод текста / числа ─────────────────────────────────────
   const handleSend = useCallback(async () => {
     const val = inputVal.trim()
     if (!val) return
-    const script = scripts[state.currentScriptIndex]
-    if (state.awaitingInput === 'number') {
+    const script = scripts[a.currentScriptIndex]
+    if (a.awaitingInput === 'number') {
       const num = parseInt(val, 10)
       if (isNaN(num) || num < 1 || num > 10) {
         await addBotMessage('Пожалуйста, введи число от 1 до 10.', 400)
@@ -505,18 +518,18 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       }
       addUserMessage(val)
       setInputVal('')
-      setState(s => ({ ...s, awaitingInput: null }))
+      setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: null })))
       if (script?.followUp) await addBotMessage(script.followUp(val), 700)
       else await addBotMessage(`Записал: ${val}/10.`, 500)
       // Сайд-эффект: оценка вопроса → score аспекта
       onScoresChange({ ...scores, [state.currentAspect]: num })
       if (script?.id) removePending(script.id)
       awardXP(script?.xp ?? 10, 0, script?.id ?? null)
-      setTimeout(() => deliverScript(state.currentScriptIndex + 1), 700)
-    } else if (state.awaitingInput === 'text') {
+      setTimeout(() => deliverScript(a.currentScriptIndex + 1), 700)
+    } else if (a.awaitingInput === 'text') {
       addUserMessage(val)
       setInputVal('')
-      setState(s => ({ ...s, awaitingInput: null }))
+      setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: null })))
       // Нейтральная реплика без похвалы за факт ответа (см. §3.6).
       // Для open-ended вопросов целей и для рефлексий используем одну формулировку.
       const ack = script?.type === 'question' ? 'Записано в карту.' : 'Записано в дневник.'
@@ -538,13 +551,13 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       ])
       if (script?.id) removePending(script.id)
       awardXP(script?.xp ?? 10, 0, script?.id ?? null)
-      setTimeout(() => deliverScript(state.currentScriptIndex + 1), 700)
-    } else if (state.awaitingInput === 'exercise_note') {
+      setTimeout(() => deliverScript(a.currentScriptIndex + 1), 700)
+    } else if (a.awaitingInput === 'exercise_note') {
       // Завершение упражнения с обязательным комментарием.
       // Пустая строка отсекается общим guard'ом в начале handleSend.
       addUserMessage(val)
       setInputVal('')
-      setState(s => ({ ...s, awaitingInput: null }))
+      setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: null })))
       await addBotMessage('Записано в дневник.', 500)
       onDiaryChange([
         {
@@ -562,9 +575,9 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       ])
       if (script?.id) removePending(script.id)
       awardXP(script?.xp ?? 15, script?.stardust ?? 0, script?.id ?? null)
-      setTimeout(() => deliverScript(state.currentScriptIndex + 1), 700)
+      setTimeout(() => deliverScript(a.currentScriptIndex + 1), 700)
     }
-  }, [inputVal, state.awaitingInput, state.currentScriptIndex, state.currentAspect, scripts, scores, diary, addBotMessage, addUserMessage, awardXP, deliverScript, onDiaryChange, onScoresChange, removePending])
+  }, [inputVal, a.awaitingInput, a.currentScriptIndex, state.currentAspect, scripts, scores, diary, addBotMessage, addUserMessage, awardXP, deliverScript, onDiaryChange, onScoresChange, removePending])
 
   const handleReset = useCallback(() => {
     setState(DEFAULT_JOURNEY)
@@ -573,21 +586,23 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   // Переход на следующий уровень. Сохраняет всю историю сообщений
   // (с level=прошлый), добавляет первый скрипт нового уровня.
   const handleNextLevel = useCallback(() => {
-    const next = currentJourney?.levels?.[state.currentLevel + 1]
+    const next = currentJourney?.levels?.[a.currentLevel + 1]
     if (!next) return
     const firstScript = (next.core ?? next.scripts ?? [])[0]
-    setState(s => ({
-      ...s,
-      currentLevel: s.currentLevel + 1,
-      currentScriptIndex: 0,
-      currentScriptId: firstScript?.id ?? null,
-      screen: 'chat',
-      awaitingInput: null,
-      messages: firstScript
-        ? [...s.messages, { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: firstScript.id, level: s.currentLevel + 1 }]
-        : s.messages
-    }))
-  }, [currentJourney, state.currentLevel])
+    setState(s => updateAspect(
+      { ...s, screen: 'chat' },
+      cur => ({
+        ...cur,
+        currentLevel: cur.currentLevel + 1,
+        currentScriptIndex: 0,
+        currentScriptId: firstScript?.id ?? null,
+        awaitingInput: null,
+        messages: firstScript
+          ? [...cur.messages, { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: firstScript.id, level: cur.currentLevel + 1 }]
+          : cur.messages
+      })
+    ))
+  }, [currentJourney, a.currentLevel])
 
   // ─── Анкета навыков (survey) ─────────────────────────────────
   // Режимы:
@@ -808,20 +823,24 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       // Продолжаем как было — без выбора. currentScriptId не трогаем:
       // он нужен для chat-flow (core-шагов), а survey-id в нём только
       // путает resolveScript при возврате в чат.
-      setState(s => ({
-        ...s,
-        currentAspect: 'БС',
-        screen: 'survey',
-        awaitingInput: null,
-        activeSurvey: {
-          scriptId: target.id,
-          skillId,
-          mode: draft.mode ?? 'short',
-          startPass: draft.startPass ?? 1,
-          stepIndex: draft.stepIndex ?? 0,
-          answers: draft.answers ?? {},
+      // Аспект переключаем на БС: анкеты сейчас живут на БС, после
+      // переключения сбрасываем awaitingInput в БС-папке.
+      setState(s => updateAspect(
+        {
+          ...s,
+          currentAspect: 'БС',
+          screen: 'survey',
+          activeSurvey: {
+            scriptId: target.id,
+            skillId,
+            mode: draft.mode ?? 'short',
+            startPass: draft.startPass ?? 1,
+            stepIndex: draft.stepIndex ?? 0,
+            answers: draft.answers ?? {},
+          },
         },
-      }))
+        cur => ({ ...cur, awaitingInput: null })
+      ))
       return
     }
 
@@ -829,13 +848,15 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
     // Открываем экран выбора. activeSurvey временно хранит skillId/scriptId,
     // mode выберется на следующем шаге.
-    setState(s => ({
-      ...s,
-      currentAspect: 'БС',
-      screen: 'survey-choice',
-      awaitingInput: null,
-      activeSurvey: { scriptId: target.id, skillId },  // mode появится после choose
-    }))
+    setState(s => updateAspect(
+      {
+        ...s,
+        currentAspect: 'БС',
+        screen: 'survey-choice',
+        activeSurvey: { scriptId: target.id, skillId },  // mode появится после choose
+      },
+      cur => ({ ...cur, awaitingInput: null })
+    ))
   }, [state.skills, setState])
 
   // Юзер выбрал режим в SurveyChoice. Стартуем активную анкету.
@@ -871,9 +892,9 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
   // 1. Пропустить текущий шаг в чате — просто двигаем currentScriptIndex.
   const handleAdminSkipStep = useCallback(() => {
-    setState(s => ({ ...s, awaitingInput: null }))
-    setTimeout(() => deliverScript(state.currentScriptIndex + 1), 50)
-  }, [deliverScript, state.currentScriptIndex])
+    setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: null })))
+    setTimeout(() => deliverScript(a.currentScriptIndex + 1), 50)
+  }, [deliverScript, a.currentScriptIndex])
 
   // 2. Заполнить активную анкету. Все утверждения текущей сессии = 7.
   //    Сдвигаем stepIndex за конец → SurveyScreen.useEffect → survey-insight.
@@ -945,18 +966,19 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     const lvlData = currentJourney?.levels?.[targetLevel]
     if (!lvlData) return
     const first = (lvlData.core ?? lvlData.scripts ?? [])[0]
-    setState(s => ({
-      ...s,
-      currentLevel: targetLevel,
-      screen: 'chat',
-      currentScriptIndex: 0,
-      currentScriptId: first?.id ?? null,
-      awaitingInput: null,
-      activeSurvey: null,
-      messages: first
-        ? [...s.messages, { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: first.id, level: targetLevel }]
-        : s.messages
-    }))
+    setState(s => updateAspect(
+      { ...s, screen: 'chat', activeSurvey: null },
+      cur => ({
+        ...cur,
+        currentLevel: targetLevel,
+        currentScriptIndex: 0,
+        currentScriptId: first?.id ?? null,
+        awaitingInput: null,
+        messages: first
+          ? [...cur.messages, { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: first.id, level: targetLevel }]
+          : cur.messages
+      })
+    ))
   }, [currentJourney, setState])
 
   // 5. Полный сброс journey-state. Без подтверждения.
@@ -1012,10 +1034,16 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     }
   }, [state.skills, scores, onScoresChange, setState])
 
-  const currentScript = scripts[state.currentScriptIndex]
+  const currentScript = scripts[a.currentScriptIndex]
   const progressPct = scripts.length > 0
-    ? Math.round((state.currentScriptIndex / scripts.length) * 100)
+    ? Math.round((a.currentScriptIndex / scripts.length) * 100)
     : 0
+
+  // «Плоский» вид state для совместимости с детьми, которые читают
+  // state.currentLevel / state.messages / state.awaitingInput / ... напрямую.
+  // После рефакторинга эти поля живут в state.aspects[currentAspect],
+  // но мерджим их сверху, чтобы не править все child-компоненты.
+  const stateForChildren = { ...state, ...a }
 
   return (
     <div className={styles.shell} style={{ '--accent': accent }}>
@@ -1023,7 +1051,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
       {state.screen === 'onboarding' && (
         <Onboarding
-          state={state}
+          state={stateForChildren}
           accent={accent}
           isTyping={isTyping}
           chatRef={chatRef}
@@ -1034,7 +1062,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
       {state.screen === 'chat' && (
         <Chat
-          state={state}
+          state={stateForChildren}
           accent={accent}
           chatRef={chatRef}
           inputRef={inputRef}
@@ -1051,13 +1079,13 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           onGoToSurveys={handleOpenSkillTree}
           // Пилюля «Оценить навыки» появляется только после L0 (или для админа).
           surveyRemaining={
-            (isAdmin || (state.currentLevel ?? 0) >= 1)
+            (isAdmin || (a.currentLevel ?? 0) >= 1)
               ? getSkillProgress(state.skills ?? {}).remaining
               : 0
           }
-          pendingCount={state.pendingTasks?.length ?? 0}
+          pendingCount={a.pendingTasks?.length ?? 0}
           aspectName={currentJourney
-            ? `Уровень ${state.currentLevel} · ${currentLevel?.title}`
+            ? `Уровень ${a.currentLevel} · ${currentLevel?.title}`
             : 'Путешествие'}
           planet={currentJourney?.planet}
         />
@@ -1065,7 +1093,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
       {state.screen === 'levelcomplete' && (
         <LevelComplete
-          state={state}
+          state={stateForChildren}
           accent={accent}
           completeText={currentLevel?.complete?.text ?? ''}
           levelTitle={currentLevel?.title}
@@ -1075,7 +1103,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           // На L0 после прохождения core — primary CTA «Открыть Колесо БС»
           // (skill-tree). На L1+ нет skill-tree → кнопка не показывается.
           onOpenWheel={
-            state.currentLevel === 0 && (currentLevel?.surveys?.length ?? 0) > 0
+            a.currentLevel === 0 && (currentLevel?.surveys?.length ?? 0) > 0
               ? handleOpenSkillTree
               : null
           }
@@ -1084,7 +1112,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
       {state.screen === 'profile' && (
         <JourneyProfile
-          state={state}
+          state={stateForChildren}
           accent={accent}
           totalSteps={scripts.length}
           progressPct={progressPct}
@@ -1120,13 +1148,16 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
                   }
                 }
               }
-              return {
-                ...s,
-                skills: nextSkills,
-                activeSurvey: null,
-                awaitingInput: null,
-                screen: s.currentScriptIndex >= scripts.length ? 'levelcomplete' : 'chat',
-              }
+              const cur = aspectOf(s)
+              return updateAspect(
+                {
+                  ...s,
+                  skills: nextSkills,
+                  activeSurvey: null,
+                  screen: cur.currentScriptIndex >= scripts.length ? 'levelcomplete' : 'chat',
+                },
+                folder => ({ ...folder, awaitingInput: null })
+              )
             })
           }}
           onReset={handleReset}
@@ -1146,7 +1177,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       {state.screen === 'skill-detail' && state.skillDetailId && (
         <SkillDetail
           skillId={state.skillDetailId}
-          currentLevel={state.currentLevel ?? 0}
+          currentLevel={a.currentLevel ?? 0}
           passes={getCompletedPasses(state.skills?.[state.skillDetailId])}
           accent={accent}
           onClose={() => goToScreen('skill-tree')}
@@ -1202,7 +1233,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
       {state.screen === 'tasks' && (
         <TasksScreen
-          tasks={state.pendingTasks ?? []}
+          tasks={a.pendingTasks ?? []}
           // Лукап тасок ищет по scriptId — в задачах могут быть core-скрипты
           // и survey-шаги (отложенные анкеты).
           scripts={[...scripts, ...(currentLevel?.surveys ?? [])]}
@@ -1234,7 +1265,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
       {isAdmin && (
         <AdminPanel
-          state={state}
+          state={stateForChildren}
           aspect={state.currentAspect}
           onSkipStep={handleAdminSkipStep}
           onFillSurvey={handleAdminFillSurvey}

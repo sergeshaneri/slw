@@ -10,6 +10,7 @@ from app.web.routes.auth import router as auth_router
 from app.web.routes.coach import router as coach_router
 from app.web.routes.diary import router as diary_router
 from app.web.routes.events import router as events_router
+from app.web.routes.hall import router as hall_router
 from app.web.routes.leaderboard import router as leaderboard_router
 from app.web.routes.me import router as me_router
 from app.web.routes.profile import router as profile_router
@@ -52,6 +53,7 @@ app.include_router(events_router, prefix="/api")
 app.include_router(coach_router, prefix="/api")
 app.include_router(profile_router, prefix="/api")
 app.include_router(leaderboard_router, prefix="/api")
+app.include_router(hall_router, prefix="/api")
 
 
 @app.get("/healthz")

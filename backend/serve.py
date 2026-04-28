@@ -213,6 +213,30 @@ async def apply_ddl() -> None:
             "but bot+web are up): %s", e
         )
 
+    # aspect_messages — чат внутри холла аспекта.
+    try:
+        async with asyncio.timeout(15):
+            async with engine.connect() as conn:
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS aspect_messages (
+                        id           BIGSERIAL PRIMARY KEY,
+                        aspect       TEXT NOT NULL,
+                        web_user_id  INTEGER NOT NULL,
+                        text         TEXT NOT NULL,
+                        created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS aspect_messages_aspect_idx "
+                    "ON aspect_messages (aspect, id DESC)"
+                ))
+                await conn.commit()
+    except Exception as e:
+        log.warning(
+            "aspect_messages DDL failed (hall chat disabled, "
+            "but bot+web are up): %s", e
+        )
+
     await engine.dispose()
 
 

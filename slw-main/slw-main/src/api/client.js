@@ -212,6 +212,36 @@ export async function fetchHeatmap(userId, days = 180) {
   return request('GET', `/api/profile/${userId}/heatmap?days=${days}`)
 }
 
+// ── Холл аспекта ────────────────────────────────────────────────────────────
+
+export async function fetchHallOverview(aspect) {
+  return request('GET', `/api/hall/${encodeURIComponent(aspect)}/overview`)
+}
+
+export async function fetchHallMessages(aspect, sinceId = 0, limit = 100) {
+  return request('GET', `/api/hall/${encodeURIComponent(aspect)}/messages?since_id=${sinceId}&limit=${limit}`)
+}
+
+export async function postHallMessage(aspect, text) {
+  return request('POST', `/api/hall/${encodeURIComponent(aspect)}/messages`, { text })
+}
+
+export async function deleteHallMessage(aspect, messageId) {
+  return request('DELETE', `/api/hall/${encodeURIComponent(aspect)}/messages/${messageId}`)
+}
+
+export async function fetchHallInsights(aspect, sort = 'new') {
+  return request('GET', `/api/hall/${encodeURIComponent(aspect)}/insights?sort=${sort}`)
+}
+
+export async function fetchHallLeaderboard(aspect) {
+  return request('GET', `/api/hall/${encodeURIComponent(aspect)}/leaderboard`)
+}
+
+export async function fetchHallInspirations(aspect) {
+  return request('GET', `/api/hall/${encodeURIComponent(aspect)}/inspirations`)
+}
+
 export async function reactToInsight(id, reaction = 'heart') {
   return request('POST', `/api/profile/insights/${id}/react`, { reaction })
 }

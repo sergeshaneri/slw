@@ -4,7 +4,7 @@ import { BLOCKS, LEVEL_LABELS, getBlockItems } from './blocks'
 import BSWheel from './BSWheel'
 import styles from './AspectsView.module.css'
 
-export default function AspectsView({ selectedAspect, onAspectSelect, scores, onScoreChange, diary, onDiaryChange, journey, onGoToBSSurveys, t }) {
+export default function AspectsView({ selectedAspect, onAspectSelect, scores, onScoreChange, diary, onDiaryChange, journey, onGoToBSSurveys, onEnterHall, t }) {
   const [blockId, setBlockId] = useState(null)
 
   useEffect(() => {
@@ -25,7 +25,8 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, on
     if (!block) {
       return <Toc aspect={selectedAspect} data={data} color={color} available={available}
         scores={scores} onScoreChange={onScoreChange} onAspectSelect={onAspectSelect}
-        journey={journey} onGoToBSSurveys={onGoToBSSurveys} onOpenBlock={setBlockId} />
+        journey={journey} onGoToBSSurveys={onGoToBSSurveys} onOpenBlock={setBlockId}
+    onEnterHall={onEnterHall} />
     }
     return (
       <BlockReader
@@ -47,7 +48,8 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, on
 
   return <Toc aspect={selectedAspect} data={data} color={color} available={available}
     scores={scores} onScoreChange={onScoreChange} onAspectSelect={onAspectSelect}
-    journey={journey} onGoToBSSurveys={onGoToBSSurveys} onOpenBlock={setBlockId} />
+    journey={journey} onGoToBSSurveys={onGoToBSSurveys} onOpenBlock={setBlockId}
+    onEnterHall={onEnterHall} />
 }
 
 // ─── Сетка 8 аспектов ──────────────────────────────────────────────────────
@@ -89,7 +91,7 @@ function AspectsGrid({ scores, onAspectSelect }) {
 
 // ─── Оглавление аспекта ────────────────────────────────────────────────────
 
-function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSelect, journey, onGoToBSSurveys, onOpenBlock }) {
+function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSelect, journey, onGoToBSSurveys, onOpenBlock, onEnterHall }) {
   const byLevel = useMemo(() => {
     const m = { 0: [], 1: [], 2: [], 3: [] }
     available.forEach(b => m[b.level].push(b))
@@ -105,6 +107,7 @@ function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSe
         score={scores[aspect]}
         onScoreChange={v => onScoreChange({ ...scores, [aspect]: v })}
         onBack={() => onAspectSelect(null)}
+        onEnterHall={onEnterHall ? () => onEnterHall(aspect) : null}
       />
 
       {/* Колесо БС с разбивкой по 4 архетипам — только на странице БС.
@@ -114,7 +117,7 @@ function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSe
           skills={journey?.skills ?? {}}
           color={color}
           onContinueSurveys={onGoToBSSurveys}
-          isLocked={(journey?.currentLevel ?? 0) < 1}
+          isLocked={(journey?.aspects?.['БС']?.currentLevel ?? 0) < 1}
         />
       )}
 
@@ -161,7 +164,7 @@ function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSe
 
 // ─── Шапка аспекта (одинаковая в оглавлении и чтении) ──────────────────────
 
-function AspectHeader({ aspect, data, color, score, onScoreChange, onBack, compact }) {
+function AspectHeader({ aspect, data, color, score, onScoreChange, onBack, compact, onEnterHall }) {
   return (
     <header className={`${styles.aspectHeader} ${compact ? styles.aspectHeaderCompact : ''}`} style={{ '--accent': color }}>
       <div
@@ -195,6 +198,16 @@ function AspectHeader({ aspect, data, color, score, onScoreChange, onBack, compa
               />
               <span className={styles.scoreValue} style={{ color }}>{score}</span>
             </div>
+            {onEnterHall && (
+              <button
+                type="button"
+                className={styles.hallBtn}
+                onClick={onEnterHall}
+                style={{ borderColor: `${color}aa`, color }}
+              >
+                ✦ Войти в холл
+              </button>
+            )}
           </div>
         </div>
       )}
