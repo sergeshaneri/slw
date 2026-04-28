@@ -12,6 +12,7 @@ import LeaderboardView from './components/LeaderboardView/LeaderboardView'
 import HallView from './components/HallView/HallView'
 import DMView from './components/DMView/DMView'
 import SearchView from './components/SearchView/SearchView'
+import DashboardView from './components/DashboardView/DashboardView'
 import SettingsView from './components/SettingsView/SettingsView'
 import AchievementToast from './components/Toast/AchievementToast'
 import { fetchMyProfile } from './api/client'
@@ -57,6 +58,8 @@ const lsSet = (key, value) => {
 export default function App() {
   const { user, loading: authLoading, onAuthSuccess, logout } = useAuth()
 
+  // Дефолт: залогиненным — дашборд, гостям — колесо.
+  // Конкретный view выставится в useEffect после того как `user` определится.
   const [view, setView] = useState('wheel')
   const [scores, setScores] = useState(initScores())
   const [history, setHistory] = useState([])
@@ -111,6 +114,8 @@ export default function App() {
     if (user === null) return  // ещё проверяем токен — ничего не делаем
     if (user) {
       loadFromApi()
+      // При первом логине переключаем на дашборд (если ещё на стартовом 'wheel').
+      setView(v => v === 'wheel' ? 'dashboard' : v)
     } else {
       loadFromLocal()
     }
@@ -511,6 +516,41 @@ export default function App() {
         ref={mainRef}
         className={view === 'journey' ? styles.mainJourney : styles.main}
       >
+        {view === 'dashboard' && user && (
+          <DashboardView
+            currentUserId={user.id}
+            onOpenAspect={(aspect) => {
+              setSelectedAspect(aspect)
+              setView('aspects')
+            }}
+            onOpenAspects={() => handleViewChange('aspects')}
+            onOpenWheel={() => handleViewChange('wheel')}
+            onOpenJourney={() => handleViewChange('journey')}
+            onOpenCoach={() => handleViewChange('coach')}
+            onOpenHall={enterHall}
+            onOpenProfile={openPublicProfile}
+            onOpenDM={openDM}
+            onOpenLeaderboard={() => handleViewChange('leaderboard')}
+          />
+        )}
+
+        {view === 'wheel' && !user && (
+          <div className={styles.guestBanner}>
+            <div className={styles.guestBannerTitle}>Ознакомься со сферами жизни</div>
+            <p className={styles.guestBannerText}>
+              Колесо показывает 8 аспектов соционики — каждый отвечает за свою сферу твоей жизни. Тыкни в любой сектор, чтобы прочитать.
+              Когда захочешь начать путешествие по уровням — зарегистрируйся, и большинство закрытых сейчас уровней откроется.
+            </p>
+            <button
+              type="button"
+              className={styles.guestBannerCta}
+              onClick={() => setShowAuth(true)}
+            >
+              Войти / Зарегистрироваться
+            </button>
+          </div>
+        )}
+
         {view === 'wheel' && (
           <WheelView
             scores={scores}

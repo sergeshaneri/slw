@@ -366,6 +366,12 @@ export async function searchAll(q, scope = 'all', limit = 20) {
   return request('GET', url)
 }
 
+// ── Дашборд ──────────────────────────────────────────────────────────────
+
+export async function fetchDashboard() {
+  return request('GET', '/api/dashboard')
+}
+
 export async function reactToInsight(id, reaction = 'heart') {
   return request('POST', `/api/profile/insights/${id}/react`, { reaction })
 }

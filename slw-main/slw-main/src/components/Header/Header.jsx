@@ -14,6 +14,8 @@ export default function Header({
   onOpenHall,
 }) {
   const navItems = [
+    // Главная: для залогиненных — Дашборд, гостям — сразу к Колесу.
+    ...(user ? [{ id: 'dashboard', label: t.nav.dashboard }] : []),
     { id: 'wheel', label: t.nav.wheel },
     { id: 'journey', label: t.nav.journey, badge: journeyPendingCount },
     { id: 'aspects', label: t.nav.aspects },

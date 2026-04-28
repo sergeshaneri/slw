@@ -9,6 +9,7 @@ from app.config import settings
 from app.web.routes.auth import router as auth_router
 from app.web.routes.bookmarks import router as bookmarks_router
 from app.web.routes.coach import router as coach_router
+from app.web.routes.dashboard import router as dashboard_router
 from app.web.routes.diary import router as diary_router
 from app.web.routes.dm import router as dm_router
 from app.web.routes.events import router as events_router
@@ -66,6 +67,7 @@ app.include_router(habits_router, prefix="/api")
 app.include_router(streak_router, prefix="/api")
 app.include_router(bookmarks_router, prefix="/api")
 app.include_router(search_router, prefix="/api")
+app.include_router(dashboard_router, prefix="/api")
 
 
 @app.get("/healthz")

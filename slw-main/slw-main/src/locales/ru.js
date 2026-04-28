@@ -4,6 +4,7 @@ export const ru = {
     subtitle: 'Колесо Баланса',
   },
   nav: {
+    dashboard: '◉ Главная',
     wheel: '◎ Колесо',
     journey: '◐ Путешествие',
     aspects: '⬡ Аспекты',

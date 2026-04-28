@@ -1,0 +1,388 @@
+.container {
+  --text: #f1f2f5;
+  --text-soft: #c8cad1;
+  --text-muted: #8f929c;
+  --text-dim: #5f6169;
+  --line: rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.16);
+  --surface: #15161c;
+  --surface-2: #1c1d25;
+  --accent: #b39ddb;
+  --danger: #e57373;
+  color: var(--text);
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.muted { color: var(--text-muted); font-size: 13px; }
+
+.error {
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: rgba(229,115,115,0.08);
+  border: 1px solid rgba(229,115,115,0.3);
+  border-radius: 8px;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+/* ── Шапка ───────────────────────────────────── */
+
+.greetRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0 18px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.greet {
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.streakBlock {
+  text-align: right;
+}
+
+.streakNumber {
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.streakStatus {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ── Grid layout ─────────────────────────────── */
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+@media (min-width: 760px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .spanFull { grid-column: 1 / -1; }
+}
+
+/* ── Section ────────────────────────────────── */
+
+.section {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+
+.sectionLabel {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+/* ── Buttons ─────────────────────────────────── */
+
+.btnPrimary {
+  background: var(--accent);
+  border: none;
+  color: #1a1622;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+
+.btnPrimary:hover:not(:disabled) { background: #d6bcfa; }
+.btnPrimary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btnGhost {
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+
+.btnGhost:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.linkBtn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.linkBtn:hover { color: #d6bcfa; }
+
+/* ── Habits list ─────────────────────────────── */
+
+.habitsList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.habitRow {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  transition: background .12s;
+}
+
+.habitRow:hover { background: rgba(255,255,255,0.02); }
+
+.habitRowDone {
+  background: rgba(179,157,219,0.08);
+  border-color: var(--accent);
+}
+
+.habitAspect { font-weight: 700; font-size: 14px; }
+.habitTitle { font-size: 14px; line-height: 1.4; color: var(--text); }
+.habitTick { font-size: 18px; color: var(--accent); }
+
+.emptyCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+/* ── Sphere CTA ──────────────────────────────── */
+
+.sphereCta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.sphereCta > div:first-child { flex: 1; }
+
+.sphereCtaTitle {
+  font-size: 17px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+/* ── Wheel + scores ─────────────────────────── */
+
+.scoresLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 12px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.scoreChip {
+  font-weight: 600;
+}
+
+.activeAspectRow {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.activeAspectRow .linkBtn { font-weight: 600; font-size: 14px; }
+
+/* ── Coach card ─────────────────────────────── */
+
+.coachCard {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.coachStats { flex: 1; }
+
+.coachBig {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1;
+}
+
+/* ── Diary quick ────────────────────────────── */
+
+.diaryRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.diaryInput {
+  flex: 1;
+  min-width: 200px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.diaryInput:focus { border-color: var(--accent); }
+
+.diarySelect {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+}
+
+/* ── Notif list ──────────────────────────────── */
+
+.notifList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notifItem {
+  font-size: 13px;
+  color: var(--text-soft);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.notifItem:last-child { border-bottom: none; }
+
+/* ── Feed / suggested ────────────────────────── */
+
+.feedList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.feedItem {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.feedAuthor {
+  background: none;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+
+.feedAuthor:hover { color: var(--accent); }
+
+.feedAvatar { font-size: 18px; margin-right: 6px; }
+
+.feedAspect {
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 8px;
+}
+
+.feedText {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+
+.suggestedList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.suggestedItem {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .suggestedItem {
+    grid-template-columns: auto 1fr auto;
+  }
+  .suggestedItem .muted { display: none; }
+}
+
+/* ── Quote ────────────────────────────────────── */
+
+.quote {
+  margin: 0;
+  padding: 12px 16px;
+  border-left: 3px solid var(--accent);
+  background: rgba(179,157,219,0.04);
+  font-style: italic;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.quoteFooter {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: normal;
+}

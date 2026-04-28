@@ -1,0 +1,37 @@
+.wrap {
+  position: relative;
+  margin: 0 auto;
+}
+
+.svg {
+  display: block;
+  overflow: visible;
+}
+
+.ring {
+  fill: none;
+  stroke: rgba(255,255,255,0.05);
+  stroke-width: 1;
+}
+
+.sector { cursor: pointer; transition: opacity .15s; }
+.sector:hover { opacity: 0.85; }
+
+.label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
+.center {
+  fill: rgba(255,255,255,0.06);
+  stroke: rgba(255,255,255,0.18);
+  stroke-width: 1;
+  cursor: pointer;
+  transition: fill .15s;
+}
+
+.center:hover {
+  fill: rgba(179,157,219,0.18);
+}
