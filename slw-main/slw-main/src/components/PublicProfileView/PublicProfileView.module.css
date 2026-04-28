@@ -384,3 +384,78 @@
   color: var(--text);
   white-space: pre-wrap;
 }
+
+/* ── Reactors (кто реагировал) ────────────────────────── */
+
+.reactorsToggle {
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 14px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: color .15s, border-color .15s;
+}
+
+.reactorsToggle:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.reactorsBlock {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.reactorsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reactorItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reactorEmoji {
+  font-size: 14px;
+  line-height: 1;
+  width: 16px;
+  text-align: center;
+}
+
+.reactorName {
+  background: none;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.reactorName:hover {
+  color: var(--accent);
+}
+
+.reactorAspect {
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid;
+  border-radius: 10px;
+  padding: 1px 6px;
+}

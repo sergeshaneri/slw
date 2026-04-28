@@ -156,13 +156,20 @@ export function hasSkillContent(skillId) {
   return Boolean(SKILLS_CONTENT[skillId])
 }
 
-// Соответствие между уровнем путешествия (currentLevel в state) и уровнем
-// открытия деталей навыка. Простой mapping: текущий уровень аспекта = последний
-// открытый skill-уровень.
-//   currentLevel 0 → 0 (ничего из деталей навыка не открыто)
-//   currentLevel 1 → 1 (открыт первый уровень навыка — формирующаяся черта)
-//   currentLevel 2 → 2 (плюс второй — практическая глубина)
-//   currentLevel 3 → 3 (плюс третий — психосоматический пласт)
-export function getUnlockedSkillLevel(currentLevel) {
-  return Math.max(0, Math.min(3, currentLevel ?? 0))
+// Уровни деталей навыка открываются по ДВУМ условиям одновременно:
+//   уровень N навыка ⇔ currentLevel >= N (пройден соответствующий уровень
+//                       путешествия по аспекту)
+//                    & passes      >= N (пройдено N анкетных проходов по
+//                       этому навыку: 1 короткая / 2 короткие / полная=3)
+//
+// L1: currentLevel >= 1 (пройден L0) и хотя бы 1 короткая анкета.
+// L2: currentLevel >= 2 (пройден L1) и хотя бы 2 коротких анкеты.
+// L3: currentLevel >= 3 (пройден L2) и пройдена полная анкета (passes=3).
+export function getUnlockedSkillLevel(currentLevel, passes) {
+  const cl = currentLevel ?? 0
+  const p  = passes ?? 0
+  if (cl >= 3 && p >= 3) return 3
+  if (cl >= 2 && p >= 2) return 2
+  if (cl >= 1 && p >= 1) return 1
+  return 0
 }

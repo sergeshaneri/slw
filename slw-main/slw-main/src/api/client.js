@@ -176,6 +176,10 @@ export async function toggleInsightLike(id) {
   return request('POST', `/api/profile/insights/${id}/like`)
 }
 
+export async function fetchInsightReactions(id) {
+  return request('GET', `/api/profile/insights/${id}/reactions`)
+}
+
 export async function reactToInsight(id, reaction = 'heart') {
   return request('POST', `/api/profile/insights/${id}/react`, { reaction })
 }

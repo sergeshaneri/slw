@@ -5,22 +5,21 @@ import styles from './JourneyView.module.css'
 
 // SkillDetail — экран подробного разбора одного навыка.
 //
-// Показывает три уровня (1, 2, 3). На каждом уровне:
-//   — Что развиваешь: формирующаяся черта-Дар (название + раскрытие)
-//   — От чего уходишь: устраняемая черта-Тень
-//   — Как развить: раскрывающийся блок с практиками и действиями
-//
-// Уровни выше state.currentLevel показываются «приглушённо» с подписью
-// «откроется на уровне N» — это сигнал юзеру вернуться позже.
+// Показывает три уровня (1, 2, 3). Каждый уровень открывается по двум
+// условиям: пройден соответствующий уровень путешествия по аспекту И
+// пройдено N анкетных проходов по этому навыку (1/2/3, см. skillsContent.js).
 //
 // Props:
 //   skillId       — id навыка из tree.js
 //   currentLevel  — state.currentLevel (0..3)
+//   passes        — getCompletedPasses(state.skills[skillId]) (0..3)
 //   accent        — цвет аспекта
 //   onClose       — назад в дерево навыков
-export default function SkillDetail({ skillId, currentLevel, accent, onClose }) {
+export default function SkillDetail({ skillId, currentLevel, passes, accent, onClose }) {
   const content = getSkillContent(skillId)
-  const unlockedLevel = getUnlockedSkillLevel(currentLevel)
+  const cl = currentLevel ?? 0
+  const p  = passes ?? 0
+  const unlockedLevel = getUnlockedSkillLevel(cl, p)
 
   // Найдём базовое имя из tree.js (даже если детального контента ещё нет).
   const archeKey = SKILL_TO_ARCHETYPE[skillId]
@@ -70,13 +69,15 @@ export default function SkillDetail({ skillId, currentLevel, accent, onClose }) 
 
             {[1, 2, 3].map(lvl => {
               const lvlData = content.levels?.[lvl]
-              const isUnlocked = unlockedLevel >= lvl
+              const isUnlocked = lvl <= unlockedLevel
               return (
                 <SkillLevelCard
                   key={lvl}
                   level={lvl}
                   data={lvlData}
                   unlocked={isUnlocked}
+                  currentLevel={cl}
+                  passes={p}
                 />
               )
             })}
@@ -84,15 +85,7 @@ export default function SkillDetail({ skillId, currentLevel, accent, onClose }) 
             {unlockedLevel < 3 && (
               <div className={styles.skillDetailReturn}>
                 <span aria-hidden="true">↩</span>
-                <span>
-                  Возвращайся, когда пройдёшь {' '}
-                  {unlockedLevel < 1
-                    ? 'Уровень 1 путешествия'
-                    : unlockedLevel < 2
-                    ? 'Уровень 2 путешествия'
-                    : 'Уровень 3 путешествия'}
-                  {' '}— откроются новые слои этого навыка.
-                </span>
+                <span>Закрытые уровни откроются, когда выполнишь оба условия выше.</span>
               </div>
             )}
           </>
@@ -102,8 +95,32 @@ export default function SkillDetail({ skillId, currentLevel, accent, onClose }) 
   )
 }
 
+// Условия открытия уровня в человекочитаемом виде.
+function lockMessage(level, currentLevel, passes) {
+  const cl = currentLevel ?? 0
+  const p  = passes ?? 0
+  const journeyOk = cl >= level
+  const passesOk  = p >= level
+
+  const passNeed =
+    level === 1 ? '1 короткую анкету по этому навыку'
+    : level === 2 ? '2 коротких анкеты по этому навыку'
+    : 'полную анкету (3 прохода) по этому навыку'
+
+  const journeyNeed = `Уровень ${level} путешествия по аспекту`
+
+  if (!journeyOk && !passesOk) {
+    return `Откроется, когда пройдёшь ${journeyNeed} и сдашь ${passNeed}.`
+  }
+  if (!journeyOk) {
+    return `Откроется, когда пройдёшь ${journeyNeed}. Анкета — готово ✓`
+  }
+  // !passesOk
+  return `Откроется, когда сдашь ${passNeed}. Уровень путешествия — готово ✓`
+}
+
 // Карточка одного уровня с гейтингом.
-function SkillLevelCard({ level, data, unlocked }) {
+function SkillLevelCard({ level, data, unlocked, currentLevel, passes }) {
   const [showHow, setShowHow] = useState(false)
 
   if (!unlocked) {
@@ -114,7 +131,7 @@ function SkillLevelCard({ level, data, unlocked }) {
           <span className={styles.skillLevelLockedTag}>закрыт</span>
         </div>
         <p className={styles.skillLevelLockedText}>
-          Откроется, когда пройдёшь Уровень {level} путешествия по аспекту.
+          {lockMessage(level, currentLevel, passes)}
         </p>
       </section>
     )

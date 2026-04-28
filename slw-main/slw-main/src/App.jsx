@@ -452,6 +452,7 @@ export default function App() {
               setViewingProfileId(null)
               setView('leaderboard')
             }}
+            onOpenProfile={openPublicProfile}
           />
         )}
 

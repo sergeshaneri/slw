@@ -6,6 +6,7 @@ import {
   postInsight,
   deleteInsight,
 } from '../../api/client'
+import ReactorsList from '../PublicProfileView/ReactorsList'
 import styles from './ProfileView.module.css'
 
 const INSPIRATION_TYPES = [
@@ -28,6 +29,8 @@ export default function ProfileView({ onOpenPublicProfile, onOpenSettings }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [savedAt, setSavedAt] = useState(null)
+  // id своих инсайтов, для которых раскрыт список реагировавших
+  const [reactorsOpen, setReactorsOpen] = useState(() => new Set())
 
   // Локальные черновики
   const [bio, setBio] = useState('')
@@ -430,6 +433,29 @@ export default function ProfileView({ onOpenPublicProfile, onOpenSettings }) {
                 </button>
               </div>
               <div className={styles.insightText}>{ins.text}</div>
+              {ins.is_public && ins.likes > 0 && (
+                <>
+                  <button
+                    type="button"
+                    className={styles.reactorsToggleOwn}
+                    onClick={() => setReactorsOpen(prev => {
+                      const next = new Set(prev)
+                      if (next.has(ins.id)) next.delete(ins.id)
+                      else next.add(ins.id)
+                      return next
+                    })}
+                  >
+                    {reactorsOpen.has(ins.id)
+                      ? '▲ скрыть кто реагировал'
+                      : `👥 кто реагировал (${ins.likes})`}
+                  </button>
+                  <ReactorsList
+                    insightId={ins.id}
+                    open={reactorsOpen.has(ins.id)}
+                    onOpenProfile={onOpenPublicProfile}
+                  />
+                </>
+              )}
             </div>
           ))}
           {(profile.insights ?? []).length === 0 && (

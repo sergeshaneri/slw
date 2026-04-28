@@ -1050,6 +1050,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         <SkillDetail
           skillId={state.skillDetailId}
           currentLevel={state.currentLevel ?? 0}
+          passes={getCompletedPasses(state.skills?.[state.skillDetailId])}
           accent={accent}
           onClose={() => goToScreen('skill-tree')}
         />

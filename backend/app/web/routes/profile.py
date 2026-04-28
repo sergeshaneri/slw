@@ -53,6 +53,7 @@ REACTION_TYPES = {"heart", "thanks", "aha", "fire"}
 # scored_aspects) и возвращает bool.
 
 ACHIEVEMENT_CATALOG: dict[str, dict] = {
+    # ── Прогресс по XP ──
     "first_step":    {"title": "Первый шаг",    "icon": "🚶", "desc": "Прошёл первый шаг путешествия",
                       "check": lambda c: c["xp"] >= 1},
     "xp_10":         {"title": "Десятка",       "icon": "⚜",  "desc": "Накопил 10 XP",
@@ -61,20 +62,74 @@ ACHIEVEMENT_CATALOG: dict[str, dict] = {
                       "check": lambda c: c["xp"] >= 50},
     "xp_100":        {"title": "Сотня",         "icon": "🏆", "desc": "Накопил 100 XP",
                       "check": lambda c: c["xp"] >= 100},
+    "xp_500":        {"title": "Полтыщи",       "icon": "🥈", "desc": "Накопил 500 XP",
+                      "check": lambda c: c["xp"] >= 500},
+    "xp_1000":       {"title": "Тысячник",      "icon": "👑", "desc": "Накопил 1000 XP",
+                      "check": lambda c: c["xp"] >= 1000},
+
+    # ── Стрики ──
+    "streak_3":      {"title": "Тройка",        "icon": "🌱", "desc": "Стрик 3 дня",
+                      "check": lambda c: c["streak"] >= 3},
     "streak_7":      {"title": "Неделя огня",   "icon": "🔥", "desc": "Стрик 7 дней",
                       "check": lambda c: c["streak"] >= 7},
     "streak_30":     {"title": "Месяц огня",    "icon": "🌋", "desc": "Стрик 30 дней",
                       "check": lambda c: c["streak"] >= 30},
+    "streak_100":    {"title": "Стохроник",     "icon": "💎", "desc": "Стрик 100 дней",
+                      "check": lambda c: c["streak"] >= 100},
+
+    # ── Дневник ──
+    "first_diary":   {"title": "Первая запись", "icon": "📝", "desc": "Сделал запись в дневнике",
+                      "check": lambda c: c["diary_count"] >= 1},
+    "diary_10":      {"title": "Хроникёр",      "icon": "📖", "desc": "10 записей в дневнике",
+                      "check": lambda c: c["diary_count"] >= 10},
+    "diary_all":     {"title": "Всеохват",      "icon": "🎯", "desc": "Записи по всем 8 аспектам",
+                      "check": lambda c: c["diary_aspects"] >= 8},
+
+    # ── Инсайты (свои) ──
     "first_insight": {"title": "Первый инсайт", "icon": "💡", "desc": "Опубликовал первый инсайт",
                       "check": lambda c: c["insights_count"] >= 1},
     "five_insights": {"title": "Мысль течёт",   "icon": "🧠", "desc": "5 опубликованных инсайтов",
                       "check": lambda c: c["insights_count"] >= 5},
+    "insights_10":   {"title": "Мыслитель",     "icon": "📚", "desc": "10 опубликованных инсайтов",
+                      "check": lambda c: c["insights_count"] >= 10},
+    "storyteller":   {"title": "Рассказчик",    "icon": "🎙",  "desc": "Длинный инсайт (более 500 символов)",
+                      "check": lambda c: c["has_long_insight"]},
+
+    # ── Реакции получено ──
     "liked_by_5":    {"title": "Резонанс",      "icon": "✨", "desc": "5 реакций на твои инсайты",
                       "check": lambda c: c["likes_received"] >= 5},
+    "liked_by_25":   {"title": "Эхо",           "icon": "🔊", "desc": "25 реакций на твои инсайты",
+                      "check": lambda c: c["likes_received"] >= 25},
+    "all_reactions": {"title": "Палитра",       "icon": "🎨", "desc": "Получил все 4 типа реакций",
+                      "check": lambda c: c["distinct_received_types"] >= 4},
+
+    # ── Реакции отдано (мотивация поддерживать других) ──
+    "first_react":   {"title": "Поддержка",     "icon": "🤝", "desc": "Поставил первую реакцию другому",
+                      "check": lambda c: c["reactions_given"] >= 1},
+    "react_10":      {"title": "Активист",      "icon": "👍", "desc": "Поставил 10 реакций",
+                      "check": lambda c: c["reactions_given"] >= 10},
+    "bridge":        {"title": "Мостостроитель", "icon": "🌉", "desc": "Реакции 5 разным авторам",
+                      "check": lambda c: c["distinct_targets_reacted"] >= 5},
+
+    # ── Коуч ──
     "first_coach":   {"title": "Зов коуча",     "icon": "🤖", "desc": "Первый ИИ-вызов",
                       "check": lambda c: c["coach_calls"] >= 1},
+    "coach_5":       {"title": "Беседа",        "icon": "💬", "desc": "5 ИИ-вызовов",
+                      "check": lambda c: c["coach_calls"] >= 5},
+
+    # ── Аспекты ──
     "polymath":      {"title": "Полиглот",      "icon": "🌐", "desc": "Оценил все 8 аспектов",
                       "check": lambda c: c["scored_aspects"] >= 8},
+    "score_8":       {"title": "Эксперт",       "icon": "⭐", "desc": "Оценка 8+ хотя бы в одном аспекте",
+                      "check": lambda c: c["max_score"] >= 8},
+    "balanced":      {"title": "Баланс",        "icon": "⚖", "desc": "Все 8 аспектов оценены ≥ 5",
+                      "check": lambda c: c["scored_5_count"] >= 8},
+
+    # ── Профиль ──
+    "profile_full":  {"title": "Цельный",       "icon": "🪞", "desc": "Заполнил bio, цели и 5+ карточек вдохновения",
+                      "check": lambda c: c["bio_filled"] and c["goals_count"] >= 3 and c["inspirations_count"] >= 5},
+    "tg_linked":     {"title": "Связной",       "icon": "🔗", "desc": "Связал Telegram с веб-аккаунтом",
+                      "check": lambda c: c["tg_linked"]},
 }
 
 
@@ -220,8 +275,10 @@ async def _check_and_grant_achievements(session: AsyncSession, user: WebUser) ->
     Только для своего профиля — иначе бесплатно «начислил» бы себе чужие.
     """
     # Контекст для check-функций.
+    from app.db.models import WebDiaryEntry
     xp = await _xp(session, user)
     streak = await _streak(session, user)
+
     insights_count = int((
         await session.execute(
             select(func.count())
@@ -229,6 +286,18 @@ async def _check_and_grant_achievements(session: AsyncSession, user: WebUser) ->
             .where(AspectInsight.web_user_id == user.id)
         )
     ).scalar_one())
+    has_long_insight = bool((
+        await session.execute(
+            select(func.count())
+            .select_from(AspectInsight)
+            .where(
+                AspectInsight.web_user_id == user.id,
+                func.length(AspectInsight.text) > 500,
+            )
+        )
+    ).scalar_one())
+
+    # Реакции получено: всего и по типам.
     likes_received = int((
         await session.execute(
             select(func.count())
@@ -237,6 +306,32 @@ async def _check_and_grant_achievements(session: AsyncSession, user: WebUser) ->
             .where(AspectInsight.web_user_id == user.id)
         )
     ).scalar_one())
+    distinct_received_types = int((
+        await session.execute(
+            select(func.count(func.distinct(InsightLike.reaction)))
+            .select_from(InsightLike)
+            .join(AspectInsight, AspectInsight.id == InsightLike.insight_id)
+            .where(AspectInsight.web_user_id == user.id)
+        )
+    ).scalar_one())
+
+    # Реакции отдано: всего и скольким разным авторам.
+    reactions_given = int((
+        await session.execute(
+            select(func.count())
+            .select_from(InsightLike)
+            .where(InsightLike.web_user_id == user.id)
+        )
+    ).scalar_one())
+    distinct_targets_reacted = int((
+        await session.execute(
+            select(func.count(func.distinct(AspectInsight.web_user_id)))
+            .select_from(InsightLike)
+            .join(AspectInsight, AspectInsight.id == InsightLike.insight_id)
+            .where(InsightLike.web_user_id == user.id)
+        )
+    ).scalar_one())
+
     coach_calls = int((
         await session.execute(
             select(func.count())
@@ -244,17 +339,60 @@ async def _check_and_grant_achievements(session: AsyncSession, user: WebUser) ->
             .where(CoachCall.web_user_id == user.id, CoachCall.error.is_(None))
         )
     ).scalar_one())
-    scored_aspects = int((
+
+    # Дневник: записи и сколько разных аспектов покрыто.
+    diary_count = int((
         await session.execute(
-            select(func.count(func.distinct(WebScore.aspect)))
-            .where(WebScore.web_user_id == user.id)
+            select(func.count())
+            .select_from(WebDiaryEntry)
+            .where(WebDiaryEntry.web_user_id == user.id)
+        )
+    ).scalar_one())
+    diary_aspects = int((
+        await session.execute(
+            select(func.count(func.distinct(WebDiaryEntry.aspect)))
+            .where(
+                WebDiaryEntry.web_user_id == user.id,
+                WebDiaryEntry.aspect.is_not(None),
+            )
         )
     ).scalar_one())
 
+    # Аспекты и оценки.
+    score_rows = (
+        await session.execute(
+            select(WebScore.aspect, WebScore.value).where(WebScore.web_user_id == user.id)
+        )
+    ).all()
+    scored_aspects = len({a for a, _ in score_rows})
+    max_score = max((float(v) for _, v in score_rows), default=0.0)
+    scored_5_count = sum(1 for _, v in score_rows if float(v) >= 5)
+
+    # Профиль: для profile_full.
+    pp = await session.get(PublicProfile, user.id)
+    bio_filled = bool(pp and pp.bio and pp.bio.strip())
+    goals_count = len(pp.goals) if pp and isinstance(pp.goals, list) else 0
+    inspirations_count = len(pp.inspirations) if pp and isinstance(pp.inspirations, list) else 0
+
     ctx = {
-        "xp": xp, "streak": streak, "insights_count": insights_count,
-        "likes_received": likes_received, "coach_calls": coach_calls,
+        "xp": xp,
+        "streak": streak,
+        "insights_count": insights_count,
+        "has_long_insight": has_long_insight,
+        "likes_received": likes_received,
+        "distinct_received_types": distinct_received_types,
+        "reactions_given": reactions_given,
+        "distinct_targets_reacted": distinct_targets_reacted,
+        "coach_calls": coach_calls,
+        "diary_count": diary_count,
+        "diary_aspects": diary_aspects,
         "scored_aspects": scored_aspects,
+        "max_score": max_score,
+        "scored_5_count": scored_5_count,
+        "bio_filled": bio_filled,
+        "goals_count": goals_count,
+        "inspirations_count": inspirations_count,
+        "tg_linked": user.telegram_id is not None,
     }
 
     # Уже разблокированные.
@@ -667,3 +805,59 @@ async def toggle_like_compat(
         current_user=current_user,
         session=session,
     )
+
+
+# ── Кто реагировал ──────────────────────────────────────────────────────────
+# Зачем: главный путь к коннекту между юзерами. Видя «кому откликнулось»
+# твой инсайт, можно зайти на их профиль и связаться (когда появятся ЛС).
+#
+# Видимость: возвращаем только реагировавших с публичным профилем; сколько
+# скрыли свой профиль — отдаём агрегированно как `hidden_count`. Для
+# приватного инсайта — только владелец инсайта может видеть список
+# (по сути это уже не публичная фича, а «кто отреагировал на моё личное»).
+
+@router.get("/profile/insights/{insight_id}/reactions")
+async def get_insight_reactions(
+    insight_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    insight = await session.get(AspectInsight, insight_id)
+    if not insight:
+        raise HTTPException(status_code=404, detail="Insight not found")
+    if insight.is_public is False:
+        # Приватный — внешним не показываем (для своего фронт зовёт через
+        # /me/insights, там есть отдельный путь по той же таблице).
+        raise HTTPException(status_code=404, detail="Insight is private")
+
+    rows = (
+        await session.execute(
+            select(InsightLike, WebUser, PublicProfile)
+            .join(WebUser, WebUser.id == InsightLike.web_user_id)
+            .outerjoin(PublicProfile, PublicProfile.web_user_id == WebUser.id)
+            .where(InsightLike.insight_id == insight_id)
+            .order_by(InsightLike.created_at.desc())
+        )
+    ).all()
+
+    reactors: list[dict] = []
+    hidden_count = 0
+    for like, user, pp in rows:
+        # is_public=true по умолчанию, либо явно
+        is_public = True if pp is None else bool(pp.is_public)
+        if not is_public:
+            hidden_count += 1
+            continue
+        reactors.append({
+            "user_id": user.id,
+            "display_name": _display_name(user),
+            "reaction": like.reaction or "heart",
+            "focus_aspects": (pp.focus_aspects if pp else None) or [],
+            "created_at": like.created_at.isoformat(),
+        })
+
+    return {
+        "insight_id": insight_id,
+        "reactors": reactors,
+        "hidden_count": hidden_count,
+        "total": len(reactors) + hidden_count,
+    }

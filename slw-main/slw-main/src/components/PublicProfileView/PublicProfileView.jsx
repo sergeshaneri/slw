@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
-import { fetchPublicProfile, reactToInsight } from '../../api/client'
+import { fetchPublicProfile, reactToInsight, fetchInsightReactions } from '../../api/client'
+import ReactorsList from './ReactorsList'
 import styles from './PublicProfileView.module.css'
 
 const KIND_LABEL = {
@@ -24,10 +25,12 @@ const REACTIONS = [
   { type: 'fire',   emoji: '🔥', title: 'топ' },
 ]
 
-export default function PublicProfileView({ userId, currentUserId, onBack }) {
+export default function PublicProfileView({ userId, currentUserId, onBack, onOpenProfile }) {
   const [profile, setProfile] = useState(null)
   const [busy, setBusy] = useState(true)
   const [error, setError] = useState(null)
+  // id инсайтов, для которых раскрыт список реагировавших
+  const [reactorsOpen, setReactorsOpen] = useState(() => new Set())
 
   useEffect(() => {
     if (!userId) return
@@ -238,6 +241,32 @@ export default function PublicProfileView({ userId, currentUserId, onBack }) {
                     )
                   })}
                 </div>
+                {(() => {
+                  const total = ins.likes ?? Object.values(ins.reactions ?? {}).reduce((a, b) => a + b, 0)
+                  if (total === 0) return null
+                  const isOpen = reactorsOpen.has(ins.id)
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        className={styles.reactorsToggle}
+                        onClick={() => setReactorsOpen(prev => {
+                          const next = new Set(prev)
+                          if (next.has(ins.id)) next.delete(ins.id)
+                          else next.add(ins.id)
+                          return next
+                        })}
+                      >
+                        {isOpen ? '▲ скрыть' : `👥 кто реагировал (${total})`}
+                      </button>
+                      <ReactorsList
+                        insightId={ins.id}
+                        open={isOpen}
+                        onOpenProfile={onOpenProfile}
+                      />
+                    </>
+                  )
+                })()}
               </div>
             ))}
           </div>

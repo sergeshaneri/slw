@@ -453,6 +453,24 @@
   color: var(--accent);
 }
 
+.reactorsToggleOwn {
+  margin-top: 8px;
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+
+.reactorsToggleOwn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .insightText {
   font-size: 14px;
   line-height: 1.55;
