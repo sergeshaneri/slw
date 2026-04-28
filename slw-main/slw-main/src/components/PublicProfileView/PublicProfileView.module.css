@@ -77,6 +77,13 @@
   flex-shrink: 0;
 }
 
+.actionStack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .followBtn {
   background: var(--accent);
   border: none;
@@ -89,6 +96,23 @@
   cursor: pointer;
   flex-shrink: 0;
   transition: background .15s, opacity .15s;
+}
+
+.dmBtn {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+
+.dmBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .followBtn:hover { background: #d6bcfa; }

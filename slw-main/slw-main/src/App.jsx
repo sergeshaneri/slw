@@ -10,6 +10,7 @@ import ProfileView from './components/ProfileView/ProfileView'
 import PublicProfileView from './components/PublicProfileView/PublicProfileView'
 import LeaderboardView from './components/LeaderboardView/LeaderboardView'
 import HallView from './components/HallView/HallView'
+import DMView from './components/DMView/DMView'
 import SettingsView from './components/SettingsView/SettingsView'
 import AchievementToast from './components/Toast/AchievementToast'
 import { fetchMyProfile } from './api/client'
@@ -65,6 +66,8 @@ export default function App() {
   const [viewingProfileId, setViewingProfileId] = useState(null)
   // В каком холле сейчас юзер (ключ аспекта). null — не в холле.
   const [hallAspect, setHallAspect] = useState(null)
+  // С каким юзером открыт DM-тред. null — список тредов.
+  const [dmPartnerId, setDmPartnerId] = useState(null)
   // Очередь тостов (новые ачивки и т.п.). Каждый { id, icon, title, desc, kind, stardust }.
   const [toasts, setToasts] = useState([])
   const [dataLoading, setDataLoading] = useState(false)
@@ -376,6 +379,7 @@ export default function App() {
     setSelectedAspect(null)
     setViewingProfileId(null)
     setHallAspect(null)
+    if (newView !== 'dm') setDmPartnerId(null)
   }
 
   const openPublicProfile = (userId) => {
@@ -390,6 +394,12 @@ export default function App() {
     }
     setHallAspect(aspect)
     setView('hall')
+  }
+
+  const openDM = (partnerId = null) => {
+    if (!user) { setShowAuth(true); return }
+    setDmPartnerId(partnerId)
+    setView('dm')
   }
 
   const dismissToast = (id) => {
@@ -482,6 +492,9 @@ export default function App() {
         user={user}
         onLogin={() => setShowAuth(true)}
         onLogout={logout}
+        onOpenProfile={openPublicProfile}
+        onOpenDM={openDM}
+        onOpenHall={enterHall}
         t={t}
       />
 
@@ -562,6 +575,16 @@ export default function App() {
           <ProfileView
             onOpenPublicProfile={openPublicProfile}
             onOpenSettings={() => handleViewChange('settings')}
+            journey={journey}
+            onJourneyChange={saveJourney}
+          />
+        )}
+
+        {view === 'dm' && user && (
+          <DMView
+            initialPartnerId={dmPartnerId}
+            currentUserId={user.id}
+            onOpenProfile={openPublicProfile}
           />
         )}
 
@@ -574,6 +597,7 @@ export default function App() {
               setView('leaderboard')
             }}
             onOpenProfile={openPublicProfile}
+            onOpenDM={openDM}
           />
         )}
 

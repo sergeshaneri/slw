@@ -304,3 +304,52 @@ class AspectMessage(Base):
     web_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("web_users.id"))
     text: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class Notification(Base):
+    """Уведомление для юзера. Создаётся бэком при событиях:
+      reaction      — кто-то отреагировал на твой инсайт
+      follow        — на тебя подписались
+      dm            — пришло личное сообщение
+      hall_reply    — в холле где ты писал, появилось новое сообщение
+      achievement   — разблокирована ачивка
+    payload — JSONB с деталями (actor_id, insight_id, reaction, и т.п.).
+    """
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    web_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("web_users.id"))
+    type: Mapped[str] = mapped_column(Text)
+    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    is_read: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class DirectMessage(Base):
+    """Личное сообщение. Доступно только при mutual follow (взаимной подписке)
+    между sender_id и recipient_id — проверяется в роуте.
+    """
+    __tablename__ = "direct_messages"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    sender_id: Mapped[int] = mapped_column(Integer, ForeignKey("web_users.id"))
+    recipient_id: Mapped[int] = mapped_column(Integer, ForeignKey("web_users.id"))
+    text: Mapped[str] = mapped_column(Text)
+    read_at: Mapped[datetime | None] = mapped_column(TZ, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class HabitTick(Base):
+    """Ежедневный тик практики по аспекту. PK по (user, aspect, date) даёт
+    идемпотентность: повторное «тикнул сегодня» не дублируется.
+    """
+    __tablename__ = "habit_ticks"
+
+    web_user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("web_users.id"), primary_key=True
+    )
+    aspect: Mapped[str] = mapped_column(Text, primary_key=True)
+    date: Mapped[str] = mapped_column(Text, primary_key=True)  # 'YYYY-MM-DD'
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)

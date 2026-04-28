@@ -1,6 +1,18 @@
+import NotificationsBell from '../Notifications/NotificationsBell'
 import styles from './Header.module.css'
 
-export default function Header({ view, onViewChange, journeyPendingCount = 0, user, onLogin, onLogout, t }) {
+export default function Header({
+  view,
+  onViewChange,
+  journeyPendingCount = 0,
+  user,
+  onLogin,
+  onLogout,
+  t,
+  onOpenProfile,
+  onOpenDM,
+  onOpenHall,
+}) {
   const navItems = [
     { id: 'wheel', label: t.nav.wheel },
     { id: 'journey', label: t.nav.journey, badge: journeyPendingCount },
@@ -12,6 +24,7 @@ export default function Header({ view, onViewChange, journeyPendingCount = 0, us
     // Коуч и Профиль гейтятся в App.jsx:handleViewChange — без логина
     // откроется AuthModal.
     { id: 'coach', label: t.nav.coach },
+    ...(user ? [{ id: 'dm', label: t.nav.dm }] : []),
     // Настройки переехали внутрь страницы Профиля.
     ...(user ? [{ id: 'profile', label: t.nav.profile }] : []),
   ]
@@ -38,6 +51,13 @@ export default function Header({ view, onViewChange, journeyPendingCount = 0, us
       </nav>
 
       <div className={styles.authBlock}>
+        {user && (
+          <NotificationsBell
+            onOpenProfile={onOpenProfile}
+            onOpenDM={onOpenDM}
+            onOpenHall={onOpenHall}
+          />
+        )}
         {user ? (
           <>
             {!user.email && onLogin && (

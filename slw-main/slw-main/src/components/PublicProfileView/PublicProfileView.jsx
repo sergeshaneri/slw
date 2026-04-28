@@ -31,7 +31,7 @@ const REACTIONS = [
   { type: 'fire',   emoji: '🔥', title: 'топ' },
 ]
 
-export default function PublicProfileView({ userId, currentUserId, onBack, onOpenProfile }) {
+export default function PublicProfileView({ userId, currentUserId, onBack, onOpenProfile, onOpenDM }) {
   const [profile, setProfile] = useState(null)
   const [busy, setBusy] = useState(true)
   const [error, setError] = useState(null)
@@ -137,13 +137,25 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
             </div>
           </div>
           {!isMe && currentUserId != null && (
-            <button
-              type="button"
-              className={`${styles.followBtn} ${profile.is_followed_by_me ? styles.followBtnActive : ''}`}
-              onClick={handleFollow}
-            >
-              {profile.is_followed_by_me ? '✓ Подписан' : '+ Подписаться'}
-            </button>
+            <div className={styles.actionStack}>
+              <button
+                type="button"
+                className={`${styles.followBtn} ${profile.is_followed_by_me ? styles.followBtnActive : ''}`}
+                onClick={handleFollow}
+              >
+                {profile.is_followed_by_me ? '✓ Подписан' : '+ Подписаться'}
+              </button>
+              {onOpenDM && (
+                <button
+                  type="button"
+                  className={styles.dmBtn}
+                  onClick={() => onOpenDM(profile.user_id)}
+                  title="Доступно при взаимной подписке"
+                >
+                  ✉ Написать
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>

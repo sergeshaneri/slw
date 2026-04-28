@@ -237,6 +237,65 @@ async def apply_ddl() -> None:
             "but bot+web are up): %s", e
         )
 
+    # Уведомления + ЛС + трекер привычек.
+    try:
+        async with asyncio.timeout(15):
+            async with engine.connect() as conn:
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS notifications (
+                        id           BIGSERIAL PRIMARY KEY,
+                        web_user_id  INTEGER NOT NULL,
+                        type         TEXT NOT NULL,
+                        payload      JSONB,
+                        is_read      BOOLEAN NOT NULL DEFAULT false,
+                        created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS notifications_user_idx "
+                    "ON notifications (web_user_id, id DESC)"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS notifications_unread_idx "
+                    "ON notifications (web_user_id, is_read)"
+                ))
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS direct_messages (
+                        id            BIGSERIAL PRIMARY KEY,
+                        sender_id     INTEGER NOT NULL,
+                        recipient_id  INTEGER NOT NULL,
+                        text          TEXT NOT NULL,
+                        read_at       TIMESTAMPTZ,
+                        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS dm_pair_idx "
+                    "ON direct_messages (sender_id, recipient_id, id DESC)"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS dm_recipient_idx "
+                    "ON direct_messages (recipient_id, id DESC)"
+                ))
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS habit_ticks (
+                        web_user_id  INTEGER NOT NULL,
+                        aspect       TEXT NOT NULL,
+                        date         TEXT NOT NULL,
+                        created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (web_user_id, aspect, date)
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS habit_ticks_user_idx "
+                    "ON habit_ticks (web_user_id, date DESC)"
+                ))
+                await conn.commit()
+    except Exception as e:
+        log.warning(
+            "notifications/dm/habits DDL failed: %s", e
+        )
+
     await engine.dispose()
 
 

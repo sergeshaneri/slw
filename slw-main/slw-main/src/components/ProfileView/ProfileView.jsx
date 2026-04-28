@@ -31,7 +31,12 @@ const KIND_LABEL = {
   recommendation: 'рекомендация',
 }
 
-export default function ProfileView({ onOpenPublicProfile, onOpenSettings }) {
+export default function ProfileView({
+  onOpenPublicProfile,
+  onOpenSettings,
+  journey,
+  onJourneyChange,
+}) {
   const [profile, setProfile] = useState(null)
   const [busy, setBusy] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -485,6 +490,9 @@ export default function ProfileView({ onOpenPublicProfile, onOpenSettings }) {
         catalog={profile.achievements_catalog ?? []}
       />
 
+      {/* ── Стрик-shield ─────────────────────── */}
+      <StreakShieldSection journey={journey} onJourneyChange={onJourneyChange} />
+
       {/* ── Heatmap активности ──────────────────── */}
       <Section label="Активность за полгода">
         <Heatmap userId={profile.user_id} days={180} />
@@ -605,6 +613,50 @@ function Section({ label, children }) {
       <div className={styles.sectionLabel}>{label}</div>
       {children}
     </section>
+  )
+}
+
+const SHIELD_COST = 50
+
+function StreakShieldSection({ journey, onJourneyChange }) {
+  const stardust = journey?.stardust ?? 0
+  const streak = journey?.streak ?? 0
+  const shieldUntil = journey?.streakShieldUntil ?? null
+  const today = new Date().toISOString().slice(0, 10)
+  const active = shieldUntil && shieldUntil >= today
+
+  const handleActivate = async () => {
+    if (active || stardust < SHIELD_COST || !onJourneyChange) return
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const until = tomorrow.toISOString().slice(0, 10)
+    await onJourneyChange({
+      ...journey,
+      stardust: stardust - SHIELD_COST,
+      streakShieldUntil: until,
+    })
+  }
+
+  return (
+    <Section label="Защита стрика">
+      <div className={styles.muted} style={{ marginBottom: 10 }}>
+        Текущий стрик: <strong style={{ color: 'var(--accent)' }}>{streak} дн.</strong>
+        {active && <> · 🛡 защищён до {shieldUntil}</>}
+      </div>
+      {active ? (
+        <div className={styles.muted}>Если пропустишь день — стрик сохранится один раз.</div>
+      ) : (
+        <button
+          type="button"
+          className={styles.btnGhost}
+          onClick={handleActivate}
+          disabled={stardust < SHIELD_COST}
+          title={stardust < SHIELD_COST ? `Нужно ${SHIELD_COST} стардаста` : ''}
+        >
+          🛡 Активировать (⚡{SHIELD_COST})
+        </button>
+      )}
+    </Section>
   )
 }
 

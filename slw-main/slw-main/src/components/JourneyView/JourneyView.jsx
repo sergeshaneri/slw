@@ -19,6 +19,7 @@ import SurveyChoice from './SurveyChoice'
 import SurveyInsight from './SurveyInsight'
 import SkillTree from './SkillTree'
 import SkillDetail from './SkillDetail'
+import PlanetMap from './PlanetMap'
 import AdminPanel from './AdminPanel'
 import AdminSkillsEditor from './AdminSkillsEditor'
 import styles from './JourneyView.module.css'
@@ -394,6 +395,10 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   }, [scripts, setState])
 
   // ─── Онбординг ───────────────────────────────────────────────
+  // Шаги 0–3: общее интро, не привязанное к аспекту.
+  // После шага 3 → Карта Планет, юзер сам выбирает с какой планеты
+  // начать. Дальше handleSwitchAspect сам инжектит aspectIntro и
+  // первый скрипт L0 выбранного аспекта.
   const handleOnboardingNext = useCallback(async () => {
     const step = state.onboardingStep
     addUserMessage(ONBOARDING[Math.min(step, 3)]?.button || 'Далее')
@@ -401,32 +406,16 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       await addBotMessage(ONBOARDING[step + 1].text, 700)
       setState(s => ({ ...s, onboardingStep: step + 1 }))
     } else if (step === 3) {
+      // Завершаем общую часть онбординга и переводим на Карту Планет.
+      // onboardingStep остаётся 4 (между 3 и 6), чтобы handleSwitchAspect
+      // потом дотянул его до 6 при выборе планеты.
       await addBotMessage(
-        'Доступна планета:\n\nБелая Сенсорика — Terra Harmonia\nМир баланса ощущений: тело, комфорт, уют, здоровье.\n\nНажми, чтобы начать путешествие.',
+        'Готово. Сейчас покажу Карту Планет — выбери, с какого аспекта хочешь начать.',
         900
       )
-      setState(s => ({ ...s, onboardingStep: 4 }))
-    } else if (step === 4) {
-      addUserMessage('Белая Сенсорика — Terra Harmonia')
-      await addBotMessage(aspectIntro[0]?.text ?? '...', 900)
-      setState(s => ({ ...s, onboardingStep: 5 }))
-    } else if (step === 5) {
-      addUserMessage(aspectIntro[1]?.button || 'Далее')
-      await addBotMessage(aspectIntro[1]?.text ?? '...', 700)
-      awardXP(aspectIntro[1]?.xp ?? 10, 0, 'aspect-intro')
-      setState(s => updateAspect(
-        { ...s, screen: 'chat', onboardingStep: 6 },
-        cur => ({
-          ...cur,
-          currentScriptIndex: 0,
-          currentScriptId: scripts[0]?.id ?? null,
-          messages: scripts[0]
-            ? [...cur.messages, { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: scripts[0].id, level: 0 }]
-            : cur.messages
-        })
-      ))
+      setState(s => ({ ...s, onboardingStep: 4, screen: 'planets' }))
     }
-  }, [state.onboardingStep, aspectIntro, scripts, addBotMessage, addUserMessage, awardXP, setState])
+  }, [state.onboardingStep, addBotMessage, addUserMessage, setState])
 
   // Помещаем задание в очередь активных (без дублей по scriptId).
   const enqueueTask = useCallback((script, status) => {
@@ -886,6 +875,93 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setState(s => ({ ...s, screen }))
   }, [setState])
 
+  // Вспомогательное: если открыта анкета — сохраняем её черновик в
+  // state.skills[id].draft и закрываем модалку. Возвращает state с
+  // обнулёнными activeSurvey/skillDetailId. Используется при свободном
+  // переключении планеты, чтобы не терять заполненную часть.
+  const dismissActiveSurveyToDraft = useCallback((s) => {
+    if (!s.activeSurvey) return { ...s, skillDetailId: null }
+    const { skillId, mode, startPass, stepIndex, answers } = s.activeSurvey
+    const skillEntry = s.skills?.[skillId] ?? {}
+    return {
+      ...s,
+      activeSurvey: null,
+      skillDetailId: null,
+      skills: {
+        ...s.skills,
+        [skillId]: {
+          ...skillEntry,
+          draft: { mode, startPass, stepIndex, answers: answers ?? {} },
+        },
+      },
+    }
+  }, [])
+
+  // Открыть Карту Планет. Если открыта анкета — сохраняем её draft.
+  const handleOpenPlanetMap = useCallback(() => {
+    setState(s => ({ ...dismissActiveSurveyToDraft(s), screen: 'planets' }))
+  }, [setState, dismissActiveSurveyToDraft])
+
+  // Переключение на другой аспект. Сохраняет анкету (если открыта) в
+  // draft, ставит currentAspect, переводит экран в 'chat'.
+  // Если у нового аспекта папки ещё нет (первый заход) — инжектим intro
+  // нового аспекта + первый скрипт L0, чтобы юзер сразу попал в чат.
+  // Иначе — возвращаемся к сохранённому состоянию.
+  const handleSwitchAspect = useCallback((aspectKey) => {
+    if (!aspectKey) return
+    setState(s => {
+      const cleaned = dismissActiveSurveyToDraft(s)
+      const existing = cleaned.aspects?.[aspectKey]
+      const isFresh = !existing || (
+        !existing.messages?.length && !existing.currentScriptId
+      )
+
+      let folder = existing ?? { ...DEFAULT_ASPECT_STATE }
+      if (isFresh) {
+        const j = getJourney(aspectKey)
+        const intro = j?.intro ?? []
+        const firstScript = (j?.levels?.[0]?.core ?? j?.levels?.[0]?.scripts ?? [])[0]
+        const msgs = []
+        let idCounter = Date.now()
+        for (let i = 0; i < intro.length; i++) {
+          const e = intro[i]
+          // intro[i>0] обычно содержит button — рисуем «псевдо-клик» юзера
+          // перед ответным текстом бота, чтобы интро читалось как диалог.
+          if (i > 0 && e.button) {
+            msgs.push({ id: idCounter++, role: 'user', text: e.button })
+          }
+          if (e.text) {
+            msgs.push({ id: idCounter++, role: 'bot', text: e.text })
+          }
+        }
+        if (firstScript) {
+          msgs.push({
+            id: idCounter++,
+            role: 'bot',
+            kind: 'script',
+            scriptId: firstScript.id,
+            level: 0,
+          })
+        }
+        folder = {
+          ...DEFAULT_ASPECT_STATE,
+          currentScriptId: firstScript?.id ?? null,
+          currentScriptIndex: 0,
+          messages: msgs,
+        }
+      }
+
+      return {
+        ...cleaned,
+        currentAspect: aspectKey,
+        screen: 'chat',
+        // Переключение на любую планету закрывает общий онбординг.
+        onboardingStep: Math.max(cleaned.onboardingStep ?? 0, 6),
+        aspects: { ...(cleaned.aspects ?? {}), [aspectKey]: folder },
+      }
+    })
+  }, [setState, dismissActiveSurveyToDraft])
+
   // ─── Админ-действия (видимы только при isAdmin) ──────────────
   // Все хендлеры обходят геймификацию: XP не выдаём, в дневник
   // не пишем, через addBotMessage не отвечаем.
@@ -1077,6 +1153,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           onOpenProfile={() => goToScreen('profile')}
           onOpenTasks={() => goToScreen('tasks')}
           onGoToSurveys={handleOpenSkillTree}
+          onOpenPlanetMap={handleOpenPlanetMap}
           // Пилюля «Оценить навыки» появляется только после L0 (или для админа).
           surveyRemaining={
             (isAdmin || (a.currentLevel ?? 0) >= 1)
@@ -1228,6 +1305,15 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           skills={state.skills ?? {}}
           onApply={handleAdminApplyEdits}
           onClose={() => goToScreen('skill-tree')}
+        />
+      )}
+
+      {state.screen === 'planets' && (
+        <PlanetMap
+          state={state}
+          onSwitch={handleSwitchAspect}
+          onClose={() => goToScreen('chat')}
+          onLockedTap={() => showToast('Эта планета пока закрыта')}
         />
       )}
 

@@ -38,6 +38,7 @@ from app.db.models import (
 )
 from app.db.session import get_session
 from app.web.deps import get_current_user
+from app.web.notify import notify
 
 router = APIRouter()
 
@@ -808,6 +809,7 @@ async def react_to_insight(
 
     my_reaction: str | None
     my_comment: str | None
+    notify_owner = False
     if existing is None:
         session.add(InsightLike(
             insight_id=insight_id,
@@ -817,6 +819,7 @@ async def react_to_insight(
         ))
         my_reaction = body.reaction
         my_comment = cleaned_comment
+        notify_owner = True
     elif (existing.reaction or "heart") == body.reaction and body.comment is None:
         # Toggle off: тот же тип, без коммента → снимаем.
         await session.delete(existing)
@@ -829,6 +832,23 @@ async def react_to_insight(
             existing.comment = cleaned_comment
         my_reaction = body.reaction
         my_comment = existing.comment
+
+    # Уведомление автору инсайта (один раз — на новой реакции).
+    if notify_owner:
+        await notify(
+            session,
+            user_id=insight.web_user_id,
+            type_="reaction",
+            payload={
+                "insight_id": insight_id,
+                "reaction": body.reaction,
+                "actor_id": current_user.id,
+                "actor_name": _display_name(current_user),
+                "preview": (insight.text or "")[:120],
+                "comment": cleaned_comment,
+            },
+            skip_if_self=current_user.id,
+        )
     await session.commit()
 
     # Сводка по всем типам.
@@ -939,6 +959,18 @@ async def follow_user(
         follower_id=current_user.id, target_id=user_id,
     ).on_conflict_do_nothing(index_elements=["follower_id", "target_id"])
     await session.execute(stmt)
+
+    # Уведомляем target — у него новый подписчик.
+    await notify(
+        session,
+        user_id=user_id,
+        type_="follow",
+        payload={
+            "actor_id": current_user.id,
+            "actor_name": _display_name(current_user),
+        },
+        skip_if_self=current_user.id,
+    )
     await session.commit()
 
     followers_count = int((

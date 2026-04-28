@@ -11,6 +11,9 @@ import {
   fetchHallInspirations,
   postInsight,
   reactToInsightWithComment,
+  fetchHabitsToday,
+  tickHabit,
+  untickHabit,
 } from '../../api/client'
 import styles from './HallView.module.css'
 
@@ -50,6 +53,7 @@ export default function HallView({ aspect, currentUserId, onBack, onOpenProfile 
           {aspect} · {meta.name ?? 'Аспект'}
         </h1>
         {meta.metaphor && <div className={styles.subline}>{meta.metaphor}</div>}
+        <HabitTickButton aspect={aspect} />
       </div>
 
       <div className={styles.tabs}>
@@ -585,6 +589,46 @@ function CommunityTab({ aspect, content, currentUserId, onOpenProfile }) {
 }
 
 // ── Subcomponents ───────────────────────────────────────────────────────────
+
+function HabitTickButton({ aspect }) {
+  const [busy, setBusy] = useState(false)
+  const [ticked, setTicked] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchHabitsToday()
+      .then(({ aspects }) => { if (!cancelled) setTicked(aspects.includes(aspect)) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [aspect])
+
+  const handle = async () => {
+    setBusy(true)
+    try {
+      if (ticked) {
+        await untickHabit(aspect)
+        setTicked(false)
+      } else {
+        await tickHabit(aspect)
+        setTicked(true)
+      }
+    } catch {} finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className={`${styles.habitBtn} ${ticked ? styles.habitBtnDone : ''}`}
+      onClick={handle}
+      disabled={busy}
+      title="Отметить сегодняшнюю практику по аспекту"
+    >
+      {ticked ? '✓ Практика сегодня' : '☐ Отметить практику'}
+    </button>
+  )
+}
 
 function Section({ label, children }) {
   return (

@@ -242,6 +242,61 @@ export async function fetchHallInspirations(aspect) {
   return request('GET', `/api/hall/${encodeURIComponent(aspect)}/inspirations`)
 }
 
+// ── Уведомления ────────────────────────────────────────────────────────────
+
+export async function fetchNotifications(limit = 30) {
+  return request('GET', `/api/notifications?limit=${limit}`)
+}
+
+export async function fetchUnreadCount() {
+  return request('GET', '/api/notifications/unread_count')
+}
+
+export async function markNotificationsRead(ids) {
+  // ids = null → пометить все
+  return request('POST', '/api/notifications/mark_read', { ids: ids ?? null })
+}
+
+// ── ЛС (только при mutual follow) ──────────────────────────────────────────
+
+export async function fetchDMThreads() {
+  return request('GET', '/api/dm/threads')
+}
+
+export async function fetchDMThread(userId, limit = 100) {
+  return request('GET', `/api/dm/threads/${userId}?limit=${limit}`)
+}
+
+export async function sendDM(userId, text) {
+  return request('POST', `/api/dm/threads/${userId}`, { text })
+}
+
+export async function markDMThreadRead(userId) {
+  return request('POST', `/api/dm/threads/${userId}/read`)
+}
+
+export async function fetchDMUnreadCount() {
+  return request('GET', '/api/dm/unread_count')
+}
+
+// ── Трекер привычек ───────────────────────────────────────────────────────
+
+export async function fetchHabitsToday() {
+  return request('GET', '/api/habits/today')
+}
+
+export async function fetchHabitsHistory(aspect, days = 90) {
+  return request('GET', `/api/habits/${encodeURIComponent(aspect)}?days=${days}`)
+}
+
+export async function tickHabit(aspect) {
+  return request('POST', `/api/habits/${encodeURIComponent(aspect)}/tick`)
+}
+
+export async function untickHabit(aspect) {
+  return request('DELETE', `/api/habits/${encodeURIComponent(aspect)}/tick`)
+}
+
 export async function reactToInsight(id, reaction = 'heart') {
   return request('POST', `/api/profile/insights/${id}/react`, { reaction })
 }

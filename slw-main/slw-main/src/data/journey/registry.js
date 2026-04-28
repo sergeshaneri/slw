@@ -1,8 +1,7 @@
 // Реестр путешествий по аспектам.
 //
-// Сейчас доступны: БС — уровни 0, 1, 2 и 3 (3 в работе, написана
-// первая неделя из четырёх).
-// Остальные 7 аспектов — заглушки с пометкой «скоро».
+// Доступно: БС (уровни 0–3, 3 в работе), БЛ (только L0).
+// Остальные 6 аспектов — заглушки с пометкой «скоро» на Карте Планет.
 //
 // Уровень состоит из core-сценария (массив скриптов в линейной
 // последовательности) и опционально `surveys` — анкеты по навыкам
@@ -15,17 +14,19 @@ import {
   BS_LEVEL_2_CORE, BS_LEVEL_2_COMPLETE,
   BS_LEVEL_3_CORE, BS_LEVEL_3_COMPLETE
 } from './aspects/bs'
+import {
+  BL_ASPECT_INTRO,
+  BL_LEVEL_0_CORE, BL_LEVEL_0_COMPLETE
+} from './aspects/bl'
 import { ASPECT_KEYS, ASPECT_DATA, ASPECT_REALMS, ASPECT_COLORS } from '../aspects'
 
+// Латинские имена планет. Только для тех, у кого они уже придуманы.
+// Остальные — отображаются на карте без латинской подписи.
 const PLANETS = {
   БС: 'Terra Harmonia',
-  ЧИ: 'Caelum Possibilis',
-  БИ: 'Tempora Profunda',
-  ЧС: 'Imperium Vivum',
   БЛ: 'Structura Mentis',
-  ЧЛ: 'Officium Operum',
-  БЭ: 'Cordia Vinculum',
-  ЧЭ: 'Ignis Animae'
+  ЧЭ: 'Passio Ignis',
+  ЧИ: 'Essence Prime',
 }
 
 export const JOURNEYS = {
@@ -61,6 +62,19 @@ export const JOURNEYS = {
         scripts: BS_LEVEL_3_CORE
       }
     }
+  },
+  БЛ: {
+    available: true,
+    planet: PLANETS.БЛ,
+    intro: BL_ASPECT_INTRO,
+    levels: {
+      0: {
+        title: 'Первый контакт',
+        core: BL_LEVEL_0_CORE,
+        complete: BL_LEVEL_0_COMPLETE,
+        scripts: BL_LEVEL_0_CORE
+      }
+    }
   }
 }
 
@@ -72,7 +86,7 @@ export function getAllPlanets() {
     name: ASPECT_DATA[key].name,
     realm: ASPECT_REALMS[key],
     color: ASPECT_COLORS[key],
-    planet: PLANETS[key],
+    planet: PLANETS[key] ?? null,
     available: !!JOURNEYS[key]?.available
   }))
 }

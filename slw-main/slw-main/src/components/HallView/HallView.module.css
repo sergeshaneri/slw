@@ -71,6 +71,28 @@
   font-style: italic;
 }
 
+.habitBtn {
+  margin-top: 10px;
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+}
+
+.habitBtn:hover { border-color: var(--accent); color: var(--accent); }
+
+.habitBtnDone {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(179,157,219,0.08);
+}
+
 /* ── Tabs ─────────────────────────────────────── */
 
 .tabs {

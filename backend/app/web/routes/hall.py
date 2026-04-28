@@ -30,6 +30,7 @@ from app.db.models import (
 )
 from app.db.session import get_session
 from app.web.deps import get_current_user
+from app.web.notify import notify_hall_writers
 
 router = APIRouter()
 
@@ -271,6 +272,17 @@ async def post_message(
     session.add(msg)
     await session.commit()
     await session.refresh(msg)
+
+    # Уведомляем всех, кто писал в этот холл, кроме автора.
+    await notify_hall_writers(
+        session,
+        aspect=aspect,
+        new_message_id=msg.id,
+        actor_id=current_user.id,
+        actor_name=_display_name(current_user),
+        text_preview=text,
+    )
+    await session.commit()
 
     pp = await session.get(PublicProfile, current_user.id)
     return {

@@ -1,0 +1,226 @@
+/* Карта планет — экран выбора аспекта. */
+
+.shell {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 16px 16px 40px;
+  color: #f1f2f5;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #d8c8ff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+
+.backBtn:hover {
+  background: rgba(157, 78, 221, 0.10);
+  border-color: rgba(199, 125, 255, 0.45);
+}
+
+/* Заголовок. */
+.titleBlock {
+  text-align: center;
+  margin: 24px 0 28px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  font-weight: 700;
+  background: linear-gradient(90deg, #9d4edd 0%, #c77dff 50%, #4cc9f0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 8px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 300;
+  letter-spacing: 1.5px;
+  margin: 0 0 12px;
+  color: #f1f2f5;
+}
+
+.subtitle {
+  max-width: 520px;
+  margin: 0 auto;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #8f929c;
+}
+
+/* Сетка планет. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (min-width: 720px) {
+  .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* Карточка планеты. */
+.card {
+  --planet-color: #9d4edd;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 16px 14px;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--planet-color) 12%, #15161c),
+    #15161c 60%
+  );
+  border: 1px solid color-mix(in srgb, var(--planet-color) 25%, rgba(255,255,255,0.08));
+  border-radius: 16px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: transform .15s ease, border-color .2s, box-shadow .2s;
+  min-height: 200px;
+  overflow: hidden;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--planet-color) 60%, transparent);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.35),
+    0 0 0 1px color-mix(in srgb, var(--planet-color) 25%, transparent),
+    0 0 24px color-mix(in srgb, var(--planet-color) 18%, transparent);
+}
+
+.card:active {
+  transform: translateY(0);
+}
+
+/* Активная — где юзер сейчас. */
+.card.active {
+  border-color: color-mix(in srgb, var(--planet-color) 75%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--planet-color) 45%, transparent),
+    0 0 24px color-mix(in srgb, var(--planet-color) 30%, transparent);
+}
+
+/* С прогрессом — чуть ярче. */
+.card.hasProgress {
+  border-color: color-mix(in srgb, var(--planet-color) 45%, rgba(255,255,255,0.08));
+}
+
+/* Locked — приглушённая. */
+.card.locked {
+  opacity: 0.55;
+  filter: grayscale(0.35);
+}
+
+.card.locked:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* Шапка карточки: глиф + ключ аспекта. */
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.glyph {
+  font-size: 22px;
+  line-height: 1;
+  color: var(--planet-color);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--planet-color) 50%, transparent));
+}
+
+.aspectKey {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--planet-color);
+  text-transform: uppercase;
+}
+
+/* Тело карточки. */
+.cardBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.aspectName {
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  color: #f1f2f5;
+  line-height: 1.25;
+}
+
+.realm {
+  font-size: 13px;
+  line-height: 1.4;
+  color: #c8cad1;
+}
+
+.latin {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #8f929c;
+  font-style: italic;
+  margin-top: auto;
+}
+
+/* Подвал карточки — статус. */
+.cardFoot {
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+}
+
+.activeTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--planet-color);
+  padding: 4px 10px;
+  background: color-mix(in srgb, var(--planet-color) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--planet-color) 45%, transparent);
+  border-radius: 999px;
+}
+
+.statusTag {
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.status_progress { color: var(--planet-color); }
+.status_idle     { color: #8f929c; }
+.status_locked   { color: #5f6169; font-style: italic; }

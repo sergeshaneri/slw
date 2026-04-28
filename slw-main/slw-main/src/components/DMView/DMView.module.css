@@ -1,0 +1,268 @@
+.container {
+  --text: #f1f2f5;
+  --text-soft: #c8cad1;
+  --text-muted: #8f929c;
+  --text-dim: #5f6169;
+  --line: rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.16);
+  --surface: #15161c;
+  --surface-2: #1c1d25;
+  --accent: #b39ddb;
+  --danger: #e57373;
+  color: var(--text);
+  max-width: 960px;
+}
+
+.titleBlock {
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.eyebrow {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.title {
+  font-size: 26px;
+  font-weight: 500;
+  margin: 0 0 6px;
+}
+
+.subline { font-size: 13px; color: var(--text-muted); }
+
+.muted { color: var(--text-muted); font-size: 13px; padding: 8px 0; }
+
+.error {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: rgba(229,115,115,0.08);
+  border: 1px solid rgba(229,115,115,0.3);
+  border-radius: 8px;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.empty {
+  padding: 28px;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+}
+
+/* ── Layout ───────────────────────────────────── */
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  min-height: 480px;
+}
+
+@media (min-width: 720px) {
+  .layout { grid-template-columns: 280px 1fr; }
+}
+
+.sidebar {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.threadsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.threadItem {
+  border-radius: 10px;
+}
+
+.threadItemActive {
+  background: rgba(179,157,219,0.08);
+}
+
+.threadBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+  font: inherit;
+  border-radius: 10px;
+}
+
+.threadBtn:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+.threadAvatar {
+  font-size: 22px;
+  width: 32px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.threadBody { flex: 1; min-width: 0; }
+
+.threadName {
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.threadBadge {
+  background: var(--accent);
+  color: #1a1622;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 1px 6px;
+}
+
+.threadPreview {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+/* ── Thread (right) ───────────────────────────── */
+
+.thread {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.threadHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+
+.threadHeaderAvatar {
+  font-size: 28px;
+  width: 36px;
+  text-align: center;
+}
+
+.threadHeaderName {
+  background: none;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+
+.threadHeaderName:hover { color: var(--accent); }
+
+.messages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.bubble {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 12px;
+  max-width: 70%;
+  align-self: flex-start;
+}
+
+.bubbleMine {
+  align-self: flex-end;
+  background: rgba(179,157,219,0.08);
+  border-color: rgba(179,157,219,0.3);
+}
+
+.bubbleText {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.bubbleTime {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  text-align: right;
+}
+
+.inputRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.input {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+  min-height: 44px;
+}
+
+.input:focus { border-color: var(--accent); }
+
+.btnPrimary {
+  background: var(--accent);
+  border: none;
+  color: #1a1622;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.btnPrimary:disabled { opacity: 0.4; cursor: not-allowed; }

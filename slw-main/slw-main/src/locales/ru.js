@@ -12,6 +12,7 @@ export const ru = {
     coach: '✦ Коуч',
     profile: '☆ Профиль',
     leaderboard: '⚜ Топ',
+    dm: '✉ Сообщения',
     settings: '⚙ Настройки',
   },
   wheel: {

@@ -81,6 +81,33 @@
 
 .topbarInfo { flex: 1; min-width: 0; }
 
+/* Кликабельный вариант — пилюля «текущая планета ▾», ведёт на Карту. */
+.topbarInfoBtn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 6px 10px;
+  margin-left: -10px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: background .15s, border-color .15s;
+}
+
+.topbarInfoBtn:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+.topbarChevron {
+  display: inline-block;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: 4px;
+  transform: translateY(-1px);
+}
+
 .topbarTitle {
   font-weight: 600;
   font-size: 15px;

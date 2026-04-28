@@ -9,6 +9,7 @@ export default function Chat({
   inputVal, setInputVal, currentScript, scripts, resolveScript, onAction, onSend,
   onOpenProfile, onOpenTasks, pendingCount = 0,
   onGoToSurveys, surveyRemaining = 0,
+  onOpenPlanetMap,
   aspectName, planet
 }) {
   // Резолвер из props учитывает level, fallback на текущие scripts.
@@ -40,10 +41,25 @@ export default function Chat({
         <button type="button" className={styles.avatar} onClick={onOpenProfile} aria-label="Профиль">
           <span className={styles.avatarGlyph}>◐</span>
         </button>
-        <div className={styles.topbarInfo}>
-          <div className={styles.topbarTitle}>{planet ?? 'Путешествие'}</div>
-          <div className={styles.topbarSub}>{aspectName}</div>
-        </div>
+        {onOpenPlanetMap ? (
+          <button
+            type="button"
+            className={`${styles.topbarInfo} ${styles.topbarInfoBtn}`}
+            onClick={onOpenPlanetMap}
+            aria-label="Сменить планету"
+            title="Карта планет"
+          >
+            <div className={styles.topbarTitle}>
+              {planet ?? 'Путешествие'} <span className={styles.topbarChevron} aria-hidden="true">▾</span>
+            </div>
+            <div className={styles.topbarSub}>{aspectName}</div>
+          </button>
+        ) : (
+          <div className={styles.topbarInfo}>
+            <div className={styles.topbarTitle}>{planet ?? 'Путешествие'}</div>
+            <div className={styles.topbarSub}>{aspectName}</div>
+          </div>
+        )}
         <div className={styles.topbarStats}>
           {surveyRemaining > 0 && onGoToSurveys && (
             <button
