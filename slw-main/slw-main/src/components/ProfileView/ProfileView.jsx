@@ -5,9 +5,17 @@ import {
   updateMyProfile,
   postInsight,
   deleteInsight,
+  fetchMySubscriptions,
+  fetchMyFollowers,
 } from '../../api/client'
 import ReactorsList from '../PublicProfileView/ReactorsList'
+import Heatmap from '../Heatmap/Heatmap'
 import styles from './ProfileView.module.css'
+
+const AVATAR_OPTIONS = [
+  '🧑', '🧙', '🧝', '🌱', '🌟', '🦊', '🦉', '🐻', '🦁', '🐉',
+  '🌊', '🔥', '⚡', '🌙', '☀', '🌌', '✨', '💎', '🎭', '🎨',
+]
 
 const INSPIRATION_TYPES = [
   ['film', 'Фильм'],
@@ -29,11 +37,16 @@ export default function ProfileView({ onOpenPublicProfile, onOpenSettings }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [savedAt, setSavedAt] = useState(null)
+  const [shareCopied, setShareCopied] = useState(false)
+  const [subsList, setSubsList] = useState([])
+  const [followersList, setFollowersList] = useState([])
+  const [subsTab, setSubsTab] = useState(null) // 'subs' | 'followers' | null
   // id своих инсайтов, для которых раскрыт список реагировавших
   const [reactorsOpen, setReactorsOpen] = useState(() => new Set())
 
   // Локальные черновики
   const [bio, setBio] = useState('')
+  const [avatar, setAvatar] = useState('')
   const [focusAspects, setFocusAspects] = useState([])
   const [interestInput, setInterestInput] = useState('')
   const [interests, setInterests] = useState([])
@@ -51,6 +64,7 @@ export default function ProfileView({ onOpenPublicProfile, onOpenSettings }) {
       .then(p => {
         setProfile(p)
         setBio(p.bio ?? '')
+        setAvatar(p.avatar ?? '')
         setFocusAspects(p.focus_aspects ?? [])
         setInterests(p.interests ?? [])
         setInspirations(p.inspirations ?? [])
@@ -60,6 +74,33 @@ export default function ProfileView({ onOpenPublicProfile, onOpenSettings }) {
       .catch(e => setError(e.message ?? 'Ошибка загрузки профиля'))
       .finally(() => setBusy(false))
   }, [])
+
+  const handleShare = async () => {
+    if (!profile) return
+    const url = `${window.location.origin}${window.location.pathname}?u=${profile.user_id}`
+    try {
+      await navigator.clipboard.writeText(url)
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
+    } catch {
+      // Fallback: показываем prompt
+      window.prompt('Скопируй ссылку:', url)
+    }
+  }
+
+  const openSubsTab = async (which) => {
+    if (subsTab === which) {
+      setSubsTab(null)
+      return
+    }
+    setSubsTab(which)
+    try {
+      if (which === 'subs') setSubsList(await fetchMySubscriptions())
+      else setFollowersList(await fetchMyFollowers())
+    } catch (e) {
+      setError(e.message ?? 'Не удалось загрузить')
+    }
+  }
 
   const toggleFocus = (aspect) => {
     setFocusAspects(prev => {
@@ -109,6 +150,7 @@ export default function ProfileView({ onOpenPublicProfile, onOpenSettings }) {
 
       const updated = await updateMyProfile({
         bio: bio.trim() || null,
+        avatar: avatar || null,
         focus_aspects: focusAspects,
         interests,
         inspirations: cleanedInsp,
@@ -161,12 +203,64 @@ export default function ProfileView({ onOpenPublicProfile, onOpenSettings }) {
   return (
     <div className={styles.container}>
       <div className={styles.titleBlock}>
-        <span className={styles.eyebrow}>Профиль</span>
-        <h1 className={styles.title}>{profile.display_name}</h1>
-        <div className={styles.subline}>
-          XP: {profile.xp}
-          {profile.is_public ? null : ' · 🔒 скрыт от других'}
+        <div className={styles.titleRow}>
+          <div className={styles.avatarBig}>{profile.avatar || '🧑'}</div>
+          <div className={styles.titleText}>
+            <span className={styles.eyebrow}>Профиль</span>
+            <h1 className={styles.title}>{profile.display_name}</h1>
+            <div className={styles.subline}>
+              XP: {profile.xp}
+              {profile.is_public ? null : ' · 🔒 скрыт от других'}
+            </div>
+          </div>
         </div>
+        <div className={styles.subsRow}>
+          <button
+            type="button"
+            className={styles.subsCount}
+            onClick={() => openSubsTab('followers')}
+          >
+            <strong>{profile.followers_count ?? 0}</strong> подписчиков
+          </button>
+          <button
+            type="button"
+            className={styles.subsCount}
+            onClick={() => openSubsTab('subs')}
+          >
+            <strong>{profile.following_count ?? 0}</strong> подписок
+          </button>
+        </div>
+        {subsTab && (
+          <div className={styles.subsListBlock}>
+            {(subsTab === 'subs' ? subsList : followersList).length === 0 ? (
+              <div className={styles.muted}>Пока никого нет.</div>
+            ) : (
+              <ul className={styles.subsList}>
+                {(subsTab === 'subs' ? subsList : followersList).map(u => (
+                  <li key={u.user_id} className={styles.subsItem}>
+                    <span className={styles.subsAvatar}>{u.avatar || '🧑'}</span>
+                    <button
+                      type="button"
+                      className={styles.subsName}
+                      onClick={() => onOpenPublicProfile?.(u.user_id)}
+                    >
+                      {u.display_name}
+                    </button>
+                    {(u.focus_aspects ?? []).slice(0, 2).map(a => (
+                      <span
+                        key={a}
+                        className={styles.subsChip}
+                        style={{ color: ASPECT_COLORS[a], borderColor: `${ASPECT_COLORS[a]}55` }}
+                      >
+                        {a}
+                      </span>
+                    ))}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         <div className={styles.headerActions}>
           <button
             type="button"
@@ -174,6 +268,13 @@ export default function ProfileView({ onOpenPublicProfile, onOpenSettings }) {
             onClick={() => onOpenPublicProfile?.(profile.user_id)}
           >
             Посмотреть как видят другие →
+          </button>
+          <button
+            type="button"
+            className={styles.settingsBtn}
+            onClick={handleShare}
+          >
+            {shareCopied ? '✓ скопировано' : '🔗 поделиться'}
           </button>
           {onOpenSettings && (
             <button
@@ -188,6 +289,32 @@ export default function ProfileView({ onOpenPublicProfile, onOpenSettings }) {
       </div>
 
       {error && <div className={styles.error}>{error}</div>}
+
+      {/* ── Avatar picker ───────────────────────── */}
+      <Section label="Аватар">
+        <div className={styles.avatarPicker}>
+          {AVATAR_OPTIONS.map(emoji => (
+            <button
+              key={emoji}
+              type="button"
+              className={`${styles.avatarOption} ${avatar === emoji ? styles.avatarOptionActive : ''}`}
+              onClick={() => setAvatar(emoji)}
+            >
+              {emoji}
+            </button>
+          ))}
+          {avatar && (
+            <button
+              type="button"
+              className={styles.avatarClear}
+              onClick={() => setAvatar('')}
+              title="Сбросить"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      </Section>
 
       {/* ── Bio ─────────────────────────────────── */}
       <Section label="О себе">
@@ -357,6 +484,11 @@ export default function ProfileView({ onOpenPublicProfile, onOpenSettings }) {
         unlocked={profile.achievements ?? []}
         catalog={profile.achievements_catalog ?? []}
       />
+
+      {/* ── Heatmap активности ──────────────────── */}
+      <Section label="Активность за полгода">
+        <Heatmap userId={profile.user_id} days={180} />
+      </Section>
 
       {/* ── Insights ────────────────────────────── */}
       <Section label="Мои инсайты и рекомендации">

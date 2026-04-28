@@ -56,6 +56,53 @@
   border-bottom: 1px solid var(--line);
 }
 
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.titleText { flex: 1; min-width: 0; }
+
+.avatarBig {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 38px;
+  flex-shrink: 0;
+}
+
+.followBtn {
+  background: var(--accent);
+  border: none;
+  color: #1a1622;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background .15s, opacity .15s;
+}
+
+.followBtn:hover { background: #d6bcfa; }
+
+.followBtnActive {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+
+.followBtnActive:hover {
+  background: rgba(179,157,219,0.1);
+}
+
 .eyebrow {
   display: block;
   font-size: 11px;
@@ -349,6 +396,76 @@
 .reactionEmoji { font-size: 14px; line-height: 1; }
 .reactionCount { font-variant-numeric: tabular-nums; }
 
+/* ── Reaction comment ──────────────────────────────── */
+
+.commentToggle {
+  margin-top: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+.commentToggle:hover { color: var(--accent); }
+
+.myCommentRow {
+  margin-top: 6px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.myCommentText {
+  flex: 1;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--text-soft);
+  background: rgba(179,157,219,0.05);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.commentEdit {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.commentInput {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.commentInput:focus { border-color: var(--accent); }
+
+.commentSave,
+.commentCancel {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.commentSave:hover { color: var(--accent); border-color: var(--accent); }
+.commentCancel:hover { color: var(--danger); border-color: var(--danger); }
+
 /* ── Achievements ─────────────────────────────────────── */
 
 .achievementsRow {
@@ -425,9 +542,40 @@
 
 .reactorItem {
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.reactorItem:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.reactorTopRow {
+  display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.reactorAvatar {
+  font-size: 16px;
+  width: 22px;
+  text-align: center;
+}
+
+.reactorComment {
+  margin-left: 30px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text-soft);
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .reactorEmoji {

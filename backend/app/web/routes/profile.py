@@ -30,6 +30,7 @@ from app.db.models import (
     InsightLike,
     JourneyEvent,
     PublicProfile,
+    Subscription,
     WebAchievement,
     WebScore,
     WebState,
@@ -144,6 +145,7 @@ class InspirationCard(BaseModel):
 
 class ProfileUpdate(BaseModel):
     bio: str | None = Field(default=None, max_length=600)
+    avatar: str | None = Field(default=None, max_length=10)
     focus_aspects: list[str] | None = None
     interests: list[str] | None = None
     inspirations: list[InspirationCard] | None = None
@@ -417,7 +419,9 @@ async def _check_and_grant_achievements(session: AsyncSession, user: WebUser) ->
     if new_codes:
         await session.commit()
 
-    return sorted(have | earned)
+    # Возвращаем кортеж: все коды + только что разблокированные.
+    # Фронт показывает тоаст за newly + начисляет +1 стардаст за каждый.
+    return sorted(have | earned), sorted(new_codes)
 
 
 async def _achievements_payload(session: AsyncSession, codes: list[str]) -> list[dict]:
@@ -462,19 +466,21 @@ async def _reactions_for_insights(
         reactions.setdefault(int(iid), {})[rtype or "heart"] = int(cnt)
 
     my_reaction: dict[int, str | None] = {iid: None for iid in insight_ids}
+    my_comment: dict[int, str | None] = {iid: None for iid in insight_ids}
     if viewer_user is not None:
         my_rows = (
             await session.execute(
-                select(InsightLike.insight_id, InsightLike.reaction)
+                select(InsightLike.insight_id, InsightLike.reaction, InsightLike.comment)
                 .where(
                     InsightLike.insight_id.in_(insight_ids),
                     InsightLike.web_user_id == viewer_user.id,
                 )
             )
         ).all()
-        for iid, rtype in my_rows:
+        for iid, rtype, comment in my_rows:
             my_reaction[int(iid)] = rtype or "heart"
-    return reactions, my_reaction
+            my_comment[int(iid)] = comment
+    return reactions, my_reaction, my_comment
 
 
 async def _profile_payload(
@@ -511,7 +517,7 @@ async def _profile_payload(
     insights_payload = []
     if insights_rows:
         ids = [r.id for r in insights_rows]
-        reactions_map, my_reaction_map = await _reactions_for_insights(
+        reactions_map, my_reaction_map, my_comment_map = await _reactions_for_insights(
             session, ids, viewer_user
         )
         for r in insights_rows:
@@ -525,13 +531,15 @@ async def _profile_payload(
                 "reactions": r_counts,
                 "likes": sum(r_counts.values()),  # back-compat для старого фронта
                 "my_reaction": my_reaction_map.get(r.id),
+                "my_comment": my_comment_map.get(r.id),
                 "liked_by_me": my_reaction_map.get(r.id) is not None,
                 "created_at": r.created_at.isoformat(),
             })
 
     # Ачивки.
+    newly_unlocked: list[str] = []
     if grant_achievements:
-        codes = await _check_and_grant_achievements(session, target_user)
+        codes, newly_unlocked = await _check_and_grant_achievements(session, target_user)
     else:
         codes = sorted((
             await session.execute(
@@ -541,9 +549,38 @@ async def _profile_payload(
         ).scalars().all())
     achievements = await _achievements_payload(session, codes)
 
+    # Подписки.
+    followers_count = int((
+        await session.execute(
+            select(func.count())
+            .select_from(Subscription)
+            .where(Subscription.target_id == target_user.id)
+        )
+    ).scalar_one())
+    following_count = int((
+        await session.execute(
+            select(func.count())
+            .select_from(Subscription)
+            .where(Subscription.follower_id == target_user.id)
+        )
+    ).scalar_one())
+    is_followed_by_me = False
+    if viewer_user is not None and viewer_user.id != target_user.id:
+        existing = (
+            await session.execute(
+                select(Subscription)
+                .where(
+                    Subscription.follower_id == viewer_user.id,
+                    Subscription.target_id == target_user.id,
+                )
+            )
+        ).scalar_one_or_none()
+        is_followed_by_me = existing is not None
+
     return {
         "user_id": target_user.id,
         "display_name": _display_name(target_user),
+        "avatar": (profile.avatar if profile else None),
         "bio": (profile.bio if profile else None),
         "focus_aspects": (profile.focus_aspects if profile else None) or [],
         "interests": (profile.interests if profile else None) or [],
@@ -554,6 +591,10 @@ async def _profile_payload(
         "scores": scores,
         "insights": insights_payload,
         "achievements": achievements,
+        "newly_unlocked": newly_unlocked,
+        "followers_count": followers_count,
+        "following_count": following_count,
+        "is_followed_by_me": is_followed_by_me,
         # Полный каталог — чтобы фронт мог показать «запертые» ачивки.
         "achievements_catalog": [
             {
@@ -596,6 +637,8 @@ async def update_my_profile(
     # PATCH-семантика: апдейтим только то, что прислано (не None).
     if body.bio is not None:
         profile.bio = body.bio.strip()[:600] or None
+    if body.avatar is not None:
+        profile.avatar = body.avatar.strip()[:10] or None
     if body.focus_aspects is not None:
         profile.focus_aspects = _validate_aspects(body.focus_aspects, max_count=3)
     if body.interests is not None:
@@ -654,7 +697,7 @@ async def get_my_insights(
         return []
 
     ids = [r.id for r in rows]
-    reactions_map, _ = await _reactions_for_insights(session, ids, viewer_user=None)
+    reactions_map, _, _ = await _reactions_for_insights(session, ids, viewer_user=None)
     return [
         {
             "id": r.id,
@@ -728,6 +771,7 @@ async def delete_insight(
 
 class ReactionIn(BaseModel):
     reaction: str = "heart"
+    comment: str | None = Field(default=None, max_length=300)
 
 
 @router.post("/profile/insights/{insight_id}/react")
@@ -760,20 +804,31 @@ async def react_to_insight(
         )
     ).scalar_one_or_none()
 
+    cleaned_comment = (body.comment or "").strip()[:300] or None
+
     my_reaction: str | None
+    my_comment: str | None
     if existing is None:
         session.add(InsightLike(
             insight_id=insight_id,
             web_user_id=current_user.id,
             reaction=body.reaction,
+            comment=cleaned_comment,
         ))
         my_reaction = body.reaction
-    elif (existing.reaction or "heart") == body.reaction:
+        my_comment = cleaned_comment
+    elif (existing.reaction or "heart") == body.reaction and body.comment is None:
+        # Toggle off: тот же тип, без коммента → снимаем.
         await session.delete(existing)
         my_reaction = None
+        my_comment = None
     else:
+        # Меняем тип и/или обновляем коммент.
         existing.reaction = body.reaction
+        if body.comment is not None:
+            existing.comment = cleaned_comment
         my_reaction = body.reaction
+        my_comment = existing.comment
     await session.commit()
 
     # Сводка по всем типам.
@@ -787,6 +842,7 @@ async def react_to_insight(
     reactions = {(r or "heart"): int(c) for r, c in rows}
     return {
         "my_reaction": my_reaction,
+        "my_comment": my_comment,
         "reactions": reactions,
         "total": sum(reactions.values()),
     }
@@ -850,7 +906,9 @@ async def get_insight_reactions(
         reactors.append({
             "user_id": user.id,
             "display_name": _display_name(user),
+            "avatar": (pp.avatar if pp else None),
             "reaction": like.reaction or "heart",
+            "comment": like.comment,
             "focus_aspects": (pp.focus_aspects if pp else None) or [],
             "created_at": like.created_at.isoformat(),
         })
@@ -860,4 +918,197 @@ async def get_insight_reactions(
         "reactors": reactors,
         "hidden_count": hidden_count,
         "total": len(reactors) + hidden_count,
+    }
+
+
+# ── Подписки ────────────────────────────────────────────────────────────────
+
+@router.post("/profile/{user_id}/follow")
+async def follow_user(
+    user_id: int,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot follow yourself")
+    target = await session.get(WebUser, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    stmt = pg_insert(Subscription).values(
+        follower_id=current_user.id, target_id=user_id,
+    ).on_conflict_do_nothing(index_elements=["follower_id", "target_id"])
+    await session.execute(stmt)
+    await session.commit()
+
+    followers_count = int((
+        await session.execute(
+            select(func.count())
+            .select_from(Subscription)
+            .where(Subscription.target_id == user_id)
+        )
+    ).scalar_one())
+    return {"following": True, "followers_count": followers_count}
+
+
+@router.delete("/profile/{user_id}/follow")
+async def unfollow_user(
+    user_id: int,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    await session.execute(
+        delete(Subscription).where(
+            Subscription.follower_id == current_user.id,
+            Subscription.target_id == user_id,
+        )
+    )
+    await session.commit()
+    followers_count = int((
+        await session.execute(
+            select(func.count())
+            .select_from(Subscription)
+            .where(Subscription.target_id == user_id)
+        )
+    ).scalar_one())
+    return {"following": False, "followers_count": followers_count}
+
+
+@router.get("/profile/me/subscriptions")
+async def my_subscriptions(
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list:
+    """На кого я подписан."""
+    rows = (
+        await session.execute(
+            select(WebUser, PublicProfile)
+            .join(Subscription, Subscription.target_id == WebUser.id)
+            .outerjoin(PublicProfile, PublicProfile.web_user_id == WebUser.id)
+            .where(Subscription.follower_id == current_user.id)
+            .order_by(Subscription.created_at.desc())
+        )
+    ).all()
+    return [
+        {
+            "user_id": u.id,
+            "display_name": _display_name(u),
+            "avatar": (pp.avatar if pp else None),
+            "focus_aspects": (pp.focus_aspects if pp else None) or [],
+            "is_public": True if pp is None else bool(pp.is_public),
+        }
+        for u, pp in rows
+    ]
+
+
+@router.get("/profile/me/followers")
+async def my_followers(
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list:
+    """Кто на меня подписан. Скрытые юзеры исключаются."""
+    rows = (
+        await session.execute(
+            select(WebUser, PublicProfile)
+            .join(Subscription, Subscription.follower_id == WebUser.id)
+            .outerjoin(PublicProfile, PublicProfile.web_user_id == WebUser.id)
+            .where(Subscription.target_id == current_user.id)
+            .order_by(Subscription.created_at.desc())
+        )
+    ).all()
+    out = []
+    for u, pp in rows:
+        is_public = True if pp is None else bool(pp.is_public)
+        if not is_public:
+            continue
+        out.append({
+            "user_id": u.id,
+            "display_name": _display_name(u),
+            "avatar": (pp.avatar if pp else None),
+            "focus_aspects": (pp.focus_aspects if pp else None) or [],
+        })
+    return out
+
+
+# ── Heatmap активности ──────────────────────────────────────────────────────
+# Возвращает массив [{date: 'YYYY-MM-DD', count: N}] за последние N дней.
+# Источники: journey_events (step_completed), web_diary_entries, aspect_insights.
+# Один день = объединение всех источников; для GitHub-style визуализации.
+
+@router.get("/profile/{user_id}/heatmap")
+async def get_heatmap(
+    user_id: int,
+    days: int = 180,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    days = max(7, min(days, 365))
+    target = await session.get(WebUser, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    profile = await session.get(PublicProfile, user_id)
+    if profile is not None and profile.is_public is False:
+        raise HTTPException(status_code=404, detail="Profile is private")
+
+    from sqlalchemy import or_
+    from app.db.models import WebDiaryEntry
+    from datetime import timedelta
+
+    since = datetime.utcnow() - timedelta(days=days)
+    counts: dict[str, int] = {}
+
+    def add(date_str: str, n: int = 1) -> None:
+        counts[date_str] = counts.get(date_str, 0) + n
+
+    # journey_events: web_user_id или telegram_id
+    je_conds = [JourneyEvent.web_user_id == target.id]
+    if target.telegram_id:
+        je_conds.append(JourneyEvent.telegram_id == target.telegram_id)
+    je_rows = (
+        await session.execute(
+            select(JourneyEvent.created_at)
+            .where(
+                JourneyEvent.type == "step_completed",
+                JourneyEvent.created_at >= since,
+                or_(*je_conds),
+            )
+        )
+    ).all()
+    for (ts,) in je_rows:
+        if ts:
+            add(ts.strftime("%Y-%m-%d"))
+
+    # diary entries
+    diary_rows = (
+        await session.execute(
+            select(WebDiaryEntry.created_at)
+            .where(
+                WebDiaryEntry.web_user_id == target.id,
+                WebDiaryEntry.created_at >= since,
+            )
+        )
+    ).all()
+    for (ts,) in diary_rows:
+        if ts:
+            add(ts.strftime("%Y-%m-%d"))
+
+    # инсайты
+    ins_rows = (
+        await session.execute(
+            select(AspectInsight.created_at)
+            .where(
+                AspectInsight.web_user_id == target.id,
+                AspectInsight.created_at >= since,
+            )
+        )
+    ).all()
+    for (ts,) in ins_rows:
+        if ts:
+            add(ts.strftime("%Y-%m-%d"))
+
+    return {
+        "user_id": user_id,
+        "days": days,
+        "from": since.strftime("%Y-%m-%d"),
+        "to": datetime.utcnow().strftime("%Y-%m-%d"),
+        "data": [{"date": d, "count": c} for d, c in sorted(counts.items())],
     }

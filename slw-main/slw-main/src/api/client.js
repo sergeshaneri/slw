@@ -180,6 +180,38 @@ export async function fetchInsightReactions(id) {
   return request('GET', `/api/profile/insights/${id}/reactions`)
 }
 
+// reaction: 'heart'|'thanks'|'aha'|'fire', опциональный коммент.
+// Семантика toggle: тот же тип без коммента — снимает; передал коммент — обновит.
+export async function reactToInsightWithComment(id, reaction, comment) {
+  const body = { reaction }
+  if (comment !== undefined) body.comment = comment
+  return request('POST', `/api/profile/insights/${id}/react`, body)
+}
+
+// ── Подписки ────────────────────────────────────────────────────────────────
+
+export async function followUser(userId) {
+  return request('POST', `/api/profile/${userId}/follow`)
+}
+
+export async function unfollowUser(userId) {
+  return request('DELETE', `/api/profile/${userId}/follow`)
+}
+
+export async function fetchMySubscriptions() {
+  return request('GET', '/api/profile/me/subscriptions')
+}
+
+export async function fetchMyFollowers() {
+  return request('GET', '/api/profile/me/followers')
+}
+
+// ── Heatmap активности ──────────────────────────────────────────────────────
+
+export async function fetchHeatmap(userId, days = 180) {
+  return request('GET', `/api/profile/${userId}/heatmap?days=${days}`)
+}
+
 export async function reactToInsight(id, reaction = 'heart') {
   return request('POST', `/api/profile/insights/${id}/react`, { reaction })
 }

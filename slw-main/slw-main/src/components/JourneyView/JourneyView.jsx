@@ -48,20 +48,52 @@ import styles from './JourneyView.module.css'
 //     и переименовали несколько шагов (Аудит комфорта → Что меня
 //     окружает, и т.п.), убрали ID-метки из тела скриптов,
 //     перевели «или проговорить» в обязательное «Запиши ответы».
-export const CONTENT_VERSION = 7
+// 8 — per-aspect рефакторинг state. Раньше currentLevel/messages/
+//     currentScriptIndex/currentScriptId/awaitingInput/completedScripts/
+//     pendingTasks были глобальными — теперь живут в state.aspects[aspect].
+//     Это позволяет одному юзеру параллельно идти по БС и БЛ (и далее)
+//     без коллизий. XP/streak/skills/stardust остаются глобальными.
+//     При миграции с v<8 старые «плоские» поля помещаются в активный
+//     аспект; чат сбрасывается (как при любом бампе CONTENT_VERSION).
+export const CONTENT_VERSION = 8
+
+// Дефолтные значения per-aspect папки.
+export const DEFAULT_ASPECT_STATE = {
+  currentLevel: 0,
+  currentScriptIndex: 0,
+  currentScriptId: null,
+  awaitingInput: null,
+  messages: [],
+  completedScripts: [],
+  pendingTasks: [],   // { id, scriptId, aspect, addedAt, status: 'taken' | 'deferred' }
+}
+
+// Безопасное чтение активной папки. Если её нет — отдаёт дефолт
+// (чтобы старые места state.currentLevel и т.п. не падали).
+export function aspectOf(s) {
+  return s.aspects?.[s.currentAspect] ?? DEFAULT_ASPECT_STATE
+}
+
+// Иммутабельный апдейт активной папки. patch может быть объектом
+// (мерджится поверх) или функцией (cur) => next.
+export function updateAspect(s, patch) {
+  const cur = s.aspects?.[s.currentAspect] ?? DEFAULT_ASPECT_STATE
+  const next = typeof patch === 'function' ? patch(cur) : { ...cur, ...patch }
+  return {
+    ...s,
+    aspects: { ...(s.aspects ?? {}), [s.currentAspect]: next },
+  }
+}
 
 export const DEFAULT_JOURNEY = {
   screen: 'onboarding',
   onboardingStep: 0,
   currentAspect: 'БС',
-  currentLevel: 0,
-  messages: [],
-  currentScriptIndex: 0,
-  currentScriptId: null,
-  awaitingInput: null,
-  completedScripts: [],
-  pendingTasks: [],   // { id, scriptId, aspect, addedAt, status: 'taken' | 'deferred' }
-  // Результаты анкет навыков БС.
+  // Per-aspect «папки». Лениво создаются при первом обращении.
+  aspects: {
+    БС: { ...DEFAULT_ASPECT_STATE },
+  },
+  // Результаты анкет навыков (плоско по skillId — навыки уникальны в рамках всех аспектов).
   // skills[skillId] = { result: avg-навыка, blocks: { [blockKey]: avg }, completedAt }
   skills: {},
   // Активная анкета (если открыт screen='survey').
@@ -107,40 +139,94 @@ function migrateSkills(skills) {
   return out
 }
 
-// Миграция при загрузке: если у юзера сохранён старый контент,
-// сбрасываем чат и счётчик скриптов, но сохраняем XP/streak/dust.
-// state.skills сохраняем всегда — анкеты, уже пройденные юзером,
-// потерять было бы нечестно.
+// Нормализует одну per-aspect папку — заполняет недостающие ключи
+// дефолтами. Используется и для актуальной версии (внутри aspects),
+// и для старого «плоского» state при миграции.
+function normalizeAspect(folder) {
+  return {
+    ...DEFAULT_ASPECT_STATE,
+    ...(folder ?? {}),
+    messages: folder?.messages ?? [],
+    completedScripts: folder?.completedScripts ?? [],
+    pendingTasks: folder?.pendingTasks ?? [],
+  }
+}
+
+// Миграция при загрузке. Семантика та же, что была:
+//   • контент-версия совпала → пропускаем state почти как есть (с safety
+//     defaults для пропавших ключей в aspects);
+//   • контент-версия не совпала → сбрасываем чат / completedScripts /
+//     pendingTasks (и заодно currentLevel — как и до v8), сохраняем
+//     XP/streak/stardust/totalCompleted/lastActiveDate/skills/activeSurvey.
 //
-// Старое поле `mode` ('core'|'pool') v5 удаляется из приходящего
-// state — концепция pool ушла в v6, scripts теперь всегда core.
+// Тут же поддерживаем входной «плоский» state (v<8 либо bot-sync override
+// из App.jsx, который в legacy-формате может прислать flat currentLevel
+// и т.п.) — флэты складываем в aspects[currentAspect].
+//
+// Старое поле `mode` ('core'|'pool') v5 удаляется при чтении.
 function migrateState(stored) {
   if (!stored) return DEFAULT_JOURNEY
+
+  const currentAspect = stored.currentAspect ?? 'БС'
+
+  // Собираем aspects: если уже есть — нормализуем каждую папку; плоские
+  // legacy-поля (currentLevel/messages/...) поглощаются в активный аспект.
+  const incomingAspects = stored.aspects ?? {}
+  const flatLegacy = {
+    currentLevel: stored.currentLevel,
+    currentScriptIndex: stored.currentScriptIndex,
+    currentScriptId: stored.currentScriptId,
+    awaitingInput: stored.awaitingInput,
+    messages: stored.messages,
+    completedScripts: stored.completedScripts,
+    pendingTasks: stored.pendingTasks,
+  }
+  const hasFlatLegacy = Object.values(flatLegacy).some(v => v !== undefined)
+
   if (stored.contentVersion === CONTENT_VERSION) {
-    // eslint-disable-next-line no-unused-vars
-    const { mode, ...rest } = stored
+    const aspects = {}
+    for (const [k, v] of Object.entries(incomingAspects)) {
+      aspects[k] = normalizeAspect(v)
+    }
+    if (hasFlatLegacy) {
+      // Bot-sync override может прийти с плоскими полями — поглощаем их
+      // в активный аспект, не затирая то, что уже есть.
+      const cur = aspects[currentAspect] ?? { ...DEFAULT_ASPECT_STATE }
+      aspects[currentAspect] = normalizeAspect({
+        ...cur,
+        ...Object.fromEntries(
+          Object.entries(flatLegacy).filter(([, v]) => v !== undefined)
+        ),
+      })
+    }
+    if (!aspects[currentAspect]) {
+      aspects[currentAspect] = { ...DEFAULT_ASPECT_STATE }
+    }
     return {
       ...DEFAULT_JOURNEY,
-      ...rest,
-      messages: rest.messages ?? [],
-      completedScripts: rest.completedScripts ?? [],
-      pendingTasks: rest.pendingTasks ?? [],
-      skills: migrateSkills(rest.skills),
-      activeSurvey: rest.activeSurvey ?? null
+      ...stored,
+      aspects,
+      currentAspect,
+      skills: migrateSkills(stored.skills),
+      activeSurvey: stored.activeSurvey ?? null,
     }
   }
-  // Контент уровня обновился — сбрасываем сценарий, оставляем достижения и
-  // skills (юзер их прошёл, нечестно сбрасывать). activeSurvey тоже
-  // переносим — юзер с незавершённой анкетой продолжит с того же места.
+
+  // Контент-версия не совпала — сбрасываем папки аспектов до дефолтов
+  // (как делал старый код: messages/completedScripts/pendingTasks/
+  // currentLevel обнулялись). Глобальные поля (XP/streak/skills/etc) —
+  // сохраняем.
   return {
     ...DEFAULT_JOURNEY,
+    currentAspect,
+    aspects: { [currentAspect]: { ...DEFAULT_ASPECT_STATE } },
+    onboardingStep: stored.onboardingStep ?? 0,
+    screen: stored.screen ?? DEFAULT_JOURNEY.screen,
     xp: stored.xp ?? 0,
     stardust: stored.stardust ?? 0,
     streak: stored.streak ?? 0,
     totalCompleted: stored.totalCompleted ?? 0,
     lastActiveDate: stored.lastActiveDate ?? null,
-    completedScripts: [],
-    pendingTasks: [],
     skills: migrateSkills(stored.skills),
     activeSurvey: stored.activeSurvey ?? null,
     contentVersion: CONTENT_VERSION
@@ -185,8 +271,12 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   const chatRef = useRef(null)
   const inputRef = useRef(null)
 
+  // Активная per-aspect папка. Все per-aspect чтения идут через `a`,
+  // все per-aspect записи — через updateAspect(s, ...).
+  const a = aspectOf(state)
+
   const currentJourney = getJourney(state.currentAspect)
-  const currentLevel = currentJourney?.levels?.[state.currentLevel]
+  const currentLevel = currentJourney?.levels?.[a.currentLevel]
   // Linear core-маршрут уровня. Анкеты (currentLevel.surveys) живут
   // отдельно, доступны только через дерево навыков, не из chat-ленты.
   const scripts = currentLevel?.core ?? currentLevel?.scripts ?? []
@@ -198,16 +288,16 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   // уровнями. Дополнительный fallback в surveys целевого уровня —
   // на случай чтения старых state с архивными SURV-сообщениями (v5).
   const resolveScript = useCallback((scriptId, level) => {
-    const lvl = level ?? state.currentLevel
+    const lvl = level ?? a.currentLevel
     const lvlData = currentJourney?.levels?.[lvl]
     const inCore = lvlData?.core?.find(s => s.id === scriptId)
     if (inCore) return inCore
     const inSurveys = lvlData?.surveys?.find(s => s.id === scriptId)
     if (inSurveys) return inSurveys
     return scripts.find(s => s.id === scriptId) ?? null
-  }, [currentJourney, scripts, state.currentLevel])
+  }, [currentJourney, scripts, a.currentLevel])
 
-  const nextLevel = currentJourney?.levels?.[state.currentLevel + 1] ?? null
+  const nextLevel = currentJourney?.levels?.[a.currentLevel + 1] ?? null
 
   // Первый скрол после mount/смены экрана — мгновенный, чтобы юзер
   // сразу видел последние сообщения. Дальше — плавный.
@@ -222,7 +312,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       }, 50)
       return () => clearTimeout(id)
     }
-  }, [state.messages, isTyping, state.screen, state.awaitingInput])
+  }, [a.messages, isTyping, state.screen, a.awaitingInput])
 
   const showToast = useCallback((msg) => {
     setToast(msg)
@@ -233,34 +323,41 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setIsTyping(true)
     setTimeout(() => {
       setIsTyping(false)
-      setState(s => ({
-        ...s,
-        messages: [...s.messages, { id: Date.now() + Math.random(), role: 'bot', text }]
-      }))
+      setState(s => updateAspect(s, cur => ({
+        ...cur,
+        messages: [...cur.messages, { id: Date.now() + Math.random(), role: 'bot', text }]
+      })))
       resolve()
     }, delay)
   }), [setState])
 
   const addUserMessage = useCallback((text) => {
-    setState(s => ({
-      ...s,
-      messages: [...s.messages, { id: Date.now() + Math.random(), role: 'user', text }]
-    }))
+    setState(s => updateAspect(s, cur => ({
+      ...cur,
+      messages: [...cur.messages, { id: Date.now() + Math.random(), role: 'user', text }]
+    })))
   }, [setState])
 
   const awardXP = useCallback((xp, stardust = 0, scriptId = null) => {
     if (xp <= 0 && stardust <= 0) return
-    setState(s => ({
-      ...s,
-      xp: s.xp + xp,
-      stardust: s.stardust + stardust,
-      streak: calcStreak(s),
-      totalCompleted: s.totalCompleted + 1,
-      lastActiveDate: todayStr(),
-      completedScripts: scriptId
-        ? [...s.completedScripts, scriptId]
-        : (s.currentScriptId ? [...s.completedScripts, s.currentScriptId] : s.completedScripts)
-    }))
+    setState(s => {
+      // Глобальные счётчики (XP/streak/...).
+      const globals = {
+        ...s,
+        xp: s.xp + xp,
+        stardust: s.stardust + stardust,
+        streak: calcStreak(s),
+        totalCompleted: s.totalCompleted + 1,
+        lastActiveDate: todayStr(),
+      }
+      // Per-aspect: completedScripts.
+      return updateAspect(globals, cur => ({
+        ...cur,
+        completedScripts: scriptId
+          ? [...cur.completedScripts, scriptId]
+          : (cur.currentScriptId ? [...cur.completedScripts, cur.currentScriptId] : cur.completedScripts)
+      }))
+    })
     const parts = []
     if (xp > 0) parts.push(`+${xp} XP`)
     if (stardust > 0) parts.push(`+${stardust} ✦`)
@@ -270,21 +367,21 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   const deliverScript = useCallback((index) => {
     const script = scripts[index]
     if (!script) {
-      setState(s => ({ ...s, screen: 'levelcomplete', awaitingInput: null }))
+      setState(s => updateAspect({ ...s, screen: 'levelcomplete' }, cur => ({ ...cur, awaitingInput: null })))
       return
     }
-    setState(s => ({
-      ...s,
+    setState(s => updateAspect(s, cur => ({
+      ...cur,
       currentScriptIndex: index,
       currentScriptId: script.id,
       awaitingInput: null,
       // Архивируем скрипт в историю чата с level — чтобы lookup всегда
       // находил правильный текст, даже если ID совпадают между уровнями.
       messages: [
-        ...s.messages,
-        { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: script.id, level: s.currentLevel }
+        ...cur.messages,
+        { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: script.id, level: cur.currentLevel }
       ]
-    }))
+    })))
   }, [scripts, setState])
 
   // ─── Онбординг ───────────────────────────────────────────────

@@ -178,6 +178,41 @@ async def apply_ddl() -> None:
             "but bot+web are up): %s", e
         )
 
+    # Аватар на профиле + коммент к реакции + таблица подписок.
+    try:
+        async with asyncio.timeout(15):
+            async with engine.connect() as conn:
+                await conn.execute(text(
+                    "ALTER TABLE public_profiles "
+                    "ADD COLUMN IF NOT EXISTS avatar TEXT"
+                ))
+                await conn.execute(text(
+                    "ALTER TABLE insight_likes "
+                    "ADD COLUMN IF NOT EXISTS comment TEXT"
+                ))
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS subscriptions (
+                        follower_id  INTEGER NOT NULL,
+                        target_id    INTEGER NOT NULL,
+                        created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (follower_id, target_id)
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS subscriptions_follower_idx "
+                    "ON subscriptions (follower_id)"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS subscriptions_target_idx "
+                    "ON subscriptions (target_id)"
+                ))
+                await conn.commit()
+    except Exception as e:
+        log.warning(
+            "avatar/comment/subscriptions DDL failed (features limited, "
+            "but bot+web are up): %s", e
+        )
+
     await engine.dispose()
 
 

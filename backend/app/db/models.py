@@ -200,6 +200,9 @@ class PublicProfile(Base):
         Integer, ForeignKey("web_users.id"), primary_key=True
     )
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Эмодзи-аватар (выбор из набора во фронте). Полноценные изображения —
+    # позже, через S3/Cloudinary. Сейчас храним просто строку.
+    avatar: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Список аспектов (1-3) на которых юзер сейчас фокусируется.
     # Например ["БС", "ЧИ"]. Валидация на стороне роута.
     focus_aspects: Mapped[list | None] = mapped_column(JSONB, nullable=True)
@@ -256,6 +259,8 @@ class InsightLike(Base):
     reaction: Mapped[str] = mapped_column(
         Text, nullable=False, default="heart", server_default="heart"
     )
+    # Опциональный коммент к реакции. Видим в списке реакторов.
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
 
 
@@ -270,3 +275,19 @@ class WebAchievement(Base):
     )
     code: Mapped[str] = mapped_column(Text, primary_key=True)
     unlocked_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class Subscription(Base):
+    """Подписка одного web-юзера на другого.
+    follower_id — кто подписался. target_id — на кого.
+    PK по (follower_id, target_id), один follow от юзера на юзера.
+    """
+    __tablename__ = "subscriptions"
+
+    follower_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("web_users.id"), primary_key=True
+    )
+    target_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("web_users.id"), primary_key=True
+    )
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)

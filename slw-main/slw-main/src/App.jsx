@@ -10,6 +10,8 @@ import ProfileView from './components/ProfileView/ProfileView'
 import PublicProfileView from './components/PublicProfileView/PublicProfileView'
 import LeaderboardView from './components/LeaderboardView/LeaderboardView'
 import SettingsView from './components/SettingsView/SettingsView'
+import AchievementToast from './components/Toast/AchievementToast'
+import { fetchMyProfile } from './api/client'
 import LoadingScreen from './components/LoadingScreen/LoadingScreen'
 import AuthModal from './components/Auth/AuthModal'
 import WelcomeScreen from './components/Welcome/WelcomeScreen'
@@ -60,6 +62,8 @@ export default function App() {
   const [selectedAspect, setSelectedAspect] = useState(null)
   // Чей публичный профиль смотрим (id WebUser). null — не открыт.
   const [viewingProfileId, setViewingProfileId] = useState(null)
+  // Очередь тостов (новые ачивки и т.п.). Каждый { id, icon, title, desc, kind, stardust }.
+  const [toasts, setToasts] = useState([])
   const [dataLoading, setDataLoading] = useState(false)
   const [showAuth, setShowAuth] = useState(false)
   // welcomeDismissed: гость нажал «Начать бесплатно» и вошёл в приложение
@@ -332,6 +336,65 @@ export default function App() {
     setView('public-profile')
   }
 
+  const dismissToast = (id) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }
+
+  // При логине проверяем разблокированные ачивки. /api/profile/me грантит
+  // и возвращает newly_unlocked — ставим тосты и +1 стардаст за каждую.
+  // Хук срабатывает только когда user стал не-null (loadFromApi уже отработал).
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    fetchMyProfile()
+      .then(p => {
+        if (cancelled) return
+        const newCodes = p.newly_unlocked ?? []
+        if (newCodes.length === 0) return
+        const catalog = new Map((p.achievements_catalog ?? []).map(a => [a.code, a]))
+        const newToasts = newCodes.map(code => {
+          const meta = catalog.get(code) || { title: code, icon: '✨', desc: '' }
+          return {
+            id: `ach-${code}-${Date.now()}`,
+            kind: 'achievement',
+            icon: meta.icon,
+            title: meta.title,
+            desc: meta.desc,
+            stardust: 1,
+          }
+        })
+        setToasts(prev => [...prev, ...newToasts])
+        // +1 стардаст за каждую новую ачивку. Списываем во фронтовый journey
+        // и пушим назад в state. Trust-based, как и всё со стардастом сейчас.
+        const grant = newCodes.length
+        if (grant > 0) {
+          setJourney(j => {
+            const updated = { ...j, stardust: (j?.stardust ?? 0) + grant }
+            saveState({ journey: updated }).catch(() => {})
+            return updated
+          })
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
+
+  // ?u=<id> в URL → открываем публичный профиль (deeplink с шеринга).
+  // Один раз при маунте: если параметр есть, переключаемся на view.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const u = params.get('u')
+    if (u && /^\d+$/.test(u)) {
+      setViewingProfileId(parseInt(u, 10))
+      setView('public-profile')
+      // Убираем из URL чтобы reload не зацикливал.
+      const url = new URL(window.location.href)
+      url.searchParams.delete('u')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [])
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   // Пока useAuth проверяет токен — короткий лоадер, чтобы не моргало.
@@ -355,6 +418,7 @@ export default function App() {
 
   return (
     <div className={styles.app}>
+      <AchievementToast items={toasts} onDismiss={dismissToast} />
       <Header
         view={view}
         onViewChange={handleViewChange}

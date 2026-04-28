@@ -44,25 +44,31 @@ export default function ReactorsList({ insightId, open, onOpenProfile }) {
         <ul className={styles.reactorsList}>
           {data.reactors.map(r => (
             <li key={`${r.user_id}-${r.created_at}`} className={styles.reactorItem}>
-              <span className={styles.reactorEmoji}>
-                {REACTION_EMOJI[r.reaction] ?? '♥'}
-              </span>
-              <button
-                type="button"
-                className={styles.reactorName}
-                onClick={() => onOpenProfile?.(r.user_id)}
-              >
-                {r.display_name}
-              </button>
-              {(r.focus_aspects ?? []).slice(0, 2).map(a => (
-                <span
-                  key={a}
-                  className={styles.reactorAspect}
-                  style={{ color: ASPECT_COLORS[a], borderColor: `${ASPECT_COLORS[a]}55` }}
-                >
-                  {a}
+              <div className={styles.reactorTopRow}>
+                <span className={styles.reactorAvatar}>{r.avatar || '🧑'}</span>
+                <span className={styles.reactorEmoji}>
+                  {REACTION_EMOJI[r.reaction] ?? '♥'}
                 </span>
-              ))}
+                <button
+                  type="button"
+                  className={styles.reactorName}
+                  onClick={() => onOpenProfile?.(r.user_id)}
+                >
+                  {r.display_name}
+                </button>
+                {(r.focus_aspects ?? []).slice(0, 2).map(a => (
+                  <span
+                    key={a}
+                    className={styles.reactorAspect}
+                    style={{ color: ASPECT_COLORS[a], borderColor: `${ASPECT_COLORS[a]}55` }}
+                  >
+                    {a}
+                  </span>
+                ))}
+              </div>
+              {r.comment && (
+                <div className={styles.reactorComment}>{r.comment}</div>
+              )}
             </li>
           ))}
         </ul>

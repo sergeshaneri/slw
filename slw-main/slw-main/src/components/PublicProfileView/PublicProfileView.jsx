@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
-import { fetchPublicProfile, reactToInsight, fetchInsightReactions } from '../../api/client'
+import {
+  fetchPublicProfile,
+  reactToInsightWithComment,
+  followUser,
+  unfollowUser,
+} from '../../api/client'
 import ReactorsList from './ReactorsList'
+import Heatmap from '../Heatmap/Heatmap'
 import styles from './PublicProfileView.module.css'
 
 const KIND_LABEL = {
@@ -46,9 +52,10 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
       .finally(() => setBusy(false))
   }, [userId])
 
-  const handleReact = async (insightId, reaction) => {
+  const handleReact = async (insightId, reaction, comment) => {
     try {
-      const { my_reaction, reactions, total } = await reactToInsight(insightId, reaction)
+      const { my_reaction, my_comment, reactions, total } =
+        await reactToInsightWithComment(insightId, reaction, comment)
       setProfile(p => ({
         ...p,
         insights: (p.insights ?? []).map(i =>
@@ -56,6 +63,7 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
             ? {
                 ...i,
                 my_reaction,
+                my_comment,
                 liked_by_me: my_reaction !== null,
                 reactions,
                 likes: total,
@@ -65,6 +73,16 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
       }))
     } catch (e) {
       setError(e.message ?? 'Не удалось поставить реакцию')
+    }
+  }
+
+  const handleFollow = async () => {
+    try {
+      const fn = profile?.is_followed_by_me ? unfollowUser : followUser
+      const { following, followers_count } = await fn(profile.user_id)
+      setProfile(p => ({ ...p, is_followed_by_me: following, followers_count }))
+    } catch (e) {
+      setError(e.message ?? 'Не удалось изменить подписку')
     }
   }
 
@@ -91,26 +109,41 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
       <BackBtn onBack={onBack} />
 
       <div className={styles.titleBlock}>
-        <span className={styles.eyebrow}>Профиль</span>
-        <h1 className={styles.title}>
-          {profile.display_name}
-          {isMe && <span className={styles.youBadge}>ты</span>}
-        </h1>
-        <div className={styles.statsRow}>
-          <span><strong>{profile.xp}</strong> XP</span>
-          {(profile.focus_aspects ?? []).length > 0 && (
-            <span className={styles.focusList}>
-              · развивает:
-              {profile.focus_aspects.map(a => (
-                <span
-                  key={a}
-                  className={styles.focusChip}
-                  style={{ color: ASPECT_COLORS[a], borderColor: `${ASPECT_COLORS[a]}55` }}
-                >
-                  {a}
+        <div className={styles.titleRow}>
+          <div className={styles.avatarBig}>{profile.avatar || '🧑'}</div>
+          <div className={styles.titleText}>
+            <span className={styles.eyebrow}>Профиль</span>
+            <h1 className={styles.title}>
+              {profile.display_name}
+              {isMe && <span className={styles.youBadge}>ты</span>}
+            </h1>
+            <div className={styles.statsRow}>
+              <span><strong>{profile.xp}</strong> XP</span>
+              <span>· <strong>{profile.followers_count ?? 0}</strong> подписчиков</span>
+              {(profile.focus_aspects ?? []).length > 0 && (
+                <span className={styles.focusList}>
+                  · развивает:
+                  {profile.focus_aspects.map(a => (
+                    <span
+                      key={a}
+                      className={styles.focusChip}
+                      style={{ color: ASPECT_COLORS[a], borderColor: `${ASPECT_COLORS[a]}55` }}
+                    >
+                      {a}
+                    </span>
+                  ))}
                 </span>
-              ))}
-            </span>
+              )}
+            </div>
+          </div>
+          {!isMe && currentUserId != null && (
+            <button
+              type="button"
+              className={`${styles.followBtn} ${profile.is_followed_by_me ? styles.followBtnActive : ''}`}
+              onClick={handleFollow}
+            >
+              {profile.is_followed_by_me ? '✓ Подписан' : '+ Подписаться'}
+            </button>
           )}
         </div>
       </div>
@@ -181,6 +214,10 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
         </Section>
       )}
 
+      <Section label="Активность за полгода">
+        <Heatmap userId={profile.user_id} days={180} />
+      </Section>
+
       {sortedScores.length > 0 && (
         <Section label="Оценки по аспектам">
           <div className={styles.scoresList}>
@@ -241,6 +278,12 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
                     )
                   })}
                 </div>
+                {!isMe && ins.my_reaction && (
+                  <ReactionCommentInput
+                    initial={ins.my_comment ?? ''}
+                    onSave={(comment) => handleReact(ins.id, ins.my_reaction, comment)}
+                  />
+                )}
                 {(() => {
                   const total = ins.likes ?? Object.values(ins.reactions ?? {}).reduce((a, b) => a + b, 0)
                   if (total === 0) return null
@@ -302,5 +345,83 @@ function BackBtn({ onBack }) {
     <button type="button" className={styles.backBtn} onClick={onBack}>
       ← Назад
     </button>
+  )
+}
+
+/**
+ * Inline-инпут для коммента к реакции. Появляется когда юзер уже поставил
+ * реакцию на инсайт. По нажатию «Сохранить» обновляет коммент через
+ * существующий react-эндпоинт (тот же reaction + новый comment).
+ */
+function ReactionCommentInput({ initial, onSave }) {
+  const [text, setText] = useState(initial)
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => { setText(initial) }, [initial])
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSave(text.trim())
+    } finally {
+      setSaving(false)
+      setEditing(false)
+    }
+  }
+
+  if (!editing && !initial) {
+    return (
+      <button
+        type="button"
+        className={styles.commentToggle}
+        onClick={() => setEditing(true)}
+      >
+        ✎ добавить коммент к реакции
+      </button>
+    )
+  }
+
+  if (!editing && initial) {
+    return (
+      <div className={styles.myCommentRow}>
+        <span className={styles.myCommentText}>{initial}</span>
+        <button
+          type="button"
+          className={styles.commentToggle}
+          onClick={() => setEditing(true)}
+        >
+          ✎ изменить
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className={styles.commentEdit}>
+      <input
+        type="text"
+        className={styles.commentInput}
+        value={text}
+        onChange={e => setText(e.target.value)}
+        placeholder="Коротко скажи почему откликнулось…"
+        maxLength={300}
+      />
+      <button
+        type="button"
+        className={styles.commentSave}
+        onClick={handleSave}
+        disabled={saving}
+      >
+        {saving ? '…' : '✓'}
+      </button>
+      <button
+        type="button"
+        className={styles.commentCancel}
+        onClick={() => { setText(initial); setEditing(false) }}
+      >
+        ×
+      </button>
+    </div>
   )
 }
