@@ -30,6 +30,11 @@ from app.bot.handlers.start import cmd_start
 from app.config import settings
 
 logging.basicConfig(level=logging.INFO)
+# Глушим INFO-спам от httpx (каждый getUpdates бота → строка лога ~раз
+# в 5 сек) и telegram-stack-а. WARNING/ERROR сквозь себя пропускают.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("telegram.ext.Updater").setLevel(logging.WARNING)
 log = logging.getLogger(__name__)
 
 BTN_PROFILE  = filters.Regex(r"^Профиль$")
