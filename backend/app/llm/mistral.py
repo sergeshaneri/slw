@@ -28,6 +28,8 @@ class MistralClient:
         self._client = AsyncOpenAI(
             api_key=settings.mistral_api_key,
             base_url=_BASE_URL,
+            timeout=120,
+            max_retries=1,
         )
 
     async def complete(self, system: str, user: str, max_tokens: int = 1024) -> LLMResponse:
@@ -41,7 +43,11 @@ class MistralClient:
                 ],
             )
         except Exception as exc:
-            logger.error(f"Mistral API error (model={settings.llm_model}): {type(exc).__name__}: {exc}")
+            import traceback
+            logger.error(
+                f"Mistral API error (model={settings.llm_model}): {type(exc).__name__}: {exc}\n"
+                f"{traceback.format_exc()}"
+            )
             raise
         choice = resp.choices[0].message.content or ""
         usage = resp.usage
