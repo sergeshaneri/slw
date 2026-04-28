@@ -496,8 +496,10 @@ export default function App() {
         onViewChange={handleViewChange}
         journeyPendingCount={journey?.aspects?.[journey?.currentAspect]?.pendingTasks?.length ?? 0}
         user={user}
+        userAvatar={journey?.avatar}
         onLogin={() => setShowAuth(true)}
         onLogout={logout}
+        onOpenMyProfile={() => handleViewChange('profile')}
         onOpenProfile={openPublicProfile}
         onOpenDM={openDM}
         onOpenHall={enterHall}
@@ -529,7 +531,9 @@ export default function App() {
             onOpenCoach={() => handleViewChange('coach')}
             onOpenHall={enterHall}
             onOpenProfile={openPublicProfile}
+            onOpenMyProfile={() => handleViewChange('profile')}
             onOpenDM={openDM}
+            onOpenDMList={() => openDM(null)}
             onOpenLeaderboard={() => handleViewChange('leaderboard')}
           />
         )}
