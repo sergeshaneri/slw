@@ -218,3 +218,49 @@
 
   .authBlock { margin-left: 0; }
 }
+
+/* ── Кликабельный аватар справа ─────────────── */
+.avatarBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  padding: 4px 12px 4px 4px;
+  cursor: pointer;
+  font: inherit;
+  color: #f1f2f5;
+  transition: border-color .15s, background .15s;
+}
+
+.avatarBtn:hover {
+  border-color: rgba(179,157,219,0.5);
+  background: rgba(179,157,219,0.06);
+}
+
+.avatarEmoji {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.avatarName {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+@media (max-width: 720px) {
+  .avatarName { display: none; }
+  .avatarBtn { padding: 4px; }
+}

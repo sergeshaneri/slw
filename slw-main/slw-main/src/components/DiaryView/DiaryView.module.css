@@ -35,6 +35,43 @@
   color: var(--text);
 }
 
+.tabRow {
+  display: inline-flex;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tabBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color .15s, background .15s;
+}
+
+.tabBtn:hover:not(.tabBtnActive) {
+  color: var(--text-soft);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tabBtnActive {
+  background: linear-gradient(135deg, rgba(157, 78, 221, 0.85) 0%, rgba(76, 201, 240, 0.55) 100%);
+  color: #ffffff;
+  box-shadow:
+    0 0 0 1px rgba(199, 125, 255, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
 /* ── Форма новой записи ───────────────────────────────── */
 
 .newEntry {

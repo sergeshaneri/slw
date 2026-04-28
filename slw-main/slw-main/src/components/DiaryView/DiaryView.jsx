@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
 import { SURVEY_BLOCKS } from '../../data/journey/skills'
+import SearchView from '../SearchView/SearchView'
 import styles from './DiaryView.module.css'
 
 const SOURCE_LABEL = {
@@ -12,10 +13,13 @@ const SOURCE_LABEL = {
   coach: 'от ИИ-коуча',
 }
 
-export default function DiaryView({ diary, onDiaryChange, t }) {
+export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user }) {
   const [text, setText] = useState('')
   const [aspect, setAspect] = useState('general')
   const [filter, setFilter] = useState('all')
+  // Вкладки внутри страницы: «entries» (записи) / «search» (поиск).
+  // Поиск работает только для залогиненных юзеров (запрос идёт на бэк).
+  const [mode, setMode] = useState('entries')
 
   const handleAdd = () => {
     if (!text.trim()) return
@@ -42,8 +46,32 @@ export default function DiaryView({ diary, onDiaryChange, t }) {
       <div className={styles.titleBlock}>
         <span className={styles.eyebrow}>Дневник</span>
         <h1 className={styles.title}>{t.diary.title}</h1>
+        {user && (
+          <div className={styles.tabRow}>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${mode === 'entries' ? styles.tabBtnActive : ''}`}
+              onClick={() => setMode('entries')}
+            >
+              Записи
+            </button>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${mode === 'search' ? styles.tabBtnActive : ''}`}
+              onClick={() => setMode('search')}
+            >
+              🔍 Поиск
+            </button>
+          </div>
+        )}
       </div>
 
+      {mode === 'search' && user && (
+        <SearchView onOpenProfile={onOpenProfile} />
+      )}
+
+      {mode === 'entries' && (
+      <>
       <div className={styles.newEntry}>
         <div className={styles.entryHeader}>
           <select
@@ -95,6 +123,8 @@ export default function DiaryView({ diary, onDiaryChange, t }) {
           <div className={styles.noEntries}>{t.diary.noEntries}</div>
         )}
       </div>
+      </>
+      )}
     </div>
   )
 }

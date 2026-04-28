@@ -600,6 +600,8 @@ export default function App() {
             diary={diary}
             onDiaryChange={saveDiary}
             t={t}
+            user={user}
+            onOpenProfile={openPublicProfile}
           />
         )}
 
@@ -629,11 +631,7 @@ export default function App() {
           />
         )}
 
-        {view === 'search' && user && (
-          <SearchView onOpenProfile={openPublicProfile} />
-        )}
-
-        {view === 'public-profile' && viewingProfileId && (
+{view === 'public-profile' && viewingProfileId && (
           <PublicProfileView
             userId={viewingProfileId}
             currentUserId={user?.id}

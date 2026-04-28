@@ -6,8 +6,10 @@ export default function Header({
   onViewChange,
   journeyPendingCount = 0,
   user,
+  userAvatar,
   onLogin,
   onLogout,
+  onOpenMyProfile,
   t,
   onOpenProfile,
   onOpenDM,
@@ -23,13 +25,10 @@ export default function Header({
     { id: 'progress', label: t.nav.progress },
     // Топ публичный (без auth) — виден всем.
     { id: 'leaderboard', label: t.nav.leaderboard },
-    // Коуч и Профиль гейтятся в App.jsx:handleViewChange — без логина
-    // откроется AuthModal.
+    // Коуч гейтится в App.jsx:handleViewChange — без логина откроется AuthModal.
     { id: 'coach', label: t.nav.coach },
-    ...(user ? [{ id: 'dm', label: t.nav.dm }] : []),
-    ...(user ? [{ id: 'search', label: t.nav.search }] : []),
-    // Настройки переехали внутрь страницы Профиля.
-    ...(user ? [{ id: 'profile', label: t.nav.profile }] : []),
+    // Сообщения и Профиль вынесены на дашборд (карточки) +
+    // профиль доступен по клику на аватар справа.
   ]
 
   return (
@@ -73,13 +72,26 @@ export default function Header({
                 + email
               </button>
             )}
+            {onOpenMyProfile && (
+              <button
+                type="button"
+                onClick={onOpenMyProfile}
+                className={styles.avatarBtn}
+                title="Мой профиль"
+              >
+                <span className={styles.avatarEmoji}>{userAvatar || '🧑'}</span>
+                <span className={styles.avatarName}>
+                  {user.telegram_first_name || user.email?.split('@')[0] || 'Профиль'}
+                </span>
+              </button>
+            )}
             <button
               type="button"
               onClick={onLogout}
               className={styles.authBtn}
-              title={user.email ?? user.telegram_first_name ?? 'Профиль'}
+              title="Выйти"
             >
-              {user.telegram_first_name || user.email?.split('@')[0] || 'Профиль'} · выйти
+              выйти
             </button>
           </>
         ) : (

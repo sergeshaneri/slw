@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import (
     AspectInsight,
     CoachCall,
+    DirectMessage,
     HabitTick,
     InsightLike,
     JourneyEvent,
@@ -502,6 +503,18 @@ async def get_dashboard(
         ],
     }
 
+    # Непрочитанные ЛС — для бейджа на карточке "Сообщения".
+    dm_unread = int((
+        await session.execute(
+            select(func.count())
+            .select_from(DirectMessage)
+            .where(
+                DirectMessage.recipient_id == current_user.id,
+                DirectMessage.read_at.is_(None),
+            )
+        )
+    ).scalar_one())
+
     # Лента подписок ИЛИ топ-авторы.
     feed = await _subs_feed(session, current_user, limit=5)
     suggested = await _suggested_authors(session, current_user, limit=5) if not feed else []
@@ -528,6 +541,7 @@ async def get_dashboard(
         "level_progress": level_progress,
         "coach": coach_payload,
         "notifications": notif_payload,
+        "dm_unread_count": dm_unread,
         "subs_feed": feed,
         "suggested_authors": suggested,
         "heatmap_30d": heatmap,

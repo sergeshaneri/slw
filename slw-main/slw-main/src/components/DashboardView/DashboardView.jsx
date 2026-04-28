@@ -32,7 +32,9 @@ export default function DashboardView({
   onOpenCoach,
   onOpenHall,
   onOpenProfile,
+  onOpenMyProfile,
   onOpenDM,
+  onOpenDMList,
   onOpenLeaderboard,
 }) {
   const [data, setData] = useState(null)
@@ -173,6 +175,49 @@ export default function DashboardView({
             </div>
             <button type="button" className={styles.btnPrimary} onClick={onOpenAspects}>
               → К аспектам
+            </button>
+          </div>
+        </Section>
+
+        {/* ── Личное: профиль + сообщения ───────── */}
+        <Section label="✦ Я" className={styles.spanFull}>
+          <div className={styles.personalRow}>
+            <button
+              type="button"
+              className={styles.personalCard}
+              onClick={onOpenMyProfile}
+            >
+              <span className={styles.personalIcon}>{data.user.avatar || '🧑'}</span>
+              <div className={styles.personalBody}>
+                <div className={styles.personalTitle}>Мой профиль</div>
+                <div className={styles.muted}>
+                  {data.user.display_name}
+                  {(data.user.focus_aspects ?? []).length > 0 && ' · ' + data.user.focus_aspects.join(', ')}
+                </div>
+              </div>
+              <span className={styles.personalArrow}>→</span>
+            </button>
+
+            <button
+              type="button"
+              className={styles.personalCard}
+              onClick={() => onOpenDMList?.()}
+            >
+              <span className={styles.personalIcon}>✉</span>
+              <div className={styles.personalBody}>
+                <div className={styles.personalTitle}>
+                  Сообщения
+                  {data.dm_unread_count > 0 && (
+                    <span className={styles.dmBadge}>{data.dm_unread_count}</span>
+                  )}
+                </div>
+                <div className={styles.muted}>
+                  {data.dm_unread_count > 0
+                    ? `${data.dm_unread_count} непрочитанных`
+                    : 'Личные диалоги'}
+                </div>
+              </div>
+              <span className={styles.personalArrow}>→</span>
             </button>
           </div>
         </Section>
