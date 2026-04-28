@@ -296,6 +296,34 @@ async def apply_ddl() -> None:
             "notifications/dm/habits DDL failed: %s", e
         )
 
+    # Серверный стрик + выбранные привычки.
+    try:
+        async with asyncio.timeout(15):
+            async with engine.connect() as conn:
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS user_streaks (
+                        web_user_id      INTEGER PRIMARY KEY,
+                        current          INTEGER NOT NULL DEFAULT 0,
+                        longest          INTEGER NOT NULL DEFAULT 0,
+                        last_active_date TEXT,
+                        shield_until     TEXT,
+                        updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """))
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS user_habits (
+                        web_user_id  INTEGER NOT NULL,
+                        aspect       TEXT NOT NULL,
+                        title        TEXT NOT NULL,
+                        exercise_id  TEXT,
+                        started_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (web_user_id, aspect)
+                    )
+                """))
+                await conn.commit()
+    except Exception as e:
+        log.warning("user_streaks/user_habits DDL failed: %s", e)
+
     await engine.dispose()
 
 

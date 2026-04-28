@@ -197,6 +197,83 @@
   border-color: var(--danger);
 }
 
+/* ── Streak ───────────────────────────────────── */
+
+.streakRow {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.streakBig {
+  font-size: 36px;
+  font-weight: 600;
+  color: var(--accent);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.streakUnit {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.streakMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+/* ── Habits list ──────────────────────────────── */
+
+.habitsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.habitItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.habitAspect {
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+  width: 28px;
+}
+
+.habitTitle {
+  flex: 1;
+  color: var(--text);
+}
+
+.habitDot {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.habitDotDone {
+  color: var(--accent);
+}
+
 .linkBtn {
   background: none;
   border: none;

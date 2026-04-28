@@ -39,6 +39,7 @@ from app.db.models import (
 from app.db.session import get_session
 from app.web.deps import get_current_user
 from app.web.notify import notify
+from app.web.streak import bump_streak
 
 router = APIRouter()
 
@@ -258,12 +259,16 @@ async def _xp(session: AsyncSession, user: WebUser) -> int:
 
 
 async def _streak(session: AsyncSession, user: WebUser) -> int:
-    """Стрик: бот-тир приоритетнее, fallback на journey-state."""
+    """Стрик: серверный UserStreak в приоритете, fallback на бот-тир и journey."""
+    from app.db.models import UserStreak
+    row = await session.get(UserStreak, user.id)
+    if row and row.current:
+        return int(row.current)
     if user.telegram_id:
         from app.db.models import UserState
-        row = await session.get(UserState, user.telegram_id)
-        if row and row.streak_days:
-            return int(row.streak_days)
+        bot_row = await session.get(UserState, user.telegram_id)
+        if bot_row and bot_row.streak_days:
+            return int(bot_row.streak_days)
     state = await session.get(WebState, user.id)
     if state and isinstance(state.journey, dict):
         s = state.journey.get("streak") or state.journey.get("streakDays")
@@ -738,6 +743,7 @@ async def post_insight(
         is_public=body.is_public,
     )
     session.add(insight)
+    await bump_streak(session, current_user.id)
     await session.commit()
     await session.refresh(insight)
     return {
@@ -849,6 +855,7 @@ async def react_to_insight(
             },
             skip_if_self=current_user.id,
         )
+    await bump_streak(session, current_user.id)
     await session.commit()
 
     # Сводка по всем типам.
@@ -1082,7 +1089,7 @@ async def get_heatmap(
         raise HTTPException(status_code=404, detail="Profile is private")
 
     from sqlalchemy import or_
-    from app.db.models import WebDiaryEntry
+    from app.db.models import HabitTick, WebDiaryEntry
     from datetime import timedelta
 
     since = datetime.utcnow() - timedelta(days=days)
@@ -1136,6 +1143,21 @@ async def get_heatmap(
     for (ts,) in ins_rows:
         if ts:
             add(ts.strftime("%Y-%m-%d"))
+
+    # тики практик — самый сильный сигнал ежедневной активности
+    since_str = since.strftime("%Y-%m-%d")
+    tick_rows = (
+        await session.execute(
+            select(HabitTick.date)
+            .where(
+                HabitTick.web_user_id == target.id,
+                HabitTick.date >= since_str,
+            )
+        )
+    ).scalars().all()
+    for d in tick_rows:
+        if d:
+            add(d)
 
     return {
         "user_id": user_id,

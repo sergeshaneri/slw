@@ -26,6 +26,7 @@ from app.db.models import (
 )
 from app.db.session import get_session
 from app.web.deps import get_current_user
+from app.web.streak import bump_streak
 
 router = APIRouter()
 
@@ -241,6 +242,7 @@ async def send_message(
         },
     ))
 
+    await bump_streak(session, current_user.id)
     await session.commit()
     await session.refresh(msg)
     return {

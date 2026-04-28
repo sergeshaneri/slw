@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import DiaryEntry, WebDiaryEntry, WebUser
 from app.db.session import get_session
 from app.web.deps import get_current_user
+from app.web.streak import bump_streak
 
 router = APIRouter()
 
@@ -102,6 +103,7 @@ async def post_diary(
             created_at=now,
         ))
 
+    await bump_streak(session, current_user.id)
     await session.commit()
     await session.refresh(entry)
     return {"id": f"w{entry.id}"}

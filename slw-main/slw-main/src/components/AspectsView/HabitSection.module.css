@@ -1,0 +1,145 @@
+.wrap {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+  border: 1px solid rgba(255,255,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin: 24px 0;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.45);
+  font-weight: 600;
+}
+
+.streakBadge {
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.muted {
+  color: rgba(255,255,255,0.5);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0 0 10px;
+}
+
+.error {
+  background: rgba(229,115,115,0.08);
+  border: 1px solid rgba(229,115,115,0.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #e57373;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.activeState {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.title {
+  font-size: 17px;
+  font-weight: 500;
+  color: #f1f2f5;
+  line-height: 1.4;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.tickBtn {
+  background: transparent;
+  border: 1px dashed rgba(255,255,255,0.25);
+  color: rgba(255,255,255,0.85);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+}
+
+.tickBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tickBtnDone {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(255,255,255,0.04);
+}
+
+.btnPrimary {
+  background: var(--accent);
+  border: none;
+  color: #1a1622;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.btnPrimary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.linkBtn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.55);
+  font: inherit;
+  font-size: 13px;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+.linkBtn:hover { color: var(--accent); }
+
+.editState {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.input {
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #f1f2f5;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.input:focus { border-color: var(--accent); }

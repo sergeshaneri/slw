@@ -19,6 +19,7 @@ from app.web.routes.notifications import router as notifications_router
 from app.web.routes.profile import router as profile_router
 from app.web.routes.scores import router as scores_router
 from app.web.routes.state import router as state_router
+from app.web.routes.streak import router as streak_router
 from app.web.routes.sync import router as sync_router
 
 log = logging.getLogger(__name__)
@@ -60,6 +61,7 @@ app.include_router(hall_router, prefix="/api")
 app.include_router(notifications_router, prefix="/api")
 app.include_router(dm_router, prefix="/api")
 app.include_router(habits_router, prefix="/api")
+app.include_router(streak_router, prefix="/api")
 
 
 @app.get("/healthz")

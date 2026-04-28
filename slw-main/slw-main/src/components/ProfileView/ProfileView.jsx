@@ -7,6 +7,10 @@ import {
   deleteInsight,
   fetchMySubscriptions,
   fetchMyFollowers,
+  fetchMyStreak,
+  activateShield,
+  fetchMyHabits,
+  clearHabit,
 } from '../../api/client'
 import ReactorsList from '../PublicProfileView/ReactorsList'
 import Heatmap from '../Heatmap/Heatmap'
@@ -490,8 +494,11 @@ export default function ProfileView({
         catalog={profile.achievements_catalog ?? []}
       />
 
-      {/* ── Стрик-shield ─────────────────────── */}
-      <StreakShieldSection journey={journey} onJourneyChange={onJourneyChange} />
+      {/* ── Стрик с бэка + защита ─────────────── */}
+      <StreakSection journey={journey} onJourneyChange={onJourneyChange} />
+
+      {/* ── Мои выбранные практики ──────────────── */}
+      <MyHabitsSection />
 
       {/* ── Heatmap активности ──────────────────── */}
       <Section label="Активность за полгода">
@@ -618,46 +625,170 @@ function Section({ label, children }) {
 
 const SHIELD_COST = 50
 
-function StreakShieldSection({ journey, onJourneyChange }) {
-  const stardust = journey?.stardust ?? 0
-  const streak = journey?.streak ?? 0
-  const shieldUntil = journey?.streakShieldUntil ?? null
-  const today = new Date().toISOString().slice(0, 10)
-  const active = shieldUntil && shieldUntil >= today
+const STATUS_DESC = {
+  none:         'Стрик ещё не начался — сделай хоть что-то сегодня (тик практики, запись в дневник, инсайт).',
+  ticked_today: 'Стрик сегодня уже подтверждён.',
+  due_today:    'Стрик ещё держится — сделай что-нибудь сегодня, чтобы продолжить.',
+  shielded:     '🛡 Защита покрыла пропущенный день.',
+  broken:       'Стрик сорвался. Начни новый — любая активность сегодня запустит цикл заново.',
+  active:       '',
+}
 
-  const handleActivate = async () => {
-    if (active || stardust < SHIELD_COST || !onJourneyChange) return
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const until = tomorrow.toISOString().slice(0, 10)
-    await onJourneyChange({
-      ...journey,
-      stardust: stardust - SHIELD_COST,
-      streakShieldUntil: until,
-    })
+function StreakSection({ journey, onJourneyChange }) {
+  const [data, setData] = useState(null)
+  const [busy, setBusy] = useState(true)
+  const [activating, setActivating] = useState(false)
+  const [error, setError] = useState(null)
+
+  const stardust = journey?.stardust ?? 0
+
+  const reload = async () => {
+    setBusy(true)
+    try {
+      setData(await fetchMyStreak())
+    } catch (e) {
+      setError(e.message ?? 'Не удалось загрузить стрик')
+    } finally {
+      setBusy(false)
+    }
   }
 
+  useEffect(() => { reload() }, [])
+
+  const handleShield = async () => {
+    if (!onJourneyChange || stardust < SHIELD_COST || activating) return
+    setActivating(true)
+    setError(null)
+    try {
+      // Сначала списываем стардаст (trust-based — как раньше).
+      await onJourneyChange({ ...journey, stardust: stardust - SHIELD_COST })
+      await activateShield()
+      await reload()
+    } catch (e) {
+      // Откатываем стардаст.
+      await onJourneyChange?.({ ...journey, stardust })
+      setError(e.message ?? 'Не удалось активировать')
+    } finally {
+      setActivating(false)
+    }
+  }
+
+  if (busy) return <Section label="Стрик"><div className={styles.muted}>Загружаем…</div></Section>
+  if (!data) return null
+
+  const today = data.today
+  const shielded = data.shield_until && data.shield_until >= today
+  const status = data.status || 'active'
+
   return (
-    <Section label="Защита стрика">
-      <div className={styles.muted} style={{ marginBottom: 10 }}>
-        Текущий стрик: <strong style={{ color: 'var(--accent)' }}>{streak} дн.</strong>
-        {active && <> · 🛡 защищён до {shieldUntil}</>}
+    <Section label="Стрик активности">
+      <div className={styles.streakRow}>
+        <div className={styles.streakBig}>
+          🔥 {data.current}
+          <span className={styles.streakUnit}>{pluralDays(data.current)}</span>
+        </div>
+        <div className={styles.streakMeta}>
+          <div>Лучший: <strong>{data.longest}</strong></div>
+          {data.last_active_date && (
+            <div className={styles.muted}>Последняя активность: {data.last_active_date}</div>
+          )}
+          {shielded && (
+            <div style={{ color: 'var(--accent)' }}>🛡 защита до {data.shield_until}</div>
+          )}
+        </div>
       </div>
-      {active ? (
-        <div className={styles.muted}>Если пропустишь день — стрик сохранится один раз.</div>
-      ) : (
+
+      {STATUS_DESC[status] && (
+        <div className={styles.muted} style={{ marginTop: 10 }}>{STATUS_DESC[status]}</div>
+      )}
+
+      {error && <div className={styles.error}>{error}</div>}
+
+      {!shielded && (
         <button
           type="button"
           className={styles.btnGhost}
-          onClick={handleActivate}
-          disabled={stardust < SHIELD_COST}
+          onClick={handleShield}
+          disabled={stardust < SHIELD_COST || activating}
           title={stardust < SHIELD_COST ? `Нужно ${SHIELD_COST} стардаста` : ''}
+          style={{ marginTop: 12 }}
         >
-          🛡 Активировать (⚡{SHIELD_COST})
+          🛡 Активировать защиту (⚡{SHIELD_COST})
         </button>
       )}
     </Section>
   )
+}
+
+function MyHabitsSection() {
+  const [habits, setHabits] = useState([])
+  const [busy, setBusy] = useState(true)
+  const [error, setError] = useState(null)
+
+  const reload = async () => {
+    setBusy(true)
+    try {
+      const { habits: h } = await fetchMyHabits()
+      setHabits(h)
+    } catch (e) {
+      setError(e.message ?? 'Не удалось загрузить')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  useEffect(() => { reload() }, [])
+
+  const handleClear = async (aspect) => {
+    if (!confirm(`Снять активную практику для ${aspect}?`)) return
+    try {
+      await clearHabit(aspect)
+      reload()
+    } catch (e) {
+      setError(e.message ?? 'Не удалось снять')
+    }
+  }
+
+  return (
+    <Section label={`Мои практики · ${habits.length}`}>
+      {busy && <div className={styles.muted}>Загружаем…</div>}
+      {error && <div className={styles.error}>{error}</div>}
+      {!busy && habits.length === 0 && (
+        <div className={styles.muted}>
+          Ты ещё не выбрал практики. Зайди на страницу аспекта (Аспекты → выбрать) и нажми «+ Выбрать практику».
+        </div>
+      )}
+      {!busy && habits.length > 0 && (
+        <ul className={styles.habitsList}>
+          {habits.map(h => (
+            <li key={h.aspect} className={styles.habitItem}>
+              <span className={styles.habitAspect}>{h.aspect}</span>
+              <span className={styles.habitTitle}>{h.title}</span>
+              <span className={`${styles.habitDot} ${h.ticked_today ? styles.habitDotDone : ''}`}>
+                {h.ticked_today ? '✓ сегодня' : '☐ сегодня'}
+              </span>
+              <button
+                type="button"
+                className={styles.btnRemove}
+                onClick={() => handleClear(h.aspect)}
+                aria-label="Снять"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
+  )
+}
+
+function pluralDays(n) {
+  const m = n % 10
+  if (n % 100 >= 11 && n % 100 <= 14) return 'дней'
+  if (m === 1) return 'день'
+  if (m >= 2 && m <= 4) return 'дня'
+  return 'дней'
 }
 
 function AchievementsSection({ unlocked, catalog }) {

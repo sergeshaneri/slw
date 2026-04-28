@@ -3,8 +3,7 @@ import styles from './JourneyView.module.css'
 
 export default function Onboarding({ state, accent, isTyping, chatRef, onNext, aspectIntro }) {
   const buttonLabel = (() => {
-    if (state.onboardingStep === 4) return 'Белая Сенсорика — Terra Harmonia'
-    if (state.onboardingStep === 5) return aspectIntro?.[1]?.button ?? 'Далее'
+    if (state.onboardingStep === 4) return 'Открыть Карту Планет →'
     if (state.onboardingStep === 3) return 'Доставай сферы жизни'
     return ONBOARDING[Math.min(state.onboardingStep, 3)]?.button ?? 'Далее'
   })()
@@ -52,7 +51,7 @@ export default function Onboarding({ state, accent, isTyping, chatRef, onNext, a
             {buttonLabel}
           </button>
           <div className={styles.dots}>
-            {[0, 1, 2, 3, 4, 5].map(i => (
+            {[0, 1, 2, 3, 4].map(i => (
               <div key={i} className={`${styles.dotsItem} ${state.onboardingStep === i ? styles.dotsItemActive : ''}`} />
             ))}
           </div>

@@ -406,14 +406,17 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       await addBotMessage(ONBOARDING[step + 1].text, 700)
       setState(s => ({ ...s, onboardingStep: step + 1 }))
     } else if (step === 3) {
-      // Завершаем общую часть онбординга и переводим на Карту Планет.
-      // onboardingStep остаётся 4 (между 3 и 6), чтобы handleSwitchAspect
-      // потом дотянул его до 6 при выборе планеты.
+      // Завершаем общую часть онбординга — рассказываем про карту планет.
+      // Юзер сам жмёт кнопку «Открыть Карту Планет» (шаг 4), чтобы перейти.
       await addBotMessage(
         'Готово. Сейчас покажу Карту Планет — выбери, с какого аспекта хочешь начать.',
         900
       )
-      setState(s => ({ ...s, onboardingStep: 4, screen: 'planets' }))
+      setState(s => ({ ...s, onboardingStep: 4 }))
+    } else if (step === 4) {
+      // Юзер нажал «Открыть Карту Планет». onboardingStep оставляем 4 —
+      // handleSwitchAspect потом дотянет его до 6 при выборе планеты.
+      setState(s => ({ ...s, screen: 'planets' }))
     }
   }, [state.onboardingStep, addBotMessage, addUserMessage, setState])
 

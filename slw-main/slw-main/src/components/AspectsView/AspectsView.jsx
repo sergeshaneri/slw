@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
 import { BLOCKS, LEVEL_LABELS, getBlockItems } from './blocks'
 import BSWheel from './BSWheel'
+import HabitSection from './HabitSection'
 import styles from './AspectsView.module.css'
 
 export default function AspectsView({ selectedAspect, onAspectSelect, scores, onScoreChange, diary, onDiaryChange, journey, onGoToBSSurveys, onEnterHall, t }) {
@@ -120,6 +121,8 @@ function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSe
           isLocked={(journey?.aspects?.['БС']?.currentLevel ?? 0) < 1}
         />
       )}
+
+      <HabitSection aspect={aspect} color={color} />
 
       <div className={styles.tocIntro}>
         <p className={styles.tocIntroText}>{data.essence}</p>

@@ -353,3 +353,43 @@ class HabitTick(Base):
     aspect: Mapped[str] = mapped_column(Text, primary_key=True)
     date: Mapped[str] = mapped_column(Text, primary_key=True)  # 'YYYY-MM-DD'
     created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class UserStreak(Base):
+    """Серверный глобальный стрик юзера.
+
+    Считается по любой «значимой активности»: тик практики, запись дневника,
+    публикация инсайта, сообщение в холле, ИИ-вызов, реакция, ЛС.
+    Bumped через app.web.streak.bump_streak() из write-роутов.
+
+    shield_until — дата (YYYY-MM-DD), до которой защита перекрывает один
+    пропуск. При пропуске стрик сохраняется и shield clears.
+    """
+    __tablename__ = "user_streaks"
+
+    web_user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("web_users.id"), primary_key=True
+    )
+    current: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    longest: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_active_date: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shield_until: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class UserHabit(Base):
+    """Выбранная юзером ежедневная практика для аспекта.
+    По одной активной привычке на (user, aspect). Юзер сам формулирует
+    название практики (потом подвяжем к script_steps когда контент уровней
+    будет готов).
+    """
+    __tablename__ = "user_habits"
+
+    web_user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("web_users.id"), primary_key=True
+    )
+    aspect: Mapped[str] = mapped_column(Text, primary_key=True)
+    title: Mapped[str] = mapped_column(Text)
+    # Опциональный id скрипта-упражнения, когда контент уровней появится.
+    exercise_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)

@@ -31,6 +31,7 @@ from app.db.models import (
 from app.db.session import get_session
 from app.web.deps import get_current_user
 from app.web.notify import notify_hall_writers
+from app.web.streak import bump_streak
 
 router = APIRouter()
 
@@ -282,6 +283,7 @@ async def post_message(
         actor_name=_display_name(current_user),
         text_preview=text,
     )
+    await bump_streak(session, current_user.id)
     await session.commit()
 
     pp = await session.get(PublicProfile, current_user.id)

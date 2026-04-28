@@ -285,8 +285,24 @@ export async function fetchHabitsToday() {
   return request('GET', '/api/habits/today')
 }
 
+export async function fetchMyHabits() {
+  return request('GET', '/api/habits/me')
+}
+
+export async function chooseHabit({ aspect, title, exerciseId = null }) {
+  return request('POST', '/api/habits/choose', {
+    aspect,
+    title,
+    exercise_id: exerciseId,
+  })
+}
+
+export async function clearHabit(aspect) {
+  return request('DELETE', `/api/habits/${encodeURIComponent(aspect)}`)
+}
+
 export async function fetchHabitsHistory(aspect, days = 90) {
-  return request('GET', `/api/habits/${encodeURIComponent(aspect)}?days=${days}`)
+  return request('GET', `/api/habits/${encodeURIComponent(aspect)}/history?days=${days}`)
 }
 
 export async function tickHabit(aspect) {
@@ -295,6 +311,16 @@ export async function tickHabit(aspect) {
 
 export async function untickHabit(aspect) {
   return request('DELETE', `/api/habits/${encodeURIComponent(aspect)}/tick`)
+}
+
+// ── Серверный стрик ──────────────────────────────────────────────────────
+
+export async function fetchMyStreak() {
+  return request('GET', '/api/streak/me')
+}
+
+export async function activateShield() {
+  return request('POST', '/api/streak/shield', { pay_with_stardust: true })
 }
 
 export async function reactToInsight(id, reaction = 'heart') {
