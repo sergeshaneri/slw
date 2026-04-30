@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { getSurvey, buildSurveyStatements, SURVEY_BLOCKS } from '../../data/journey/skills'
 import Slider from './Slider'
 import styles from './JourneyView.module.css'
+
+const INSIGHT_HINT_KEY = 'survey_insight_hint_dismissed'
 
 // Поэтапная анкета навыка.
 //
@@ -42,10 +44,44 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
     : null
   const initialValue = Number.isFinite(prevAnswer) ? prevAnswer : 5
   const [value, setValue] = useState(initialValue)
+  // Инсайт по конкретному утверждению — сбрасывается на каждом новом вопросе.
+  const [insightOpen, setInsightOpen] = useState(false)
+  const [insightText, setInsightText] = useState('')
+  // Подсказка-тултип: показывается на стартовых вопросах, закрывается крестиком
+  // (запоминается в localStorage), и поднимается на ховер через 3 сек.
+  const [hintVisible, setHintVisible] = useState(() =>
+    typeof window !== 'undefined' && localStorage.getItem(INSIGHT_HINT_KEY) !== '1'
+  )
+  const [hintHover, setHintHover] = useState(false)
+  const hoverTimerRef = useRef(null)
+
   useEffect(() => {
     setValue(initialValue)
+    setInsightOpen(false)
+    setInsightText('')
+    setHintHover(false)
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx])
+
+  const dismissHint = () => {
+    setHintVisible(false)
+    try { localStorage.setItem(INSIGHT_HINT_KEY, '1') } catch {}
+  }
+
+  const startHoverTimer = () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    hoverTimerRef.current = setTimeout(() => setHintHover(true), 3000)
+  }
+
+  const stopHoverTimer = () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    setHintHover(false)
+  }
+
+  const handleAnswer = () => {
+    onAnswer(value, insightText)
+  }
 
   if (!survey) {
     return (
@@ -93,6 +129,55 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
 
         <Slider value={value} onChange={setValue} />
 
+        {/* Необязательный инсайт по этому утверждению. Кнопка «✎ Инсайт» —
+           маленькая, ghost. Клик раскрывает textarea. Текст сохраняется
+           в дневник при «Дальше». */}
+        <div className={styles.surveyInsightRow}>
+          <button
+            type="button"
+            className={styles.surveyInsightBtn}
+            onClick={() => setInsightOpen(v => !v)}
+            onMouseEnter={startHoverTimer}
+            onMouseLeave={stopHoverTimer}
+            aria-expanded={insightOpen}
+          >
+            <span aria-hidden="true">✎</span>
+            <span>{insightOpen ? 'Скрыть инсайт' : 'Записать инсайт'}</span>
+            {insightText.trim() && !insightOpen && (
+              <span className={styles.surveyInsightDot} aria-label="есть текст">●</span>
+            )}
+          </button>
+
+          {(hintVisible || hintHover) && !insightOpen && (
+            <div className={styles.surveyInsightHint} role="tooltip">
+              <span>Можешь записать мысль по этому вопросу — попадёт в дневник. Необязательно.</span>
+              {hintVisible && (
+                <button
+                  type="button"
+                  className={styles.surveyInsightHintClose}
+                  onClick={(e) => { e.stopPropagation(); dismissHint() }}
+                  aria-label="Больше не показывать"
+                  title="Больше не показывать"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {insightOpen && (
+          <textarea
+            className={styles.surveyInsightInput}
+            value={insightText}
+            onChange={e => setInsightText(e.target.value)}
+            placeholder="Что приходит в голову по этому утверждению?"
+            rows={3}
+            maxLength={1000}
+            autoFocus
+          />
+        )}
+
         <div className={styles.surveyActions}>
           <button
             type="button"
@@ -105,7 +190,7 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
           <button
             type="button"
             className={`${styles.btn} ${styles.btnAccent}`}
-            onClick={() => onAnswer(value)}
+            onClick={handleAnswer}
           >
             Дальше →
           </button>

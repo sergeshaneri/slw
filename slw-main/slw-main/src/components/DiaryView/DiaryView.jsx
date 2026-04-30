@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
 import { SURVEY_BLOCKS } from '../../data/journey/skills'
 import SearchView from '../SearchView/SearchView'
+import DailyReview from './DailyReview'
 import styles from './DiaryView.module.css'
 
 const SOURCE_LABEL = {
@@ -57,6 +58,13 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
             </button>
             <button
               type="button"
+              className={`${styles.tabBtn} ${mode === 'today' ? styles.tabBtnActive : ''}`}
+              onClick={() => setMode('today')}
+            >
+              📅 Сегодня
+            </button>
+            <button
+              type="button"
               className={`${styles.tabBtn} ${mode === 'search' ? styles.tabBtnActive : ''}`}
               onClick={() => setMode('search')}
             >
@@ -65,6 +73,10 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
           </div>
         )}
       </div>
+
+      {mode === 'today' && user && (
+        <DailyReview diary={diary} onDiaryChange={onDiaryChange} />
+      )}
 
       {mode === 'search' && user && (
         <SearchView onOpenProfile={onOpenProfile} />

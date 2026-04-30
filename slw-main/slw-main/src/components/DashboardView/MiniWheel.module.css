@@ -8,30 +8,57 @@
   overflow: visible;
 }
 
+/* Внешний обод колеса. */
+.rimOuter {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 2;
+}
+
+.rimInner {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 1;
+}
+
+/* Спицы внутри обода — едва заметные, дают ощущение колеса. */
+.spoke {
+  stroke: rgba(255, 255, 255, 0.06);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+/* Контур-«десятка» каждого сектора с неоновым свечением. */
+.outline {
+  pointer-events: none;
+}
+
+/* Кольца-ориентиры (2/4/6/8 баллов). */
 .ring {
   fill: none;
-  stroke: rgba(255,255,255,0.05);
+  stroke: rgba(255, 255, 255, 0.04);
   stroke-width: 1;
 }
 
 .sector { cursor: pointer; transition: opacity .15s; }
-.sector:hover { opacity: 0.85; }
+.sector:hover { opacity: 0.9; }
 
 .label {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
   pointer-events: none;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
 }
 
 .center {
-  fill: rgba(255,255,255,0.06);
-  stroke: rgba(255,255,255,0.18);
+  fill: rgba(255, 255, 255, 0.08);
+  stroke: rgba(255, 255, 255, 0.22);
   stroke-width: 1;
   cursor: pointer;
   transition: fill .15s;
 }
 
 .center:hover {
-  fill: rgba(179,157,219,0.18);
+  fill: rgba(179, 157, 219, 0.22);
 }

@@ -607,7 +607,35 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   // Список утверждений вычисляется через buildSurveyStatements(survey, mode, startPass).
   // stepIndex итерирует по этому списку. Когда stepIndex >= statements.length —
   // конец сессии, переход на survey-insight.
-  const handleSurveyAnswer = useCallback((value) => {
+  const handleSurveyAnswer = useCallback((value, insightText) => {
+    // Если юзер записал инсайт по конкретному утверждению — кладём в дневник
+    // отдельной записью с привязкой к навыку и тексту утверждения.
+    const trimmedInsight = (insightText ?? '').trim()
+    if (trimmedInsight) {
+      const active = state.activeSurvey
+      const survey = active ? getSurvey(active.skillId) : null
+      const stmts = survey
+        ? buildSurveyStatements(survey, active.mode ?? 'short', active.startPass ?? 1)
+        : []
+      const current = stmts[active?.stepIndex ?? 0]
+      const statementText = current?.statement ?? ''
+      const skillName = survey?.name ?? active?.skillId ?? ''
+      onDiaryChange([
+        {
+          id: Date.now() + Math.random(),
+          date: new Date().toLocaleDateString('ru-RU'),
+          ts: Date.now(),
+          aspect: state.currentAspect,
+          text: trimmedInsight,
+          source: 'journey-survey-statement',
+          prompt: statementText,
+          promptTitle: skillName,
+          skillId: active?.skillId,
+        },
+        ...diary,
+      ])
+    }
+
     setState(s => {
       const active = s.activeSurvey
       if (!active) return s
@@ -631,7 +659,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         }
       }
     })
-  }, [setState])
+  }, [setState, state.activeSurvey, state.currentAspect, diary, onDiaryChange])
 
   // Назад на одно утверждение (внутри текущей сессии).
   const handleSurveyBack = useCallback(() => {

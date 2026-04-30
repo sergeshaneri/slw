@@ -11,6 +11,44 @@ import MiniWheel from './MiniWheel'
 import Heatmap from '../Heatmap/Heatmap'
 import styles from './DashboardView.module.css'
 
+// Маленький цветок-глиф для лейбла «Колесо баланса». 8 лепестков по
+// цветам аспектов. Заменяет красный emoji ⭕ на цветной знак, который
+// тематически вяжется с самим колесом.
+function WheelFlowerGlyph({ size = 18 }) {
+  const cx = size / 2
+  const cy = size / 2
+  const petalR = size * 0.32 // расстояние от центра до центра лепестка
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      aria-hidden="true"
+      style={{ display: 'inline-block', verticalAlign: '-3px', marginRight: '6px' }}
+    >
+      {ASPECT_KEYS.map((key, i) => {
+        const angle = (i / ASPECT_KEYS.length) * Math.PI * 2 - Math.PI / 2
+        const x = cx + Math.cos(angle) * petalR
+        const y = cy + Math.sin(angle) * petalR
+        const deg = (angle * 180) / Math.PI + 90
+        return (
+          <ellipse
+            key={key}
+            cx={x}
+            cy={y}
+            rx={size * 0.13}
+            ry={size * 0.22}
+            fill={ASPECT_COLORS[key]}
+            opacity={0.9}
+            transform={`rotate(${deg} ${x} ${y})`}
+          />
+        )
+      })}
+      <circle cx={cx} cy={cy} r={size * 0.16} fill="#fff5d6" />
+    </svg>
+  )
+}
+
 const STREAK_STATUS_LABEL = {
   none:         'Стрик ещё не начался',
   ticked_today: 'Сегодня уже отметился ✓',
@@ -223,7 +261,7 @@ export default function DashboardView({
         </Section>
 
         {/* ── Колесо мини + актуальный аспект ───── */}
-        <Section label="⭕ Колесо баланса">
+        <Section label={<><WheelFlowerGlyph />Колесо баланса</>}>
           <MiniWheel
             scores={data.scores}
             size={220}
