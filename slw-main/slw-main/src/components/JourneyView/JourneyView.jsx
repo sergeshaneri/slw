@@ -56,7 +56,31 @@ import styles from './JourneyView.module.css'
 //     без коллизий. XP/streak/skills/stardust остаются глобальными.
 //     При миграции с v<8 старые «плоские» поля помещаются в активный
 //     аспект; чат сбрасывается (как при любом бампе CONTENT_VERSION).
-export const CONTENT_VERSION = 8
+// 9 — ревизия дерева навыков БС: 33 → 47 (7 слияний + 21 новый
+//     навык). Слияния: scan→interoception, relax→balance,
+//     aging→pain, env-quality→quality, env-design→ergonomics,
+//     load→pause, library→pleasure. Старые id в state.skills
+//     мигрируем через SKILL_ID_MIGRATION в migrateSkills (если
+//     у юзера уже есть результат для нового id — старый
+//     отбрасывается; иначе старый копируется под новым id).
+//     Удалено 7 SURV-* шагов из bs-l0-surveys.md, добавлен 21 новый
+//     SURV-34..54. Нумерация старых SURV-* оставлена с пропусками,
+//     чтобы completedScripts существующих юзеров не сломались.
+export const CONTENT_VERSION = 9
+
+// Миграция id навыков после ревизии дерева (v9). Старый id → новый.
+// Если у юзера уже есть запись по новому id, старая отбрасывается
+// (приоритет — у новой записи). Если только старая — копируем под
+// новым id.
+const SKILL_ID_MIGRATION = {
+  'scan': 'interoception',
+  'relax': 'balance',
+  'aging': 'pain',
+  'env-quality': 'quality',
+  'env-design': 'ergonomics',
+  'load': 'pause',
+  'library': 'pleasure',
+}
 
 // Дефолтные значения per-aspect папки.
 export const DEFAULT_ASPECT_STATE = {
@@ -118,9 +142,13 @@ function migrateSkills(skills) {
   const out = {}
   for (const [id, entry] of Object.entries(skills)) {
     if (!entry) continue
+    // v9: переименование id после ревизии дерева. Если у юзера уже
+    // есть запись по новому id — старая отбрасывается.
+    const targetId = SKILL_ID_MIGRATION[id] ?? id
+    if (targetId !== id && skills[targetId]) continue
     // passes уже есть — оставляем как есть.
     if (Number.isFinite(entry.passes)) {
-      out[id] = { ...entry, insights: entry.insights ?? [] }
+      out[targetId] = { ...entry, insights: entry.insights ?? [] }
       continue
     }
     // Вычисляем passes по answers (max длина массива).
@@ -135,7 +163,7 @@ function migrateSkills(skills) {
       // У старых записей нет answers, но есть result — считаем как полную (3).
       passes = 3
     }
-    out[id] = { ...entry, passes, insights: entry.insights ?? [] }
+    out[targetId] = { ...entry, passes, insights: entry.insights ?? [] }
   }
   return out
 }
