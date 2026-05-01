@@ -92,10 +92,6 @@ export default function Chat({
           if (m.kind === 'script') {
             const sc = lookup(m)
             if (!sc) return null
-            // SURV-шаги больше не идут в chat-ленте — они доступны только
-            // через дерево навыков. Если в архивных messages всплыла
-            // survey-карточка от старых сессий, прячем её.
-            if (sc.type === 'survey') return null
             return <ScriptCard key={m.id} script={sc} />
           }
           return (

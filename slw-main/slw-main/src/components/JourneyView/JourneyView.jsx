@@ -18,6 +18,8 @@ import SurveyScreen from './SurveyScreen'
 import SurveyChoice from './SurveyChoice'
 import SurveyInsight from './SurveyInsight'
 import SkillTree from './SkillTree'
+import NeSkillTree from './NeSkillTree'
+import CheSkillTree from './CheSkillTree'
 import SkillDetail from './SkillDetail'
 import PlanetMap from './PlanetMap'
 import AdminPanel from './AdminPanel'
@@ -66,7 +68,36 @@ import styles from './JourneyView.module.css'
 //     Удалено 7 SURV-* шагов из bs-l0-surveys.md, добавлен 21 новый
 //     SURV-34..54. Нумерация старых SURV-* оставлена с пропусками,
 //     чтобы completedScripts существующих юзеров не сломались.
-export const CONTENT_VERSION = 9
+// 10 — добавлен аспект ЧЭ (Чёрная Этика, планета Passio Ignis):
+//     L0 (15 шагов), L1 (25), L2 (40), L3 (стартовый — 20).
+//     Регистрация в registry.js, новый файл aspects/che.js.
+//     Контент в `che-l*.md`. Дерево навыков ЧЭ и анкеты пока не
+//     интегрированы — будут добавлены отдельно. Существующие юзеры
+//     получат сброс чат-истории по другим аспектам, но прогресс
+//     XP/streak/skills сохранится.
+// 11 — в L0 БС добавлены 3 универсальные анкеты (signals,
+//     interoception, honesty) с подготовительным сообщением.
+//     Эти 3 навыка вынесены в COMMON_BASE_SKILLS — они входят в
+//     средний по каждому из 4 архетипов БС-колеса доп.слагаемыми.
+//     Survey-карточки снова рендерятся в чат-ленте (Chat.jsx).
+//     Старые архивные SURV из v6 не показываются благодаря бампу
+//     (messages сбрасываются).
+// 12 — добавлено колесо ЧЭ (CheSkillTree): 34 навыка по 4 архетипам
+//     (Заводила, Оратор, Артист, Мастер Атмосферы) + 3 ядерных
+//     общих (Эмо-осознанность, Выразительность, Конгруэнтность).
+//     Новые файлы: che-skills/{tree,parseSurveys,index}.js, surveys.md
+//     (510 утверждений, по 15 на навык). CSURV-1..3 для трёх ядерных
+//     встроены инлайн в che-l0.md как часть L0-чата. getSurvey()
+//     в skills/index.js теперь fallback-ит в ЧЭ-анкеты. JourneyView
+//     dispatch-ит CheSkillTree для currentAspect === 'ЧЭ'. Skill ID
+//     у ЧЭ имеют префикс `che-` для глобальной уникальности.
+// 13 — UX-исправления для смены аспектов: handleStartSkillSurvey теперь
+//     aspect-aware (определяет БС/ЧЭ по префиксу skill id + ищет
+//     survey-шаг и в core, и в surveys). Кнопка «🪐 Планеты» добавлена
+//     в шапку SkillTree/CheSkillTree/NeSkillTree — выход на PlanetMap
+//     из колеса любого аспекта. AdminPanel получил блок «Планета» с
+//     кнопками быстрого переключения между доступными аспектами.
+export const CONTENT_VERSION = 13
 
 // Миграция id навыков после ревизии дерева (v9). Старый id → новый.
 // Если у юзера уже есть запись по новому id, старая отбрасывается
@@ -758,13 +789,23 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
     const newSkills = { ...state.skills, [active.skillId]: newSkillEntry }
 
+    // Если анкета была запущена из чат-скрипта (например, SURV-* в L0)
+    // — возвращаем юзера в чат и продвигаем на следующий шаг.
+    // Если из дерева навыков — открываем экран деталей навыка.
+    const fromChatScript = scripts.some(sc => sc.id === active.scriptId)
+
     setState(s => ({
       ...s,
       skills: newSkills,
       activeSurvey: null,
-      skillDetailId: active.skillId,
-      screen: 'skill-detail'
+      skillDetailId: fromChatScript ? null : active.skillId,
+      screen: fromChatScript ? 'chat' : 'skill-detail',
     }))
+
+    if (fromChatScript) {
+      const nextIdx = (aspectOf(state).currentScriptIndex ?? 0) + 1
+      setTimeout(() => deliverScript(nextIdx), 100)
+    }
 
     const bsScore = calcBSScoreFromSkills(newSkills)
     if (Number.isFinite(bsScore)) {
@@ -811,7 +852,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     const xp = (actualPasses - wasPasses) * 10
     if (script) removePending(script.id)
     awardXP(xp, wentToFinal ? (script?.stardust ?? 0) : 0, script?.id ?? null)
-  }, [state.activeSurvey, state.currentAspect, state.skills, scripts, scores, diary, onDiaryChange, onScoresChange, awardXP, removePending, setState])
+  }, [state, scripts, scores, diary, onDiaryChange, onScoresChange, awardXP, removePending, setState, deliverScript])
 
   // Отмена анкеты или инсайта — сохраняем текущий прогресс как draft.
   const handleSurveyCancel = useCallback(() => {
@@ -859,11 +900,21 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   //   - Иначе → открываем экран выбора режима (short / full).
   // Анкета лежит в currentLevel.surveys (отдельный массив, не в core-чате).
   const handleStartSkillSurvey = useCallback((skillId) => {
-    const journeyData = getJourney('БС')
-    const surveys = journeyData?.levels?.[0]?.surveys ?? []
-    const idx = surveys.findIndex(s => s.type === 'survey' && s.skill === skillId)
-    if (idx === -1) return
-    const target = surveys[idx]
+    // Определяем аспект по skill ID. У ЧЭ-навыков id с префиксом `che-`,
+    // их анкеты живут инлайн в core (CSURV-1..3 в che-l0.md), у БС —
+    // в отдельном пуле levels[0].surveys.
+    const aspect = skillId.startsWith('che-') ? 'ЧЭ' : 'БС'
+    const journeyData = getJourney(aspect)
+
+    // Ищем survey-шаг и в core, и в surveys-pool — для ЧЭ они лежат в core,
+    // для БС — в surveys.
+    const allSteps = [
+      ...(journeyData?.levels?.[0]?.surveys ?? []),
+      ...(journeyData?.levels?.[0]?.core ?? [])
+    ]
+    const target = allSteps.find(s => s.type === 'survey' && s.skill === skillId)
+    if (!target) return
+
     const skillEntry = state.skills?.[skillId]
     const draft = skillEntry?.draft
 
@@ -871,12 +922,11 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       // Продолжаем как было — без выбора. currentScriptId не трогаем:
       // он нужен для chat-flow (core-шагов), а survey-id в нём только
       // путает resolveScript при возврате в чат.
-      // Аспект переключаем на БС: анкеты сейчас живут на БС, после
-      // переключения сбрасываем awaitingInput в БС-папке.
+      // Аспект переключаем на нужный (БС или ЧЭ), сбрасываем awaitingInput.
       setState(s => updateAspect(
         {
           ...s,
-          currentAspect: 'БС',
+          currentAspect: aspect,
           screen: 'survey',
           activeSurvey: {
             scriptId: target.id,
@@ -899,7 +949,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setState(s => updateAspect(
       {
         ...s,
-        currentAspect: 'БС',
+        currentAspect: aspect,
         screen: 'survey-choice',
         activeSurvey: { scriptId: target.id, skillId },  // mode появится после choose
       },
@@ -1227,24 +1277,29 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         />
       )}
 
-      {state.screen === 'levelcomplete' && (
-        <LevelComplete
-          state={stateForChildren}
-          accent={accent}
-          completeText={currentLevel?.complete?.text ?? ''}
-          levelTitle={currentLevel?.title}
-          onProfile={() => goToScreen('profile')}
-          nextLevelTitle={nextLevel?.title}
-          onNextLevel={nextLevel ? handleNextLevel : null}
-          // На L0 после прохождения core — primary CTA «Открыть Колесо БС»
-          // (skill-tree). На L1+ нет skill-tree → кнопка не показывается.
-          onOpenWheel={
-            a.currentLevel === 0 && (currentLevel?.surveys?.length ?? 0) > 0
-              ? handleOpenSkillTree
-              : null
-          }
-        />
-      )}
+      {state.screen === 'levelcomplete' && (() => {
+        // На L0 после прохождения core — primary CTA «Открыть Колесо аспекта»
+        // (skill-tree). Для БС — если у уровня есть анкеты (surveys).
+        // Для ЧИ — всегда (read-only дерево; анкеты пока не реализованы).
+        const isNe = state.currentAspect === 'ЧИ'
+        const hasSurveys = (currentLevel?.surveys?.length ?? 0) > 0
+        const showWheel = a.currentLevel === 0 && (hasSurveys || isNe)
+        const wheelLabel = isNe ? 'Открыть Колесо ЧИ' : 'Открыть Колесо БС'
+        return (
+          <LevelComplete
+            state={stateForChildren}
+            accent={accent}
+            completeText={currentLevel?.complete?.text ?? ''}
+            levelTitle={currentLevel?.title}
+            planetName={currentJourney?.planet}
+            wheelLabel={wheelLabel}
+            onProfile={() => goToScreen('profile')}
+            nextLevelTitle={nextLevel?.title}
+            onNextLevel={nextLevel ? handleNextLevel : null}
+            onOpenWheel={showWheel ? handleOpenSkillTree : null}
+          />
+        )
+      })()}
 
       {state.screen === 'profile' && (
         <JourneyProfile
@@ -1300,13 +1355,33 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         />
       )}
 
-      {state.screen === 'skill-tree' && (
+      {state.screen === 'skill-tree' && state.currentAspect === 'ЧИ' && (
+        <NeSkillTree
+          accent={accent}
+          onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
+          onOpenPlanetMap={handleOpenPlanetMap}
+        />
+      )}
+
+      {state.screen === 'skill-tree' && state.currentAspect === 'ЧЭ' && (
+        <CheSkillTree
+          accent={accent}
+          skills={state.skills ?? {}}
+          onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
+          onStartSkill={handleStartSkillSurvey}
+          onOpenSkillDetail={handleOpenSkillDetail}
+          onOpenPlanetMap={handleOpenPlanetMap}
+        />
+      )}
+
+      {state.screen === 'skill-tree' && state.currentAspect !== 'ЧИ' && state.currentAspect !== 'ЧЭ' && (
         <SkillTree
           accent={accent}
           skills={state.skills ?? {}}
           onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
           onStartSkill={handleStartSkillSurvey}
           onOpenSkillDetail={handleOpenSkillDetail}
+          onOpenPlanetMap={handleOpenPlanetMap}
         />
       )}
 
@@ -1321,11 +1396,17 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       )}
 
       {state.screen === 'survey-choice' && state.activeSurvey && (() => {
-        // Найдём имя навыка для заголовка.
+        // Найдём имя навыка для заголовка — сначала через getSurvey (универсально для БС и ЧЭ),
+        // потом через БС-дерево как фолбэк для случая, когда анкета ещё не загружена.
         let name = state.activeSurvey.skillId
-        for (const arche of ARCHETYPE_KEYS) {
-          const found = (SKILL_TREE[arche] ?? []).find(s => s.id === state.activeSurvey.skillId)
-          if (found) { name = found.name; break }
+        const survey = getSurvey(state.activeSurvey.skillId)
+        if (survey?.name) {
+          name = survey.name
+        } else {
+          for (const arche of ARCHETYPE_KEYS) {
+            const found = (SKILL_TREE[arche] ?? []).find(s => s.id === state.activeSurvey.skillId)
+            if (found) { name = found.name; break }
+          }
         }
         return (
           <SurveyChoice
@@ -1418,6 +1499,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           onOpenSkillsEditor={handleOpenSkillsEditor}
           onJumpLevel={handleAdminJumpLevel}
           onReset={handleAdminReset}
+          onSwitchAspect={handleSwitchAspect}
         />
       )}
     </div>

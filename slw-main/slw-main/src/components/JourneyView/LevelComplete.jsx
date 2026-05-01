@@ -4,18 +4,22 @@ export default function LevelComplete({
   state, accent,
   completeText,
   levelTitle,
+  planetName,
+  wheelLabel,
   onProfile,
   nextLevelTitle, onNextLevel,
   onOpenWheel
 }) {
   const levelNum = state.currentLevel ?? 0
+  const planet = planetName ?? 'Terra Harmonia'
+  const wheelBtnLabel = wheelLabel ?? 'Открыть Колесо БС'
 
   return (
     <>
       <div className={styles.topbar}>
         <div className={styles.avatar}><span className={styles.avatarGlyph}>◐</span></div>
         <div className={styles.topbarInfo}>
-          <div className={styles.topbarTitle}>Terra Harmonia</div>
+          <div className={styles.topbarTitle}>{planet}</div>
           <div className={styles.topbarSub}>Уровень завершён</div>
         </div>
       </div>
@@ -44,7 +48,7 @@ export default function LevelComplete({
           </div>
         </div>
 
-        {/* Primary CTA на L0 — открыть Колесо БС (дерево навыков).
+        {/* Primary CTA на L0 — открыть Колесо аспекта (дерево навыков).
             Анкеты — параллельный путь, не блокируют переход на L1. */}
         {onOpenWheel && (
           <button
@@ -52,7 +56,7 @@ export default function LevelComplete({
             className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`}
             onClick={onOpenWheel}
           >
-            Открыть Колесо БС
+            {wheelBtnLabel}
           </button>
         )}
 

@@ -1,7 +1,12 @@
-// Дерево навыков БС — 47 навыков распределены по 4 архетипам.
+// Дерево навыков БС — 3 общих базовых + 44 архетипных = 47 навыков.
 //
 // Архетипы соответствуют четырём «полным образам» БС из соционики:
 // Целитель, Эстет, Мастер Наслаждения, Хранитель Очага.
+//
+// Общие базовые (signals / interoception / honesty) — фундамент,
+// единый для всех четырёх архетипов. В UI отображаются в каждой ветке
+// с пометкой «общий», в среднем по архетипу учитываются как доп.
+// слагаемые (см. calcArchetypeAvg).
 //
 // id навыка — короткий латинский ключ. Используется как имя файла md
 // (ну или как ключ в один md-файле через парсер) и как id анкеты.
@@ -23,6 +28,10 @@
 //   Итого 33 - 7 + 21 = 47.
 //   Миграция id для старых результатов анкет — в JourneyView.jsx
 //   (SKILL_ID_MIGRATION + migrateSkills).
+// v3: 3 базовых навыка (signals / interoception / honesty) выделены
+//   из healer в общие — они входят в средний по каждому архетипу.
+//   Эти же 3 анкеты включены в L0-чат как первая оценка БС.
+//   Id остались прежними, миграция данных не нужна.
 
 export const ARCHETYPES = {
   healer: {
@@ -57,14 +66,27 @@ export const ARCHETYPES = {
 
 export const ARCHETYPE_KEYS = ['healer', 'aesthete', 'hedonist', 'keeper']
 
-// Раскладка 47 навыков по 4 архетипам.
+// Три общих базовых навыка БС — фундамент, общий для всех четырёх
+// архетипов. Входят в каждый архетип при подсчёте среднего и
+// отображаются в каждой ветке UI с пометкой «общий».
+//
+// Эти же 3 анкеты включены в L0-чат БС как первая оценка БС, до того,
+// как открывается полное дерево навыков.
+export const COMMON_BASE_SKILLS = [
+  { id: 'signals',       name: 'Распознавание базовых сигналов', isCommon: true },
+  { id: 'interoception', name: 'Соматическое осознание (интероцепция)', isCommon: true },
+  { id: 'honesty',       name: 'Телесная честность', isCommon: true },
+]
+
+export const COMMON_BASE_SKILL_IDS = new Set(COMMON_BASE_SKILLS.map(s => s.id))
+
+// Раскладка 44 архетипных навыков по 4 веткам.
 // Порядок внутри каждой ветки — от базовых навыков к продвинутым.
+// В UI к каждой ветке добавляются 3 общих базовых сверху.
 export const SKILL_TREE = {
   healer: [
-    // Базовые / контакт с телом
-    { id: 'signals',          name: 'Распознавание базовых сигналов' },
-    { id: 'interoception',    name: 'Соматическое осознание (интероцепция)' },
-    { id: 'honesty',          name: 'Телесная честность' },
+    // Базовые / контакт с телом (общие — signals/interoception/honesty —
+    // вынесены в COMMON_BASE_SKILLS).
     { id: 'grounding',        name: 'Физическое заземление' },
     { id: 'balance',          name: 'Баланс «напряжение–расслабление»' },
     { id: 'emotions',         name: 'Телесное проживание эмоций' },
@@ -122,16 +144,29 @@ export const SKILL_TREE = {
   ]
 }
 
-// Обратный индекс: skillId → archetypeKey. Нужен для расчёта средних
-// по архетипам и колеса баланса.
+// Обратный индекс: skillId → archetypeKey. Только для архетип-специфичных
+// навыков. Общие базовые в этот индекс НЕ попадают (они принадлежат
+// всем 4 архетипам сразу). Использовать с проверкой на COMMON_BASE_SKILL_IDS.
 export const SKILL_TO_ARCHETYPE = Object.fromEntries(
   Object.entries(SKILL_TREE).flatMap(([arche, skills]) =>
     skills.map(s => [s.id, arche])
   )
 )
 
+// Возвращает полный список навыков, отображаемых под архетипом в UI:
+// 3 общих базовых сверху + специфичные навыки архетипа.
+// Используется для отображения и для расчёта среднего.
+export function getSkillsForArchetype(archetypeKey) {
+  const specific = SKILL_TREE[archetypeKey] ?? []
+  return [...COMMON_BASE_SKILLS, ...specific]
+}
+
 // Все skill id одним массивом, в порядке отображения.
-export const ALL_SKILL_IDS = ARCHETYPE_KEYS.flatMap(k => SKILL_TREE[k].map(s => s.id))
+// 3 общих + 14 + 8 + 13 + 9 = 47.
+export const ALL_SKILL_IDS = [
+  ...COMMON_BASE_SKILLS.map(s => s.id),
+  ...ARCHETYPE_KEYS.flatMap(k => SKILL_TREE[k].map(s => s.id))
+]
 
 // Имена 5 блоков анкеты — общие для всех навыков.
 export const SURVEY_BLOCKS = [

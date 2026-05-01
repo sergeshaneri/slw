@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE,
+  COMMON_BASE_SKILL_IDS, getSkillsForArchetype,
   calcArchetypeAvg, calcBSScoreFromSkills, getSkillProgress,
   getCompletedPasses
 } from '../../data/journey/skills'
@@ -35,7 +36,7 @@ function statusFor(skillState) {
   return { kind: 'light', avg: skillState.result }
 }
 
-export default function SkillTree({ accent, skills, onClose, onStartSkill, onOpenSkillDetail }) {
+export default function SkillTree({ accent, skills, onClose, onStartSkill, onOpenSkillDetail, onOpenPlanetMap }) {
   const bsScore = calcBSScoreFromSkills(skills)
   const progress = getSkillProgress(skills)
 
@@ -71,6 +72,18 @@ export default function SkillTree({ accent, skills, onClose, onStartSkill, onOpe
             {Number.isFinite(bsScore) && ` · ср. ${bsScore.toFixed(1)}/10`}
           </div>
         </div>
+        {onOpenPlanetMap && (
+          <button
+            type="button"
+            className={styles.treePlanetsBtn}
+            onClick={onOpenPlanetMap}
+            aria-label="Карта планет"
+            title="Сменить аспект"
+          >
+            <span aria-hidden="true">🪐</span>
+            <span>Планеты</span>
+          </button>
+        )}
       </div>
 
       <div className={styles.treeProgress}>
@@ -83,7 +96,8 @@ export default function SkillTree({ accent, skills, onClose, onStartSkill, onOpe
       <div className={styles.treeBody}>
         {ARCHETYPE_KEYS.map(key => {
           const arche = ARCHETYPES[key]
-          const skillsInBranch = SKILL_TREE[key] ?? []
+          // 3 общих базовых сверху + специфичные навыки архетипа.
+          const skillsInBranch = getSkillsForArchetype(key)
           const branchAvg = calcArchetypeAvg(skills, key)
           const completed = skillsInBranch.filter(s => Number.isFinite(skills?.[s.id]?.result)).length
           const isOpen = expanded.has(key)
@@ -122,14 +136,18 @@ export default function SkillTree({ accent, skills, onClose, onStartSkill, onOpe
                       st.kind === 'draft'  ? styles.treeSkillDraft :
                       ''
                     const hasPasses = st.kind === 'light' || st.kind === 'medium' || st.kind === 'full'
+                    const isCommon = skill.isCommon || COMMON_BASE_SKILL_IDS.has(skill.id)
                     return (
-                      <li key={skill.id} className={styles.treeSkillRow}>
+                      <li key={`${key}-${skill.id}`} className={styles.treeSkillRow}>
                         <button
                           type="button"
                           className={`${styles.treeSkill} ${cls}`}
                           onClick={() => onStartSkill(skill.id)}
                         >
-                          <span className={styles.treeSkillName}>{skill.name}</span>
+                          <span className={styles.treeSkillName}>
+                            {skill.name}
+                            {isCommon && <span className={styles.treeSkillCommonTag}>общий</span>}
+                          </span>
                           <span className={styles.treeSkillStatus}>
                             {st.kind === 'idle'   && 'оценить'}
                             {st.kind === 'light'  && `${st.avg.toFixed(1)}/10 · 1/3 · углубить`}

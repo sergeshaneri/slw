@@ -1,16 +1,17 @@
 import { useState } from 'react'
-import { getJourney } from '../../data/journey/registry'
+import { getJourney, getAllPlanets } from '../../data/journey/registry'
 import styles from './AdminPanel.module.css'
 
 // Dev-панель для админ-аккаунтов (user.is_admin === true).
 // Видна только им, обычные пользователи её не видят.
 //
 // Функции:
-//   1. Skip step       — пропустить текущий шаг в чате (без XP, без записи).
-//   2. Auto-fill survey — заполнить активную анкету на 7/10 и завершить.
-//   3. Fill all skills  — все 33 навыка = 7/10 (мгновенно открывает БС-колесо).
-//   4. Jump to level    — выбор уровня L0/L1, mode='core'.
-//   5. Reset            — полный сброс journey state (без подтверждения).
+//   1. Switch planet    — быстрое переключение между доступными аспектами.
+//   2. Skip step        — пропустить текущий шаг в чате (без XP, без записи).
+//   3. Auto-fill survey — заполнить активную анкету на 7/10 и завершить.
+//   4. Fill all skills  — все БС-навыки = 7/10 (мгновенно открывает БС-колесо).
+//   5. Jump to level    — выбор уровня L0/L1, mode='core'.
+//   6. Reset            — полный сброс journey state (без подтверждения).
 export default function AdminPanel({
   state,
   onSkipStep,
@@ -19,6 +20,7 @@ export default function AdminPanel({
   onOpenSkillsEditor,
   onJumpLevel,
   onReset,
+  onSwitchAspect,
   aspect = 'БС'
 }) {
   const [open, setOpen] = useState(false)
@@ -26,6 +28,8 @@ export default function AdminPanel({
   const journey = getJourney(aspect)
   const levels = journey?.levels ?? {}
   const levelKeys = Object.keys(levels).map(n => parseInt(n, 10)).sort((a, b) => a - b)
+
+  const planets = getAllPlanets().filter(p => p.available)
 
   const isChat = state.screen === 'chat'
   const isSurvey = state.screen === 'survey' && !!state.activeSurvey
@@ -45,6 +49,25 @@ export default function AdminPanel({
       {open && (
         <div className={styles.panel} role="dialog" aria-label="Admin panel">
           <div className={styles.title}>Dev панель</div>
+
+          {onSwitchAspect && planets.length > 1 && (
+            <>
+              <div className={styles.section}>Планета</div>
+              <div className={styles.levelRow}>
+                {planets.map(p => (
+                  <button
+                    key={p.aspect}
+                    type="button"
+                    className={`${styles.levelBtn} ${aspect === p.aspect ? styles.levelBtnActive : ''}`}
+                    onClick={() => { onSwitchAspect(p.aspect); setOpen(false) }}
+                    title={p.name}
+                  >
+                    {p.aspect}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
 
           <button
             type="button"

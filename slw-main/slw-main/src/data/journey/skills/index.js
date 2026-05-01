@@ -25,19 +25,26 @@ import { parseSurveys } from './parseSurveys'
 import surveysMd from './surveys.md?raw'
 import {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE, SKILL_TO_ARCHETYPE,
+  COMMON_BASE_SKILLS, COMMON_BASE_SKILL_IDS, getSkillsForArchetype,
   ALL_SKILL_IDS, SURVEY_BLOCKS, SURVEY_BLOCK_KEYS
 } from './tree'
+import { SURVEYS_CHE } from '../che-skills'
 
 const SURVEYS = parseSurveys(surveysMd)
 
 export {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE, SKILL_TO_ARCHETYPE,
+  COMMON_BASE_SKILLS, COMMON_BASE_SKILL_IDS, getSkillsForArchetype,
   ALL_SKILL_IDS, SURVEY_BLOCKS, SURVEY_BLOCK_KEYS,
   SURVEYS
 }
 
+// Универсальный getSurvey — пробует БС, потом ЧЭ.
+// Skill id у ЧЭ имеют префикс `che-`, у БС — без префикса; коллизий нет.
 export function getSurvey(skillId) {
-  return SURVEYS[skillId] ?? null
+  if (SURVEYS[skillId]) return SURVEYS[skillId]
+  if (SURVEYS_CHE[skillId]) return SURVEYS_CHE[skillId]
+  return null
 }
 
 // Считает средние блоков и общую среднюю по навыку.
@@ -135,9 +142,10 @@ export function buildSurveyStatements(survey, mode, startPass) {
 }
 
 // Среднее по архетипу. skills — мапа state.skills.
-// Считаем avg только по тем навыкам ветки, которые имеют валидный result.
+// Включает 3 общих базовых навыка + специфичные для ветки. Только те,
+// у которых уже есть валидный result. Если ни одного — null.
 export function calcArchetypeAvg(skills, archetypeKey) {
-  const ids = (SKILL_TREE[archetypeKey] ?? []).map(s => s.id)
+  const ids = getSkillsForArchetype(archetypeKey).map(s => s.id)
   const values = ids
     .map(id => skills?.[id]?.result)
     .filter(v => Number.isFinite(v))

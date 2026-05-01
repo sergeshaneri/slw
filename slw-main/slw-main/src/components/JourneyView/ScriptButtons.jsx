@@ -10,10 +10,11 @@ export default function ScriptButtons({ script, onAction }) {
         </div>
       )
     case 'question': {
-      // Формат A: шкала 1–10 + followUp (есть в скрипте) → числовой ввод.
-      // Формат B: open-ended (followUp нет) → текстовый ввод. См.
-      // SCRIPT_GUIDELINES §4.2.
-      const hasScale = !!script.followUp
+      // Формат A: шкала 1–10 → числовой ввод (ползунок).
+      //   Триггерится либо followUp-блоками, либо явным `scale: 1-10`.
+      // Формат B: open-ended (ни того, ни другого) → текстовый ввод.
+      // См. SCRIPT_GUIDELINES §4.2.
+      const hasScale = !!script.followUp || !!script.scale
       return (
         <div className={styles.btnRow}>
           <button

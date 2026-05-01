@@ -91,6 +91,10 @@ export function parseJourneyMd(md) {
     // Текст утверждений берётся из SURVEYS[skill]; тело шага в md можно
     // оставлять пустым или давать короткое описание навыка.
     if (metadata.skill) script.skill = metadata.skill
+    // scale: 1-10 (или просто truthy) — пометка, что этот вопрос —
+    // самооценка по шкале 1–10. UI будет показывать ползунок вместо
+    // текстового ввода. Срабатывает даже без followUp-блоков.
+    if (metadata.scale) script.scale = true
 
     if (followUps.length > 0) {
       script.followUp = (ans) => {
