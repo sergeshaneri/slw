@@ -25,10 +25,30 @@ class UserState(Base):
     __tablename__ = "user_state"
 
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), primary_key=True)
+    # current_aspect — последний выбранный юзером аспект ("папка", в которой
+    # он сейчас); current_step_id — денормализованная копия из
+    # user_aspect_state[current_aspect].current_step_id для удобства быстрого
+    # доступа без второго запроса. Source of truth — user_aspect_state.
     current_aspect: Mapped[str | None] = mapped_column(Text, nullable=True)
     current_level: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     current_step_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     streak_days: Mapped[int] = mapped_column(Integer, default=0)
+    last_active_at: Mapped[datetime | None] = mapped_column(TZ, nullable=True)
+
+
+class UserAspectState(Base):
+    """Прогресс юзера в одном аспекте. Одна строка на пару (юзер, аспект).
+
+    Создаётся когда юзер впервые входит в аспект. `current_step_id` всегда
+    указывает на текущий шаг в этом аспекте. `finished=true` когда юзер
+    дошёл до конца L3 (next_step_for_aspect вернул None).
+    """
+    __tablename__ = "user_aspect_state"
+
+    telegram_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), primary_key=True)
+    aspect: Mapped[str] = mapped_column(Text, primary_key=True)
+    current_step_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    finished: Mapped[bool] = mapped_column(Boolean, default=False)
     last_active_at: Mapped[datetime | None] = mapped_column(TZ, nullable=True)
 
 

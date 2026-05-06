@@ -132,21 +132,18 @@ export default function App() {
         fetchEvents(0).catch(() => ({ events: [] })),
       ])
 
-      // Bot position: подтягиваем aspect/level/streak из бота при каждой загрузке.
-      //   • currentAspect — переносим только если веб ещё на онбординге
-      //     (не хотим перезаписывать активную ветку вебом, если бот и веб
-      //     гуляют по разным аспектам).
-      //   • currentLevel (per-aspect) — всегда `Math.max(web, bot)`. Если
-      //     юзер пробежал L0 в боте, веб на следующей загрузке должен
-      //     шагнуть на L1, а не залипнуть на старте L0. При фактическом
-      //     скачке сбрасываем currentScriptIndex/Id и подкладываем первый
-      //     шаг нового уровня в messages — чтобы чат не оказался пустым.
-      //   • streak — всегда max (глобал).
+      // Bot → Web sync. Multi-aspect модель:
+      //   • bs.aspects[] — массив прогресса по каждому аспекту, в котором
+      //     юзер был в боте. Для каждого делаем Math.max-бамп
+      //     journey.aspects[X].currentLevel и подкладываем первый шаг
+      //     нового уровня в messages, если фактически прыгнули вперёд.
+      //   • currentAspect — переносим из бота только если веб ещё на
+      //     онбординге (иначе пользователь, переключившийся в вебе на
+      //     другой аспект, после релоада возвращался бы в бот-аспект).
+      //   • streak — всегда max (глобальный счётчик).
       //
-      // Per-aspect поля (currentLevel/messages/...) живут в
-      // journeyOverride.aspects[aspect], поэтому пишем туда. migrateState
-      // на стороне JourneyView дополнительно умеет «всосать» legacy-плоские
-      // поля, но мы их больше не отправляем — формируем сразу новой формой.
+      // bs.aspects может отсутствовать на старом бэке — fallback на
+      // одиночные top-level поля (current_aspect/current_level).
       let journeyOverride = stateRes.journey ?? null
 
       const readAspectFolder = (jo, aspect) => {
@@ -176,6 +173,32 @@ export default function App() {
         }
       }
 
+      const bumpAspectFromBot = (jo, aspect, botLevel) => {
+        const folder = readAspectFolder(jo, aspect) ?? {}
+        const webLevel = folder.currentLevel ?? 0
+        if (botLevel <= webLevel) return jo
+        const nextLevelData = getJourney(aspect)?.levels?.[botLevel]
+        const firstScript = (nextLevelData?.core ?? nextLevelData?.scripts ?? [])[0]
+        return writeAspectFolder(jo, aspect, {
+          currentLevel: botLevel,
+          currentScriptIndex: 0,
+          currentScriptId: firstScript?.id ?? null,
+          awaitingInput: null,
+          messages: firstScript
+            ? [
+                ...(folder.messages ?? []),
+                {
+                  id: Date.now() + Math.random(),
+                  role: 'bot',
+                  kind: 'script',
+                  scriptId: firstScript.id,
+                  level: botLevel,
+                },
+              ]
+            : (folder.messages ?? []),
+        })
+      }
+
       if (botSync?.linked && botSync.state) {
         const bs = botSync.state
         const isWebFresh = !journeyOverride || journeyOverride.screen === 'onboarding'
@@ -187,31 +210,18 @@ export default function App() {
           }
         }
 
-        const botLevel = bs.current_level ?? 0
-        const targetAspect = journeyOverride?.currentAspect ?? bs.current_aspect ?? 'БС'
-        const targetFolder = readAspectFolder(journeyOverride, targetAspect) ?? {}
-        const webLevel = targetFolder.currentLevel ?? 0
-        if (botLevel > webLevel) {
-          const nextLevelData = getJourney(targetAspect)?.levels?.[botLevel]
-          const firstScript = (nextLevelData?.core ?? nextLevelData?.scripts ?? [])[0]
-          journeyOverride = writeAspectFolder(journeyOverride, targetAspect, {
-            currentLevel: botLevel,
-            currentScriptIndex: 0,
-            currentScriptId: firstScript?.id ?? null,
-            awaitingInput: null,
-            messages: firstScript
-              ? [
-                  ...(targetFolder.messages ?? []),
-                  {
-                    id: Date.now() + Math.random(),
-                    role: 'bot',
-                    kind: 'script',
-                    scriptId: firstScript.id,
-                    level: botLevel,
-                  },
-                ]
-              : (targetFolder.messages ?? []),
-          })
+        if (Array.isArray(bs.aspects) && bs.aspects.length > 0) {
+          // Новый формат: бэк отдаёт массив. Бампаем каждый аспект.
+          for (const row of bs.aspects) {
+            if (!row?.aspect) continue
+            const botLevel = row.current_level ?? 0
+            journeyOverride = bumpAspectFromBot(journeyOverride, row.aspect, botLevel)
+          }
+        } else if (bs.current_aspect) {
+          // Legacy: одиночные поля. Бампаем только текущий аспект.
+          journeyOverride = bumpAspectFromBot(
+            journeyOverride, bs.current_aspect, bs.current_level ?? 0
+          )
         }
 
         if (bs.streak_days) {
@@ -222,27 +232,27 @@ export default function App() {
         }
       }
 
-      // Bot → Web events: дописываем в journey.completedScripts шаги, которые
-      // юзер прошёл в TG-боте. Фильтруем по аспекту, но НЕ по level — иначе
-      // после скачка веба на L1 ачивки L0 (T-1, B-1, U-1) пропадают.
-      // Web хранит short_id (`T-1`/`intro-1`) — бэк уже отдаёт распарсенные.
+      // Bot → Web events: дописываем в каждую папку journey.aspects[X]
+      // .completedScripts события `step_completed` от бота для этого
+      // аспекта. Web хранит short_id (`T-1`/`intro-1`) — бэк уже отдаёт
+      // распарсенные. Фильтруем по аспекту, но НЕ по level — иначе после
+      // скачка на L1 ачивки L0 пропадают.
       const botEvents = (eventsRes?.events ?? []).filter(
-        e => e.source === 'bot' && e.type === 'step_completed' && e.short_id
+        e => e.source === 'bot' && e.type === 'step_completed' && e.short_id && e.aspect
       )
       if (botEvents.length > 0) {
-        const aspect = journeyOverride?.currentAspect
-        if (aspect) {
-          const fromBot = botEvents
-            .filter(e => e.aspect === aspect)
-            .map(e => e.short_id)
-          if (fromBot.length > 0) {
-            const folder = readAspectFolder(journeyOverride, aspect) ?? {}
-            const merged = new Set(folder.completedScripts ?? [])
-            fromBot.forEach(id => merged.add(id))
-            journeyOverride = writeAspectFolder(journeyOverride, aspect, {
-              completedScripts: Array.from(merged),
-            })
-          }
+        // Группируем по аспекту → раскладываем по папкам.
+        const byAspect = botEvents.reduce((acc, e) => {
+          (acc[e.aspect] ??= []).push(e.short_id)
+          return acc
+        }, {})
+        for (const [aspect, ids] of Object.entries(byAspect)) {
+          const folder = readAspectFolder(journeyOverride, aspect) ?? {}
+          const merged = new Set(folder.completedScripts ?? [])
+          ids.forEach(id => merged.add(id))
+          journeyOverride = writeAspectFolder(journeyOverride, aspect, {
+            completedScripts: Array.from(merged),
+          })
         }
       }
 

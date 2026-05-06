@@ -10,7 +10,14 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import DiaryEntry, WebDiaryEntry, WebUser
+from app.db.models import (
+    AnalyticsReport,
+    DiaryEntry,
+    Emotion,
+    Training,
+    WebDiaryEntry,
+    WebUser,
+)
 from app.db.session import get_session
 from app.web.deps import get_current_user
 from app.web.streak import bump_streak
@@ -107,3 +114,121 @@ async def post_diary(
     await session.commit()
     await session.refresh(entry)
     return {"id": f"w{entry.id}"}
+
+
+# ── Структурированные данные из vault-импорта ──────────────────────────────
+
+@router.get("/diary/emotions")
+async def get_emotions(
+    min_intensity: int | None = None,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list:
+    """Все эмоции юзера. Опц. фильтр по минимальной интенсивности (для пиков)."""
+    q = select(Emotion).where(Emotion.web_user_id == current_user.id)
+    if min_intensity is not None:
+        q = q.where(Emotion.intensity >= min_intensity)
+    q = q.order_by(Emotion.date.desc(), Emotion.id.desc())
+    rows = (await session.execute(q)).scalars().all()
+    return [
+        {
+            "id": r.id,
+            "date": r.date,
+            "name": r.name,
+            "intensity": r.intensity,
+            "trigger": r.trigger,
+            "body_sensation": r.body_sensation,
+            "roots": r.roots,
+            "lesson": r.lesson,
+            "action": r.action,
+            "diary_entry_id": r.diary_entry_id,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/diary/trainings")
+async def get_trainings(
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list:
+    rows = (
+        await session.execute(
+            select(Training)
+            .where(Training.web_user_id == current_user.id)
+            .order_by(Training.date.desc(), Training.id.desc())
+        )
+    ).scalars().all()
+    return [
+        {
+            "id": r.id,
+            "date": r.date,
+            "exercise": r.exercise,
+            "sets": r.sets,
+            "reps": r.reps,
+            "weight_kg": float(r.weight_kg) if r.weight_kg is not None else None,
+            "notes": r.notes,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/diary/analytics")
+async def get_analytics(
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list:
+    """Список аналитических отчётов (без content_md — только метаданные)."""
+    rows = (
+        await session.execute(
+            select(AnalyticsReport)
+            .where(AnalyticsReport.web_user_id == current_user.id)
+            .order_by(AnalyticsReport.period_start.desc())
+        )
+    ).scalars().all()
+    return [
+        {
+            "id": r.id,
+            "type": r.type,
+            "period_start": r.period_start,
+            "period_end": r.period_end,
+            "title": r.title,
+            "source": r.source,
+            "updated_at": r.updated_at.isoformat(),
+        }
+        for r in rows
+    ]
+
+
+@router.get("/diary/analytics/{report_id}")
+async def get_analytics_report(
+    report_id: int,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    r = await session.get(AnalyticsReport, report_id)
+    if not r or r.web_user_id != current_user.id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Report not found")
+    return {
+        "id": r.id,
+        "type": r.type,
+        "period_start": r.period_start,
+        "period_end": r.period_end,
+        "title": r.title,
+        "source": r.source,
+        "content_md": r.content_md,
+        "created_at": r.created_at.isoformat(),
+        "updated_at": r.updated_at.isoformat(),
+    }
+
+
+@router.get("/diary/template")
+async def get_diary_template(
+    current_user: WebUser = Depends(get_current_user),
+) -> dict:
+    """Шаблон записи дневника (импортированный из vault'а)."""
+    return {
+        "template": current_user.diary_template,
+        "categorization_rules": current_user.categorization_rules,
+    }

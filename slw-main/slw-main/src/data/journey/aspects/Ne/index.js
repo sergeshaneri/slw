@@ -1,17 +1,17 @@
-// Путешествие по аспекту ЧИ (Чёрная Интуиция) — планета Essence Prime.
+// Путешествие по аспекту Ne (Чёрная Интуиция, ЧИ) — планета Essence Prime.
 //
-// Источник истины — `ne-l*.md`. Vite импортирует их как сырой текст
+// Источник истины — `l*.md`. Vite импортирует их как сырой текст
 // через `?raw`, парсер `parseScripts.js` раскручивает в массив объектов.
 // Все правки контента — в md, не здесь.
 //
 // L3 — стартовая часть (4 круга = 20 шагов); продолжение по запросу.
-// Анкеты навыков для ЧИ пока не интегрированы — будут добавлены позже отдельным md.
+// Анкеты навыков для Ne пока не интегрированы — будут добавлены позже отдельным md.
 
-import { parseJourneyMd } from '../parseScripts'
-import neL0Md from './ne-l0.md?raw'
-import neL1Md from './ne-l1.md?raw'
-import neL2Md from './ne-l2.md?raw'
-import neL3Md from './ne-l3.md?raw'
+import { parseJourneyMd } from '../../parseScripts'
+import neL0Md from './l0.md?raw'
+import neL1Md from './l1.md?raw'
+import neL2Md from './l2.md?raw'
+import neL3Md from './l3.md?raw'
 
 const l0 = parseJourneyMd(neL0Md)
 const l1 = parseJourneyMd(neL1Md)

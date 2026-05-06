@@ -77,6 +77,50 @@ def first_step() -> Step:
     return load_steps()[0]
 
 
+# ── Per-aspect navigation ──────────────────────────────────────────────────
+#
+# Для multi-aspect бота: внутри одного аспекта ходим по `ord` отсортированно,
+# но при переходе между аспектами не уезжаем автоматом в соседний. После
+# конца аспекта возвращаем None — вызывающий код сам ставит finished=true.
+
+def available_aspects() -> list[str]:
+    """Список аспектов, у которых есть хоть один шаг в compiled-контенте."""
+    seen: list[str] = []
+    for s in load_steps():
+        if s.aspect and s.aspect not in seen:
+            seen.append(s.aspect)
+    return seen
+
+
+def first_step_for_aspect(aspect: str) -> Step | None:
+    """Стартовый шаг аспекта (минимальный ord). None если аспекта нет."""
+    aspect_steps = [s for s in load_steps() if s.aspect == aspect]
+    return aspect_steps[0] if aspect_steps else None
+
+
+def next_step_for_aspect(aspect: str, current_id: str | None) -> Step | None:
+    """Следующий шаг ВНУТРИ аспекта. None после последнего шага аспекта.
+
+    `current_id` может быть None (например, если шаг удалили при контент-
+    апдейте) — тогда возвращаем первый шаг аспекта как safe-fallback.
+    """
+    aspect_steps = [s for s in load_steps() if s.aspect == aspect]
+    if not aspect_steps:
+        return None
+    if not current_id:
+        return aspect_steps[0]
+    for i, s in enumerate(aspect_steps):
+        if s.id == current_id and i + 1 < len(aspect_steps):
+            return aspect_steps[i + 1]
+    return None
+
+
+def aspect_of_step(step_id: str) -> str | None:
+    """Какому аспекту принадлежит шаг. Удобно для миграции legacy-state."""
+    s = get_step(step_id)
+    return s.aspect if s else None
+
+
 def short_id_for(step: Step) -> str:
     """`бс-L0-T-1` → `T-1`; `бс-intro-1` → `intro-1`; `onboarding-intro-1` → `intro-1`.
 

@@ -372,6 +372,50 @@ export async function fetchDashboard() {
   return request('GET', '/api/dashboard')
 }
 
+// ── Импортированные структуры дневника ──────────────────────────────────
+
+export async function fetchEmotions(minIntensity = null) {
+  const q = minIntensity != null ? `?min_intensity=${minIntensity}` : ''
+  return request('GET', `/api/diary/emotions${q}`)
+}
+
+export async function fetchTrainings() {
+  return request('GET', '/api/diary/trainings')
+}
+
+export async function fetchAnalyticsList() {
+  return request('GET', '/api/diary/analytics')
+}
+
+export async function fetchAnalyticsReport(reportId) {
+  return request('GET', `/api/diary/analytics/${reportId}`)
+}
+
+export async function fetchDiaryTemplate() {
+  return request('GET', '/api/diary/template')
+}
+
+// URL для скачивания vault-архива (пользуется JWT через ?token=fragment).
+// На самом деле для StreamingResponse используем fetch+blob — отдельная функция:
+export async function downloadVaultZip() {
+  const token = getToken()
+  if (!token) throw new Error('Не авторизован')
+  const res = await fetch(`${BASE}/api/sync/vault/export`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error(`Сервер ответил ${res.status}`)
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  const today = new Date().toISOString().slice(0, 10)
+  a.download = `slw-vault-${today}.zip`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 export async function reactToInsight(id, reaction = 'heart') {
   return request('POST', `/api/profile/insights/${id}/react`, { reaction })
 }

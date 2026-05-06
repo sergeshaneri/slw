@@ -447,6 +447,40 @@ async def apply_ddl() -> None:
     except Exception as e:
         log.warning("Q&A/bookmarks DDL failed: %s", e)
 
+    # user_aspect_state — мульти-аспектный прогресс бота. Одна строка на
+    # пару (юзер, аспект). Source of truth для current_step_id внутри
+    # аспекта; user_state.current_step_id остаётся как денормализованная
+    # копия для текущего аспекта (legacy + быстрый доступ).
+    #
+    # Миграция существующих юзеров: для каждого user_state с
+    # (current_aspect, current_step_id) заполняем user_aspect_state.
+    # Идемпотентно через ON CONFLICT DO NOTHING.
+    try:
+        async with asyncio.timeout(15):
+            async with engine.connect() as conn:
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS user_aspect_state (
+                        telegram_id      BIGINT NOT NULL,
+                        aspect           TEXT NOT NULL,
+                        current_step_id  TEXT,
+                        finished         BOOLEAN NOT NULL DEFAULT false,
+                        last_active_at   TIMESTAMPTZ,
+                        PRIMARY KEY (telegram_id, aspect)
+                    )
+                """))
+                await conn.execute(text(
+                    "INSERT INTO user_aspect_state "
+                    "  (telegram_id, aspect, current_step_id, last_active_at) "
+                    "SELECT user_id, current_aspect, current_step_id, last_active_at "
+                    "  FROM user_state "
+                    "  WHERE current_aspect IS NOT NULL "
+                    "    AND current_step_id IS NOT NULL "
+                    "ON CONFLICT (telegram_id, aspect) DO NOTHING"
+                ))
+                await conn.commit()
+    except Exception as e:
+        log.warning("user_aspect_state DDL failed: %s", e)
+
     await engine.dispose()
 
 

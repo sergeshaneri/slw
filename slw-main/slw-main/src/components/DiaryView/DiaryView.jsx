@@ -3,6 +3,10 @@ import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
 import { SURVEY_BLOCKS } from '../../data/journey/skills'
 import SearchView from '../SearchView/SearchView'
 import DailyReview from './DailyReview'
+import EmotionsTab from './EmotionsTab'
+import TrainingsTab from './TrainingsTab'
+import AnalyticsTab from './AnalyticsTab'
+import VaultSyncTab from './VaultSyncTab'
 import styles from './DiaryView.module.css'
 
 const SOURCE_LABEL = {
@@ -70,9 +74,42 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
             >
               🔍 Поиск
             </button>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${mode === 'emotions' ? styles.tabBtnActive : ''}`}
+              onClick={() => setMode('emotions')}
+            >
+              💗 Эмоции
+            </button>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${mode === 'trainings' ? styles.tabBtnActive : ''}`}
+              onClick={() => setMode('trainings')}
+            >
+              💪 Тренировки
+            </button>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${mode === 'analytics' ? styles.tabBtnActive : ''}`}
+              onClick={() => setMode('analytics')}
+            >
+              📊 Отчёты
+            </button>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${mode === 'sync' ? styles.tabBtnActive : ''}`}
+              onClick={() => setMode('sync')}
+            >
+              🔗 Sync
+            </button>
           </div>
         )}
       </div>
+
+      {mode === 'emotions' && user && <EmotionsTab />}
+      {mode === 'trainings' && user && <TrainingsTab />}
+      {mode === 'analytics' && user && <AnalyticsTab />}
+      {mode === 'sync' && user && <VaultSyncTab />}
 
       {mode === 'today' && user && (
         <DailyReview diary={diary} onDiaryChange={onDiaryChange} />

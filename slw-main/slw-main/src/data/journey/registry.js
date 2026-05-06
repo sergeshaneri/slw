@@ -1,7 +1,7 @@
 // Реестр путешествий по аспектам.
 //
-// Доступно: БС (уровни 0–3, 3 в работе), БЛ (только L0), ЧИ (уровни 0–3, 3 в работе),
-// ЧЭ (уровни 0–3, 3 в работе).
+// Доступно: Si (уровни 0–3, 3 в работе), Ti (только L0), Ne (уровни 0–3, 3 в работе),
+// Fe (уровни 0–3, 3 в работе).
 // Остальные 4 аспекта — заглушки с пометкой «скоро» на Карте Планет.
 //
 // Уровень состоит из core-сценария (массив скриптов в линейной
@@ -9,91 +9,91 @@
 // аспекта, доступные параллельно через дерево навыков (Колесо).
 
 import {
-  BS_ASPECT_INTRO,
-  BS_LEVEL_0_CORE, BS_LEVEL_0_SURVEYS, BS_LEVEL_0_COMPLETE,
-  BS_LEVEL_1_CORE, BS_LEVEL_1_COMPLETE,
-  BS_LEVEL_2_CORE, BS_LEVEL_2_COMPLETE,
-  BS_LEVEL_3_CORE, BS_LEVEL_3_COMPLETE
-} from './aspects/bs'
+  SI_ASPECT_INTRO,
+  SI_LEVEL_0_CORE, SI_LEVEL_0_SURVEYS, SI_LEVEL_0_COMPLETE,
+  SI_LEVEL_1_CORE, SI_LEVEL_1_COMPLETE,
+  SI_LEVEL_2_CORE, SI_LEVEL_2_COMPLETE,
+  SI_LEVEL_3_CORE, SI_LEVEL_3_COMPLETE
+} from './aspects/Si'
 import {
-  BL_ASPECT_INTRO,
-  BL_LEVEL_0_CORE, BL_LEVEL_0_COMPLETE
-} from './aspects/bl'
+  TI_ASPECT_INTRO,
+  TI_LEVEL_0_CORE, TI_LEVEL_0_COMPLETE
+} from './aspects/Ti'
 import {
   NE_ASPECT_INTRO,
   NE_LEVEL_0_CORE, NE_LEVEL_0_COMPLETE,
   NE_LEVEL_1_CORE, NE_LEVEL_1_COMPLETE,
   NE_LEVEL_2_CORE, NE_LEVEL_2_COMPLETE,
   NE_LEVEL_3_CORE, NE_LEVEL_3_COMPLETE
-} from './aspects/ne'
+} from './aspects/Ne'
 import {
-  CHE_ASPECT_INTRO,
-  CHE_LEVEL_0_CORE, CHE_LEVEL_0_COMPLETE,
-  CHE_LEVEL_1_CORE, CHE_LEVEL_1_COMPLETE,
-  CHE_LEVEL_2_CORE, CHE_LEVEL_2_COMPLETE,
-  CHE_LEVEL_3_CORE, CHE_LEVEL_3_COMPLETE
-} from './aspects/che'
+  FE_ASPECT_INTRO,
+  FE_LEVEL_0_CORE, FE_LEVEL_0_COMPLETE,
+  FE_LEVEL_1_CORE, FE_LEVEL_1_COMPLETE,
+  FE_LEVEL_2_CORE, FE_LEVEL_2_COMPLETE,
+  FE_LEVEL_3_CORE, FE_LEVEL_3_COMPLETE
+} from './aspects/Fe'
 import { ASPECT_KEYS, ASPECT_DATA, ASPECT_REALMS, ASPECT_COLORS } from '../aspects'
 
 // Латинские имена планет. Только для тех, у кого они уже придуманы.
 // Остальные — отображаются на карте без латинской подписи.
 const PLANETS = {
-  БС: 'Terra Harmonia',
-  БЛ: 'Structura Mentis',
-  ЧЭ: 'Passio Ignis',
-  ЧИ: 'Essence Prime',
+  Si: 'Terra Harmonia',
+  Ti: 'Structura Mentis',
+  Fe: 'Passio Ignis',
+  Ne: 'Essence Prime',
 }
 
 export const JOURNEYS = {
-  БС: {
+  Si: {
     available: true,
-    planet: PLANETS.БС,
-    intro: BS_ASPECT_INTRO,
+    planet: PLANETS.Si,
+    intro: SI_ASPECT_INTRO,
     levels: {
       0: {
         title: 'Первый контакт',
-        core: BS_LEVEL_0_CORE,
-        surveys: BS_LEVEL_0_SURVEYS,
-        complete: BS_LEVEL_0_COMPLETE,
+        core: SI_LEVEL_0_CORE,
+        surveys: SI_LEVEL_0_SURVEYS,
+        complete: SI_LEVEL_0_COMPLETE,
         // Алиас для совместимости с местами, которые читали `scripts` напрямую.
-        scripts: BS_LEVEL_0_CORE
+        scripts: SI_LEVEL_0_CORE
       },
       1: {
         title: 'Карта и намерение',
-        core: BS_LEVEL_1_CORE,
-        complete: BS_LEVEL_1_COMPLETE,
-        scripts: BS_LEVEL_1_CORE
+        core: SI_LEVEL_1_CORE,
+        complete: SI_LEVEL_1_COMPLETE,
+        scripts: SI_LEVEL_1_CORE
       },
       2: {
         title: 'Системы заботы',
-        core: BS_LEVEL_2_CORE,
-        complete: BS_LEVEL_2_COMPLETE,
-        scripts: BS_LEVEL_2_CORE
+        core: SI_LEVEL_2_CORE,
+        complete: SI_LEVEL_2_COMPLETE,
+        scripts: SI_LEVEL_2_CORE
       },
       3: {
         title: 'Тень и принятие',
-        core: BS_LEVEL_3_CORE,
-        complete: BS_LEVEL_3_COMPLETE,
-        scripts: BS_LEVEL_3_CORE
+        core: SI_LEVEL_3_CORE,
+        complete: SI_LEVEL_3_COMPLETE,
+        scripts: SI_LEVEL_3_CORE
       }
     }
   },
-  БЛ: {
+  Ti: {
     available: true,
-    planet: PLANETS.БЛ,
-    intro: BL_ASPECT_INTRO,
+    planet: PLANETS.Ti,
+    intro: TI_ASPECT_INTRO,
     levels: {
       0: {
         title: 'Первый контакт',
-        core: BL_LEVEL_0_CORE,
-        complete: BL_LEVEL_0_COMPLETE,
-        scripts: BL_LEVEL_0_CORE
+        core: TI_LEVEL_0_CORE,
+        complete: TI_LEVEL_0_COMPLETE,
+        scripts: TI_LEVEL_0_CORE
       }
     }
   },
-  ЧИ: {
+  Ne: {
     available: true,
-    planet: PLANETS.ЧИ,
+    planet: PLANETS.Ne,
     intro: NE_ASPECT_INTRO,
     levels: {
       0: {
@@ -122,34 +122,34 @@ export const JOURNEYS = {
       }
     }
   },
-  ЧЭ: {
+  Fe: {
     available: true,
-    planet: PLANETS.ЧЭ,
-    intro: CHE_ASPECT_INTRO,
+    planet: PLANETS.Fe,
+    intro: FE_ASPECT_INTRO,
     levels: {
       0: {
         title: 'Первый контакт',
-        core: CHE_LEVEL_0_CORE,
-        complete: CHE_LEVEL_0_COMPLETE,
-        scripts: CHE_LEVEL_0_CORE
+        core: FE_LEVEL_0_CORE,
+        complete: FE_LEVEL_0_COMPLETE,
+        scripts: FE_LEVEL_0_CORE
       },
       1: {
         title: 'Карта и намерение',
-        core: CHE_LEVEL_1_CORE,
-        complete: CHE_LEVEL_1_COMPLETE,
-        scripts: CHE_LEVEL_1_CORE
+        core: FE_LEVEL_1_CORE,
+        complete: FE_LEVEL_1_COMPLETE,
+        scripts: FE_LEVEL_1_CORE
       },
       2: {
         title: 'Системы эмо-канала',
-        core: CHE_LEVEL_2_CORE,
-        complete: CHE_LEVEL_2_COMPLETE,
-        scripts: CHE_LEVEL_2_CORE
+        core: FE_LEVEL_2_CORE,
+        complete: FE_LEVEL_2_COMPLETE,
+        scripts: FE_LEVEL_2_CORE
       },
       3: {
         title: 'Тень и трансмутация',
-        core: CHE_LEVEL_3_CORE,
-        complete: CHE_LEVEL_3_COMPLETE,
-        scripts: CHE_LEVEL_3_CORE
+        core: FE_LEVEL_3_CORE,
+        complete: FE_LEVEL_3_COMPLETE,
+        scripts: FE_LEVEL_3_CORE
       }
     }
   }

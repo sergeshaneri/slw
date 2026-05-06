@@ -12,6 +12,7 @@ from telegram.ext import (
 
 from app.bot.fsm import IN_SCRIPT, WAITING_OPEN_ANSWER, WAITING_SCORE, WAITING_THEORY_NOTE
 from app.bot.handlers.admin import cmd_reload, cmd_reset
+from app.bot.handlers.aspect import cmd_aspect, on_aspect_pick
 from app.bot.handlers.note import cmd_note
 from app.bot.handlers.profile import cmd_profile, on_profile_resume
 from app.bot.handlers.progress import cmd_progress
@@ -65,7 +66,9 @@ def build() -> "Application":
         entry_points=[
             CommandHandler("go", cmd_go),
             CommandHandler("resume", cmd_resume),
+            CommandHandler("aspect", cmd_aspect),
             MessageHandler(BTN_CONTINUE & ~filters.COMMAND, cmd_resume),
+            CallbackQueryHandler(on_aspect_pick, pattern=r"^aspect:"),
         ],
         states={
             IN_SCRIPT: [
@@ -93,8 +96,10 @@ def build() -> "Application":
             CommandHandler("start", cmd_start),
             CommandHandler("note", cmd_note),
             CommandHandler("profile", cmd_profile),
+            CommandHandler("aspect", cmd_aspect),
             MessageHandler(BTN_PROFILE & ~filters.COMMAND, cmd_profile),
             MessageHandler(BTN_CONTINUE & ~filters.COMMAND, cmd_resume),
+            CallbackQueryHandler(on_aspect_pick, pattern=r"^aspect:"),
         ],
         per_chat=False,
         per_user=True,
