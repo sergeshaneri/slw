@@ -9,11 +9,14 @@ import {
   buildSurveyStatements, getCompletedPasses,
   ARCHETYPE_KEYS, SKILL_TREE
 } from '../../data/journey/skills'
-import { resolveSurvey, isNeSkill } from '../../data/journey/skills/resolve'
+import { resolveSurvey, isNeSkill, isNiSkill } from '../../data/journey/skills/resolve'
+import { calcNeScoreFromSkills, getNeSkillProgress } from '../../data/journey/skills/ne-skills'
+import { calcNiScoreFromSkills, getNiSkillProgress } from '../../data/journey/skills/ni-skills'
 import {
   ALL_SKILL_IDS as CHE_SKILL_IDS,
   SURVEYS_CHE,
-  calcCheScoreFromSkills
+  calcCheScoreFromSkills,
+  getSkillProgress as getCheSkillProgress
 } from '../../data/journey/che-skills'
 import Onboarding from './Onboarding'
 import Chat from './Chat'
@@ -25,6 +28,7 @@ import SurveyChoice from './SurveyChoice'
 import SurveyInsight from './SurveyInsight'
 import SkillTree from './SkillTree'
 import NeSkillTree from './NeSkillTree'
+import NiSkillTree from './NiSkillTree'
 import CheSkillTree from './CheSkillTree'
 import SkillDetail from './SkillDetail'
 import PlanetMap from './PlanetMap'
@@ -103,7 +107,24 @@ import styles from './JourneyView.module.css'
 //     в шапку SkillTree/CheSkillTree/NeSkillTree — выход на PlanetMap
 //     из колеса любого аспекта. AdminPanel получил блок «Планета» с
 //     кнопками быстрого переключения между доступными аспектами.
-export const CONTENT_VERSION = 13
+// 14 — переименование внутренних ключей аспектов с кириллицы на латиницу
+//     (БС→Si, ЧС→Se, БЛ→Ti, ЧЛ→Te, БЭ→Fi, ЧЭ→Fe, БИ→Ni, ЧИ→Ne). UI-лейблы
+//     остались русскими (ASPECT_DATA[k].name). Миграция данных-сохраняющая:
+//     `migrateCyrAspectKeys` ниже переименовывает stored.currentAspect и
+//     все ключи в stored.aspects до проверки contentVersion, чтобы v13
+//     юзеры получили латинские ключи без сброса чата. Бэкенд продолжает
+//     использовать кириллицу — трансляция на границе api/client.js.
+// 15 — добавлен аспект БИ (Белая Интуиция, планета Tempum Spiralis):
+//     L0 (30 шагов), L1 (26), L2 (41), L3 (стартовый — 21).
+//     Регистрация в registry.js, новый модуль aspects/Ni/index.js.
+//     Контент в `aspects/Ni/l*.md`. Архетипы БИ: Мифотворец (на L0) →
+//     Провидец → Разоблачитель → Шаман (на L1). 3 общих базовых навыка:
+//     attunement / subconscious-listening / inner-silence — встроены инлайн
+//     в l0.md (B-1..B-15 со scale: 1-10). Полное дерево навыков БИ
+//     (43 навыка по 4 архетипам) и анкеты для архетипных навыков пока
+//     не интегрированы — будут добавлены отдельно через модуль
+//     skills/ni-skills.js + NiSkillTree-компонент.
+export const CONTENT_VERSION = 15
 
 // Миграция id навыков после ревизии дерева (v9). Старый id → новый.
 // Если у юзера уже есть запись по новому id, старая отбрасывается
@@ -150,10 +171,10 @@ export function updateAspect(s, patch) {
 export const DEFAULT_JOURNEY = {
   screen: 'onboarding',
   onboardingStep: 0,
-  currentAspect: 'БС',
+  currentAspect: 'Si',
   // Per-aspect «папки». Лениво создаются при первом обращении.
   aspects: {
-    БС: { ...DEFAULT_ASPECT_STATE },
+    Si: { ...DEFAULT_ASPECT_STATE },
   },
   // Результаты анкет навыков (плоско по skillId — навыки уникальны в рамках всех аспектов).
   // skills[skillId] = { result: avg-навыка, blocks: { [blockKey]: avg }, completedAt }
@@ -218,6 +239,45 @@ function normalizeAspect(folder) {
   }
 }
 
+// Кириллица → латиница для ключей аспектов (v14). Применяется до проверки
+// contentVersion — поэтому v13 юзеры получают плавный rename без сброса чата.
+const CYR_TO_LAT_ASPECT = {
+  'БС': 'Si', 'ЧС': 'Se', 'БЛ': 'Ti', 'ЧЛ': 'Te',
+  'БЭ': 'Fi', 'ЧЭ': 'Fe', 'БИ': 'Ni', 'ЧИ': 'Ne',
+}
+
+// Перепишем stored.currentAspect и ключи stored.aspects в латиницу.
+// Если у юзера каким-то образом уже есть и кир. и лат. ключ — латинская
+// версия имеет приоритет (кириллический ключ отбрасывается).
+function migrateCyrAspectKeys(stored) {
+  if (!stored || typeof stored !== 'object') return stored
+  let changed = false
+  let next = stored
+
+  if (typeof stored.currentAspect === 'string' && CYR_TO_LAT_ASPECT[stored.currentAspect]) {
+    next = { ...next, currentAspect: CYR_TO_LAT_ASPECT[stored.currentAspect] }
+    changed = true
+  }
+
+  if (stored.aspects && typeof stored.aspects === 'object') {
+    const newAspects = {}
+    let aspectsChanged = false
+    for (const [k, v] of Object.entries(stored.aspects)) {
+      const target = CYR_TO_LAT_ASPECT[k] ?? k
+      if (target !== k) aspectsChanged = true
+      // Латинский ключ уже есть — кириллический отбрасываем.
+      if (newAspects[target]) continue
+      newAspects[target] = v
+    }
+    if (aspectsChanged) {
+      next = { ...next, aspects: newAspects }
+      changed = true
+    }
+  }
+
+  return changed ? next : stored
+}
+
 // Миграция при загрузке. Семантика та же, что была:
 //   • контент-версия совпала → пропускаем state почти как есть (с safety
 //     defaults для пропавших ключей в aspects);
@@ -233,7 +293,14 @@ function normalizeAspect(folder) {
 function migrateState(stored) {
   if (!stored) return DEFAULT_JOURNEY
 
-  const currentAspect = stored.currentAspect ?? 'БС'
+  // v14: переименуем кириллические ключи в латиницу ДО проверки версии.
+  // Для v13-юзеров это означает плавный rename без сброса чата (контент
+  // не менялся, поэтому contentVersion после миграции бампнем до 14
+  // в обеих ветках ниже).
+  stored = migrateCyrAspectKeys(stored)
+  const isV13Rename = stored.contentVersion === 13
+
+  const currentAspect = stored.currentAspect ?? 'Si'
 
   // Собираем aspects: если уже есть — нормализуем каждую папку; плоские
   // legacy-поля (currentLevel/messages/...) поглощаются в активный аспект.
@@ -249,7 +316,10 @@ function migrateState(stored) {
   }
   const hasFlatLegacy = Object.values(flatLegacy).some(v => v !== undefined)
 
-  if (stored.contentVersion === CONTENT_VERSION) {
+  // v13 → v14: миграция была чисто переименованием ключей (см.
+  // migrateCyrAspectKeys выше), контент не менялся. Лечим как match-version,
+  // чтобы чат не сбросился.
+  if (stored.contentVersion === CONTENT_VERSION || isV13Rename) {
     const aspects = {}
     for (const [k, v] of Object.entries(incomingAspects)) {
       aspects[k] = normalizeAspect(v)
@@ -284,6 +354,9 @@ function migrateState(stored) {
       currentAspect,
       skills: migrateSkills(stored.skills),
       activeSurvey: stored.activeSurvey ?? null,
+      // Бампим версию (важно для ветки isV13Rename — иначе при следующей
+      // загрузке снова попадём в эту же ветку).
+      contentVersion: CONTENT_VERSION,
     }
   }
 
@@ -813,13 +886,17 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       setTimeout(() => deliverScript(nextIdx), 100)
     }
 
-    // Пересчёт средних: и БС, и ЧЭ. Каждый calc смотрит только в свои id,
-    // так что один newSkills корректно обновляет оба score одновременно.
-    const bsScore = calcBSScoreFromSkills(newSkills)
+    // Пересчёт средних: БС / ЧЭ / ЧИ / БИ. Каждый calc смотрит только в свои id,
+    // так что один newSkills корректно обновляет все score одновременно.
+    const bsScore  = calcBSScoreFromSkills(newSkills)
     const cheScore = calcCheScoreFromSkills(newSkills)
+    const neScore  = calcNeScoreFromSkills(newSkills)
+    const niScore  = calcNiScoreFromSkills(newSkills)
     const nextScores = { ...scores }
-    if (Number.isFinite(bsScore))  nextScores['БС'] = Math.round(bsScore)
-    if (Number.isFinite(cheScore)) nextScores['ЧЭ'] = Math.round(cheScore)
+    if (Number.isFinite(bsScore))  nextScores['Si'] = Math.round(bsScore)
+    if (Number.isFinite(cheScore)) nextScores['Fe'] = Math.round(cheScore)
+    if (Number.isFinite(neScore))  nextScores['Ne'] = Math.round(neScore)
+    if (Number.isFinite(niScore))  nextScores['Ni'] = Math.round(niScore)
     onScoresChange(nextScores)
 
     // Запись в дневник.
@@ -900,9 +977,15 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   // вручную, с видимым прогрессом по веткам. Доступно с момента, когда
   // юзер дошёл до экрана LevelComplete L0 («Открыть Колесо БС») —
   // gate здесь лояльный, фактическая блокировка на UI-уровне.
+  // Дерево есть только у Si/Fe/Ne/Ni; для остальных аспектов — toast.
+  const ASPECTS_WITH_SKILL_TREE = ['Si', 'Fe', 'Ne', 'Ni']
   const handleOpenSkillTree = useCallback(() => {
+    if (!ASPECTS_WITH_SKILL_TREE.includes(state.currentAspect)) {
+      showToast('У этой планеты пока нет колеса навыков')
+      return
+    }
     setState(s => ({ ...s, screen: 'skill-tree' }))
-  }, [setState])
+  }, [state.currentAspect, setState, showToast])
 
   // Тык на навык в дереве:
   //   - Если passes=3 → ничего не делаем.
@@ -913,14 +996,14 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     const skillEntry = state.skills?.[skillId]
     const draft = skillEntry?.draft
 
-    // ЧИ — анкеты живут отдельно (NE_SURVEYS из ne-skills.js), не как
+    // ЧИ (Ne) — анкеты живут отдельно (NE_SURVEYS из ne-skills.js), не как
     // journey-скрипты. Используем синтетический scriptId. Аспект в
-    // state остаётся 'ЧИ' (юзер пришёл из Колеса ЧИ).
+    // state остаётся 'Ne' (юзер пришёл из Колеса Ne).
     if (isNeSkill(skillId)) {
       if (draft) {
         setState(s => ({
           ...s,
-          currentAspect: 'ЧИ',
+          currentAspect: 'Ne',
           screen: 'survey',
           activeSurvey: {
             scriptId: `ne-survey-${skillId}`,
@@ -936,9 +1019,39 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       if (getNextPass(skillEntry) === 0) return
       setState(s => ({
         ...s,
-        currentAspect: 'ЧИ',
+        currentAspect: 'Ne',
         screen: 'survey-choice',
         activeSurvey: { scriptId: `ne-survey-${skillId}`, skillId },
+      }))
+      return
+    }
+
+    // БИ (Ni) — анкеты живут отдельно (NI_SURVEYS из ni-skills.js), не как
+    // journey-скрипты. Аналогично Ne. Аспект в state остаётся 'Ni'
+    // (юзер пришёл из Колеса Ni).
+    if (isNiSkill(skillId)) {
+      if (draft) {
+        setState(s => ({
+          ...s,
+          currentAspect: 'Ni',
+          screen: 'survey',
+          activeSurvey: {
+            scriptId: `ni-survey-${skillId}`,
+            skillId,
+            mode: draft.mode ?? 'short',
+            startPass: draft.startPass ?? 1,
+            stepIndex: draft.stepIndex ?? 0,
+            answers: draft.answers ?? {},
+          },
+        }))
+        return
+      }
+      if (getNextPass(skillEntry) === 0) return
+      setState(s => ({
+        ...s,
+        currentAspect: 'Ni',
+        screen: 'survey-choice',
+        activeSurvey: { scriptId: `ni-survey-${skillId}`, skillId },
       }))
       return
     }
@@ -946,7 +1059,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     // Определяем аспект по skill ID. У ЧЭ-навыков id с префиксом `che-`,
     // их анкеты живут инлайн в core (CSURV-1..3 в che-l0.md), у БС —
     // в отдельном пуле levels[0].surveys.
-    const aspect = skillId.startsWith('che-') ? 'ЧЭ' : 'БС'
+    const aspect = skillId.startsWith('che-') ? 'Fe' : 'Si'
     const journeyData = getJourney(aspect)
 
     // Ищем survey-шаг и в core, и в surveys-pool — для ЧЭ они лежат в core,
@@ -1189,8 +1302,8 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     const bs = calcBSScoreFromSkills(newSkills)
     const che = calcCheScoreFromSkills(newSkills)
     const next = { ...scores }
-    if (Number.isFinite(bs))  next['БС'] = Math.round(bs)
-    if (Number.isFinite(che)) next['ЧЭ'] = Math.round(che)
+    if (Number.isFinite(bs))  next['Si'] = Math.round(bs)
+    if (Number.isFinite(che)) next['Fe'] = Math.round(che)
     onScoresChange(next)
   }, [scores, onScoresChange, setState])
 
@@ -1262,11 +1375,15 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       }
     }
     setState(s => ({ ...s, skills: newSkills, screen: 'skill-tree' }))
-    const bs = calcBSScoreFromSkills(newSkills)
+    const bs  = calcBSScoreFromSkills(newSkills)
     const che = calcCheScoreFromSkills(newSkills)
+    const ne  = calcNeScoreFromSkills(newSkills)
+    const ni  = calcNiScoreFromSkills(newSkills)
     const next = { ...scores }
-    if (Number.isFinite(bs))  next['БС'] = Math.round(bs)
-    if (Number.isFinite(che)) next['ЧЭ'] = Math.round(che)
+    if (Number.isFinite(bs))  next['Si'] = Math.round(bs)
+    if (Number.isFinite(che)) next['Fe'] = Math.round(che)
+    if (Number.isFinite(ne))  next['Ne'] = Math.round(ne)
+    if (Number.isFinite(ni))  next['Ni'] = Math.round(ni)
     onScoresChange(next)
   }, [state.skills, scores, onScoresChange, setState])
 
@@ -1315,11 +1432,19 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           onGoToSurveys={handleOpenSkillTree}
           onOpenPlanetMap={handleOpenPlanetMap}
           // Пилюля «Оценить навыки» появляется только после L0 (или для админа).
-          surveyRemaining={
-            (isAdmin || (a.currentLevel ?? 0) >= 1)
-              ? getSkillProgress(state.skills ?? {}).remaining
-              : 0
-          }
+          // Прогресс считается по skill-tree активного аспекта; для аспектов
+          // без дерева (Ti/Te/Se/Fi) — 0, чтобы пилюля не показывалась.
+          surveyRemaining={(() => {
+            if (!isAdmin && (a.currentLevel ?? 0) < 1) return 0
+            const sk = state.skills ?? {}
+            switch (state.currentAspect) {
+              case 'Si': return getSkillProgress(sk).remaining
+              case 'Fe': return getCheSkillProgress(sk).remaining
+              case 'Ne': return getNeSkillProgress(sk).remaining
+              case 'Ni': return getNiSkillProgress(sk).remaining
+              default:   return 0
+            }
+          })()}
           pendingCount={a.pendingTasks?.length ?? 0}
           aspectName={currentJourney
             ? `Уровень ${a.currentLevel} · ${currentLevel?.title}`
@@ -1331,11 +1456,16 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       {state.screen === 'levelcomplete' && (() => {
         // На L0 после прохождения core — primary CTA «Открыть Колесо аспекта»
         // (skill-tree). Для БС — если у уровня есть анкеты (surveys).
-        // Для ЧИ — всегда (read-only дерево; анкеты пока не реализованы).
-        const isNe = state.currentAspect === 'ЧИ'
+        // Для ЧИ/БИ — всегда (анкеты живут в ne-skills.js / ni-skills.js).
+        const isNe = state.currentAspect === 'Ne'
+        const isNi = state.currentAspect === 'Ni'
         const hasSurveys = (currentLevel?.surveys?.length ?? 0) > 0
-        const showWheel = a.currentLevel === 0 && (hasSurveys || isNe)
-        const wheelLabel = isNe ? 'Открыть Колесо ЧИ' : 'Открыть Колесо БС'
+        const showWheel = a.currentLevel === 0 && (hasSurveys || isNe || isNi)
+        const wheelLabel = isNe
+          ? 'Открыть Колесо ЧИ'
+          : isNi
+            ? 'Открыть Колесо БИ'
+            : 'Открыть Колесо БС'
         return (
           <LevelComplete
             state={stateForChildren}
@@ -1406,7 +1536,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         />
       )}
 
-      {state.screen === 'skill-tree' && state.currentAspect === 'ЧИ' && (
+      {state.screen === 'skill-tree' && state.currentAspect === 'Ne' && (
         <NeSkillTree
           accent={accent}
           skills={state.skills ?? {}}
@@ -1416,7 +1546,17 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         />
       )}
 
-      {state.screen === 'skill-tree' && state.currentAspect === 'ЧЭ' && (
+      {state.screen === 'skill-tree' && state.currentAspect === 'Ni' && (
+        <NiSkillTree
+          accent={accent}
+          skills={state.skills ?? {}}
+          onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
+          onStartSkill={handleStartSkillSurvey}
+          onOpenPlanetMap={handleOpenPlanetMap}
+        />
+      )}
+
+      {state.screen === 'skill-tree' && state.currentAspect === 'Fe' && (
         <CheSkillTree
           accent={accent}
           skills={state.skills ?? {}}
@@ -1427,7 +1567,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         />
       )}
 
-      {state.screen === 'skill-tree' && state.currentAspect !== 'ЧИ' && state.currentAspect !== 'ЧЭ' && (
+      {state.screen === 'skill-tree' && state.currentAspect === 'Si' && (
         <SkillTree
           accent={accent}
           skills={state.skills ?? {}}

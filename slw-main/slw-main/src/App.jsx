@@ -355,17 +355,17 @@ export default function App() {
     }
     // L0 должен быть пройден (currentLevel >= 1). Админу можно всегда.
     // currentLevel и awaitingInput теперь живут в journey.aspects[aspect].
-    const bsFolder = journey?.aspects?.['БС'] ?? {}
+    const bsFolder = journey?.aspects?.['Si'] ?? {}
     if (!isAdmin && (bsFolder.currentLevel ?? 0) < 1) {
       return
     }
     await saveJourney({
       ...journey,
-      currentAspect: 'БС',
+      currentAspect: 'Si',
       screen: 'skill-tree',
       aspects: {
         ...(journey?.aspects ?? {}),
-        'БС': { ...bsFolder, awaitingInput: null },
+        'Si': { ...bsFolder, awaitingInput: null },
       },
     })
     setView('journey')
@@ -377,17 +377,39 @@ export default function App() {
       return
     }
     // L0 ЧЭ должен быть пройден (currentLevel >= 1). Админу можно всегда.
-    const cheFolder = journey?.aspects?.['ЧЭ'] ?? {}
+    const cheFolder = journey?.aspects?.['Fe'] ?? {}
     if (!isAdmin && (cheFolder.currentLevel ?? 0) < 1) {
       return
     }
     await saveJourney({
       ...journey,
-      currentAspect: 'ЧЭ',
+      currentAspect: 'Fe',
       screen: 'skill-tree',
       aspects: {
         ...(journey?.aspects ?? {}),
-        'ЧЭ': { ...cheFolder, awaitingInput: null },
+        'Fe': { ...cheFolder, awaitingInput: null },
+      },
+    })
+    setView('journey')
+  }
+
+  const goToNiSurveys = async () => {
+    if (!user && !devAdmin) {
+      setShowAuth(true)
+      return
+    }
+    // L0 БИ должен быть пройден (currentLevel >= 1). Админу можно всегда.
+    const niFolder = journey?.aspects?.['Ni'] ?? {}
+    if (!isAdmin && (niFolder.currentLevel ?? 0) < 1) {
+      return
+    }
+    await saveJourney({
+      ...journey,
+      currentAspect: 'Ni',
+      screen: 'skill-tree',
+      aspects: {
+        ...(journey?.aspects ?? {}),
+        'Ni': { ...niFolder, awaitingInput: null },
       },
     })
     setView('journey')
@@ -627,6 +649,7 @@ export default function App() {
             journey={journey}
             onGoToBSSurveys={goToBSSurveys}
             onGoToCheSurveys={goToCheSurveys}
+            onGoToNiSurveys={goToNiSurveys}
             onEnterHall={enterHall}
             t={t}
           />

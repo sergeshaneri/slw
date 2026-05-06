@@ -65,7 +65,7 @@ export default function ProfileView({
   const [goals, setGoals] = useState(['', '', ''])
 
   // Новый инсайт
-  const [insightAspect, setInsightAspect] = useState('БС')
+  const [insightAspect, setInsightAspect] = useState('Si')
   const [insightKind, setInsightKind] = useState('insight')
   const [insightText, setInsightText] = useState('')
   const [insightPublic, setInsightPublic] = useState(true)

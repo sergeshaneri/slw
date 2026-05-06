@@ -1,8 +1,8 @@
 // Реестр путешествий по аспектам.
 //
 // Доступно: Si (уровни 0–3, 3 в работе), Ti (только L0), Ne (уровни 0–3, 3 в работе),
-// Fe (уровни 0–3, 3 в работе).
-// Остальные 4 аспекта — заглушки с пометкой «скоро» на Карте Планет.
+// Fe (уровни 0–3, 3 в работе), Ni (уровни 0–3, 3 в работе).
+// Остальные 3 аспекта — заглушки с пометкой «скоро» на Карте Планет.
 //
 // Уровень состоит из core-сценария (массив скриптов в линейной
 // последовательности) и опционально `surveys` — анкеты по навыкам
@@ -33,6 +33,13 @@ import {
   FE_LEVEL_2_CORE, FE_LEVEL_2_COMPLETE,
   FE_LEVEL_3_CORE, FE_LEVEL_3_COMPLETE
 } from './aspects/Fe'
+import {
+  NI_ASPECT_INTRO,
+  NI_LEVEL_0_CORE, NI_LEVEL_0_COMPLETE,
+  NI_LEVEL_1_CORE, NI_LEVEL_1_COMPLETE,
+  NI_LEVEL_2_CORE, NI_LEVEL_2_COMPLETE,
+  NI_LEVEL_3_CORE, NI_LEVEL_3_COMPLETE
+} from './aspects/Ni'
 import { ASPECT_KEYS, ASPECT_DATA, ASPECT_REALMS, ASPECT_COLORS } from '../aspects'
 
 // Латинские имена планет. Только для тех, у кого они уже придуманы.
@@ -42,6 +49,7 @@ const PLANETS = {
   Ti: 'Structura Mentis',
   Fe: 'Passio Ignis',
   Ne: 'Essence Prime',
+  Ni: 'Tempum Spiralis',
 }
 
 export const JOURNEYS = {
@@ -150,6 +158,37 @@ export const JOURNEYS = {
         core: FE_LEVEL_3_CORE,
         complete: FE_LEVEL_3_COMPLETE,
         scripts: FE_LEVEL_3_CORE
+      }
+    }
+  },
+  Ni: {
+    available: true,
+    planet: PLANETS.Ni,
+    intro: NI_ASPECT_INTRO,
+    levels: {
+      0: {
+        title: 'Первый контакт',
+        core: NI_LEVEL_0_CORE,
+        complete: NI_LEVEL_0_COMPLETE,
+        scripts: NI_LEVEL_0_CORE
+      },
+      1: {
+        title: 'Карта и намерение',
+        core: NI_LEVEL_1_CORE,
+        complete: NI_LEVEL_1_COMPLETE,
+        scripts: NI_LEVEL_1_CORE
+      },
+      2: {
+        title: 'Системы чутья',
+        core: NI_LEVEL_2_CORE,
+        complete: NI_LEVEL_2_COMPLETE,
+        scripts: NI_LEVEL_2_CORE
+      },
+      3: {
+        title: 'Тень и трансмутация',
+        core: NI_LEVEL_3_CORE,
+        complete: NI_LEVEL_3_COMPLETE,
+        scripts: NI_LEVEL_3_CORE
       }
     }
   }

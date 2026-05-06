@@ -21,7 +21,7 @@ export default function AdminPanel({
   onJumpLevel,
   onReset,
   onSwitchAspect,
-  aspect = 'БС'
+  aspect = 'Si'
 }) {
   const [open, setOpen] = useState(false)
 

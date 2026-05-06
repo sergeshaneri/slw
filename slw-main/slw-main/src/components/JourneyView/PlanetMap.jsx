@@ -68,11 +68,15 @@ export default function PlanetMap({ state, onSwitch, onClose, onLockedTap }) {
 }
 
 // Status: одно из 'active' | 'progress' | 'idle' | 'locked'.
+// «Прогресс» = юзер реально что-то сделал (закрыл хотя бы один скрипт
+// или перешёл на >L0). Просто заход на планету (есть intro в messages,
+// но completedScripts пустой) не считается прогрессом — иначе карта
+// врёт после случайного клика.
 function computeStatus(planet, folder) {
   if (!planet.available) return { kind: 'locked', label: 'Скоро' }
   const level = folder?.currentLevel ?? 0
-  const messages = folder?.messages?.length ?? 0
-  if (level > 0 || messages > 0) {
+  const completed = folder?.completedScripts?.length ?? 0
+  if (level > 0 || completed > 0) {
     return { kind: 'progress', label: `Уровень ${level}`, level }
   }
   return { kind: 'idle', label: 'Не начато' }

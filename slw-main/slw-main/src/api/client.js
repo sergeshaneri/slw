@@ -2,7 +2,94 @@
  * API client for the SLW backend.
  * Base URL is read from VITE_API_URL env var (set in .env.local).
  * Token is stored in localStorage under 'slw_token'.
+ *
+ * Aspect-key translation
+ * ──────────────────────
+ * Frontend использует латинские ключи аспектов (Si/Se/Ti/Te/Fi/Fe/Ni/Ne).
+ * Backend и БД продолжают использовать кириллицу (БС/ЧС/БЛ/ЧЛ/БЭ/ЧЭ/БИ/ЧИ).
+ * Трансляция происходит на этой границе:
+ *   • исходящие данные (path-параметры с аспектом, body.aspect) — Lat→Cyr;
+ *   • входящие данные (response) — Cyr→Lat через translateAspectsInResponse.
+ * journey-blob (state.journey.{currentAspect, aspects}) — НЕ трогаем,
+ * там миграцию делает JourneyView.migrateState.
  */
+
+const CYR_TO_LAT = {
+  'БС': 'Si', 'ЧС': 'Se', 'БЛ': 'Ti', 'ЧЛ': 'Te',
+  'БЭ': 'Fi', 'ЧЭ': 'Fe', 'БИ': 'Ni', 'ЧИ': 'Ne',
+}
+const LAT_TO_CYR = Object.fromEntries(
+  Object.entries(CYR_TO_LAT).map(([k, v]) => [v, k])
+)
+const CYR_KEYS = new Set(Object.keys(CYR_TO_LAT))
+const LAT_KEYS = new Set(Object.values(CYR_TO_LAT))
+
+// Перевод одиночного значения. Если строка не распознана — возвращаем как есть.
+function latToCyr(s) {
+  return (typeof s === 'string' && LAT_TO_CYR[s]) ? LAT_TO_CYR[s] : s
+}
+function cyrToLat(s) {
+  return (typeof s === 'string' && CYR_TO_LAT[s]) ? CYR_TO_LAT[s] : s
+}
+
+// Поля, в которых лежит одиночный код аспекта. Если значение — кир.
+// аспект-код, переводим в лат.
+const ASPECT_VALUE_FIELDS = new Set(['aspect', 'currentAspect', 'focus_aspect'])
+
+// Эвристика: ключи объекта — карта по аспектам? Все ключи должны быть
+// валидными кир./лат. кодами (и не пусто). Используется для нормализации
+// scores-подобных мап.
+function looksLikeAspectMap(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false
+  const keys = Object.keys(obj)
+  if (keys.length === 0) return false
+  for (const k of keys) {
+    if (!CYR_KEYS.has(k) && !LAT_KEYS.has(k)) return false
+  }
+  return true
+}
+
+// Рекурсивно проходит по структуре, переводя:
+//   • значения полей aspect/currentAspect/focus_aspect (Cyr→Lat);
+//   • элементы массива focus_aspects (Cyr→Lat);
+//   • ключи объектов, в которых ВСЕ ключи — аспект-коды (Cyr→Lat).
+// Не трогает journey-blob: на границе передаём skipJourney=true.
+function translateAspectsInResponse(node, opts = {}) {
+  const { skipJourneyBlob = false } = opts
+  if (node === null || node === undefined) return node
+  if (Array.isArray(node)) {
+    return node.map(item => translateAspectsInResponse(item, opts))
+  }
+  if (typeof node !== 'object') return node
+
+  // Если это аспект-keyed map — переводим ключи, не лезем в значения
+  // глубже (они могут быть числами или объектами без аспект-полей).
+  if (looksLikeAspectMap(node)) {
+    const out = {}
+    for (const [k, v] of Object.entries(node)) {
+      const newKey = CYR_TO_LAT[k] ?? k
+      out[newKey] = translateAspectsInResponse(v, opts)
+    }
+    return out
+  }
+
+  const out = {}
+  for (const [k, v] of Object.entries(node)) {
+    if (skipJourneyBlob && k === 'journey') {
+      // Сохраняем journey-blob как есть, миграция в JourneyView.
+      out[k] = v
+      continue
+    }
+    if (ASPECT_VALUE_FIELDS.has(k) && typeof v === 'string') {
+      out[k] = cyrToLat(v)
+    } else if (k === 'focus_aspects' && Array.isArray(v)) {
+      out[k] = v.map(x => (typeof x === 'string' ? cyrToLat(x) : x))
+    } else {
+      out[k] = translateAspectsInResponse(v, opts)
+    }
+  }
+  return out
+}
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -104,68 +191,97 @@ export function logout() {
 // ── Sync ──────────────────────────────────────────────────────────────────────
 
 export async function fetchBotState() {
-  return request('GET', '/api/sync/bot-state')
+  const data = await request('GET', '/api/sync/bot-state')
+  // bs.current_aspect и bs.aspects[].aspect — из BD кириллица. Переводим.
+  return translateAspectsInResponse(data)
 }
 
 // Bot → Web event-лог. На первом хите (если у юзера TG залинкован) бэк сам
 // материализует прошлый прогресс из user_state. Возвращает { events, last_id }.
 // Любая ошибка — на стороне фронта ловим через .catch и продолжаем без events.
 export async function fetchEvents(sinceId = 0) {
-  return request('GET', `/api/events?since_id=${sinceId}`)
+  const data = await request('GET', `/api/events?since_id=${sinceId}`)
+  // events[].aspect — кириллица в БД.
+  return translateAspectsInResponse(data)
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
 export async function fetchState() {
-  return request('GET', '/api/state')
+  const data = await request('GET', '/api/state')
+  // journey-blob НЕ трогаем (миграция в JourneyView.migrateState).
+  return translateAspectsInResponse(data, { skipJourneyBlob: true })
 }
 
 export async function saveState({ journey, history } = {}) {
+  // journey хранится как JSONB — бэкенд только пишет/читает as-is, без
+  // фильтров по ключам. Поэтому отправляем латинские ключи как есть.
   return request('PUT', '/api/state', { journey, history })
 }
 
 // ── Scores ────────────────────────────────────────────────────────────────────
 
 export async function fetchScores() {
-  return request('GET', '/api/scores')
+  const data = await request('GET', '/api/scores')
+  // scores: { 'БС': 5, ... } → { 'Si': 5, ... }
+  return translateAspectsInResponse(data)
 }
 
 export async function saveScores(scores) {
-  return request('PUT', '/api/scores', scores)
+  // Бэкенд хранит web_scores с кириллической колонкой aspect.
+  // Переводим ключи Lat→Cyr на отправку.
+  const cyrScores = {}
+  for (const [k, v] of Object.entries(scores ?? {})) {
+    cyrScores[latToCyr(k)] = v
+  }
+  return request('PUT', '/api/scores', cyrScores)
 }
 
 // ── Diary ─────────────────────────────────────────────────────────────────────
 
 export async function fetchDiary() {
-  return request('GET', '/api/diary')
+  const data = await request('GET', '/api/diary')
+  return translateAspectsInResponse(data)
 }
 
 export async function postDiaryEntry({ text, aspect, source = 'web', extra }) {
-  return request('POST', '/api/diary', { text, aspect, source, extra })
+  return request('POST', '/api/diary', {
+    text, aspect: latToCyr(aspect), source, extra,
+  })
 }
 
 // ── Profile / community ───────────────────────────────────────────────────────
 
 export async function fetchMyProfile() {
-  return request('GET', '/api/profile/me')
+  const data = await request('GET', '/api/profile/me')
+  return translateAspectsInResponse(data)
 }
 
 export async function updateMyProfile(patch) {
-  return request('PUT', '/api/profile/me', patch)
+  // patch может содержать focus_aspects: ['Si', 'Fe', ...] — переводим в кир.
+  const out = { ...(patch ?? {}) }
+  if (Array.isArray(out.focus_aspects)) {
+    out.focus_aspects = out.focus_aspects.map(latToCyr)
+  }
+  const data = await request('PUT', '/api/profile/me', out)
+  return translateAspectsInResponse(data)
 }
 
 export async function fetchPublicProfile(userId) {
-  return request('GET', `/api/profile/${userId}`)
+  const data = await request('GET', `/api/profile/${userId}`)
+  return translateAspectsInResponse(data)
 }
 
 export async function fetchMyInsights() {
-  return request('GET', '/api/profile/me/insights')
+  const data = await request('GET', '/api/profile/me/insights')
+  return translateAspectsInResponse(data)
 }
 
 export async function postInsight({ aspect, kind = 'insight', text, isPublic = true }) {
-  return request('POST', '/api/profile/insights', {
-    aspect, kind, text, is_public: isPublic,
+  const data = await request('POST', '/api/profile/insights', {
+    aspect: latToCyr(aspect), kind, text, is_public: isPublic,
   })
+  return translateAspectsInResponse(data)
 }
 
 export async function deleteInsight(id) {
@@ -177,7 +293,8 @@ export async function toggleInsightLike(id) {
 }
 
 export async function fetchInsightReactions(id) {
-  return request('GET', `/api/profile/insights/${id}/reactions`)
+  const data = await request('GET', `/api/profile/insights/${id}/reactions`)
+  return translateAspectsInResponse(data)
 }
 
 // reaction: 'heart'|'thanks'|'aha'|'fire', опциональный коммент.
@@ -213,39 +330,47 @@ export async function fetchHeatmap(userId, days = 180) {
 }
 
 // ── Холл аспекта ────────────────────────────────────────────────────────────
+// Path-параметр {aspect} в холл-роутах должен быть кириллицей (БД хранит так).
 
 export async function fetchHallOverview(aspect) {
-  return request('GET', `/api/hall/${encodeURIComponent(aspect)}/overview`)
+  const data = await request('GET', `/api/hall/${encodeURIComponent(latToCyr(aspect))}/overview`)
+  return translateAspectsInResponse(data)
 }
 
 export async function fetchHallMessages(aspect, sinceId = 0, limit = 100) {
-  return request('GET', `/api/hall/${encodeURIComponent(aspect)}/messages?since_id=${sinceId}&limit=${limit}`)
+  const data = await request('GET', `/api/hall/${encodeURIComponent(latToCyr(aspect))}/messages?since_id=${sinceId}&limit=${limit}`)
+  return translateAspectsInResponse(data)
 }
 
 export async function postHallMessage(aspect, text) {
-  return request('POST', `/api/hall/${encodeURIComponent(aspect)}/messages`, { text })
+  const data = await request('POST', `/api/hall/${encodeURIComponent(latToCyr(aspect))}/messages`, { text })
+  return translateAspectsInResponse(data)
 }
 
 export async function deleteHallMessage(aspect, messageId) {
-  return request('DELETE', `/api/hall/${encodeURIComponent(aspect)}/messages/${messageId}`)
+  return request('DELETE', `/api/hall/${encodeURIComponent(latToCyr(aspect))}/messages/${messageId}`)
 }
 
 export async function fetchHallInsights(aspect, sort = 'new') {
-  return request('GET', `/api/hall/${encodeURIComponent(aspect)}/insights?sort=${sort}`)
+  const data = await request('GET', `/api/hall/${encodeURIComponent(latToCyr(aspect))}/insights?sort=${sort}`)
+  return translateAspectsInResponse(data)
 }
 
 export async function fetchHallLeaderboard(aspect) {
-  return request('GET', `/api/hall/${encodeURIComponent(aspect)}/leaderboard`)
+  const data = await request('GET', `/api/hall/${encodeURIComponent(latToCyr(aspect))}/leaderboard`)
+  return translateAspectsInResponse(data)
 }
 
 export async function fetchHallInspirations(aspect) {
-  return request('GET', `/api/hall/${encodeURIComponent(aspect)}/inspirations`)
+  const data = await request('GET', `/api/hall/${encodeURIComponent(latToCyr(aspect))}/inspirations`)
+  return translateAspectsInResponse(data)
 }
 
 // ── Уведомления ────────────────────────────────────────────────────────────
 
 export async function fetchNotifications(limit = 30) {
-  return request('GET', `/api/notifications?limit=${limit}`)
+  const data = await request('GET', `/api/notifications?limit=${limit}`)
+  return translateAspectsInResponse(data)
 }
 
 export async function fetchUnreadCount() {
@@ -280,37 +405,42 @@ export async function fetchDMUnreadCount() {
 }
 
 // ── Трекер привычек ───────────────────────────────────────────────────────
+// {aspect} в path и body — кириллица для бэкенда.
 
 export async function fetchHabitsToday() {
-  return request('GET', '/api/habits/today')
+  const data = await request('GET', '/api/habits/today')
+  return translateAspectsInResponse(data)
 }
 
 export async function fetchMyHabits() {
-  return request('GET', '/api/habits/me')
+  const data = await request('GET', '/api/habits/me')
+  return translateAspectsInResponse(data)
 }
 
 export async function chooseHabit({ aspect, title, exerciseId = null }) {
-  return request('POST', '/api/habits/choose', {
-    aspect,
+  const data = await request('POST', '/api/habits/choose', {
+    aspect: latToCyr(aspect),
     title,
     exercise_id: exerciseId,
   })
+  return translateAspectsInResponse(data)
 }
 
 export async function clearHabit(aspect) {
-  return request('DELETE', `/api/habits/${encodeURIComponent(aspect)}`)
+  return request('DELETE', `/api/habits/${encodeURIComponent(latToCyr(aspect))}`)
 }
 
 export async function fetchHabitsHistory(aspect, days = 90) {
-  return request('GET', `/api/habits/${encodeURIComponent(aspect)}/history?days=${days}`)
+  const data = await request('GET', `/api/habits/${encodeURIComponent(latToCyr(aspect))}/history?days=${days}`)
+  return translateAspectsInResponse(data)
 }
 
 export async function tickHabit(aspect) {
-  return request('POST', `/api/habits/${encodeURIComponent(aspect)}/tick`)
+  return request('POST', `/api/habits/${encodeURIComponent(latToCyr(aspect))}/tick`)
 }
 
 export async function untickHabit(aspect) {
-  return request('DELETE', `/api/habits/${encodeURIComponent(aspect)}/tick`)
+  return request('DELETE', `/api/habits/${encodeURIComponent(latToCyr(aspect))}/tick`)
 }
 
 // ── Серверный стрик ──────────────────────────────────────────────────────
@@ -326,29 +456,35 @@ export async function activateShield() {
 // ── Q&A в холле ──────────────────────────────────────────────────────────
 
 export async function fetchHallQuestions(aspect, limit = 30) {
-  return request('GET', `/api/hall/${encodeURIComponent(aspect)}/questions?limit=${limit}`)
+  const data = await request('GET', `/api/hall/${encodeURIComponent(latToCyr(aspect))}/questions?limit=${limit}`)
+  return translateAspectsInResponse(data)
 }
 
 export async function fetchHallQuestion(aspect, questionId) {
-  return request('GET', `/api/hall/${encodeURIComponent(aspect)}/questions/${questionId}`)
+  const data = await request('GET', `/api/hall/${encodeURIComponent(latToCyr(aspect))}/questions/${questionId}`)
+  return translateAspectsInResponse(data)
 }
 
 export async function postHallQuestion(aspect, text) {
-  return request('POST', `/api/hall/${encodeURIComponent(aspect)}/questions`, { text })
+  const data = await request('POST', `/api/hall/${encodeURIComponent(latToCyr(aspect))}/questions`, { text })
+  return translateAspectsInResponse(data)
 }
 
 export async function postHallAnswer(aspect, questionId, text) {
-  return request('POST', `/api/hall/${encodeURIComponent(aspect)}/questions/${questionId}/answer`, { text })
+  const data = await request('POST', `/api/hall/${encodeURIComponent(latToCyr(aspect))}/questions/${questionId}/answer`, { text })
+  return translateAspectsInResponse(data)
 }
 
 export async function markBestAnswer(aspect, questionId, answerId) {
-  return request('POST', `/api/hall/${encodeURIComponent(aspect)}/questions/${questionId}/answers/${answerId}/best`)
+  const data = await request('POST', `/api/hall/${encodeURIComponent(latToCyr(aspect))}/questions/${questionId}/answers/${answerId}/best`)
+  return translateAspectsInResponse(data)
 }
 
 // ── Закладки ─────────────────────────────────────────────────────────────
 
 export async function fetchMyBookmarks() {
-  return request('GET', '/api/bookmarks')
+  const data = await request('GET', '/api/bookmarks')
+  return translateAspectsInResponse(data)
 }
 
 export async function bookmarkInsight(insightId) {
@@ -363,13 +499,15 @@ export async function unbookmarkInsight(insightId) {
 
 export async function searchAll(q, scope = 'all', limit = 20) {
   const url = `/api/search?q=${encodeURIComponent(q)}&scope=${scope}&limit=${limit}`
-  return request('GET', url)
+  const data = await request('GET', url)
+  return translateAspectsInResponse(data)
 }
 
 // ── Дашборд ──────────────────────────────────────────────────────────────
 
 export async function fetchDashboard() {
-  return request('GET', '/api/dashboard')
+  const data = await request('GET', '/api/dashboard')
+  return translateAspectsInResponse(data)
 }
 
 // ── Импортированные структуры дневника ──────────────────────────────────
@@ -421,7 +559,8 @@ export async function reactToInsight(id, reaction = 'heart') {
 }
 
 export async function fetchLeaderboard(limit = 20) {
-  return request('GET', `/api/leaderboard?limit=${limit}`)
+  const data = await request('GET', `/api/leaderboard?limit=${limit}`)
+  return translateAspectsInResponse(data)
 }
 
 // ── Coach (AI summon) ─────────────────────────────────────────────────────────
@@ -431,15 +570,17 @@ export async function fetchCoachQuota() {
 }
 
 export async function summonCoach({ prompt, focusAspect = null, payWithStardust = false }) {
-  return request('POST', '/api/coach/summon', {
+  const data = await request('POST', '/api/coach/summon', {
     prompt,
-    focus_aspect: focusAspect,
+    focus_aspect: focusAspect ? latToCyr(focusAspect) : null,
     pay_with_stardust: payWithStardust,
   })
+  return translateAspectsInResponse(data)
 }
 
 export async function fetchCoachHistory(limit = 20) {
-  return request('GET', `/api/coach/history?limit=${limit}`)
+  const data = await request('GET', `/api/coach/history?limit=${limit}`)
+  return translateAspectsInResponse(data)
 }
 
 export { getToken, setToken }
