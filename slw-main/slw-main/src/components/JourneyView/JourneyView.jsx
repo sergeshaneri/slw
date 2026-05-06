@@ -9,6 +9,12 @@ import {
   buildSurveyStatements, getCompletedPasses,
   ARCHETYPE_KEYS, SKILL_TREE
 } from '../../data/journey/skills'
+import { resolveSurvey, isNeSkill } from '../../data/journey/skills/resolve'
+import {
+  ALL_SKILL_IDS as CHE_SKILL_IDS,
+  SURVEYS_CHE,
+  calcCheScoreFromSkills
+} from '../../data/journey/che-skills'
 import Onboarding from './Onboarding'
 import Chat from './Chat'
 import LevelComplete from './LevelComplete'
@@ -672,7 +678,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     const trimmedInsight = (insightText ?? '').trim()
     if (trimmedInsight) {
       const active = state.activeSurvey
-      const survey = active ? getSurvey(active.skillId) : null
+      const survey = active ? resolveSurvey(active.skillId) : null
       const stmts = survey
         ? buildSurveyStatements(survey, active.mode ?? 'short', active.startPass ?? 1)
         : []
@@ -698,7 +704,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setState(s => {
       const active = s.activeSurvey
       if (!active) return s
-      const survey = getSurvey(active.skillId)
+      const survey = resolveSurvey(active.skillId)
       if (!survey) return s
       const stmts = buildSurveyStatements(survey, active.mode ?? 'short', active.startPass ?? 1)
       const current = stmts[active.stepIndex ?? 0]
@@ -755,7 +761,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   const handleSurveyInsight = useCallback((insightText) => {
     const active = state.activeSurvey
     if (!active) return
-    const survey = getSurvey(active.skillId)
+    const survey = resolveSurvey(active.skillId)
     if (!survey) return
 
     const result = calcSurveyResult(active.answers)
@@ -807,10 +813,14 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       setTimeout(() => deliverScript(nextIdx), 100)
     }
 
+    // Пересчёт средних: и БС, и ЧЭ. Каждый calc смотрит только в свои id,
+    // так что один newSkills корректно обновляет оба score одновременно.
     const bsScore = calcBSScoreFromSkills(newSkills)
-    if (Number.isFinite(bsScore)) {
-      onScoresChange({ ...scores, БС: Math.round(bsScore) })
-    }
+    const cheScore = calcCheScoreFromSkills(newSkills)
+    const nextScores = { ...scores }
+    if (Number.isFinite(bsScore))  nextScores['БС'] = Math.round(bsScore)
+    if (Number.isFinite(cheScore)) nextScores['ЧЭ'] = Math.round(cheScore)
+    onScoresChange(nextScores)
 
     // Запись в дневник.
     const script = scripts.find(sc => sc.id === active.scriptId)
@@ -900,6 +910,39 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   //   - Иначе → открываем экран выбора режима (short / full).
   // Анкета лежит в currentLevel.surveys (отдельный массив, не в core-чате).
   const handleStartSkillSurvey = useCallback((skillId) => {
+    const skillEntry = state.skills?.[skillId]
+    const draft = skillEntry?.draft
+
+    // ЧИ — анкеты живут отдельно (NE_SURVEYS из ne-skills.js), не как
+    // journey-скрипты. Используем синтетический scriptId. Аспект в
+    // state остаётся 'ЧИ' (юзер пришёл из Колеса ЧИ).
+    if (isNeSkill(skillId)) {
+      if (draft) {
+        setState(s => ({
+          ...s,
+          currentAspect: 'ЧИ',
+          screen: 'survey',
+          activeSurvey: {
+            scriptId: `ne-survey-${skillId}`,
+            skillId,
+            mode: draft.mode ?? 'short',
+            startPass: draft.startPass ?? 1,
+            stepIndex: draft.stepIndex ?? 0,
+            answers: draft.answers ?? {},
+          },
+        }))
+        return
+      }
+      if (getNextPass(skillEntry) === 0) return
+      setState(s => ({
+        ...s,
+        currentAspect: 'ЧИ',
+        screen: 'survey-choice',
+        activeSurvey: { scriptId: `ne-survey-${skillId}`, skillId },
+      }))
+      return
+    }
+
     // Определяем аспект по skill ID. У ЧЭ-навыков id с префиксом `che-`,
     // их анкеты живут инлайн в core (CSURV-1..3 в che-l0.md), у БС —
     // в отдельном пуле levels[0].surveys.
@@ -914,9 +957,6 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     ]
     const target = allSteps.find(s => s.type === 'survey' && s.skill === skillId)
     if (!target) return
-
-    const skillEntry = state.skills?.[skillId]
-    const draft = skillEntry?.draft
 
     if (draft) {
       // Продолжаем как было — без выбора. currentScriptId не трогаем:
@@ -1108,41 +1148,50 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     })
   }, [setState])
 
-  // 3. Заполнить все 33 навыка по 7/10 (полностью все 3 прохода).
-  //    Сразу пересчитываем БС.
+  // 3. Заполнить все навыки БС и ЧЭ по 7/10 (полностью все 3 прохода).
+  //    Сразу пересчитываем средние по обоим аспектам.
+  //    ЧИ-навыки сейчас не заполняем — для них admin-функция пока не нужна.
   const handleAdminFillAllSkills = useCallback(() => {
     const completedAt = Date.now()
     const newSkills = {}
-    for (const skillId of ALL_SKILL_IDS) {
-      const survey = SURVEYS[skillId]
-      const blocks = {}
-      const answers = {}
-      if (survey) {
-        for (const key of SURVEY_BLOCK_KEYS) {
-          const arr = survey.blocks[key] ?? []
-          if (arr.length > 0) {
-            blocks[key] = 7
-            answers[key] = arr.map(() => 7)
+    const fillFromSurveys = (skillIds, surveysMap) => {
+      for (const skillId of skillIds) {
+        const survey = surveysMap[skillId]
+        const blocks = {}
+        const answers = {}
+        if (survey) {
+          for (const key of SURVEY_BLOCK_KEYS) {
+            const arr = survey.blocks[key] ?? []
+            if (arr.length > 0) {
+              blocks[key] = 7
+              answers[key] = arr.map(() => 7)
+            }
           }
+        } else {
+          for (const key of SURVEY_BLOCK_KEYS) blocks[key] = 7
         }
-      } else {
-        for (const key of SURVEY_BLOCK_KEYS) blocks[key] = 7
-      }
-      newSkills[skillId] = {
-        result: 7,
-        blocks,
-        completedAt,
-        answers,
-        passes: 3,
-        insights: [],
-        _admin: true
+        newSkills[skillId] = {
+          result: 7,
+          blocks,
+          completedAt,
+          answers,
+          passes: 3,
+          insights: [],
+          _admin: true
+        }
       }
     }
+    fillFromSurveys(ALL_SKILL_IDS, SURVEYS)
+    fillFromSurveys(CHE_SKILL_IDS, SURVEYS_CHE)
+
     setState(s => ({ ...s, skills: newSkills }))
+
     const bs = calcBSScoreFromSkills(newSkills)
-    if (Number.isFinite(bs)) {
-      onScoresChange({ ...scores, БС: Math.round(bs) })
-    }
+    const che = calcCheScoreFromSkills(newSkills)
+    const next = { ...scores }
+    if (Number.isFinite(bs))  next['БС'] = Math.round(bs)
+    if (Number.isFinite(che)) next['ЧЭ'] = Math.round(che)
+    onScoresChange(next)
   }, [scores, onScoresChange, setState])
 
   // 4. Прыжок на конкретный уровень. Сбрасываем core-индекс, подаём
@@ -1214,9 +1263,11 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     }
     setState(s => ({ ...s, skills: newSkills, screen: 'skill-tree' }))
     const bs = calcBSScoreFromSkills(newSkills)
-    if (Number.isFinite(bs)) {
-      onScoresChange({ ...scores, БС: Math.round(bs) })
-    }
+    const che = calcCheScoreFromSkills(newSkills)
+    const next = { ...scores }
+    if (Number.isFinite(bs))  next['БС'] = Math.round(bs)
+    if (Number.isFinite(che)) next['ЧЭ'] = Math.round(che)
+    onScoresChange(next)
   }, [state.skills, scores, onScoresChange, setState])
 
   const currentScript = scripts[a.currentScriptIndex]
@@ -1358,7 +1409,9 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       {state.screen === 'skill-tree' && state.currentAspect === 'ЧИ' && (
         <NeSkillTree
           accent={accent}
+          skills={state.skills ?? {}}
           onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
+          onStartSkill={handleStartSkillSurvey}
           onOpenPlanetMap={handleOpenPlanetMap}
         />
       )}
@@ -1396,10 +1449,10 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       )}
 
       {state.screen === 'survey-choice' && state.activeSurvey && (() => {
-        // Найдём имя навыка для заголовка — сначала через getSurvey (универсально для БС и ЧЭ),
+        // Найдём имя навыка для заголовка — сначала через resolveSurvey (универсально для всех аспектов),
         // потом через БС-дерево как фолбэк для случая, когда анкета ещё не загружена.
         let name = state.activeSurvey.skillId
-        const survey = getSurvey(state.activeSurvey.skillId)
+        const survey = resolveSurvey(state.activeSurvey.skillId)
         if (survey?.name) {
           name = survey.name
         } else {

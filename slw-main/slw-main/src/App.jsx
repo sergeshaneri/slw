@@ -361,6 +361,28 @@ export default function App() {
     setView('journey')
   }
 
+  const goToCheSurveys = async () => {
+    if (!user && !devAdmin) {
+      setShowAuth(true)
+      return
+    }
+    // L0 ЧЭ должен быть пройден (currentLevel >= 1). Админу можно всегда.
+    const cheFolder = journey?.aspects?.['ЧЭ'] ?? {}
+    if (!isAdmin && (cheFolder.currentLevel ?? 0) < 1) {
+      return
+    }
+    await saveJourney({
+      ...journey,
+      currentAspect: 'ЧЭ',
+      screen: 'skill-tree',
+      aspects: {
+        ...(journey?.aspects ?? {}),
+        'ЧЭ': { ...cheFolder, awaitingInput: null },
+      },
+    })
+    setView('journey')
+  }
+
   const handleAuthSuccess = (userData) => {
     onAuthSuccess(userData)
     setShowAuth(false)
@@ -594,6 +616,7 @@ export default function App() {
             onDiaryChange={saveDiary}
             journey={journey}
             onGoToBSSurveys={goToBSSurveys}
+            onGoToCheSurveys={goToCheSurveys}
             onEnterHall={enterHall}
             t={t}
           />

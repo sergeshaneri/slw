@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { getSurvey, buildSurveyStatements, SURVEY_BLOCKS } from '../../data/journey/skills'
+import { buildSurveyStatements, SURVEY_BLOCKS } from '../../data/journey/skills'
+import { resolveSurvey } from '../../data/journey/skills/resolve'
 import Slider from './Slider'
 import styles from './JourneyView.module.css'
 
@@ -15,7 +16,7 @@ const INSIGHT_HINT_KEY = 'survey_insight_hint_dismissed'
 //   short → 5 утверждений (только startPass)
 //   full  → все утверждения от startPass до 3 (5/10/15)
 export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, onComplete, onCancel }) {
-  const survey = getSurvey(activeSurvey.skillId)
+  const survey = resolveSurvey(activeSurvey.skillId)
   const mode = activeSurvey.mode ?? 'short'
   const startPass = activeSurvey.startPass ?? 1
 

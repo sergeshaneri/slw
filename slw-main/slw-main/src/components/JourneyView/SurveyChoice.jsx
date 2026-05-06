@@ -1,4 +1,5 @@
-import { getSurvey, getCompletedPasses } from '../../data/journey/skills'
+import { getCompletedPasses } from '../../data/journey/skills'
+import { resolveSurvey } from '../../data/journey/skills/resolve'
 import styles from './JourneyView.module.css'
 
 /**
@@ -16,7 +17,7 @@ import styles from './JourneyView.module.css'
  *   onCancel: () => void
  */
 export default function SurveyChoice({ skillId, skillName, skillEntry, accent, onChoose, onCancel }) {
-  const survey = getSurvey(skillId)
+  const survey = resolveSurvey(skillId)
   const passesDone = getCompletedPasses(skillEntry)
   const nextPass = passesDone + 1
   const remainingPasses = 3 - passesDone   // 3, 2 или 1

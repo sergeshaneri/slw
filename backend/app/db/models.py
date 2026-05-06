@@ -402,6 +402,78 @@ class UserStreak(Base):
     updated_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
 
 
+class AnalyticsReport(Base):
+    """Аналитический отчёт за период (неделя/месяц/произвольный).
+    Импортируется из vault'а (`analytics/29.03-05.04.md`) или генерируется
+    ИИ-коучем по template'у `review promt.md`.
+    """
+    __tablename__ = "analytics_reports"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    web_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("web_users.id"))
+    type: Mapped[str] = mapped_column(Text)               # 'week' | 'month' | 'custom'
+    period_start: Mapped[str] = mapped_column(Text)       # 'YYYY-MM-DD'
+    period_end: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(Text)             # 'imported' | 'generated'
+    title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content_md: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class AspectGoal(Base):
+    """Цели юзера по конкретному аспекту. Импортируются из
+    `goals/{аспект}.md`. Один файл = одна запись (markdown целиком).
+    Короткие goals[] из public_profiles остаются для публичного UI.
+    """
+    __tablename__ = "aspect_goals"
+
+    web_user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("web_users.id"), primary_key=True
+    )
+    aspect: Mapped[str] = mapped_column(Text, primary_key=True)  # 'БС'/'ЧИ'/...
+    content_md: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class Emotion(Base):
+    """Эмоция за день. Парсится из таблицы дневника
+    («Эмоция / Интенсивность / Триггер / Ощущение / Корни / Урок / Что сделал»).
+    """
+    __tablename__ = "emotions"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    web_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("web_users.id"))
+    diary_entry_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # FK к web_diary_entries.id, опционально
+    date: Mapped[str] = mapped_column(Text)               # 'YYYY-MM-DD' дня дневника
+    name: Mapped[str] = mapped_column(Text)
+    intensity: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    trigger: Mapped[str | None] = mapped_column(Text, nullable=True)
+    body_sensation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    roots: Mapped[str | None] = mapped_column(Text, nullable=True)
+    lesson: Mapped[str | None] = mapped_column(Text, nullable=True)
+    action: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class Training(Base):
+    """Тренировки за день. Парсится из секции «Тренировки» дневника.
+    Свободный формат — одно упражнение на строку с подходами/повторениями.
+    """
+    __tablename__ = "trainings"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    web_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("web_users.id"))
+    diary_entry_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    date: Mapped[str] = mapped_column(Text)
+    exercise: Mapped[str] = mapped_column(Text)
+    sets: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    reps: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    weight_kg: Mapped[float | None] = mapped_column(Numeric, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
 class UserHabit(Base):
     """Выбранная юзером ежедневная практика для аспекта.
     По одной активной привычке на (user, aspect). Юзер сам формулирует

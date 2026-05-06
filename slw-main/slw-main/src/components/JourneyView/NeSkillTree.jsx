@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE, COMMON_BASE_SKILLS,
-  getSkillsForArchetype, ALL_SKILL_IDS
-} from '../../data/journey/skills/ne-tree'
+  getSkillsForArchetype, ALL_SKILL_IDS,
+  calcNeArchetypeAvg, getNeSkillProgress
+} from '../../data/journey/skills/ne-skills'
+import { getCompletedPasses } from '../../data/journey/skills'
 import styles from './JourneyView.module.css'
 
-// Колесо ЧИ — read-only дерево 36 навыков по 4 архетипам
+// Колесо ЧИ — интерактивное дерево 36 навыков по 4 архетипам
 // (Мудрец, Первооткрыватель, Катализатор, Визионер).
 //
 // 3 общих базовых навыка (Внимание к сути, Метапознание, Mindfulness)
@@ -13,12 +15,31 @@ import styles from './JourneyView.module.css'
 // сверху, помеченные «общий», и входят в средний подсчёт каждого
 // архетипа.
 //
-// Анкеты по навыкам ЧИ пока не реализованы — это задел на будущее.
-// Пользователь видит структуру и может изучить состав, но не может
-// проходить анкеты как у БС. Когда анкеты появятся, компонент можно
-// будет расширить (или объединить с SkillTree через aspect-prop).
+// Анкеты: 36 анкет (3 общих + 33 специфичных) — те же 5 блоков × 3
+// утверждения, что у БС. Прогрессивная: 5 / 10 / 15 утверждений.
+// Источник — `ne-surveys.md` (копия `Ne/вопросы для оценки навыков ЧИ.md`).
 
-export default function NeSkillTree({ accent, onClose, onOpenPlanetMap }) {
+function statusFor(skillState) {
+  if (!skillState) return { kind: 'idle' }
+  if (skillState.draft) {
+    const d = skillState.draft
+    return {
+      kind: 'draft',
+      mode: d.mode ?? 'short',
+      startPass: d.startPass ?? d.pass ?? 1,
+      stepIndex: d.stepIndex ?? d.blockIndex ?? 0,
+    }
+  }
+  const passes = getCompletedPasses(skillState)
+  if (passes === 0) return { kind: 'idle' }
+  if (passes >= 3) return { kind: 'full', avg: skillState.result }
+  if (passes === 2) return { kind: 'medium', avg: skillState.result }
+  return { kind: 'light', avg: skillState.result }
+}
+
+export default function NeSkillTree({ accent, skills, onClose, onStartSkill, onOpenPlanetMap }) {
+  const progress = getNeSkillProgress(skills ?? {})
+
   // По умолчанию все ветки свёрнуты — 36 навыков сразу пугают.
   const [expanded, setExpanded] = useState(() => new Set())
   const toggleBranch = (key) => {
@@ -45,7 +66,7 @@ export default function NeSkillTree({ accent, onClose, onOpenPlanetMap }) {
         <div className={styles.treeHeaderTitleBlock}>
           <div className={styles.treeHeaderTitle}>Навыки ЧИ</div>
           <div className={styles.treeHeaderSub}>
-            {ALL_SKILL_IDS.length} навыков · 4 архетипа
+            {progress.completed} / {progress.total} оценено · 4 архетипа
           </div>
         </div>
         {onOpenPlanetMap && (
@@ -62,6 +83,13 @@ export default function NeSkillTree({ accent, onClose, onOpenPlanetMap }) {
         )}
       </div>
 
+      <div className={styles.treeProgress}>
+        <div
+          className={styles.treeProgressFill}
+          style={{ width: `${(progress.completed / progress.total) * 100}%` }}
+        />
+      </div>
+
       <div className={styles.treeNote}>
         В каждом архетипе три общих базовых сверху —{' '}
         {COMMON_BASE_SKILLS.map(s => s.name.replace(/\s*\(.*\)/, '')).join(', ')}.
@@ -73,6 +101,10 @@ export default function NeSkillTree({ accent, onClose, onOpenPlanetMap }) {
           const arche = ARCHETYPES[key]
           const allSkillsInBranch = getSkillsForArchetype(key)
           const specificCount = (SKILL_TREE[key] ?? []).length
+          const branchAvg = calcNeArchetypeAvg(skills ?? {}, key)
+          const completedInBranch = allSkillsInBranch.filter(
+            s => Number.isFinite(skills?.[s.id]?.result)
+          ).length
           const isOpen = expanded.has(key)
           return (
             <section key={key} className={styles.treeBranch}>
@@ -85,16 +117,22 @@ export default function NeSkillTree({ accent, onClose, onOpenPlanetMap }) {
                 <div className={styles.treeBranchTitleRow}>
                   <span className={styles.treeBranchGlyph}>{arche.glyph}</span>
                   <span className={styles.treeBranchName}>{arche.name}</span>
-                  <span className={styles.treeBranchCount}>{allSkillsInBranch.length}</span>
+                  <span className={styles.treeBranchCount}>
+                    {completedInBranch} / {allSkillsInBranch.length}
+                  </span>
                   <span className={styles.treeBranchChevron} aria-hidden="true">
                     {isOpen ? '▴' : '▾'}
                   </span>
                 </div>
                 <div className={styles.treeBranchSubRow}>
                   <span className={styles.treeBranchSub}>{arche.subtitle}</span>
-                  <span className={styles.treeBranchAvg}>
-                    3 общих + {specificCount} специфичных
-                  </span>
+                  {Number.isFinite(branchAvg) ? (
+                    <span className={styles.treeBranchAvg}>ср. {branchAvg.toFixed(1)}</span>
+                  ) : (
+                    <span className={styles.treeBranchAvg}>
+                      3 общих + {specificCount} специфичных
+                    </span>
+                  )}
                 </div>
               </button>
 
@@ -102,19 +140,39 @@ export default function NeSkillTree({ accent, onClose, onOpenPlanetMap }) {
                 <>
                   <div className={styles.treeBranchBlurb}>{arche.blurb}</div>
                   <ul className={styles.treeSkillList}>
-                    {allSkillsInBranch.map(skill => (
-                      <li key={skill.id} className={styles.treeSkillRow}>
-                        <div className={`${styles.treeSkill} ${styles.treeSkillReadOnly}`}>
-                          <span className={styles.treeSkillName}>
-                            {skill.name}
-                            {skill.isCommon && (
-                              <span className={styles.treeSkillTag}> · общий</span>
-                            )}
-                          </span>
-                          <span className={styles.treeSkillStatus}>скоро · оценка</span>
-                        </div>
-                      </li>
-                    ))}
+                    {allSkillsInBranch.map(skill => {
+                      const st = statusFor(skills?.[skill.id])
+                      const cls =
+                        st.kind === 'full'   ? styles.treeSkillDone :
+                        st.kind === 'medium' ? styles.treeSkillMedium :
+                        st.kind === 'light'  ? styles.treeSkillLight :
+                        st.kind === 'draft'  ? styles.treeSkillDraft :
+                        ''
+                      return (
+                        <li key={skill.id} className={styles.treeSkillRow}>
+                          <button
+                            type="button"
+                            className={`${styles.treeSkill} ${cls}`}
+                            onClick={() => onStartSkill?.(skill.id)}
+                            disabled={!onStartSkill}
+                          >
+                            <span className={styles.treeSkillName}>
+                              {skill.name}
+                              {skill.isCommon && (
+                                <span className={styles.treeSkillTag}> · общий</span>
+                              )}
+                            </span>
+                            <span className={styles.treeSkillStatus}>
+                              {st.kind === 'idle'   && 'оценить'}
+                              {st.kind === 'light'  && `${st.avg.toFixed(1)}/10 · 1/3 · углубить`}
+                              {st.kind === 'medium' && `${st.avg.toFixed(1)}/10 · 2/3 · углубить`}
+                              {st.kind === 'full'   && `${st.avg.toFixed(1)}/10 · полная`}
+                              {st.kind === 'draft'  && `${st.mode === 'full' ? 'полный' : 'короткий'} · продолжить`}
+                            </span>
+                          </button>
+                        </li>
+                      )
+                    })}
                   </ul>
                 </>
               )}

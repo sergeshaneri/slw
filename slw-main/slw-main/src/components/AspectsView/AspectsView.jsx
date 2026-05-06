@@ -2,10 +2,11 @@ import { useState, useMemo, useEffect } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
 import { BLOCKS, LEVEL_LABELS, getBlockItems } from './blocks'
 import BSWheel from './BSWheel'
+import CheWheel from './CheWheel'
 import HabitSection from './HabitSection'
 import styles from './AspectsView.module.css'
 
-export default function AspectsView({ selectedAspect, onAspectSelect, scores, onScoreChange, diary, onDiaryChange, journey, onGoToBSSurveys, onEnterHall, t }) {
+export default function AspectsView({ selectedAspect, onAspectSelect, scores, onScoreChange, diary, onDiaryChange, journey, onGoToBSSurveys, onGoToCheSurveys, onEnterHall, t }) {
   const [blockId, setBlockId] = useState(null)
 
   useEffect(() => {
@@ -26,7 +27,7 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, on
     if (!block) {
       return <Toc aspect={selectedAspect} data={data} color={color} available={available}
         scores={scores} onScoreChange={onScoreChange} onAspectSelect={onAspectSelect}
-        journey={journey} onGoToBSSurveys={onGoToBSSurveys} onOpenBlock={setBlockId}
+        journey={journey} onGoToBSSurveys={onGoToBSSurveys} onGoToCheSurveys={onGoToCheSurveys} onOpenBlock={setBlockId}
     onEnterHall={onEnterHall} />
     }
     return (
@@ -49,7 +50,7 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, on
 
   return <Toc aspect={selectedAspect} data={data} color={color} available={available}
     scores={scores} onScoreChange={onScoreChange} onAspectSelect={onAspectSelect}
-    journey={journey} onGoToBSSurveys={onGoToBSSurveys} onOpenBlock={setBlockId}
+    journey={journey} onGoToBSSurveys={onGoToBSSurveys} onGoToCheSurveys={onGoToCheSurveys} onOpenBlock={setBlockId}
     onEnterHall={onEnterHall} />
 }
 
@@ -92,7 +93,7 @@ function AspectsGrid({ scores, onAspectSelect }) {
 
 // ─── Оглавление аспекта ────────────────────────────────────────────────────
 
-function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSelect, journey, onGoToBSSurveys, onOpenBlock, onEnterHall }) {
+function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSelect, journey, onGoToBSSurveys, onGoToCheSurveys, onOpenBlock, onEnterHall }) {
   const byLevel = useMemo(() => {
     const m = { 0: [], 1: [], 2: [], 3: [] }
     available.forEach(b => m[b.level].push(b))
@@ -119,6 +120,17 @@ function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSe
           color={color}
           onContinueSurveys={onGoToBSSurveys}
           isLocked={(journey?.aspects?.['БС']?.currentLevel ?? 0) < 1}
+        />
+      )}
+
+      {/* Колесо ЧЭ с разбивкой по 4 архетипам ЧЭ — только на странице ЧЭ.
+          Заблокировано до прохождения L0 ЧЭ (currentLevel >= 1). */}
+      {aspect === 'ЧЭ' && (
+        <CheWheel
+          skills={journey?.skills ?? {}}
+          color={color}
+          onContinueSurveys={onGoToCheSurveys}
+          isLocked={(journey?.aspects?.['ЧЭ']?.currentLevel ?? 0) < 1}
         />
       )}
 

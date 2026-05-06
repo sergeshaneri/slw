@@ -24,6 +24,7 @@ from app.web.routes.search import router as search_router
 from app.web.routes.state import router as state_router
 from app.web.routes.streak import router as streak_router
 from app.web.routes.sync import router as sync_router
+from app.web.routes.sync_vault import router as sync_vault_router
 
 log = logging.getLogger(__name__)
 
@@ -68,6 +69,7 @@ app.include_router(streak_router, prefix="/api")
 app.include_router(bookmarks_router, prefix="/api")
 app.include_router(search_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
+app.include_router(sync_vault_router, prefix="/api")
 
 
 @app.get("/healthz")

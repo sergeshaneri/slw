@@ -324,6 +324,88 @@ async def apply_ddl() -> None:
     except Exception as e:
         log.warning("user_streaks/user_habits DDL failed: %s", e)
 
+    # Sync с локальным vault: отчёты, цели, эмоции, тренировки
+    # + два ALTER на web_users (diary_template, categorization_rules).
+    try:
+        async with asyncio.timeout(15):
+            async with engine.connect() as conn:
+                await conn.execute(text(
+                    "ALTER TABLE web_users "
+                    "ADD COLUMN IF NOT EXISTS diary_template TEXT"
+                ))
+                await conn.execute(text(
+                    "ALTER TABLE web_users "
+                    "ADD COLUMN IF NOT EXISTS categorization_rules TEXT"
+                ))
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS analytics_reports (
+                        id            BIGSERIAL PRIMARY KEY,
+                        web_user_id   INTEGER NOT NULL,
+                        type          TEXT NOT NULL,
+                        period_start  TEXT NOT NULL,
+                        period_end    TEXT NOT NULL,
+                        source        TEXT NOT NULL,
+                        title         TEXT,
+                        content_md    TEXT NOT NULL,
+                        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS analytics_reports_user_idx "
+                    "ON analytics_reports (web_user_id, period_start DESC)"
+                ))
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS aspect_goals (
+                        web_user_id  INTEGER NOT NULL,
+                        aspect       TEXT NOT NULL,
+                        content_md   TEXT NOT NULL,
+                        updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (web_user_id, aspect)
+                    )
+                """))
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS emotions (
+                        id              BIGSERIAL PRIMARY KEY,
+                        web_user_id     INTEGER NOT NULL,
+                        diary_entry_id  INTEGER,
+                        date            TEXT NOT NULL,
+                        name            TEXT NOT NULL,
+                        intensity       SMALLINT,
+                        trigger         TEXT,
+                        body_sensation  TEXT,
+                        roots           TEXT,
+                        lesson          TEXT,
+                        action          TEXT,
+                        created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS emotions_user_idx "
+                    "ON emotions (web_user_id, date DESC)"
+                ))
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS trainings (
+                        id              BIGSERIAL PRIMARY KEY,
+                        web_user_id     INTEGER NOT NULL,
+                        diary_entry_id  INTEGER,
+                        date            TEXT NOT NULL,
+                        exercise        TEXT NOT NULL,
+                        sets            SMALLINT,
+                        reps            SMALLINT,
+                        weight_kg       NUMERIC,
+                        notes           TEXT,
+                        created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS trainings_user_idx "
+                    "ON trainings (web_user_id, date DESC)"
+                ))
+                await conn.commit()
+    except Exception as e:
+        log.warning("vault-sync DDL failed: %s", e)
+
     # Q&A в холле + закладки.
     try:
         async with asyncio.timeout(15):
