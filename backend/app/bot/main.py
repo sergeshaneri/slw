@@ -99,6 +99,7 @@ def build() -> "Application":
             CommandHandler("go", cmd_go),
             CommandHandler("resume", cmd_resume),
             CommandHandler("start", cmd_start),
+            CommandHandler("reset", cmd_reset),
             CommandHandler("note", cmd_note),
             CommandHandler("profile", cmd_profile),
             CommandHandler("aspect", cmd_aspect),
