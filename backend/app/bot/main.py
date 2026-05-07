@@ -53,7 +53,11 @@ def build() -> "Application":
     """Build and return the configured Application (without starting polling)."""
     app = ApplicationBuilder().token(settings.bot_token).build()
 
-    app.add_handler(CommandHandler("start", cmd_start))
+    # /start теперь сам показывает первый шаг онбординга (для новых юзеров)
+    # или пикер планет, поэтому регистрируется как entry_point ConversationHandler-а —
+    # после возврата IN_SCRIPT юзер оказывается в conv-state и нижние кнопки работают.
+    # На верхнем уровне /start больше не висит, иначе он бы перехватывал апдейт
+    # раньше conv'а и юзер вне state'а с неработающим «Далее ▶».
     app.add_handler(CommandHandler("reload", cmd_reload))
     app.add_handler(CommandHandler("reset", cmd_reset))
     app.add_handler(CommandHandler("profile", cmd_profile))
@@ -64,6 +68,7 @@ def build() -> "Application":
 
     script_conv = ConversationHandler(
         entry_points=[
+            CommandHandler("start", cmd_start),
             CommandHandler("go", cmd_go),
             CommandHandler("resume", cmd_resume),
             CommandHandler("aspect", cmd_aspect),

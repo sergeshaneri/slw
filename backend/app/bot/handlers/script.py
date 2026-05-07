@@ -152,7 +152,11 @@ async def show_step(update: Update, context: ContextTypes.DEFAULT_TYPE, step: St
 async def _advance(update: Update, context: ContextTypes.DEFAULT_TYPE,
                    step_id: str | None) -> int:
     """Продвинуть юзера к следующему шагу в его текущем аспекте.
-    Если аспект кончился — пометить finished и предложить /aspect."""
+
+    Конец «аспекта»:
+      • onboarding — помечаем finished и сразу показываем пикер планет.
+      • реальный аспект — помечаем finished и пишем «пройден полностью!».
+    """
     user_id = update.effective_user.id
     aspect = aspect_of_step(step_id) if step_id else None
     if not aspect:
@@ -162,11 +166,18 @@ async def _advance(update: Update, context: ContextTypes.DEFAULT_TYPE,
     nxt = next_step_for_aspect(aspect, step_id)
     if nxt is None:
         await _mark_aspect_finished(user_id, aspect)
-        await update.message.reply_text(
-            f"Аспект «{aspect}» пройден полностью!\n\n"
-            "Можешь выбрать другой через /aspect.",
-            reply_markup=MAIN_KEYBOARD,
-        )
+        if aspect == "onboarding":
+            await update.message.reply_text(
+                "Теперь выбери, с какой планеты начать путешествие.",
+                reply_markup=MAIN_KEYBOARD,
+            )
+            await show_aspect_picker(update, context)
+        else:
+            await update.message.reply_text(
+                f"Планета «{aspect}» пройдена полностью!\n\n"
+                "Можешь выбрать другую через /aspect.",
+                reply_markup=MAIN_KEYBOARD,
+            )
         return IN_SCRIPT
     return await show_step(update, context, nxt)
 

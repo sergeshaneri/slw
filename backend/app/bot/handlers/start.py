@@ -4,7 +4,7 @@ from sqlalchemy import select
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from app.content.loader import available_aspects
+from app.content.loader import available_aspects, first_step_for_aspect, get_step
 from app.db.models import User, UserAspectState, UserState
 from app.db.session import AsyncSessionLocal
 
@@ -17,6 +17,28 @@ NEXT_INSIGHT_KEYBOARD = _kb("Далее ▶", "Записать инсайт", "
 ACK_KEYBOARD          = _kb("Выполнил ✓", "Профиль")
 SCORE_KEYBOARD        = _kb("Ввести оценку", "Профиль")
 REFLECTION_KEYBOARD   = _kb("Написать ответ", "Профиль")
+
+# Короткие описания планет — те же что в web `data/aspects.js:ASPECT_REALMS`.
+# Показываем рядом с кодом аспекта в InlineKeyboard /aspect-пикера.
+ASPECT_TAGLINES = {
+    "ЧЛ": "мир действий и эффективности",
+    "БЛ": "мир структур и причин",
+    "ЧЭ": "мир эмоций и яркости",
+    "БЭ": "мир чувств и отношений",
+    "ЧС": "мир проявленности и воли",
+    "БС": "мир баланса ощущений",
+    "ЧИ": "мир идей и возможностей",
+    "БИ": "мир подсознания и времени",
+}
+
+ONBOARDING_ASPECT = "onboarding"
+
+
+async def _is_onboarding_finished(user_id: int) -> bool:
+    """True если юзер дошёл до конца онбординга (4 intro-шага)."""
+    async with AsyncSessionLocal() as session:
+        row = await session.get(UserAspectState, (user_id, ONBOARDING_ASPECT))
+    return bool(row and row.finished)
 
 
 async def show_aspect_picker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -54,25 +76,36 @@ async def show_aspect_picker(update: Update, context: ContextTypes.DEFAULT_TYPE)
             marker = "✓ "
         elif asp in started_set:
             marker = "· "
-        buttons.append([InlineKeyboardButton(f"{marker}{asp}", callback_data=f"aspect:{asp}")])
+        tagline = ASPECT_TAGLINES.get(asp, "")
+        label = f"{marker}{asp} · {tagline}" if tagline else f"{marker}{asp}"
+        buttons.append([InlineKeyboardButton(label, callback_data=f"aspect:{asp}")])
 
-    text = "Выбери аспект:"
-    if current_aspect:
+    text = "Выбери планету:"
+    if current_aspect and current_aspect != ONBOARDING_ASPECT:
         text = (
-            "Текущий аспект помечен ✓. Завершённые — 🏆, начатые — ·.\n"
-            "Выбери, в какой аспект перейти:"
+            "Текущая планета — ✓. Завершённые — 🏆, начатые — ·.\n"
+            "Выбери, на какую перейти:"
         )
     msg = update.effective_message
     if msg:
         await msg.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
 
 
-async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Точка входа.
+
+    Логика:
+      • Если юзер уже выбрал реальный аспект (current_aspect ≠ onboarding)
+        → короткое приветствие, кнопка «Продолжить» восстановит шаг.
+      • Если онбординг ещё не закончен → ведём по 4 intro-шагам.
+        После последнего → _advance вернёт пикер (см. script.py).
+      • Если онбординг закончен но аспект не выбран (юзер пробежал
+        онбординг и закрыл бот) → сразу пикер.
+    """
     tg_user = update.effective_user
     async with AsyncSessionLocal() as session:
         user = await session.get(User, tg_user.id)
-        is_new = user is None
-        if is_new:
+        if user is None:
             user = User(
                 id=tg_user.id,
                 username=tg_user.username,
@@ -95,20 +128,44 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         current_aspect = state.current_aspect
 
     name = tg_user.first_name or "друг"
-    await update.message.reply_text(
-        f"Привет, {name}!\n\n"
-        "Я СКБ-коуч — помогу тебе исследовать Соционическое Колесо Баланса.\n\n"
-        "В путешествии 8 аспектов — выбираешь любой и идёшь по нему. "
-        "В любой момент можно сменить аспект через /aspect.",
-        reply_markup=MAIN_KEYBOARD,
-    )
 
-    if not current_aspect:
-        # Новый юзер или вернулся без выбранного аспекта — сразу пикер.
-        await show_aspect_picker(update, context)
-    else:
+    # Поздний импорт — show_step живёт в script.py, который сам импортирует
+    # show_aspect_picker отсюда (кросс-модульный цикл иначе).
+    from app.bot.fsm import IN_SCRIPT
+    from app.bot.handlers.script import show_step
+
+    # 1. Юзер уже выбрал реальный аспект — короткое приветствие.
+    if current_aspect and current_aspect != ONBOARDING_ASPECT:
         await update.message.reply_text(
-            f"Сейчас ты в аспекте «{current_aspect}». "
-            "Жми «Продолжить» или /aspect чтобы переключиться.",
+            f"Привет, {name}! Сейчас ты на планете «{current_aspect}». "
+            "Жми «Продолжить» или /aspect чтобы сменить планету.",
             reply_markup=MAIN_KEYBOARD,
         )
+        return IN_SCRIPT
+
+    # 2. Онбординг ещё не пройден — стартуем (или продолжаем) его.
+    if not await _is_onboarding_finished(tg_user.id):
+        await update.message.reply_text(
+            f"Привет, {name}!\n\n"
+            "Я СКБ-коуч — помогу тебе исследовать Соционическое Колесо Баланса.",
+            reply_markup=MAIN_KEYBOARD,
+        )
+        # Если уже шёл по онбордингу — продолжим с того же шага.
+        step = None
+        if current_aspect == ONBOARDING_ASPECT and state and state.current_step_id:
+            step = get_step(state.current_step_id)
+        if step is None:
+            step = first_step_for_aspect(ONBOARDING_ASPECT)
+        if step is None:
+            # Контента онбординга нет в compiled — fallback на пикер.
+            await show_aspect_picker(update, context)
+            return IN_SCRIPT
+        return await show_step(update, context, step)
+
+    # 3. Онбординг пройден, аспект не выбран — пикер.
+    await update.message.reply_text(
+        f"Привет, {name}! Выбери планету для путешествия.",
+        reply_markup=MAIN_KEYBOARD,
+    )
+    await show_aspect_picker(update, context)
+    return IN_SCRIPT
