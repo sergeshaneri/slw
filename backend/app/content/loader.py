@@ -84,10 +84,15 @@ def first_step() -> Step:
 # конца аспекта возвращаем None — вызывающий код сам ставит finished=true.
 
 def available_aspects() -> list[str]:
-    """Список аспектов, у которых есть хоть один шаг в compiled-контенте."""
+    """Список аспектов, у которых есть хоть один шаг в compiled-контенте.
+    Псевдо-аспект 'onboarding' (мета-секция для intro-флоу) исключаем —
+    в пикере его быть не должно, это не выбор юзера, а сквозной онбординг.
+    """
     seen: list[str] = []
     for s in load_steps():
-        if s.aspect and s.aspect not in seen:
+        if not s.aspect or s.aspect == "onboarding":
+            continue
+        if s.aspect not in seen:
             seen.append(s.aspect)
     return seen
 

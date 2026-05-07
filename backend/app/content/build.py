@@ -1,11 +1,11 @@
 """
 CLI: python -m app.content.build
 Reads:
-  - slw-main/src/data/journey/onboarding.js       (4 onboarding steps)
-  - slw-main/src/data/journey/aspects/bs-l0.md    (BS L0 content)
-  - slw-main/src/data/journey/aspects/bs-l1.md    (BS L1 content)
-  - slw-main/src/data/journey/aspects/bs-l2.md    (BS L2 content)
-  - slw-main/src/data/journey/aspects/bs-l3.md    (BS L3 content, в работе)
+  - slw-main/src/data/journey/onboarding.md       (onboarding steps)
+  - slw-main/src/data/journey/aspects/Si/l0.md    (Si L0 content)
+  - slw-main/src/data/journey/aspects/Si/l1.md    (Si L1 content)
+  - slw-main/src/data/journey/aspects/Si/l2.md    (Si L2 content)
+  - slw-main/src/data/journey/aspects/Si/l3.md    (Si L3 content)
 Writes app/content/compiled.json.
 """
 import json
@@ -101,7 +101,7 @@ def _make_step(*, id, aspect, level, ord, kind, title, body_md,
     }
 
 
-def _parse_bs_md(path: Path, aspect: str, level: int, start_ord: int,
+def _parse_aspect_md(path: Path, aspect: str, level: int, start_ord: int,
                  open_question_prefixes: set[str] | None = None) -> list[dict]:
     text = path.read_text(encoding="utf-8")
     sections = _split_sections(text)
@@ -168,37 +168,51 @@ def _parse_bs_md(path: Path, aspect: str, level: int, start_ord: int,
     return steps
 
 
+# Все 8 аспектов: латинский ключ папки → русский ключ аспекта (как
+# его хранит бот в БД). Порядок не важен — финальный ord проставляется
+# глобально после сбора. open_b — для аспектов, где B-вопросы переведены
+# в open-text без followUp (Si после CONTENT_VERSION=6). Остальные
+# аспекты держат B-вопросы как `question` (шкала 1–10 с реакцией бота
+# на ответ); если у их markdown нет followUp-блоков — бот всё равно
+# спросит число и продолжит без бот-реакции, это ок.
+ASPECTS_PIPELINE: list[tuple[str, str, bool]] = [
+    # (folder, aspect_label, open_b)
+    ("Si", "БС", True),
+    ("Se", "ЧС", False),
+    ("Ti", "БЛ", False),
+    ("Te", "ЧЛ", False),
+    ("Fi", "БЭ", False),
+    ("Fe", "ЧЭ", False),
+    ("Ni", "БИ", False),
+    ("Ne", "ЧИ", False),
+]
+
+
 def build() -> None:
     all_steps: list[dict] = []
 
-    ob_steps = _parse_bs_md(WEB_DATA / "onboarding.md", "onboarding", 0, start_ord=1)
+    ob_steps = _parse_aspect_md(WEB_DATA / "onboarding.md", "onboarding", 0, start_ord=1)
     all_steps.extend(ob_steps)
 
-    # B-1/2/3 на уровне 0 теперь open-text (без шкалы и followUp),
-    # как и на L1+. Помечаем префикс B → reflection.
-    bs_steps = _parse_bs_md(
-        WEB_DATA / "aspects" / "bs-l0.md", "БС", 0, start_ord=10,
-        open_question_prefixes={"B"},
-    )
-    all_steps.extend(bs_steps)
+    # Каждому аспекту даём свой ord-блок, чтобы шаги одного аспекта шли
+    # подряд после глобальной сортировки. Внутри аспекта _parse_aspect_md
+    # сам раскладывает intro/scripts/complete по start_ord+(1..N).
+    for idx, (folder, label, open_b) in enumerate(ASPECTS_PIPELINE):
+        base = 100 + idx * 1000  # Si=100, Se=1100, Ti=2100, ...
+        for level in range(4):
+            md_path = WEB_DATA / "aspects" / folder / f"l{level}.md"
+            if not md_path.exists():
+                continue
+            steps = _parse_aspect_md(
+                md_path, label, level,
+                start_ord=base + level * 200,
+                open_question_prefixes={"B"} if open_b else None,
+            )
+            all_steps.extend(steps)
 
-    bs1_steps = _parse_bs_md(
-        WEB_DATA / "aspects" / "bs-l1.md", "БС", 1, start_ord=200,
-        open_question_prefixes={"B"},
-    )
-    all_steps.extend(bs1_steps)
-
-    bs2_steps = _parse_bs_md(
-        WEB_DATA / "aspects" / "bs-l2.md", "БС", 2, start_ord=400,
-        open_question_prefixes={"B"},
-    )
-    all_steps.extend(bs2_steps)
-
-    bs3_steps = _parse_bs_md(
-        WEB_DATA / "aspects" / "bs-l3.md", "БС", 3, start_ord=600,
-        open_question_prefixes={"B"},
-    )
-    all_steps.extend(bs3_steps)
+    # Anketas (kind=survey) — web-only фича (skill-tree). Бот их рендерить
+    # не умеет: show_step не знает kind=survey и зависнет. Фильтруем.
+    all_steps = [s for s in all_steps if s["kind"] != "survey"]
 
     # Assign clean global ord
     all_steps.sort(key=lambda s: s["ord"])
