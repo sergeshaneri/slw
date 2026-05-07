@@ -15,7 +15,8 @@ import SearchView from './components/SearchView/SearchView'
 import DashboardView from './components/DashboardView/DashboardView'
 import SettingsView from './components/SettingsView/SettingsView'
 import AchievementToast from './components/Toast/AchievementToast'
-import { fetchMyProfile } from './api/client'
+import IntroTour from './components/Onboarding/IntroTour'
+import { fetchMyProfile, markOnboardingDone } from './api/client'
 import LoadingScreen from './components/LoadingScreen/LoadingScreen'
 import AuthModal from './components/Auth/AuthModal'
 import WelcomeScreen from './components/Welcome/WelcomeScreen'
@@ -98,6 +99,11 @@ export default function App() {
   }
   const isAdmin = (user?.is_admin === true) || devAdmin
   const t = ru
+  // IntroTour (Layer 1) — Quick Tour. Видим если:
+  //   • залогиненный юзер ещё не прошёл (user.onboarding_done === false)
+  //   • гость в режиме welcomeDismissed и без localStorage['slw_intro_seen']='1'
+  // Re-open из Profile через кнопку «📖 Гид».
+  const [showIntroTour, setShowIntroTour] = useState(false)
 
   // Скроллим `.main` наверх при смене view или selectedAspect.
   // Без этого позиция сохраняется и страница может оказаться на середине/внизу.
@@ -616,6 +622,39 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
+  // IntroTour: показать при первом контакте.
+  // Залогиненным — read user.onboarding_done с бэка (грузится в useAuth).
+  // Гостям — localStorage флаг 'slw_intro_seen' (после welcomeDismissed).
+  // user === null означает «ещё проверяем токен» — ничего не делаем.
+  useEffect(() => {
+    if (user === null) return
+    if (user && user.onboarding_done === false) {
+      setShowIntroTour(true)
+    } else if (user === false && welcomeDismissed && localStorage.getItem('slw_intro_seen') !== '1') {
+      setShowIntroTour(true)
+    }
+  }, [user, welcomeDismissed])
+
+  const handleTourClose = async () => {
+    setShowIntroTour(false)
+    if (user) {
+      try { await markOnboardingDone() } catch (e) { console.error(e) }
+      // Локально ставим флаг в user, чтобы повторный логин не открывал тур
+      // снова из useEffect выше (useAuth кэширует user).
+      onAuthSuccess({ ...user, onboarding_done: true })
+    } else {
+      localStorage.setItem('slw_intro_seen', '1')
+    }
+  }
+
+  const handleTourComplete = async () => {
+    await handleTourClose()
+    // Финальный CTA — переключаемся на journey (Карта Планет открывается
+    // по умолчанию для тех, кто ещё не входил в чат).
+    if (user || devAdmin) setView('journey')
+    else setView('aspects')
+  }
+
   // ?u=<id> в URL → открываем публичный профиль (deeplink с шеринга).
   // Один раз при маунте: если параметр есть, переключаемся на view.
   useEffect(() => {
@@ -655,6 +694,13 @@ export default function App() {
   return (
     <div className={styles.app}>
       <AchievementToast items={toasts} onDismiss={dismissToast} />
+      {showIntroTour && (
+        <IntroTour
+          isGuest={!user}
+          onClose={handleTourClose}
+          onGoToPlanets={handleTourComplete}
+        />
+      )}
       <Header
         view={view}
         onViewChange={handleViewChange}
@@ -685,6 +731,8 @@ export default function App() {
         {view === 'dashboard' && user && (
           <DashboardView
             currentUserId={user.id}
+            user={user}
+            journey={journey}
             onOpenAspect={(aspect) => {
               setSelectedAspect(aspect)
               setView('aspects')
@@ -693,6 +741,7 @@ export default function App() {
             onOpenWheel={() => handleViewChange('wheel')}
             onOpenJourney={() => handleViewChange('journey')}
             onOpenCoach={() => handleViewChange('coach')}
+            onOpenDiary={() => handleViewChange('diary')}
             onOpenHall={enterHall}
             onOpenProfile={openPublicProfile}
             onOpenMyProfile={() => handleViewChange('profile')}
@@ -745,6 +794,7 @@ export default function App() {
             onDiaryChange={saveDiary}
             t={t}
             isAdmin={isAdmin}
+            user={user}
           />
         )}
 
@@ -768,6 +818,7 @@ export default function App() {
             onEnterHall={enterHall}
             isAdmin={isAdmin}
             t={t}
+            user={user}
           />
         )}
 
@@ -794,6 +845,7 @@ export default function App() {
           <ProfileView
             onOpenPublicProfile={openPublicProfile}
             onOpenSettings={() => handleViewChange('settings')}
+            onOpenTour={() => setShowIntroTour(true)}
             journey={journey}
             onJourneyChange={saveJourney}
           />

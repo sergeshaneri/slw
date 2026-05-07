@@ -11,9 +11,10 @@ import TiWheel from './TiWheel'
 import SeWheel from './SeWheel'
 import PlaceholderWheel from './PlaceholderWheel'
 import HabitSection from './HabitSection'
+import Hint from '../Onboarding/Hint'
 import styles from './AspectsView.module.css'
 
-export default function AspectsView({ selectedAspect, onAspectSelect, scores, onScoreChange, diary, onDiaryChange, journey, onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys, onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys, onEnterHall, isAdmin = false, t }) {
+export default function AspectsView({ selectedAspect, onAspectSelect, scores, onScoreChange, diary, onDiaryChange, journey, onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys, onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys, onEnterHall, isAdmin = false, t, user }) {
   const [blockId, setBlockId] = useState(null)
 
   useEffect(() => {
@@ -53,6 +54,7 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, on
         onGoto={setBlockId}
         journey={journey}
         isAdmin={isAdmin}
+        user={user}
       />
     )
   }
@@ -329,7 +331,7 @@ function AspectHeader({ aspect, data, color, score, onScoreChange, onBack, compa
 
 // ─── Чтение одного блока (с sidebar) ───────────────────────────────────────
 
-function BlockReader({ aspect, data, color, block, available, prev, next, diary, onDiaryChange, onBack, onGoto, journey, isAdmin = false }) {
+function BlockReader({ aspect, data, color, block, available, prev, next, diary, onDiaryChange, onBack, onGoto, journey, isAdmin = false, user }) {
   const byLevel = useMemo(() => {
     const m = { 0: [], 1: [], 2: [], 3: [] }
     available.forEach(b => m[b.level].push(b))
@@ -454,6 +456,9 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
             <BlockBody block={block} data={data} color={color} />
           ) : (
             <div className={styles.blockLocked}>
+              <Hint id="aspect-locked-intro" user={user}>
+                Часть теории закрыта замком. Дойди до соответствующего уровня в путешествии этого аспекта — откроются.
+              </Hint>
               <BlockBody block={block} data={teaserData} color={color} />
               <div className={styles.blockSilhouette} aria-hidden="true">
                 <div className={styles.silhouetteLine} style={{ width: '88%' }} />

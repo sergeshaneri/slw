@@ -40,6 +40,7 @@ const KIND_LABEL = {
 export default function ProfileView({
   onOpenPublicProfile,
   onOpenSettings,
+  onOpenTour,
   journey,
   onJourneyChange,
 }) {
@@ -287,6 +288,15 @@ export default function ProfileView({
           >
             {shareCopied ? '✓ скопировано' : '🔗 поделиться'}
           </button>
+          {onOpenTour && (
+            <button
+              type="button"
+              className={styles.settingsBtn}
+              onClick={() => onOpenTour()}
+            >
+              📖 Гид по приложению
+            </button>
+          )}
           {onOpenSettings && (
             <button
               type="button"

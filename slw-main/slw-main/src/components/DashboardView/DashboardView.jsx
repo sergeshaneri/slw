@@ -9,6 +9,8 @@ import {
 } from '../../api/client'
 import MiniWheel from './MiniWheel'
 import Heatmap from '../Heatmap/Heatmap'
+import Hint from '../Onboarding/Hint'
+import DiscoverMore from './DiscoverMore'
 import styles from './DashboardView.module.css'
 
 // Маленький цветок-глиф для лейбла «Колесо баланса». 8 лепестков по
@@ -63,11 +65,14 @@ const STREAK_STATUS_LABEL = {
  */
 export default function DashboardView({
   currentUserId,
+  user,
+  journey,
   onOpenAspect,
   onOpenAspects,
   onOpenWheel,
   onOpenJourney,
   onOpenCoach,
+  onOpenDiary,
   onOpenHall,
   onOpenProfile,
   onOpenMyProfile,
@@ -155,6 +160,10 @@ export default function DashboardView({
 
   return (
     <div className={styles.container}>
+      <Hint id="dashboard-intro" user={user}>
+        Здесь твой день начинается. Практики, колесо, лента сообщества и AI-коуч.
+      </Hint>
+
       {/* ── Шапка ──────────────────────────────── */}
       <div className={styles.greetRow}>
         <div>
@@ -440,6 +449,20 @@ export default function DashboardView({
             </blockquote>
           </Section>
         )}
+
+        {/* ── DiscoverMore (Layer 3) ──────────── */}
+        <div className={styles.spanFull}>
+          <DiscoverMore
+            data={data}
+            journey={journey}
+            user={user}
+            onOpenDiary={() => onOpenDiary?.()}
+            onOpenPlanets={onOpenJourney}
+            onOpenLeaderboard={onOpenLeaderboard}
+            onOpenMyProfile={onOpenMyProfile}
+            onReload={reload}
+          />
+        </div>
 
         {/* ── Heatmap 30 дней ────────────────── */}
         <Section label="📅 Активность за 30 дней" className={styles.spanFull}>

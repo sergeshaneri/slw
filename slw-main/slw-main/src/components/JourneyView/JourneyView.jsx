@@ -60,7 +60,20 @@ import SkillDetail from './SkillDetail'
 import PlanetMap from './PlanetMap'
 import AdminPanel from './AdminPanel'
 import AdminSkillsEditor from './AdminSkillsEditor'
+import Hint from '../Onboarding/Hint'
 import styles from './JourneyView.module.css'
+
+// Маленькая обёртка-хинт для skill-tree экранов (8 типов деревьев — не хочется
+// внедряться в каждый отдельно). Хинт показывается ОДИН раз на любом дереве.
+function SkillTreeIntroHint({ user }) {
+  return (
+    <div style={{ padding: '12px 16px 0' }}>
+      <Hint id="skill-tree-intro" user={user}>
+        Анкета 5 вопросов × 3 прохода. Можно идти по поверхности или углубляться. Колесо растёт по мере прокачки.
+      </Hint>
+    </div>
+  )
+}
 
 // Версия контента уровня. При несовпадении с сохранённой в state
 // чат-история сбрасывается, чтобы юзер увидел новые тексты с начала
@@ -483,7 +496,7 @@ function calcStreak(s) {
   return diff === 1 ? s.streak + 1 : 1
 }
 
-export default function JourneyView({ journey: extJourney, onJourneyChange, scores, onScoresChange, diary, onDiaryChange, t, isAdmin = false }) {
+export default function JourneyView({ journey: extJourney, onJourneyChange, scores, onScoresChange, diary, onDiaryChange, t, isAdmin = false, user }) {
   // Локальный стейт — единственный source of truth.
   // Наружу синхронизируется через useEffect (ниже), чтобы persist-callback
   // не ломал серийные setState в одном хэндлере.
@@ -1765,6 +1778,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
             ? `Уровень ${a.currentLevel} · ${currentLevel?.title}`
             : 'Путешествие'}
           planet={currentJourney?.planet}
+          user={user}
         />
       )}
 
@@ -1857,6 +1871,10 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           onReset={handleReset}
           onOpenPlanetMap={handleOpenPlanetMap}
         />
+      )}
+
+      {state.screen === 'skill-tree' && (
+        <SkillTreeIntroHint user={user} />
       )}
 
       {state.screen === 'skill-tree' && state.currentAspect === 'Ne' && (

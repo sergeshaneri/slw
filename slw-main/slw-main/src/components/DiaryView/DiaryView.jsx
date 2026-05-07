@@ -3,6 +3,7 @@ import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
 import { SURVEY_BLOCKS } from '../../data/journey/skills'
 import SearchView from '../SearchView/SearchView'
 import DailyReview from './DailyReview'
+import Hint from '../Onboarding/Hint'
 import EmotionsTab from './EmotionsTab'
 import TrainingsTab from './TrainingsTab'
 import AnalyticsTab from './AnalyticsTab'
@@ -112,7 +113,12 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
       {mode === 'sync' && user && <VaultSyncTab />}
 
       {mode === 'today' && user && (
-        <DailyReview diary={diary} onDiaryChange={onDiaryChange} />
+        <>
+          <Hint id="daily-review-intro" user={user}>
+            Один экран — весь день. Все блоки опциональны. Привычки в самом низу.
+          </Hint>
+          <DailyReview diary={diary} onDiaryChange={onDiaryChange} />
+        </>
       )}
 
       {mode === 'search' && user && (

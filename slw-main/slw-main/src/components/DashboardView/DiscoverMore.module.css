@@ -1,0 +1,126 @@
+/* DiscoverMore — динамическая секция «Открой больше» в дашборде. */
+
+.section {
+  margin: 12px 0 4px;
+  padding: 16px 18px 18px;
+  background: rgba(20, 18, 36, 0.55);
+  border: 1px solid rgba(157, 78, 221, 0.20);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  position: relative;
+  overflow: hidden;
+}
+
+.section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 0% 0%,
+    rgba(157, 78, 221, 0.10), transparent 60%);
+}
+
+.label {
+  position: relative;
+  font-size: 12px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: rgba(199, 125, 255, 0.85);
+  margin-bottom: 14px;
+}
+
+.cards {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  position: relative;
+  padding: 14px 14px 14px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color .15s, background .15s;
+}
+
+.card:hover {
+  border-color: rgba(157, 78, 221, 0.40);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cardDismiss {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(214, 216, 226, 0.6);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background .15s, color .15s, border-color .15s;
+}
+
+.cardDismiss:hover {
+  background: rgba(255, 255, 255, 0.10);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.icon {
+  font-size: 26px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f1f2f5;
+  letter-spacing: 0.1px;
+}
+
+.desc {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: rgba(214, 216, 226, 0.72);
+  flex: 1;
+}
+
+.cta {
+  align-self: flex-start;
+  margin-top: 6px;
+  background: linear-gradient(90deg, rgba(157, 78, 221, 0.20), rgba(76, 201, 240, 0.15));
+  border: 1px solid rgba(157, 78, 221, 0.40);
+  color: #e4d6ff;
+  padding: 7px 13px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, transform .15s;
+}
+
+.cta:hover {
+  background: linear-gradient(90deg, rgba(157, 78, 221, 0.32), rgba(76, 201, 240, 0.22));
+  border-color: rgba(199, 125, 255, 0.65);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 480px) {
+  .cards { grid-template-columns: 1fr; }
+}

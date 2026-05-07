@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import ScriptCard from './ScriptCard'
 import ScriptButtons from './ScriptButtons'
 import Slider from './Slider'
+import Hint from '../Onboarding/Hint'
 import styles from './JourneyView.module.css'
 
 export default function Chat({
@@ -10,7 +11,7 @@ export default function Chat({
   onOpenProfile, onOpenTasks, pendingCount = 0,
   onGoToSurveys, surveyRemaining = 0,
   onOpenPlanetMap,
-  aspectName, planet
+  aspectName, planet, user
 }) {
   // Резолвер из props учитывает level, fallback на текущие scripts.
   const lookup = (m) => {
@@ -91,6 +92,9 @@ export default function Chat({
       </div>
 
       <div className={styles.chatScroll} ref={chatRef}>
+        <Hint id="journey-chat-intro" user={user}>
+          Каждый ответ — XP. Под утверждениями анкет можно писать инсайты — попадут в дневник.
+        </Hint>
         {state.messages.map(m => {
           if (m.kind === 'script') {
             const sc = lookup(m)

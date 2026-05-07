@@ -1,0 +1,83 @@
+/* Hint — небольшой tooltip-баббл, исчезает после клика по × */
+
+.hint {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 460px;
+  margin: 12px 0;
+  padding: 12px 14px 12px 16px;
+  background:
+    linear-gradient(135deg, rgba(157, 78, 221, 0.10), rgba(76, 201, 240, 0.06)),
+    rgba(20, 18, 36, 0.85);
+  border: 1px solid rgba(157, 78, 221, 0.32);
+  border-radius: 12px;
+  color: #d6d8e2;
+  font-size: 13px;
+  line-height: 1.55;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(8px);
+  animation: hintFade 0.35s ease-out;
+}
+
+@keyframes hintFade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Позиции — по умолчанию hint живёт в потоке. Если родитель ставит
+ * position:relative и хочет absolute-позиционирование — модификаторы. */
+.pos_top-right    { /* in-flow default */ }
+.pos_top-left     { /* in-flow default */ }
+.pos_bottom-right { /* in-flow default */ }
+.pos_bottom-left  { /* in-flow default */ }
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.content :global(strong) {
+  color: #f1f2f5;
+  font-weight: 600;
+}
+
+.closeBtn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(214, 216, 226, 0.8);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, color .15s, border-color .15s;
+  padding: 0;
+}
+
+.closeBtn:hover {
+  background: rgba(255, 255, 255, 0.10);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.30);
+}
+
+/* Перед содержимым — маленький значок «инфо». */
+.hint::before {
+  content: '✦';
+  flex-shrink: 0;
+  color: #c77dff;
+  font-size: 16px;
+  line-height: 1.4;
+  margin-right: 2px;
+  filter: drop-shadow(0 0 4px rgba(199, 125, 255, 0.6));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hint { animation: none; }
+}
