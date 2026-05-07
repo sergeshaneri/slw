@@ -53,9 +53,9 @@ export const ARCHETYPE_KEYS = ['zavodila', 'orator', 'artist', 'master_atmo']
 // Эти же 3 анкеты включаются в L0-чат ЧЭ как первая оценка ЧЭ, до того,
 // как открывается полное колесо навыков.
 export const COMMON_BASE_SKILLS = [
-  { id: 'che-awareness',     name: 'Эмоциональная осознанность',  isCommon: true },
-  { id: 'che-expressiveness', name: 'Выразительность',             isCommon: true },
-  { id: 'che-congruence',    name: 'Конгруэнтность',               isCommon: true },
+  { id: 'fe-awareness',     name: 'Эмоциональная осознанность',  isCommon: true },
+  { id: 'fe-expressiveness', name: 'Выразительность',             isCommon: true },
+  { id: 'fe-congruence',    name: 'Конгруэнтность',               isCommon: true },
 ]
 
 export const COMMON_BASE_SKILL_IDS = new Set(COMMON_BASE_SKILLS.map(s => s.id))
@@ -65,50 +65,50 @@ export const COMMON_BASE_SKILL_IDS = new Set(COMMON_BASE_SKILLS.map(s => s.id))
 export const SKILL_TREE = {
   zavodila: [
     // Дополнительные навыки для Заводилы
-    { id: 'che-pause',           name: 'Пауза перед реакцией' },
-    { id: 'che-emo-hygiene',     name: 'Эмо-гигиена' },
-    { id: 'che-group-pulse',     name: 'Считывание группового импульса' },
-    { id: 'che-open-emotion',    name: 'Открытое проявление эмоций' },
+    { id: 'fe-pause',           name: 'Пауза перед реакцией' },
+    { id: 'fe-emo-hygiene',     name: 'Эмо-гигиена' },
+    { id: 'fe-group-pulse',     name: 'Считывание группового импульса' },
+    { id: 'fe-open-emotion',    name: 'Открытое проявление эмоций' },
     // Архетипные навыки Заводилы
-    { id: 'che-warm-up',         name: 'Разогрев собственного тонуса' },
-    { id: 'che-state-spread',    name: 'Заражение состоянием' },
-    { id: 'che-play-humor',      name: 'Игра и юмор' },
-    { id: 'che-hold-peak',       name: 'Удержание пика' },
-    { id: 'che-discharge',       name: 'Эмо-разрядка' }
+    { id: 'fe-warm-up',         name: 'Разогрев собственного тонуса' },
+    { id: 'fe-state-spread',    name: 'Заражение состоянием' },
+    { id: 'fe-play-humor',      name: 'Игра и юмор' },
+    { id: 'fe-hold-peak',       name: 'Удержание пика' },
+    { id: 'fe-discharge',       name: 'Эмо-разрядка' }
   ],
   orator: [
     // Дополнительные навыки для Оратора
-    { id: 'che-breath',          name: 'Дыхательная регуляция' },
-    { id: 'che-self-honesty',    name: 'Эмо-честность с собой' },
-    { id: 'che-targeted-delivery', name: 'Адресная подача' },
-    { id: 'che-artistry',        name: 'Артистичность' },
+    { id: 'fe-breath',          name: 'Дыхательная регуляция' },
+    { id: 'fe-self-honesty',    name: 'Эмо-честность с собой' },
+    { id: 'fe-targeted-delivery', name: 'Адресная подача' },
+    { id: 'fe-artistry',        name: 'Артистичность' },
     // Архетипные навыки Оратора
-    { id: 'che-imagery',         name: 'Образное слово' },
-    { id: 'che-call-action',     name: 'Призыв к действию' }
+    { id: 'fe-imagery',         name: 'Образное слово' },
+    { id: 'fe-call-action',     name: 'Призыв к действию' }
   ],
   artist: [
     // Дополнительные навыки для Артиста
-    { id: 'che-shades',          name: 'Различение оттенков' },
-    { id: 'che-triggers',        name: 'Распознавание собственных триггеров' },
-    { id: 'che-read-others',     name: 'Считывание чужих эмоций' },
-    { id: 'che-empathy',         name: 'Эмпатия' },
+    { id: 'fe-shades',          name: 'Различение оттенков' },
+    { id: 'fe-triggers',        name: 'Распознавание собственных триггеров' },
+    { id: 'fe-read-others',     name: 'Считывание чужих эмоций' },
+    { id: 'fe-empathy',         name: 'Эмпатия' },
     // Архетипные навыки Артиста
-    { id: 'che-body-instrument', name: 'Тело-инструмент' },
-    { id: 'che-improv',          name: 'Импровизация' },
-    { id: 'che-storytelling',    name: 'Storytelling' },
-    { id: 'che-stage-fear',      name: 'Управление страхом перед сценой' }
+    { id: 'fe-body-instrument', name: 'Тело-инструмент' },
+    { id: 'fe-improv',          name: 'Импровизация' },
+    { id: 'fe-storytelling',    name: 'Storytelling' },
+    { id: 'fe-stage-fear',      name: 'Управление страхом перед сценой' }
   ],
   master_atmo: [
     // Дополнительные навыки для Мастера Атмосферы
-    { id: 'che-containment',     name: 'Контейнирование' },
-    { id: 'che-emo-borders',     name: 'Эмо-границы' },
-    { id: 'che-room-atmo',       name: 'Считывание атмосферы помещения' },
+    { id: 'fe-containment',     name: 'Контейнирование' },
+    { id: 'fe-emo-borders',     name: 'Эмо-границы' },
+    { id: 'fe-room-atmo',       name: 'Считывание атмосферы помещения' },
     // Архетипные навыки Мастера Атмосферы
-    { id: 'che-set-tone',        name: 'Задавание тона встречи' },
-    { id: 'che-include-people',  name: 'Включение людей в общий разговор' },
-    { id: 'che-protect-quiet',   name: 'Защита тихого участника от давления' },
-    { id: 'che-rituals',         name: 'Ритуалы группы' },
-    { id: 'che-group-history',   name: 'Удержание истории группы' }
+    { id: 'fe-set-tone',        name: 'Задавание тона встречи' },
+    { id: 'fe-include-people',  name: 'Включение людей в общий разговор' },
+    { id: 'fe-protect-quiet',   name: 'Защита тихого участника от давления' },
+    { id: 'fe-rituals',         name: 'Ритуалы группы' },
+    { id: 'fe-group-history',   name: 'Удержание истории группы' }
   ]
 }
 
@@ -157,48 +157,48 @@ export const BLOCK_RUS_TO_KEY = Object.fromEntries(
 // ВАЖНО: текст должен совпадать с заголовком в `surveys.md` точно.
 export const SKILL_BY_RUS_NAME = {
   // Ядерные
-  'Эмоциональная осознанность': 'che-awareness',
-  'Выразительность': 'che-expressiveness',
-  'Конгруэнтность': 'che-congruence',
+  'Эмоциональная осознанность': 'fe-awareness',
+  'Выразительность': 'fe-expressiveness',
+  'Конгруэнтность': 'fe-congruence',
 
   // Заводила (доп. + арх.)
-  'Пауза перед реакцией': 'che-pause',
-  'Эмо-гигиена': 'che-emo-hygiene',
-  'Считывание группового импульса': 'che-group-pulse',
-  'Открытое проявление эмоций': 'che-open-emotion',
-  'Разогрев собственного тонуса': 'che-warm-up',
-  'Заражение состоянием': 'che-state-spread',
-  'Игра и юмор': 'che-play-humor',
-  'Удержание пика': 'che-hold-peak',
-  'Эмо-разрядка': 'che-discharge',
+  'Пауза перед реакцией': 'fe-pause',
+  'Эмо-гигиена': 'fe-emo-hygiene',
+  'Считывание группового импульса': 'fe-group-pulse',
+  'Открытое проявление эмоций': 'fe-open-emotion',
+  'Разогрев собственного тонуса': 'fe-warm-up',
+  'Заражение состоянием': 'fe-state-spread',
+  'Игра и юмор': 'fe-play-humor',
+  'Удержание пика': 'fe-hold-peak',
+  'Эмо-разрядка': 'fe-discharge',
 
   // Оратор (доп. + арх.)
-  'Дыхательная регуляция': 'che-breath',
-  'Эмо-честность с собой': 'che-self-honesty',
-  'Адресная подача': 'che-targeted-delivery',
-  'Артистичность': 'che-artistry',
-  'Образное слово': 'che-imagery',
-  'Призыв к действию': 'che-call-action',
+  'Дыхательная регуляция': 'fe-breath',
+  'Эмо-честность с собой': 'fe-self-honesty',
+  'Адресная подача': 'fe-targeted-delivery',
+  'Артистичность': 'fe-artistry',
+  'Образное слово': 'fe-imagery',
+  'Призыв к действию': 'fe-call-action',
 
   // Артист (доп. + арх.)
-  'Различение оттенков': 'che-shades',
-  'Распознавание собственных триггеров': 'che-triggers',
-  'Считывание чужих эмоций': 'che-read-others',
-  'Эмпатия': 'che-empathy',
-  'Тело-инструмент': 'che-body-instrument',
-  'Импровизация': 'che-improv',
-  'Storytelling': 'che-storytelling',
-  'Управление страхом перед сценой': 'che-stage-fear',
+  'Различение оттенков': 'fe-shades',
+  'Распознавание собственных триггеров': 'fe-triggers',
+  'Считывание чужих эмоций': 'fe-read-others',
+  'Эмпатия': 'fe-empathy',
+  'Тело-инструмент': 'fe-body-instrument',
+  'Импровизация': 'fe-improv',
+  'Storytelling': 'fe-storytelling',
+  'Управление страхом перед сценой': 'fe-stage-fear',
 
   // Мастер Атмосферы (доп. + арх.)
-  'Контейнирование': 'che-containment',
-  'Эмо-границы': 'che-emo-borders',
-  'Считывание атмосферы помещения': 'che-room-atmo',
-  'Задавание тона встречи': 'che-set-tone',
-  'Включение людей в общий разговор': 'che-include-people',
-  'Защита тихого участника от давления': 'che-protect-quiet',
-  'Ритуалы группы': 'che-rituals',
-  'Удержание истории группы': 'che-group-history'
+  'Контейнирование': 'fe-containment',
+  'Эмо-границы': 'fe-emo-borders',
+  'Считывание атмосферы помещения': 'fe-room-atmo',
+  'Задавание тона встречи': 'fe-set-tone',
+  'Включение людей в общий разговор': 'fe-include-people',
+  'Защита тихого участника от давления': 'fe-protect-quiet',
+  'Ритуалы группы': 'fe-rituals',
+  'Удержание истории группы': 'fe-group-history'
 }
 
 // Среднее по архетипу: ядерные + специфичные навыки архетипа.
@@ -214,7 +214,7 @@ export function calcArchetypeAvg(skills, archetypeKey) {
 }
 
 // Общая оценка ЧЭ: среднее по архетипам, в которых есть хоть одна анкета.
-export function calcCheScoreFromSkills(skills) {
+export function calcFeScoreFromSkills(skills) {
   const archeAvgs = ARCHETYPE_KEYS
     .map(k => calcArchetypeAvg(skills, k))
     .filter(v => v != null)

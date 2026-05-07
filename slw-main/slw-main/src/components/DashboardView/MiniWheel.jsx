@@ -1,4 +1,4 @@
-import { ASPECT_KEYS, ASPECT_COLORS } from '../../data/aspects'
+import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import styles from './MiniWheel.module.css'
 
 /**
@@ -106,7 +106,7 @@ export default function MiniWheel({ scores, size = 240, onAspectClick, onCenterC
                 className={styles.label}
                 fill={ASPECT_COLORS[key]}
               >
-                {key}
+                {ASPECT_DISPLAY_KEY[key]}
               </text>
             </g>
           )

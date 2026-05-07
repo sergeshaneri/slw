@@ -1,13 +1,13 @@
 import {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE,
-  calcArchetypeAvg, calcCheScoreFromSkills, getSkillProgress
-} from '../../data/journey/che-skills'
-import styles from './BSWheel.module.css'
+  calcArchetypeAvg, calcFeScoreFromSkills, getSkillProgress
+} from '../../data/journey/fe-skills'
+import styles from './SiWheel.module.css'
 
 // Колесо ЧЭ — реальное колесо баланса по 4 архетипам (Заводила, Оратор,
 // Артист, Мастер Атмосферы) + 3 ядерных навыка, входящие в каждый архетип.
 //
-// Структура и стадии — те же, что и в BSWheel: лепестки по avg, звёзды
+// Структура и стадии — те же, что и в SiWheel: лепестки по avg, звёзды
 // по пройденным анкетам, эволюция украшений per-архетип и глобально.
 //
 // Стадии per-архетип:
@@ -194,8 +194,8 @@ function MasterfulArcs({ radius, color = 'currentColor' }) {
   return <g>{elements}</g>
 }
 
-export default function CheWheel({ skills, color, onContinueSurveys, isLocked = false }) {
-  const cheScore = calcCheScoreFromSkills(skills)
+export default function FeWheel({ skills, color, onContinueSurveys, isLocked = false }) {
+  const feScore = calcFeScoreFromSkills(skills)
   const progress = getSkillProgress(skills)
 
   // Per-архетип состояние — для ЧЭ ветки включают 3 ядерных навыка сверху.
@@ -221,7 +221,7 @@ export default function CheWheel({ skills, color, onContinueSurveys, isLocked = 
   const showGlow        = globalStageIdx >= STAGE_ORDER.indexOf('strong')
 
   const stageLabel = isLocked
-    ? 'Пройди уровень 1, чтобы открыть оценку навыков'
+    ? 'Пройди уровень 0, чтобы открыть колесо навыков'
     : 'Изучай свои навыки эмоционального канала для эволюции колеса'
 
   return (
@@ -233,7 +233,7 @@ export default function CheWheel({ skills, color, onContinueSurveys, isLocked = 
         </div>
         <div className={styles.wheelStat}>
           <div className={styles.wheelStatVal}>
-            {Number.isFinite(cheScore) ? cheScore.toFixed(1) : '—'}
+            {Number.isFinite(feScore) ? feScore.toFixed(1) : '—'}
             <span className={styles.wheelStatTotal}>/10</span>
           </div>
           <div className={styles.wheelStatLbl}>общее ЧЭ</div>
@@ -475,7 +475,7 @@ export default function CheWheel({ skills, color, onContinueSurveys, isLocked = 
             fontSize={showBigBadge ? 17 : 14}
             fontWeight="700"
           >
-            {Number.isFinite(cheScore) ? cheScore.toFixed(1) : '—'}
+            {Number.isFinite(feScore) ? feScore.toFixed(1) : '—'}
           </text>
           <text
             x={CX} y={showBigBadge ? CY + 12 : CY + 11}

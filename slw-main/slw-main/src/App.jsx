@@ -348,15 +348,15 @@ export default function App() {
     setView('journey')
   }
 
-  const goToBSSurveys = async () => {
+  const goToSiSurveys = async () => {
     if (!user && !devAdmin) {
       setShowAuth(true)
       return
     }
     // L0 должен быть пройден (currentLevel >= 1). Админу можно всегда.
     // currentLevel и awaitingInput теперь живут в journey.aspects[aspect].
-    const bsFolder = journey?.aspects?.['Si'] ?? {}
-    if (!isAdmin && (bsFolder.currentLevel ?? 0) < 1) {
+    const siFolder = journey?.aspects?.['Si'] ?? {}
+    if (!isAdmin && (siFolder.currentLevel ?? 0) < 1) {
       return
     }
     await saveJourney({
@@ -365,20 +365,20 @@ export default function App() {
       screen: 'skill-tree',
       aspects: {
         ...(journey?.aspects ?? {}),
-        'Si': { ...bsFolder, awaitingInput: null },
+        'Si': { ...siFolder, awaitingInput: null },
       },
     })
     setView('journey')
   }
 
-  const goToCheSurveys = async () => {
+  const goToFeSurveys = async () => {
     if (!user && !devAdmin) {
       setShowAuth(true)
       return
     }
     // L0 ЧЭ должен быть пройден (currentLevel >= 1). Админу можно всегда.
-    const cheFolder = journey?.aspects?.['Fe'] ?? {}
-    if (!isAdmin && (cheFolder.currentLevel ?? 0) < 1) {
+    const feFolder = journey?.aspects?.['Fe'] ?? {}
+    if (!isAdmin && (feFolder.currentLevel ?? 0) < 1) {
       return
     }
     await saveJourney({
@@ -387,7 +387,29 @@ export default function App() {
       screen: 'skill-tree',
       aspects: {
         ...(journey?.aspects ?? {}),
-        'Fe': { ...cheFolder, awaitingInput: null },
+        'Fe': { ...feFolder, awaitingInput: null },
+      },
+    })
+    setView('journey')
+  }
+
+  const goToNeSurveys = async () => {
+    if (!user && !devAdmin) {
+      setShowAuth(true)
+      return
+    }
+    // L0 ЧИ должен быть пройден (currentLevel >= 1). Админу можно всегда.
+    const neFolder = journey?.aspects?.['Ne'] ?? {}
+    if (!isAdmin && (neFolder.currentLevel ?? 0) < 1) {
+      return
+    }
+    await saveJourney({
+      ...journey,
+      currentAspect: 'Ne',
+      screen: 'skill-tree',
+      aspects: {
+        ...(journey?.aspects ?? {}),
+        'Ne': { ...neFolder, awaitingInput: null },
       },
     })
     setView('journey')
@@ -410,6 +432,94 @@ export default function App() {
       aspects: {
         ...(journey?.aspects ?? {}),
         'Ni': { ...niFolder, awaitingInput: null },
+      },
+    })
+    setView('journey')
+  }
+
+  const goToFiSurveys = async () => {
+    if (!user && !devAdmin) {
+      setShowAuth(true)
+      return
+    }
+    // L0 БЭ должен быть пройден (currentLevel >= 1). Админу можно всегда.
+    const fiFolder = journey?.aspects?.['Fi'] ?? {}
+    if (!isAdmin && (fiFolder.currentLevel ?? 0) < 1) {
+      return
+    }
+    await saveJourney({
+      ...journey,
+      currentAspect: 'Fi',
+      screen: 'skill-tree',
+      aspects: {
+        ...(journey?.aspects ?? {}),
+        'Fi': { ...fiFolder, awaitingInput: null },
+      },
+    })
+    setView('journey')
+  }
+
+  const goToTeSurveys = async () => {
+    if (!user && !devAdmin) {
+      setShowAuth(true)
+      return
+    }
+    // L0 ЧЛ должен быть пройден (currentLevel >= 1). Админу можно всегда.
+    const teFolder = journey?.aspects?.['Te'] ?? {}
+    if (!isAdmin && (teFolder.currentLevel ?? 0) < 1) {
+      return
+    }
+    await saveJourney({
+      ...journey,
+      currentAspect: 'Te',
+      screen: 'skill-tree',
+      aspects: {
+        ...(journey?.aspects ?? {}),
+        'Te': { ...teFolder, awaitingInput: null },
+      },
+    })
+    setView('journey')
+  }
+
+  const goToTiSurveys = async () => {
+    if (!user && !devAdmin) {
+      setShowAuth(true)
+      return
+    }
+    // L0 БЛ должен быть пройден (currentLevel >= 1). Админу можно всегда.
+    const tiFolder = journey?.aspects?.['Ti'] ?? {}
+    if (!isAdmin && (tiFolder.currentLevel ?? 0) < 1) {
+      return
+    }
+    await saveJourney({
+      ...journey,
+      currentAspect: 'Ti',
+      screen: 'skill-tree',
+      aspects: {
+        ...(journey?.aspects ?? {}),
+        'Ti': { ...tiFolder, awaitingInput: null },
+      },
+    })
+    setView('journey')
+  }
+
+  const goToSeSurveys = async () => {
+    if (!user && !devAdmin) {
+      setShowAuth(true)
+      return
+    }
+    // L0 ЧС должен быть пройден (currentLevel >= 1). Админу можно всегда.
+    const seFolder = journey?.aspects?.['Se'] ?? {}
+    if (!isAdmin && (seFolder.currentLevel ?? 0) < 1) {
+      return
+    }
+    await saveJourney({
+      ...journey,
+      currentAspect: 'Se',
+      screen: 'skill-tree',
+      aspects: {
+        ...(journey?.aspects ?? {}),
+        'Se': { ...seFolder, awaitingInput: null },
       },
     })
     setView('journey')
@@ -647,10 +757,16 @@ export default function App() {
             diary={diary}
             onDiaryChange={saveDiary}
             journey={journey}
-            onGoToBSSurveys={goToBSSurveys}
-            onGoToCheSurveys={goToCheSurveys}
+            onGoToSiSurveys={goToSiSurveys}
+            onGoToFeSurveys={goToFeSurveys}
+            onGoToNeSurveys={goToNeSurveys}
             onGoToNiSurveys={goToNiSurveys}
+            onGoToFiSurveys={goToFiSurveys}
+            onGoToTeSurveys={goToTeSurveys}
+            onGoToTiSurveys={goToTiSurveys}
+            onGoToSeSurveys={goToSeSurveys}
             onEnterHall={enterHall}
+            isAdmin={isAdmin}
             t={t}
           />
         )}

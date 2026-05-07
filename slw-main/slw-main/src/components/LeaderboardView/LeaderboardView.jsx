@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ASPECT_COLORS } from '../../data/aspects'
+import { ASPECT_COLORS, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { fetchLeaderboard } from '../../api/client'
 import styles from './LeaderboardView.module.css'
 
@@ -58,7 +58,7 @@ export default function LeaderboardView({ currentUserId, onOpenPublicProfile }) 
                     className={styles.aspectChip}
                     style={{ color: ASPECT_COLORS[a], borderColor: `${ASPECT_COLORS[a]}55` }}
                   >
-                    {a}
+                    {ASPECT_DISPLAY_KEY[a] ?? a}
                   </span>
                 ))}
               </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
+import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import {
   fetchDashboard,
   tickHabit,
@@ -230,7 +230,7 @@ export default function DashboardView({
                 <div className={styles.personalTitle}>Мой профиль</div>
                 <div className={styles.muted}>
                   {data.user.display_name}
-                  {(data.user.focus_aspects ?? []).length > 0 && ' · ' + data.user.focus_aspects.join(', ')}
+                  {(data.user.focus_aspects ?? []).length > 0 && ' · ' + data.user.focus_aspects.map(a => ASPECT_DISPLAY_KEY[a] ?? a).join(', ')}
                 </div>
               </div>
               <span className={styles.personalArrow}>→</span>
@@ -271,7 +271,7 @@ export default function DashboardView({
           <div className={styles.scoresLine}>
             {ASPECT_KEYS.map(k => (
               <span key={k} style={{ color: ASPECT_COLORS[k] }} className={styles.scoreChip}>
-                {k} {(data.scores[k] ?? 5).toFixed(1)}
+                {ASPECT_DISPLAY_KEY[k]} {(data.scores[k] ?? 5).toFixed(1)}
               </span>
             ))}
           </div>
@@ -284,7 +284,7 @@ export default function DashboardView({
                 style={{ color: ASPECT_COLORS[active] }}
                 onClick={() => onOpenAspect?.(active)}
               >
-                {active} · {ASPECT_DATA[active]?.name ?? ''}
+                {ASPECT_DISPLAY_KEY[active]} · {ASPECT_DATA[active]?.name ?? ''}
               </button>
               {lvl && (
                 <div className={styles.muted}>
@@ -336,7 +336,7 @@ export default function DashboardView({
             >
               <option value="general">— общая запись —</option>
               {ASPECT_KEYS.map(k => (
-                <option key={k} value={k}>{k} · {ASPECT_DATA[k].name}</option>
+                <option key={k} value={k}>{ASPECT_DISPLAY_KEY[k]} · {ASPECT_DATA[k].name}</option>
               ))}
             </select>
             <button

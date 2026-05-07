@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts'
-import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_REALMS } from '../../data/aspects'
+import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_REALMS, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import styles from './WheelView.module.css'
 
 export default function WheelView({ scores, onSaveHistory, history, journey, onAspectClick, onStartJourney, onOpenTasks, t }) {
   const [saveStatus, setSaveStatus] = useState('')
 
   const radarData = ASPECT_KEYS.map(key => ({
-    subject: key,
+    subject: ASPECT_DISPLAY_KEY[key],
     value: scores[key],
     fullMark: 10
   }))
@@ -126,7 +126,7 @@ export default function WheelView({ scores, onSaveHistory, history, journey, onA
                   style={{ background: `radial-gradient(circle at 30% 20%, ${color}28, transparent 60%)` }}
                 />
                 <div className={styles.aspectTop}>
-                  <span className={styles.aspectCode} style={{ color, textShadow: `0 0 24px ${color}66` }}>{key}</span>
+                  <span className={styles.aspectCode} style={{ color, textShadow: `0 0 24px ${color}66` }}>{ASPECT_DISPLAY_KEY[key]}</span>
                   <span className={styles.aspectScore}>{scores[key]}<span>/10</span></span>
                 </div>
                 <div className={styles.aspectName}>{ASPECT_DATA[key].name}</div>

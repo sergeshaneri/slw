@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ASPECT_COLORS } from '../../data/aspects'
+import { ASPECT_COLORS, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { searchAll } from '../../api/client'
 import styles from './SearchView.module.css'
 

@@ -28,7 +28,7 @@ import {
   COMMON_BASE_SKILLS, COMMON_BASE_SKILL_IDS, getSkillsForArchetype,
   ALL_SKILL_IDS, SURVEY_BLOCKS, SURVEY_BLOCK_KEYS
 } from './tree'
-import { SURVEYS_CHE } from '../che-skills'
+import { SURVEYS_FE } from '../fe-skills'
 
 const SURVEYS = parseSurveys(surveysMd)
 
@@ -39,11 +39,11 @@ export {
   SURVEYS
 }
 
-// Универсальный getSurvey — пробует БС, потом ЧЭ.
-// Skill id у ЧЭ имеют префикс `che-`, у БС — без префикса; коллизий нет.
+// Универсальный getSurvey — пробует Si, потом Fe.
+// Skill id у Fe имеют префикс `fe-`, у Si — без префикса; коллизий нет.
 export function getSurvey(skillId) {
   if (SURVEYS[skillId]) return SURVEYS[skillId]
-  if (SURVEYS_CHE[skillId]) return SURVEYS_CHE[skillId]
+  if (SURVEYS_FE[skillId]) return SURVEYS_FE[skillId]
   return null
 }
 
@@ -96,7 +96,7 @@ export function getNextPass(skillEntry) {
 }
 
 // Глубина навыка для UI. 'idle' = ничего не пройдено, 'light' = 1 проход,
-// 'medium' = 2 прохода, 'full' = 3. Используется в SkillTree, BSWheel.
+// 'medium' = 2 прохода, 'full' = 3. Используется в SkillTree, SiWheel.
 export function getSkillDepth(skillEntry) {
   const passes = getCompletedPasses(skillEntry)
   if (passes === 0) return 'idle'
@@ -156,7 +156,7 @@ export function calcArchetypeAvg(skills, archetypeKey) {
 // Общая оценка БС: среднее по архетипам, в которых есть хоть одна анкета.
 // Если ни одной анкеты не пройдено — возвращает null (вызывающий сам
 // решает, использовать fallback или нет).
-export function calcBSScoreFromSkills(skills) {
+export function calcSiScoreFromSkills(skills) {
   const archeAvgs = ARCHETYPE_KEYS
     .map(k => calcArchetypeAvg(skills, k))
     .filter(v => v != null)

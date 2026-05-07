@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { getSurvey, calcSurveyResult, SURVEY_BLOCKS } from '../../data/journey/skills'
+import { calcSurveyResult, SURVEY_BLOCKS } from '../../data/journey/skills'
+import { resolveSurvey } from '../../data/journey/skills/resolve'
 import styles from './JourneyView.module.css'
 
 /**
@@ -14,7 +15,7 @@ import styles from './JourneyView.module.css'
  */
 export default function SurveyInsight({ activeSurvey, accent, onSave, onCancel }) {
   const [text, setText] = useState('')
-  const survey = getSurvey(activeSurvey.skillId)
+  const survey = resolveSurvey(activeSurvey.skillId)
   const pass = activeSurvey.pass ?? 1
 
   // Считаем итоги прохода (из всех накопленных ответов, не только текущего pass).

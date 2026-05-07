@@ -1,58 +1,59 @@
 import { useEffect, useRef, useState } from 'react'
-import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
+import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { fetchHabitsToday, tickHabit, untickHabit } from '../../api/client'
 import styles from './DiaryView.module.css'
 
 // Подсказки-«вопросы дня» по каждому аспекту. Список — это лишь гайд,
 // юзер пишет свободным текстом. Все блоки опциональны.
+// Ключи — латинские (Si/Se/...) под внутренний state.
 const ASPECT_PROMPTS = {
-  ЧИ: [
+  Ne: [
     'Что нового',
     'Что творческого',
     'Какие инсайты',
     'Как раскрыл свой потенциал',
     'Что увидел впервые',
   ],
-  БС: [
+  Si: [
     'Как себя чувствовал',
     'Что ел',
     'Как о себе заботился',
     'Что улучшил в уровне жизни',
     'Где было комфортно или неудобно',
   ],
-  ЧЭ: [
+  Fe: [
     'Какие были эмоции',
     'Какие впечатления',
     'Как это влияло на твою энергию',
     'Что зажгло, а что погасило',
   ],
-  БЛ: [
+  Ti: [
     'Что изучил',
     'Что упорядочил',
     'Что воплотил в структуру',
     'Что продумал',
     'Какую систему собрал',
   ],
-  ЧЛ: [
+  Te: [
     'Что сделал по работе',
     'Улучшил в профессиональной деятельности',
     'Что для улучшения дохода',
     'Какой результат измерим',
   ],
-  БЭ: [
+  Fi: [
     'Уровень счастья',
     'С кем поддерживал контакт',
     'Что было в сфере отношений (с собой, семьёй, друзьями, работой, клиентами…)',
     'Что согрело',
   ],
-  ЧС: [
+  Se: [
     'Тренировки',
     'Вклад в опору по жизни',
     'Победы дня',
     'Приближение к цели',
     'Где проявил волю',
   ],
-  БИ: [
+  Ni: [
     'Сны',
     'Знаки',
     'Насколько был в потоке',
@@ -283,7 +284,7 @@ export default function DailyReview({ diary, onDiaryChange }) {
               onClick={() => toggleExpanded(aspect)}
               aria-expanded={isOpen}
             >
-              <span className={styles.dayAspectKey} style={{ color }}>{aspect}</span>
+              <span className={styles.dayAspectKey} style={{ color }}>{ASPECT_DISPLAY_KEY[aspect]}</span>
               <span className={styles.dayAspectName}>{ASPECT_DATA[aspect].name}</span>
               <span className={styles.dayAspectChevron} aria-hidden="true">
                 {isOpen ? '▴' : '▾'}

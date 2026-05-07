@@ -2,8 +2,8 @@ import { useState } from 'react'
 import {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE,
   COMMON_BASE_SKILL_IDS, getSkillsForArchetype,
-  calcArchetypeAvg, calcCheScoreFromSkills, getSkillProgress
-} from '../../data/journey/che-skills'
+  calcArchetypeAvg, calcFeScoreFromSkills, getSkillProgress
+} from '../../data/journey/fe-skills'
 import { getCompletedPasses } from '../../data/journey/skills'
 import styles from './JourneyView.module.css'
 
@@ -32,8 +32,8 @@ function statusFor(skillState) {
   return { kind: 'light', avg: skillState.result }
 }
 
-export default function CheSkillTree({ accent, skills, onClose, onStartSkill, onOpenSkillDetail, onOpenPlanetMap }) {
-  const cheScore = calcCheScoreFromSkills(skills)
+export default function FeSkillTree({ accent, skills, onClose, onStartSkill, onOpenSkillDetail, onOpenPlanetMap }) {
+  const feScore = calcFeScoreFromSkills(skills)
   const progress = getSkillProgress(skills)
 
   const [expanded, setExpanded] = useState(() => new Set())
@@ -62,7 +62,7 @@ export default function CheSkillTree({ accent, skills, onClose, onStartSkill, on
           <div className={styles.treeHeaderTitle}>Навыки ЧЭ</div>
           <div className={styles.treeHeaderSub}>
             {progress.completed} / {progress.total} оценено
-            {Number.isFinite(cheScore) && ` · ср. ${cheScore.toFixed(1)}/10`}
+            {Number.isFinite(feScore) && ` · ср. ${feScore.toFixed(1)}/10`}
           </div>
         </div>
         {onOpenPlanetMap && (

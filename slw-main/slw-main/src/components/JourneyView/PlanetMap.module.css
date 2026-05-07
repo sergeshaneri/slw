@@ -87,41 +87,53 @@
   flex-direction: column;
   gap: 14px;
   padding: 18px 16px 14px;
-  background: linear-gradient(
-    160deg,
-    color-mix(in srgb, var(--planet-color) 12%, #15161c),
-    #15161c 60%
-  );
-  border: 1px solid color-mix(in srgb, var(--planet-color) 25%, rgba(255,255,255,0.08));
+  /* Многослойный фон: радиальное сияние из угла + базовый тёмный градиент. */
+  background:
+    radial-gradient(
+      circle at 100% 0%,
+      color-mix(in srgb, var(--planet-color) 28%, transparent) 0%,
+      transparent 55%
+    ),
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--planet-color) 18%, #15161c),
+      #15161c 65%
+    );
+  border: 1px solid color-mix(in srgb, var(--planet-color) 35%, rgba(255,255,255,0.08));
   border-radius: 16px;
   cursor: pointer;
   text-align: left;
   font: inherit;
   color: inherit;
-  transition: transform .15s ease, border-color .2s, box-shadow .2s;
+  /* Базовое мягкое свечение — даже без ховера карточка дышит цветом. */
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.28),
+    0 0 18px color-mix(in srgb, var(--planet-color) 10%, transparent);
+  transition: transform .18s ease, border-color .2s, box-shadow .25s;
   min-height: 200px;
   overflow: hidden;
 }
 
 .card:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--planet-color) 60%, transparent);
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--planet-color) 75%, transparent);
   box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.35),
-    0 0 0 1px color-mix(in srgb, var(--planet-color) 25%, transparent),
-    0 0 24px color-mix(in srgb, var(--planet-color) 18%, transparent);
+    0 12px 32px rgba(0, 0, 0, 0.45),
+    0 0 0 1px color-mix(in srgb, var(--planet-color) 40%, transparent),
+    0 0 36px color-mix(in srgb, var(--planet-color) 28%, transparent);
 }
 
 .card:active {
-  transform: translateY(0);
+  transform: translateY(-1px);
 }
 
 /* Активная — где юзер сейчас. */
 .card.active {
-  border-color: color-mix(in srgb, var(--planet-color) 75%, transparent);
+  border-color: color-mix(in srgb, var(--planet-color) 90%, transparent);
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--planet-color) 45%, transparent),
-    0 0 24px color-mix(in srgb, var(--planet-color) 30%, transparent);
+    inset 0 1px 0 color-mix(in srgb, var(--planet-color) 55%, transparent),
+    0 0 36px color-mix(in srgb, var(--planet-color) 40%, transparent),
+    0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 /* С прогрессом — чуть ярче. */

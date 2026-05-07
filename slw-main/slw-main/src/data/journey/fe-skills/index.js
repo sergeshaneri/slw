@@ -1,4 +1,4 @@
-// Сборка всего, что относится к навыкам ЧЭ.
+// Сборка всего, что относится к навыкам ЧЭ (Fe).
 //
 // Источники:
 //   - `tree.js` — структура архетипов и распределение навыков ЧЭ.
@@ -6,7 +6,7 @@
 //   - `parseSurveys.js` — парсер.
 //
 // Используется параллельно с `data/journey/skills/index.js` (БС/общая инфраструктура).
-// Идентификаторы навыков ЧЭ имеют префикс `che-` для глобальной уникальности
+// Идентификаторы навыков Fe имеют префикс `fe-` для глобальной уникальности
 // в едином `state.skills` map.
 
 import { parseSurveys } from './parseSurveys'
@@ -15,23 +15,23 @@ import {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE, SKILL_TO_ARCHETYPE,
   COMMON_BASE_SKILLS, COMMON_BASE_SKILL_IDS, getSkillsForArchetype,
   ALL_SKILL_IDS, SURVEY_BLOCKS, SURVEY_BLOCK_KEYS,
-  calcArchetypeAvg, calcCheScoreFromSkills, getSkillProgress
+  calcArchetypeAvg, calcFeScoreFromSkills, getSkillProgress
 } from './tree'
 
-const SURVEYS_CHE = parseSurveys(surveysMd)
+const SURVEYS_FE = parseSurveys(surveysMd)
 
 export {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE, SKILL_TO_ARCHETYPE,
   COMMON_BASE_SKILLS, COMMON_BASE_SKILL_IDS, getSkillsForArchetype,
   ALL_SKILL_IDS, SURVEY_BLOCKS, SURVEY_BLOCK_KEYS,
-  SURVEYS_CHE,
-  calcArchetypeAvg, calcCheScoreFromSkills, getSkillProgress
+  SURVEYS_FE,
+  calcArchetypeAvg, calcFeScoreFromSkills, getSkillProgress
 }
 
-// Возвращает анкету ЧЭ по skillId или null.
-export function getSurveyChe(skillId) {
-  return SURVEYS_CHE[skillId] ?? null
+// Возвращает анкету Fe по skillId или null.
+export function getSurveyFe(skillId) {
+  return SURVEYS_FE[skillId] ?? null
 }
 
-// Множество всех id анкет ЧЭ (для маршрутизации getSurvey между БС и ЧЭ).
-export const CHE_SKILL_ID_SET = new Set(Object.keys(SURVEYS_CHE))
+// Множество всех id анкет Fe (для маршрутизации getSurvey между Si и Fe).
+export const FE_SKILL_ID_SET = new Set(Object.keys(SURVEYS_FE))

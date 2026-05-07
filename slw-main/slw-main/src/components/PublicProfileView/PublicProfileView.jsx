@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
+import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import {
   fetchPublicProfile,
   reactToInsightWithComment,
@@ -146,7 +146,7 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
                       className={styles.focusChip}
                       style={{ color: ASPECT_COLORS[a], borderColor: `${ASPECT_COLORS[a]}55` }}
                     >
-                      {a}
+                      {ASPECT_DISPLAY_KEY[a] ?? a}
                     </span>
                   ))}
                 </span>

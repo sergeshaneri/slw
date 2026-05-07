@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import styles from './JourneyView.module.css'
+import MarkdownLite from './MarkdownLite'
 
 const TYPE_LABEL = {
   exercise: 'Упражнение',
@@ -71,7 +72,7 @@ function TaskItem({ task, script, accent, onCompleteWithNote, onDelete }) {
         </span>
       </div>
       <div className={styles.taskTitle}>{script.title}</div>
-      <div className={styles.taskBody}>{script.text}</div>
+      <div className={styles.taskBody}><MarkdownLite text={script.text} /></div>
 
       {!noteOpen ? (
         <div className={styles.taskActions}>

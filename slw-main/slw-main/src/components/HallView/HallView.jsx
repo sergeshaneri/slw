@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
+import { ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { HALL_CONTENT } from '../../data/hallContent'
 import {
   fetchHallOverview,
@@ -414,7 +414,7 @@ function InsightsTab({ aspect, currentUserId, onOpenProfile }) {
               <option value="insight">Инсайт</option>
               <option value="recommendation">Рекомендация</option>
             </select>
-            <span className={styles.muted}>аспект: <strong>{aspect}</strong></span>
+            <span className={styles.muted}>аспект: <strong>{ASPECT_DISPLAY_KEY[aspect]}</strong></span>
           </div>
           <textarea
             className={styles.textarea}

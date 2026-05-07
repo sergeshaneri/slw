@@ -2,7 +2,7 @@ import { useState } from 'react'
 import {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE,
   COMMON_BASE_SKILL_IDS, getSkillsForArchetype,
-  calcArchetypeAvg, calcBSScoreFromSkills, getSkillProgress,
+  calcArchetypeAvg, calcSiScoreFromSkills, getSkillProgress,
   getCompletedPasses
 } from '../../data/journey/skills'
 import styles from './JourneyView.module.css'
@@ -37,7 +37,7 @@ function statusFor(skillState) {
 }
 
 export default function SkillTree({ accent, skills, onClose, onStartSkill, onOpenSkillDetail, onOpenPlanetMap }) {
-  const bsScore = calcBSScoreFromSkills(skills)
+  const siScore = calcSiScoreFromSkills(skills)
   const progress = getSkillProgress(skills)
 
   // Multi-accordion: набор раскрытых архетипов. По умолчанию все свёрнуты —
@@ -69,7 +69,7 @@ export default function SkillTree({ accent, skills, onClose, onStartSkill, onOpe
           <div className={styles.treeHeaderTitle}>Навыки БС</div>
           <div className={styles.treeHeaderSub}>
             {progress.completed} / {progress.total} оценено
-            {Number.isFinite(bsScore) && ` · ср. ${bsScore.toFixed(1)}/10`}
+            {Number.isFinite(siScore) && ` · ср. ${siScore.toFixed(1)}/10`}
           </div>
         </div>
         {onOpenPlanetMap && (

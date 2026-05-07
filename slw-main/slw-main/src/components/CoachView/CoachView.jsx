@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
+import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import {
   fetchCoachQuota,
   summonCoach,
@@ -147,7 +147,7 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
           >
             <option value="">Без фокус-аспекта</option>
             {ASPECT_KEYS.map(key => (
-              <option key={key} value={key}>{key} · {ASPECT_DATA[key].name}</option>
+              <option key={key} value={key}>{ASPECT_DISPLAY_KEY[key]} · {ASPECT_DATA[key].name}</option>
             ))}
           </select>
         </div>

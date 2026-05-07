@@ -1,20 +1,16 @@
 import {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE,
-  calcArchetypeAvg, calcBSScoreFromSkills, getSkillProgress
-} from '../../data/journey/skills'
-import styles from './BSWheel.module.css'
+  calcSeArchetypeAvg, calcSeScoreFromSkills, getSeSkillProgress
+} from '../../data/journey/skills/se-skills'
+import styles from './SiWheel.module.css'
 
-// Колесо БС — реальное колесо баланса.
+// Колесо ЧС — реальное колесо баланса по 4 архетипам (Защитник, Правитель,
+// Строитель, Герой) + 4 общих базовых навыка, входящих в каждый архетип
+// сквозным слоем.
 //
-// Принципы:
-//   • Заливка каждого квадранта = avg по архетипу (длина лепестка = avg/10*R).
-//   • Звёздочки внутри квадранта = пройденные анкеты в архетипе. Радиус —
-//     только в пределах закрашенной области.
-//   • Chrome (украшения) per-архетип: каждый квадрант эволюционирует
-//     ИНДИВИДУАЛЬНО при 1 / 3 / 6 / max завершённых в его ветке.
-//   • Глобальные украшения (двойной ring, центральный pulse, общий corona)
-//     включаются по min-стадии — т.е. колесо на уровне X только когда
-//     ВСЕ архетипы достигли X.
+// Структура и стадии — те же, что и в SiWheel/FeWheel/NeWheel/NiWheel/TeWheel:
+// лепестки по avg, звёзды по пройденным анкетам, эволюция украшений
+// per-архетип и глобально.
 //
 // Стадии per-архетип:
 //   pre       — 0 анкет в архетипе
@@ -29,13 +25,16 @@ const R_INNER = 32
 const R_OUTER = 130
 const R_AVAILABLE = R_OUTER - R_INNER
 
-const QUADRANT_ORDER = ['healer', 'aesthete', 'hedonist', 'keeper']
+const QUADRANT_ORDER = ['defender', 'ruler', 'builder', 'hero']
 
+// Цвета подбираются по смыслу архетипов ЧС: щит-синий (защитник),
+// янтарно-золотой (правитель), кирпично-бронзовый (строитель),
+// красный-действие (герой). Не пересекаются с цветовой схемой ЧЛ.
 const ARCHETYPE_COLORS = {
-  healer:   '#7dc975',
-  aesthete: '#9eb6e8',
-  hedonist: '#dec98a',
-  keeper:   '#e0a3a3',
+  defender: '#2563eb', // глубокий синий — Защитник, щит и устойчивость
+  ruler:    '#d97706', // тёмный янтарный — Правитель, корона и авторитет
+  builder:  '#b45309', // бронза-кирпич — Строитель, материя и фундамент
+  hero:     '#dc2626', // красный — Герой, действие и поступок
 }
 
 const STAGE_ORDER = ['pre', 'light', 'medium', 'strong', 'masterful']
@@ -48,13 +47,11 @@ function getArcheStage(completed, total) {
   return 'pre'
 }
 
-// Полярные координаты в SVG-системе. Угол 0° = верх, по часовой.
 function polar(angleDeg, radius) {
   const a = (angleDeg - 90) * (Math.PI / 180)
   return { x: CX + radius * Math.cos(a), y: CY + radius * Math.sin(a) }
 }
 
-// Path для клина.
 function wedgePath(angleStart, angleEnd, rInner, rOuter) {
   const p1 = polar(angleStart, rInner)
   const p2 = polar(angleStart, rOuter)
@@ -71,7 +68,6 @@ function wedgePath(angleStart, angleEnd, rInner, rOuter) {
   ].join(' ')
 }
 
-// Path для дуги (только внешняя кривая, без замыкания).
 function arcPath(angleStart, angleEnd, radius) {
   const p1 = polar(angleStart, radius)
   const p2 = polar(angleEnd, radius)
@@ -111,28 +107,9 @@ function Star({ x, y, size = 2.6, opacity = 0.9 }) {
   )
 }
 
-function CoronaDots({ count, radius, color, size = 1.5, opacity = 0.7, startAngle = 0, sweepAngle = 360 }) {
-  const dots = []
-  for (let i = 0; i < count; i++) {
-    const angle = startAngle + (i / count) * sweepAngle
-    const p = polar(angle, radius)
-    dots.push(
-      <circle
-        key={i}
-        cx={p.x} cy={p.y} r={size}
-        fill={color}
-        opacity={opacity}
-      />
-    )
-  }
-  return <g>{dots}</g>
-}
-
-// Микро-зарубки на внешнем ring per archetype — одна на каждую пройденную анкету.
 function TallyMarks({ qi, count, total, radius, length = 4, opacity = 0.55, color = 'currentColor' }) {
   if (count === 0) return null
   const lines = []
-  // Распределяем равномерно в углах квадранта (с padding).
   const pad = 6
   for (let i = 0; i < count; i++) {
     const angleFrac = total === 1 ? 0.5 : pad / 90 + (i / (total - 1)) * ((90 - 2 * pad) / 90)
@@ -152,7 +129,6 @@ function TallyMarks({ qi, count, total, radius, length = 4, opacity = 0.55, colo
   return <g>{lines}</g>
 }
 
-// Корона-дуга для конкретного квадранта (medium+ архетип).
 function QuadrantCorona({ qi, color, dots = 5, radius, size = 1.6, opacity = 0.65 }) {
   const startA = qi * 90 + 8
   const endA = qi * 90 + 82
@@ -173,8 +149,6 @@ function QuadrantCorona({ qi, color, dots = 5, radius, size = 1.6, opacity = 0.6
   return <g>{elements}</g>
 }
 
-// Декоративные жемчужины-«драгоценности» в углах квадрантов (между ними).
-// Появляются на разных стадиях глобального прогресса.
 function CompassMarks({ globalStage, radius, color = 'currentColor' }) {
   if (globalStage === 'pre') return null
   const size =
@@ -205,7 +179,6 @@ function CompassMarks({ globalStage, radius, color = 'currentColor' }) {
   return <g>{elements}</g>
 }
 
-// Ажурный pattern на масterful-стадии — арки между жемчужинами.
 function MasterfulArcs({ radius, color = 'currentColor' }) {
   const elements = []
   for (let i = 0; i < 4; i++) {
@@ -226,22 +199,25 @@ function MasterfulArcs({ radius, color = 'currentColor' }) {
   return <g>{elements}</g>
 }
 
-export default function BSWheel({ skills, color, onContinueSurveys, isLocked = false }) {
-  const bsScore = calcBSScoreFromSkills(skills)
-  const progress = getSkillProgress(skills)
+export default function SeWheel({ skills, color, onContinueSurveys, isLocked = false }) {
+  const seScore = calcSeScoreFromSkills(skills)
+  const progress = getSeSkillProgress(skills)
 
-  // Per-архетип состояние.
+  // Per-архетип состояние — у ЧС ветки включают 4 общих базовых сверху
+  // (Физическая Заземлённость, Реалистичная Оценка Сил, Принятие Решения,
+  // Сила Воли), которые входят в средний подсчёт каждого архетипа.
+  // branch здесь — только специфичные навыки;
+  // calcSeArchetypeAvg учитывает общие.
   const archeStates = QUADRANT_ORDER.map((key, qi) => {
     const branch = SKILL_TREE[key] ?? []
     const total = branch.length
     const completedSkills = branch.filter(s => Number.isFinite(skills?.[s.id]?.result))
     const completed = completedSkills.length
-    const avg = calcArchetypeAvg(skills, key)
+    const avg = calcSeArchetypeAvg(skills, key)
     const stage = getArcheStage(completed, total)
     return { key, qi, branch, total, completed, completedSkills, avg, stage }
   })
 
-  // Глобальная стадия = минимум по всем архетипам.
   const globalStageIdx = Math.min(...archeStates.map(a => STAGE_ORDER.indexOf(a.stage)))
   const globalStage = STAGE_ORDER[globalStageIdx]
 
@@ -254,22 +230,22 @@ export default function BSWheel({ skills, color, onContinueSurveys, isLocked = f
   const showGlow        = globalStageIdx >= STAGE_ORDER.indexOf('strong')
 
   const stageLabel = isLocked
-    ? 'Пройди уровень 1, чтобы открыть оценку навыков'
-    : 'Изучай свои навыки контакта с телом для эволюции колеса'
+    ? 'Пройди уровень 0, чтобы открыть колесо навыков'
+    : 'Оценивай навыки силы, чтобы колесо росло'
 
   return (
     <section className={styles.wheel} style={{ '--accent': color }}>
       <header className={styles.wheelHeader}>
         <div className={styles.wheelTitleBlock}>
-          <span className={styles.wheelEyebrow}>Колесо БС</span>
+          <span className={styles.wheelEyebrow}>Колесо ЧС</span>
           <h2 className={styles.wheelTitle}>Самооценка по архетипам</h2>
         </div>
         <div className={styles.wheelStat}>
           <div className={styles.wheelStatVal}>
-            {Number.isFinite(bsScore) ? bsScore.toFixed(1) : '—'}
+            {Number.isFinite(seScore) ? seScore.toFixed(1) : '—'}
             <span className={styles.wheelStatTotal}>/10</span>
           </div>
-          <div className={styles.wheelStatLbl}>общее БС</div>
+          <div className={styles.wheelStatLbl}>общее ЧС</div>
         </div>
       </header>
 
@@ -281,7 +257,6 @@ export default function BSWheel({ skills, color, onContinueSurveys, isLocked = f
           xmlns="http://www.w3.org/2000/svg"
           className={`${styles.svg} ${showPulse ? styles.svgPulse : ''}`}
         >
-          {/* Подложка квадрантов — насыщенность зависит от индивидуальной стадии. */}
           {archeStates.map(({ key, qi, stage }) => {
             const opacity =
               stage === 'masterful' ? 0.18 :
@@ -298,7 +273,6 @@ export default function BSWheel({ skills, color, onContinueSurveys, isLocked = f
             )
           })}
 
-          {/* Per-quadrant glow на strong+ — мягкое сияние под закрашенной частью. */}
           {archeStates.map(({ key, qi, avg, stage }) => {
             if (!Number.isFinite(avg)) return null
             if (stage !== 'strong' && stage !== 'masterful') return null
@@ -314,7 +288,6 @@ export default function BSWheel({ skills, color, onContinueSurveys, isLocked = f
             )
           })}
 
-          {/* Заливка квадрантов по avg архетипа — всегда яркая. */}
           {archeStates.map(({ key, qi, avg }) => {
             if (!Number.isFinite(avg)) return null
             const length = R_INNER + (avg / 10) * R_AVAILABLE
@@ -328,7 +301,6 @@ export default function BSWheel({ skills, color, onContinueSurveys, isLocked = f
             )
           })}
 
-          {/* Звёздочки внутри закрашенной части */}
           {archeStates.map(({ key, qi, avg, completedSkills, stage }) => {
             if (completedSkills.length === 0 || !Number.isFinite(avg)) return null
             const filledOuter = R_INNER + (avg / 10) * R_AVAILABLE
@@ -352,8 +324,7 @@ export default function BSWheel({ skills, color, onContinueSurveys, isLocked = f
             )
           })}
 
-          {/* Per-quadrant corona-dots на medium+ архетипе */}
-          {archeStates.map(({ key, qi, stage, completed, total }) => {
+          {archeStates.map(({ key, qi, stage }) => {
             if (stage === 'pre' || stage === 'light') return null
             const dots = stage === 'masterful' ? 9 : stage === 'strong' ? 7 : 5
             const radius = R_OUTER + 7
@@ -370,8 +341,6 @@ export default function BSWheel({ skills, color, onContinueSurveys, isLocked = f
             )
           })}
 
-          {/* Per-quadrant tally marks на внешнем ring — одна полоска на пройденную анкету.
-              Цвет архетипа, тонкая. Видны всегда (от 1 завершённой). */}
           {archeStates.map(({ key, qi, completed, total }) => (
             <TallyMarks
               key={`tally-${key}`}
@@ -385,12 +354,10 @@ export default function BSWheel({ skills, color, onContinueSurveys, isLocked = f
             />
           ))}
 
-          {/* Внутренние арки внутри секторов на strong+ — добавляют слой деталей */}
           {archeStates.map(({ key, qi, avg, stage }) => {
             if (stage !== 'strong' && stage !== 'masterful') return null
             if (!Number.isFinite(avg)) return null
             const length = R_INNER + (avg / 10) * R_AVAILABLE
-            // Тонкая дуга на середине высоты сектора.
             const arcR = R_INNER + (length - R_INNER) * 0.55
             return (
               <path
@@ -404,7 +371,6 @@ export default function BSWheel({ skills, color, onContinueSurveys, isLocked = f
             )
           })}
 
-          {/* Outer ring — всегда. Динамически меняет толщину. */}
           <circle
             cx={CX} cy={CY} r={R_OUTER + 4}
             fill="none"
@@ -437,16 +403,12 @@ export default function BSWheel({ skills, color, onContinueSurveys, isLocked = f
             />
           )}
 
-          {/* Жемчужины-компас в углах квадрантов */}
           <CompassMarks globalStage={globalStage} radius={R_OUTER + (showDoubleRing ? 9 : 4)} />
 
-          {/* Декоративные арки между квадрантами на strong+ */}
           {showMasterArcs && (
             <MasterfulArcs radius={R_OUTER + 12} />
           )}
 
-          {/* Спицы между квадрантами — на strong+ только если все архетипы strong+;
-              иначе остаются обычные separators. */}
           {globalStageIdx >= STAGE_ORDER.indexOf('strong') ? (
             QUADRANT_ORDER.map((_, qi) => {
               const angle = qi * 90
@@ -482,21 +444,17 @@ export default function BSWheel({ skills, color, onContinueSurveys, isLocked = f
             })
           )}
 
-          {/* Внутренние концентры у центра — на medium+ */}
           {showInnerDetail && (
-            <>
-              <circle
-                cx={CX} cy={CY} r={R_INNER + 8}
-                fill="none"
-                stroke="currentColor"
-                strokeOpacity={0.18}
-                strokeWidth={0.6}
-                strokeDasharray="1 2"
-              />
-            </>
+            <circle
+              cx={CX} cy={CY} r={R_INNER + 8}
+              fill="none"
+              stroke="currentColor"
+              strokeOpacity={0.18}
+              strokeWidth={0.6}
+              strokeDasharray="1 2"
+            />
           )}
 
-          {/* Inner ring around centre — на strong+ */}
           {showInnerRing && (
             <circle
               cx={CX} cy={CY} r={R_INNER + 5}
@@ -507,7 +465,6 @@ export default function BSWheel({ skills, color, onContinueSurveys, isLocked = f
             />
           )}
 
-          {/* Center disk + текст */}
           <circle
             cx={CX} cy={CY} r={showBigBadge ? R_INNER + 2 : R_INNER - 2}
             fill="var(--surface-2, #1c1d25)"
@@ -527,7 +484,7 @@ export default function BSWheel({ skills, color, onContinueSurveys, isLocked = f
             fontSize={showBigBadge ? 17 : 14}
             fontWeight="700"
           >
-            {Number.isFinite(bsScore) ? bsScore.toFixed(1) : '—'}
+            {Number.isFinite(seScore) ? seScore.toFixed(1) : '—'}
           </text>
           <text
             x={CX} y={showBigBadge ? CY + 12 : CY + 11}
@@ -538,10 +495,9 @@ export default function BSWheel({ skills, color, onContinueSurveys, isLocked = f
             opacity={0.65}
             letterSpacing="0.1em"
           >
-            БС
+            ЧС
           </text>
 
-          {/* Glyphs архетипов снаружи — всегда */}
           {archeStates.map(({ key, qi, stage }) => {
             const arche = ARCHETYPES[key]
             const midAngle = qi * 90 + 45
@@ -572,7 +528,6 @@ export default function BSWheel({ skills, color, onContinueSurveys, isLocked = f
         </svg>
       </div>
 
-      {/* CTA — скрыто, пока заблокировано (L0 не пройден). */}
       {!isLocked && progress.remaining > 0 && onContinueSurveys && (
         <button
           type="button"
@@ -594,7 +549,6 @@ export default function BSWheel({ skills, color, onContinueSurveys, isLocked = f
         </button>
       )}
 
-      {/* Текстовая разбивка по архетипам — теперь со стадией. */}
       <div className={styles.archetypeRow}>
         {archeStates.map(({ key, avg, completed, total, stage }) => {
           const arche = ARCHETYPES[key]

@@ -1,4 +1,5 @@
 import styles from './JourneyView.module.css'
+import MarkdownLite from './MarkdownLite'
 
 const TYPE_CONFIG = {
   theory:     { label: 'Теория',     glyph: '◇' },
@@ -19,7 +20,9 @@ export default function ScriptCard({ script }) {
 
       </div>
       <div className={styles.scriptTitle}>{script.title}</div>
-      <div className={styles.scriptBody}>{script.text}</div>
+      <div className={styles.scriptBody}>
+        <MarkdownLite text={script.text} />
+      </div>
       <div className={styles.scriptMeta}>
         <span>+{script.xp} XP</span>
         {script.stardust > 0 && <span>+{script.stardust} ✦</span>}

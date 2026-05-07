@@ -1,23 +1,45 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { ASPECT_COLORS } from '../../data/aspects'
+import { ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
 import { ONBOARDING } from '../../data/journey/onboarding'
 import { getJourney } from '../../data/journey/registry'
 import {
-  getSurvey, calcSurveyResult, calcBSScoreFromSkills, getSkillProgress,
+  calcSurveyResult, calcSiScoreFromSkills, getSkillProgress,
   findFirstUnansweredSurveyIndex, ALL_SKILL_IDS, SURVEY_BLOCK_KEYS, SURVEYS,
   getNextPass, getStatementsForPass, getStatementsForFullRange,
   buildSurveyStatements, getCompletedPasses,
   ARCHETYPE_KEYS, SKILL_TREE
 } from '../../data/journey/skills'
-import { resolveSurvey, isNeSkill, isNiSkill } from '../../data/journey/skills/resolve'
-import { calcNeScoreFromSkills, getNeSkillProgress } from '../../data/journey/skills/ne-skills'
-import { calcNiScoreFromSkills, getNiSkillProgress } from '../../data/journey/skills/ni-skills'
+import { resolveSurvey, isNeSkill, isNiSkill, isTeSkill, isTiSkill, isFiSkill, isSeSkill } from '../../data/journey/skills/resolve'
 import {
-  ALL_SKILL_IDS as CHE_SKILL_IDS,
-  SURVEYS_CHE,
-  calcCheScoreFromSkills,
-  getSkillProgress as getCheSkillProgress
-} from '../../data/journey/che-skills'
+  calcNeScoreFromSkills, getNeSkillProgress,
+  ALL_SKILL_IDS as NE_SKILL_IDS,
+} from '../../data/journey/skills/ne-skills'
+import {
+  calcNiScoreFromSkills, getNiSkillProgress,
+  ALL_SKILL_IDS as NI_SKILL_IDS,
+} from '../../data/journey/skills/ni-skills'
+import {
+  calcTeScoreFromSkills, getTeSkillProgress,
+  ALL_SKILL_IDS as TE_SKILL_IDS,
+} from '../../data/journey/skills/te-skills'
+import {
+  calcTiScoreFromSkills, getTiSkillProgress,
+  ALL_SKILL_IDS as TI_SKILL_IDS,
+} from '../../data/journey/skills/ti-skills'
+import {
+  calcFiScoreFromSkills, getFiSkillProgress,
+  ALL_SKILL_IDS as FI_SKILL_IDS,
+} from '../../data/journey/skills/fi-skills'
+import {
+  calcSeScoreFromSkills, getSeSkillProgress,
+  ALL_SKILL_IDS as SE_SKILL_IDS,
+} from '../../data/journey/skills/se-skills'
+import {
+  ALL_SKILL_IDS as FE_SKILL_IDS,
+  SURVEYS_FE,
+  calcFeScoreFromSkills,
+  getSkillProgress as getFeSkillProgress
+} from '../../data/journey/fe-skills'
 import Onboarding from './Onboarding'
 import Chat from './Chat'
 import LevelComplete from './LevelComplete'
@@ -29,7 +51,11 @@ import SurveyInsight from './SurveyInsight'
 import SkillTree from './SkillTree'
 import NeSkillTree from './NeSkillTree'
 import NiSkillTree from './NiSkillTree'
-import CheSkillTree from './CheSkillTree'
+import FeSkillTree from './FeSkillTree'
+import TeSkillTree from './TeSkillTree'
+import TiSkillTree from './TiSkillTree'
+import FiSkillTree from './FiSkillTree'
+import SeSkillTree from './SeSkillTree'
 import SkillDetail from './SkillDetail'
 import PlanetMap from './PlanetMap'
 import AdminPanel from './AdminPanel'
@@ -124,7 +150,44 @@ import styles from './JourneyView.module.css'
 //     (43 навыка по 4 архетипам) и анкеты для архетипных навыков пока
 //     не интегрированы — будут добавлены отдельно через модуль
 //     skills/ni-skills.js + NiSkillTree-компонент.
-export const CONTENT_VERSION = 15
+// 16 — пересборка общих базовых навыков БС: signals / interoception /
+//     honesty возвращены в SKILL_TREE.healer как обычные навыки архетипа
+//     (id остался прежним → state.skills.* по этим id сохраняется).
+//     На их место в COMMON_BASE_SKILLS введены 4 новых сквозных навыка:
+//     body-listening, needs-awareness, timely-care, details. Это цепочка
+//     «вход → понимание → выход + базовое качество тонкости», работающая
+//     через все 4 архетипа БС. В L0-чате БС старые SURV-100/101/102
+//     заменены на SURV-100..103 для четырёх новых навыков. Полные анкеты
+//     SURV-55..58 добавлены в l0-surveys.md. Содержательное описание
+//     навыков — `Si/Навыки БС — Универсальные.md`. Из-за бампа
+//     L0/L1/L2-чаты у БС перезапустятся, XP/skills/streak/stardust
+//     сохраняются.
+// 17 — добавлен аспект БЭ (Белая Этика, планета Anima Humanitatis):
+//     L0 (15 шагов), L1 (25), L2 (40), L3 (стартовый — 20). Регистрация
+//     в registry.js, новый модуль aspects/Fi/index.js. Контент в
+//     `aspects/Fi/l*.md`. Полное колесо БЭ: 58 навыков (2 корневых +
+//     17 Дипломат + 14 Духовник + 9 Хранитель Рода + 16 Друг) по 4
+//     архетипам, новые файлы skills/{fi-tree,fi-skills}.js + fi-surveys.md
+//     (870 утверждений, по 15 на навык). Новый компонент FiSkillTree.jsx
+//     дисптачится для currentAspect === 'Fi'. Skill ID у БЭ имеют
+//     префикс `fi-` для глобальной уникальности. resolveSurvey() и
+//     handleStartSkillSurvey обновлены для поддержки Fi. Существующие
+//     юзеры получат сброс чат-истории по другим аспектам, прогресс
+//     XP/streak/skills сохранится.
+// 18 — добавлен аспект ЧС (Чёрная Сенсорика, планета Imperium Magnum):
+//     L0 (15 шагов), L1 (25), L2 (40), L3 (60). Регистрация в registry.js,
+//     новый модуль aspects/Se/index.js. Контент в `aspects/Se/l*.md`.
+//     Полное колесо ЧС: 47 навыков (4 общих сквозных квартета
+//     тело-восприятие-выбор-исполнение + 12 Защитник + 9 Правитель +
+//     10 Строитель + 12 Герой включая синергический навык Радикальное
+//     Принятие), новый файл skills/se-tree.js + l0-surveys.md (47 анкет
+//     по 15 утверждений). SeSkillTree-компонент пока не реализован —
+//     дерево навыков ЧС видно только через `JOURNEYS.Se` для чата
+//     уровней. Survey-анкеты по навыкам ЧС будут добавлены отдельно.
+//     Все 8 аспектов теперь имеют контент уровней. Существующие
+//     юзеры получат сброс чат-истории по другим аспектам, прогресс
+//     XP/streak/skills сохранится.
+export const CONTENT_VERSION = 18
 
 // Миграция id навыков после ревизии дерева (v9). Старый id → новый.
 // Если у юзера уже есть запись по новому id, старая отбрасывается
@@ -192,6 +255,12 @@ export const DEFAULT_JOURNEY = {
   contentVersion: CONTENT_VERSION
 }
 
+// Префикс ID навыков ЧЭ переименован с `che-` (русский транслит) на `fe-`
+// (стандартная соционическая нотация). Применяется до общего SKILL_ID_MIGRATION.
+function renameChePrefix(id) {
+  return id.startsWith('che-') ? 'fe-' + id.slice(4) : id
+}
+
 // Миграция skills-записей со старого формата (без passes/insights) на новый.
 // Старые записи: { result, blocks, completedAt, answers? }.
 // Новые: + passes (вычисляется по answers), + insights: [].
@@ -200,9 +269,9 @@ function migrateSkills(skills) {
   const out = {}
   for (const [id, entry] of Object.entries(skills)) {
     if (!entry) continue
-    // v9: переименование id после ревизии дерева. Если у юзера уже
-    // есть запись по новому id — старая отбрасывается.
-    const targetId = SKILL_ID_MIGRATION[id] ?? id
+    // Префикс che- → fe- для навыков ЧЭ + v9-переименования БС-навыков.
+    const renamed = renameChePrefix(id)
+    const targetId = SKILL_ID_MIGRATION[renamed] ?? renamed
     if (targetId !== id && skills[targetId]) continue
     // passes уже есть — оставляем как есть.
     if (Number.isFinite(entry.passes)) {
@@ -886,17 +955,25 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       setTimeout(() => deliverScript(nextIdx), 100)
     }
 
-    // Пересчёт средних: БС / ЧЭ / ЧИ / БИ. Каждый calc смотрит только в свои id,
+    // Пересчёт средних: БС / ЧЭ / ЧИ / БИ / ЧЛ / БЛ / БЭ / ЧС. Каждый calc смотрит только в свои id,
     // так что один newSkills корректно обновляет все score одновременно.
-    const bsScore  = calcBSScoreFromSkills(newSkills)
-    const cheScore = calcCheScoreFromSkills(newSkills)
+    const siScore  = calcSiScoreFromSkills(newSkills)
+    const feScore = calcFeScoreFromSkills(newSkills)
     const neScore  = calcNeScoreFromSkills(newSkills)
     const niScore  = calcNiScoreFromSkills(newSkills)
+    const teScore  = calcTeScoreFromSkills(newSkills)
+    const tiScore  = calcTiScoreFromSkills(newSkills)
+    const fiScore  = calcFiScoreFromSkills(newSkills)
+    const seScore  = calcSeScoreFromSkills(newSkills)
     const nextScores = { ...scores }
-    if (Number.isFinite(bsScore))  nextScores['Si'] = Math.round(bsScore)
-    if (Number.isFinite(cheScore)) nextScores['Fe'] = Math.round(cheScore)
+    if (Number.isFinite(siScore))  nextScores['Si'] = Math.round(siScore)
+    if (Number.isFinite(feScore)) nextScores['Fe'] = Math.round(feScore)
     if (Number.isFinite(neScore))  nextScores['Ne'] = Math.round(neScore)
     if (Number.isFinite(niScore))  nextScores['Ni'] = Math.round(niScore)
+    if (Number.isFinite(teScore))  nextScores['Te'] = Math.round(teScore)
+    if (Number.isFinite(tiScore))  nextScores['Ti'] = Math.round(tiScore)
+    if (Number.isFinite(fiScore))  nextScores['Fi'] = Math.round(fiScore)
+    if (Number.isFinite(seScore))  nextScores['Se'] = Math.round(seScore)
     onScoresChange(nextScores)
 
     // Запись в дневник.
@@ -977,8 +1054,8 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   // вручную, с видимым прогрессом по веткам. Доступно с момента, когда
   // юзер дошёл до экрана LevelComplete L0 («Открыть Колесо БС») —
   // gate здесь лояльный, фактическая блокировка на UI-уровне.
-  // Дерево есть только у Si/Fe/Ne/Ni; для остальных аспектов — toast.
-  const ASPECTS_WITH_SKILL_TREE = ['Si', 'Fe', 'Ne', 'Ni']
+  // Дерево есть у Si/Fe/Ne/Ni/Te/Ti/Fi/Se; для остальных аспектов — toast.
+  const ASPECTS_WITH_SKILL_TREE = ['Si', 'Fe', 'Ne', 'Ni', 'Te', 'Ti', 'Fi', 'Se']
   const handleOpenSkillTree = useCallback(() => {
     if (!ASPECTS_WITH_SKILL_TREE.includes(state.currentAspect)) {
       showToast('У этой планеты пока нет колеса навыков')
@@ -1056,10 +1133,130 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       return
     }
 
-    // Определяем аспект по skill ID. У ЧЭ-навыков id с префиксом `che-`,
-    // их анкеты живут инлайн в core (CSURV-1..3 в che-l0.md), у БС —
+    // ЧЛ (Te) — анкеты живут отдельно (TE_SURVEYS из te-skills.js), не как
+    // journey-скрипты. Аналогично Ne/Ni. Аспект в state остаётся 'Te'
+    // (юзер пришёл из Колеса Te).
+    if (isTeSkill(skillId)) {
+      if (draft) {
+        setState(s => ({
+          ...s,
+          currentAspect: 'Te',
+          screen: 'survey',
+          activeSurvey: {
+            scriptId: `te-survey-${skillId}`,
+            skillId,
+            mode: draft.mode ?? 'short',
+            startPass: draft.startPass ?? 1,
+            stepIndex: draft.stepIndex ?? 0,
+            answers: draft.answers ?? {},
+          },
+        }))
+        return
+      }
+      if (getNextPass(skillEntry) === 0) return
+      setState(s => ({
+        ...s,
+        currentAspect: 'Te',
+        screen: 'survey-choice',
+        activeSurvey: { scriptId: `te-survey-${skillId}`, skillId },
+      }))
+      return
+    }
+
+    // БЛ (Ti) — анкеты живут отдельно (TI_SURVEYS из ti-skills.js), не как
+    // journey-скрипты. Аналогично Ne/Ni/Te. Аспект в state остаётся 'Ti'
+    // (юзер пришёл из Колеса Ti).
+    if (isTiSkill(skillId)) {
+      if (draft) {
+        setState(s => ({
+          ...s,
+          currentAspect: 'Ti',
+          screen: 'survey',
+          activeSurvey: {
+            scriptId: `ti-survey-${skillId}`,
+            skillId,
+            mode: draft.mode ?? 'short',
+            startPass: draft.startPass ?? 1,
+            stepIndex: draft.stepIndex ?? 0,
+            answers: draft.answers ?? {},
+          },
+        }))
+        return
+      }
+      if (getNextPass(skillEntry) === 0) return
+      setState(s => ({
+        ...s,
+        currentAspect: 'Ti',
+        screen: 'survey-choice',
+        activeSurvey: { scriptId: `ti-survey-${skillId}`, skillId },
+      }))
+      return
+    }
+
+    // БЭ (Fi) — анкеты живут отдельно (FI_SURVEYS из fi-skills.js), не как
+    // journey-скрипты. Аналогично Ne/Ni/Te. Аспект в state остаётся 'Fi'
+    // (юзер пришёл из Колеса Fi).
+    if (isFiSkill(skillId)) {
+      if (draft) {
+        setState(s => ({
+          ...s,
+          currentAspect: 'Fi',
+          screen: 'survey',
+          activeSurvey: {
+            scriptId: `fi-survey-${skillId}`,
+            skillId,
+            mode: draft.mode ?? 'short',
+            startPass: draft.startPass ?? 1,
+            stepIndex: draft.stepIndex ?? 0,
+            answers: draft.answers ?? {},
+          },
+        }))
+        return
+      }
+      if (getNextPass(skillEntry) === 0) return
+      setState(s => ({
+        ...s,
+        currentAspect: 'Fi',
+        screen: 'survey-choice',
+        activeSurvey: { scriptId: `fi-survey-${skillId}`, skillId },
+      }))
+      return
+    }
+
+    // ЧС (Se) — анкеты живут отдельно (SE_SURVEYS из se-skills.js), не как
+    // journey-скрипты. Аналогично Ne/Ni/Te/Fi. Аспект в state остаётся 'Se'
+    // (юзер пришёл из Колеса Se).
+    if (isSeSkill(skillId)) {
+      if (draft) {
+        setState(s => ({
+          ...s,
+          currentAspect: 'Se',
+          screen: 'survey',
+          activeSurvey: {
+            scriptId: `se-survey-${skillId}`,
+            skillId,
+            mode: draft.mode ?? 'short',
+            startPass: draft.startPass ?? 1,
+            stepIndex: draft.stepIndex ?? 0,
+            answers: draft.answers ?? {},
+          },
+        }))
+        return
+      }
+      if (getNextPass(skillEntry) === 0) return
+      setState(s => ({
+        ...s,
+        currentAspect: 'Se',
+        screen: 'survey-choice',
+        activeSurvey: { scriptId: `se-survey-${skillId}`, skillId },
+      }))
+      return
+    }
+
+    // Определяем аспект по skill ID. У Fe-навыков id с префиксом `fe-`,
+    // их анкеты живут инлайн в core (CSURV-1..3 в Fe/l0.md), у Si —
     // в отдельном пуле levels[0].surveys.
-    const aspect = skillId.startsWith('che-') ? 'Fe' : 'Si'
+    const aspect = skillId.startsWith('fe-') ? 'Fe' : 'Si'
     const journeyData = getJourney(aspect)
 
     // Ищем survey-шаг и в core, и в surveys-pool — для ЧЭ они лежат в core,
@@ -1236,10 +1433,11 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
   // 2. Заполнить активную анкету. Все утверждения текущей сессии = 7.
   //    Сдвигаем stepIndex за конец → SurveyScreen.useEffect → survey-insight.
+  //    resolveSurvey работает для всех аспектов (Si/Fe/Ne/Ni/Te/Fi).
   const handleAdminFillSurvey = useCallback(() => {
     setState(s => {
       if (!s.activeSurvey) return s
-      const survey = SURVEYS[s.activeSurvey.skillId]
+      const survey = resolveSurvey(s.activeSurvey.skillId)
       if (!survey) return s
       const mode = s.activeSurvey.mode ?? 'short'
       const startPass = s.activeSurvey.startPass ?? 1
@@ -1261,15 +1459,17 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     })
   }, [setState])
 
-  // 3. Заполнить все навыки БС и ЧЭ по 7/10 (полностью все 3 прохода).
-  //    Сразу пересчитываем средние по обоим аспектам.
-  //    ЧИ-навыки сейчас не заполняем — для них admin-функция пока не нужна.
+  // 3. Заполнить все навыки 7/10 (полностью все 3 прохода).
+  //    Охватывает все аспекты, у которых есть skill-tree:
+  //    Si / Fe / Ne / Ni / Te / Fi. Анкета по skillId резолвится через
+  //    resolveSurvey() — он сам выбирает нужный *_SURVEYS-словарь.
+  //    Сразу пересчитываем средние по всем 6.
   const handleAdminFillAllSkills = useCallback(() => {
     const completedAt = Date.now()
     const newSkills = {}
-    const fillFromSurveys = (skillIds, surveysMap) => {
+    const fillFromIds = (skillIds) => {
       for (const skillId of skillIds) {
-        const survey = surveysMap[skillId]
+        const survey = resolveSurvey(skillId)
         const blocks = {}
         const answers = {}
         if (survey) {
@@ -1294,16 +1494,34 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         }
       }
     }
-    fillFromSurveys(ALL_SKILL_IDS, SURVEYS)
-    fillFromSurveys(CHE_SKILL_IDS, SURVEYS_CHE)
+    fillFromIds(ALL_SKILL_IDS)     // Si
+    fillFromIds(FE_SKILL_IDS)      // Fe
+    fillFromIds(NE_SKILL_IDS)      // Ne
+    fillFromIds(NI_SKILL_IDS)      // Ni
+    fillFromIds(TE_SKILL_IDS)      // Te
+    fillFromIds(TI_SKILL_IDS)      // Ti
+    fillFromIds(FI_SKILL_IDS)      // Fi
+    fillFromIds(SE_SKILL_IDS)      // Se
 
     setState(s => ({ ...s, skills: newSkills }))
 
-    const bs = calcBSScoreFromSkills(newSkills)
-    const che = calcCheScoreFromSkills(newSkills)
     const next = { ...scores }
-    if (Number.isFinite(bs))  next['Si'] = Math.round(bs)
-    if (Number.isFinite(che)) next['Fe'] = Math.round(che)
+    const si = calcSiScoreFromSkills(newSkills)
+    const fe = calcFeScoreFromSkills(newSkills)
+    const ne = calcNeScoreFromSkills(newSkills)
+    const ni = calcNiScoreFromSkills(newSkills)
+    const te = calcTeScoreFromSkills(newSkills)
+    const ti = calcTiScoreFromSkills(newSkills)
+    const fi = calcFiScoreFromSkills(newSkills)
+    const se = calcSeScoreFromSkills(newSkills)
+    if (Number.isFinite(si)) next['Si'] = Math.round(si)
+    if (Number.isFinite(fe)) next['Fe'] = Math.round(fe)
+    if (Number.isFinite(ne)) next['Ne'] = Math.round(ne)
+    if (Number.isFinite(ni)) next['Ni'] = Math.round(ni)
+    if (Number.isFinite(te)) next['Te'] = Math.round(te)
+    if (Number.isFinite(ti)) next['Ti'] = Math.round(ti)
+    if (Number.isFinite(fi)) next['Fi'] = Math.round(fi)
+    if (Number.isFinite(se)) next['Se'] = Math.round(se)
     onScoresChange(next)
   }, [scores, onScoresChange, setState])
 
@@ -1350,7 +1568,8 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         if (newSkills[id]) delete newSkills[id]
         continue
       }
-      const survey = SURVEYS[id]
+      // resolveSurvey покрывает все аспекты, не только БС.
+      const survey = resolveSurvey(id)
       const blocks = {}
       const answers = {}
       if (survey) {
@@ -1375,15 +1594,23 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       }
     }
     setState(s => ({ ...s, skills: newSkills, screen: 'skill-tree' }))
-    const bs  = calcBSScoreFromSkills(newSkills)
-    const che = calcCheScoreFromSkills(newSkills)
+    const bs  = calcSiScoreFromSkills(newSkills)
+    const che = calcFeScoreFromSkills(newSkills)
     const ne  = calcNeScoreFromSkills(newSkills)
     const ni  = calcNiScoreFromSkills(newSkills)
+    const te  = calcTeScoreFromSkills(newSkills)
+    const ti  = calcTiScoreFromSkills(newSkills)
+    const fi  = calcFiScoreFromSkills(newSkills)
+    const se  = calcSeScoreFromSkills(newSkills)
     const next = { ...scores }
     if (Number.isFinite(bs))  next['Si'] = Math.round(bs)
     if (Number.isFinite(che)) next['Fe'] = Math.round(che)
     if (Number.isFinite(ne))  next['Ne'] = Math.round(ne)
     if (Number.isFinite(ni))  next['Ni'] = Math.round(ni)
+    if (Number.isFinite(te))  next['Te'] = Math.round(te)
+    if (Number.isFinite(ti))  next['Ti'] = Math.round(ti)
+    if (Number.isFinite(fi))  next['Fi'] = Math.round(fi)
+    if (Number.isFinite(se))  next['Se'] = Math.round(se)
     onScoresChange(next)
   }, [state.skills, scores, onScoresChange, setState])
 
@@ -1432,16 +1659,19 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           onGoToSurveys={handleOpenSkillTree}
           onOpenPlanetMap={handleOpenPlanetMap}
           // Пилюля «Оценить навыки» появляется только после L0 (или для админа).
-          // Прогресс считается по skill-tree активного аспекта; для аспектов
-          // без дерева (Ti/Te/Se/Fi) — 0, чтобы пилюля не показывалась.
+          // Прогресс считается по skill-tree активного аспекта.
           surveyRemaining={(() => {
             if (!isAdmin && (a.currentLevel ?? 0) < 1) return 0
             const sk = state.skills ?? {}
             switch (state.currentAspect) {
               case 'Si': return getSkillProgress(sk).remaining
-              case 'Fe': return getCheSkillProgress(sk).remaining
+              case 'Fe': return getFeSkillProgress(sk).remaining
               case 'Ne': return getNeSkillProgress(sk).remaining
               case 'Ni': return getNiSkillProgress(sk).remaining
+              case 'Te': return getTeSkillProgress(sk).remaining
+              case 'Ti': return getTiSkillProgress(sk).remaining
+              case 'Fi': return getFiSkillProgress(sk).remaining
+              case 'Se': return getSeSkillProgress(sk).remaining
               default:   return 0
             }
           })()}
@@ -1456,16 +1686,22 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       {state.screen === 'levelcomplete' && (() => {
         // На L0 после прохождения core — primary CTA «Открыть Колесо аспекта»
         // (skill-tree). Для БС — если у уровня есть анкеты (surveys).
-        // Для ЧИ/БИ — всегда (анкеты живут в ne-skills.js / ni-skills.js).
+        // Для ЧИ/БИ/ЧЛ/БЭ — всегда (анкеты живут в ne-skills.js / ni-skills.js / te-skills.js / fi-skills.js).
         const isNe = state.currentAspect === 'Ne'
         const isNi = state.currentAspect === 'Ni'
+        const isTe = state.currentAspect === 'Te'
+        const isFi = state.currentAspect === 'Fi'
         const hasSurveys = (currentLevel?.surveys?.length ?? 0) > 0
-        const showWheel = a.currentLevel === 0 && (hasSurveys || isNe || isNi)
+        const showWheel = a.currentLevel === 0 && (hasSurveys || isNe || isNi || isTe || isFi)
         const wheelLabel = isNe
           ? 'Открыть Колесо ЧИ'
           : isNi
             ? 'Открыть Колесо БИ'
-            : 'Открыть Колесо БС'
+            : isTe
+              ? 'Открыть Колесо ЧЛ'
+              : isFi
+                ? 'Открыть Колесо БЭ'
+                : 'Открыть Колесо БС'
         return (
           <LevelComplete
             state={stateForChildren}
@@ -1490,6 +1726,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           progressPct={progressPct}
           levelTitle={currentLevel?.title}
           planet={currentJourney?.planet}
+          aspectName={ASPECT_DATA[state.currentAspect]?.name ?? 'Путешествие'}
           // Возврат в чат должен очистить активную анкету: иначе её
           // SURV-script-карточка всплывает в chat-ленте через resolveScript
           // (который теперь fallback-ит в currentLevel.surveys), и юзер
@@ -1533,6 +1770,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
             })
           }}
           onReset={handleReset}
+          onOpenPlanetMap={handleOpenPlanetMap}
         />
       )}
 
@@ -1557,7 +1795,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       )}
 
       {state.screen === 'skill-tree' && state.currentAspect === 'Fe' && (
-        <CheSkillTree
+        <FeSkillTree
           accent={accent}
           skills={state.skills ?? {}}
           onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
@@ -1574,6 +1812,46 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
           onStartSkill={handleStartSkillSurvey}
           onOpenSkillDetail={handleOpenSkillDetail}
+          onOpenPlanetMap={handleOpenPlanetMap}
+        />
+      )}
+
+      {state.screen === 'skill-tree' && state.currentAspect === 'Te' && (
+        <TeSkillTree
+          accent={accent}
+          skills={state.skills ?? {}}
+          onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
+          onStartSkill={handleStartSkillSurvey}
+          onOpenPlanetMap={handleOpenPlanetMap}
+        />
+      )}
+
+      {state.screen === 'skill-tree' && state.currentAspect === 'Ti' && (
+        <TiSkillTree
+          accent={accent}
+          skills={state.skills ?? {}}
+          onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
+          onStartSkill={handleStartSkillSurvey}
+          onOpenPlanetMap={handleOpenPlanetMap}
+        />
+      )}
+
+      {state.screen === 'skill-tree' && state.currentAspect === 'Fi' && (
+        <FiSkillTree
+          accent={accent}
+          skills={state.skills ?? {}}
+          onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
+          onStartSkill={handleStartSkillSurvey}
+          onOpenPlanetMap={handleOpenPlanetMap}
+        />
+      )}
+
+      {state.screen === 'skill-tree' && state.currentAspect === 'Se' && (
+        <SeSkillTree
+          accent={accent}
+          skills={state.skills ?? {}}
+          onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
+          onStartSkill={handleStartSkillSurvey}
           onOpenPlanetMap={handleOpenPlanetMap}
         />
       )}

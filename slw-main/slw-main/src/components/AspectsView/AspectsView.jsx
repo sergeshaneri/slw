@@ -1,13 +1,19 @@
 import { useState, useMemo, useEffect } from 'react'
-import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
+import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { BLOCKS, LEVEL_LABELS, getBlockItems } from './blocks'
-import BSWheel from './BSWheel'
-import CheWheel from './CheWheel'
+import SiWheel from './SiWheel'
+import FeWheel from './FeWheel'
+import NeWheel from './NeWheel'
 import NiWheel from './NiWheel'
+import FiWheel from './FiWheel'
+import TeWheel from './TeWheel'
+import TiWheel from './TiWheel'
+import SeWheel from './SeWheel'
+import PlaceholderWheel from './PlaceholderWheel'
 import HabitSection from './HabitSection'
 import styles from './AspectsView.module.css'
 
-export default function AspectsView({ selectedAspect, onAspectSelect, scores, onScoreChange, diary, onDiaryChange, journey, onGoToBSSurveys, onGoToCheSurveys, onGoToNiSurveys, onEnterHall, t }) {
+export default function AspectsView({ selectedAspect, onAspectSelect, scores, onScoreChange, diary, onDiaryChange, journey, onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys, onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys, onEnterHall, isAdmin = false, t }) {
   const [blockId, setBlockId] = useState(null)
 
   useEffect(() => {
@@ -28,8 +34,8 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, on
     if (!block) {
       return <Toc aspect={selectedAspect} data={data} color={color} available={available}
         scores={scores} onScoreChange={onScoreChange} onAspectSelect={onAspectSelect}
-        journey={journey} onGoToBSSurveys={onGoToBSSurveys} onGoToCheSurveys={onGoToCheSurveys} onGoToNiSurveys={onGoToNiSurveys} onOpenBlock={setBlockId}
-    onEnterHall={onEnterHall} />
+        journey={journey} onGoToSiSurveys={onGoToSiSurveys} onGoToFeSurveys={onGoToFeSurveys} onGoToNeSurveys={onGoToNeSurveys} onGoToNiSurveys={onGoToNiSurveys} onGoToFiSurveys={onGoToFiSurveys} onGoToTeSurveys={onGoToTeSurveys} onGoToTiSurveys={onGoToTiSurveys} onGoToSeSurveys={onGoToSeSurveys} onOpenBlock={setBlockId}
+    onEnterHall={onEnterHall} isAdmin={isAdmin} />
     }
     return (
       <BlockReader
@@ -51,8 +57,8 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, on
 
   return <Toc aspect={selectedAspect} data={data} color={color} available={available}
     scores={scores} onScoreChange={onScoreChange} onAspectSelect={onAspectSelect}
-    journey={journey} onGoToBSSurveys={onGoToBSSurveys} onGoToCheSurveys={onGoToCheSurveys} onGoToNiSurveys={onGoToNiSurveys} onOpenBlock={setBlockId}
-    onEnterHall={onEnterHall} />
+    journey={journey} onGoToSiSurveys={onGoToSiSurveys} onGoToFeSurveys={onGoToFeSurveys} onGoToNeSurveys={onGoToNeSurveys} onGoToNiSurveys={onGoToNiSurveys} onGoToFiSurveys={onGoToFiSurveys} onGoToTeSurveys={onGoToTeSurveys} onGoToTiSurveys={onGoToTiSurveys} onGoToSeSurveys={onGoToSeSurveys} onOpenBlock={setBlockId}
+    onEnterHall={onEnterHall} isAdmin={isAdmin} />
 }
 
 // ─── Сетка 8 аспектов ──────────────────────────────────────────────────────
@@ -73,7 +79,7 @@ function AspectsGrid({ scores, onAspectSelect }) {
           >
             <div className={styles.aspectGlow} style={{ background: `radial-gradient(circle at 30% 20%, ${color}22, transparent 60%)` }} />
             <div className={styles.aspectTop}>
-              <span className={styles.aspectCode} style={{ color, textShadow: `0 0 30px ${color}66` }}>{key}</span>
+              <span className={styles.aspectCode} style={{ color, textShadow: `0 0 30px ${color}66` }}>{ASPECT_DISPLAY_KEY[key]}</span>
               <span className={styles.aspectScore}>{scores[key]}<span>/10</span></span>
             </div>
             <div className={styles.aspectName}>{d.name}</div>
@@ -94,7 +100,7 @@ function AspectsGrid({ scores, onAspectSelect }) {
 
 // ─── Оглавление аспекта ────────────────────────────────────────────────────
 
-function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSelect, journey, onGoToBSSurveys, onGoToCheSurveys, onGoToNiSurveys, onOpenBlock, onEnterHall }) {
+function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSelect, journey, onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys, onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys, onOpenBlock, onEnterHall, isAdmin = false }) {
   const byLevel = useMemo(() => {
     const m = { 0: [], 1: [], 2: [], 3: [] }
     available.forEach(b => m[b.level].push(b))
@@ -116,22 +122,34 @@ function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSe
       {/* Колесо БС с разбивкой по 4 архетипам — только на странице БС.
           Заблокировано до прохождения L0 (currentLevel >= 1). */}
       {aspect === 'Si' && (
-        <BSWheel
+        <SiWheel
           skills={journey?.skills ?? {}}
           color={color}
-          onContinueSurveys={onGoToBSSurveys}
-          isLocked={(journey?.aspects?.['Si']?.currentLevel ?? 0) < 1}
+          onContinueSurveys={onGoToSiSurveys}
+          isLocked={!isAdmin && (journey?.aspects?.['Si']?.currentLevel ?? 0) < 1}
         />
       )}
 
       {/* Колесо ЧЭ с разбивкой по 4 архетипам ЧЭ — только на странице ЧЭ.
           Заблокировано до прохождения L0 ЧЭ (currentLevel >= 1). */}
       {aspect === 'Fe' && (
-        <CheWheel
+        <FeWheel
           skills={journey?.skills ?? {}}
           color={color}
-          onContinueSurveys={onGoToCheSurveys}
-          isLocked={(journey?.aspects?.['Fe']?.currentLevel ?? 0) < 1}
+          onContinueSurveys={onGoToFeSurveys}
+          isLocked={!isAdmin && (journey?.aspects?.['Fe']?.currentLevel ?? 0) < 1}
+        />
+      )}
+
+      {/* Колесо ЧИ с разбивкой по 4 архетипам ЧИ (Мудрец, Первооткрыватель,
+          Катализатор, Визионер) — только на странице ЧИ.
+          Заблокировано до прохождения L0 ЧИ (currentLevel >= 1). */}
+      {aspect === 'Ne' && (
+        <NeWheel
+          skills={journey?.skills ?? {}}
+          color={color}
+          onContinueSurveys={onGoToNeSurveys}
+          isLocked={!isAdmin && (journey?.aspects?.['Ne']?.currentLevel ?? 0) < 1}
         />
       )}
 
@@ -143,7 +161,55 @@ function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSe
           skills={journey?.skills ?? {}}
           color={color}
           onContinueSurveys={onGoToNiSurveys}
-          isLocked={(journey?.aspects?.['Ni']?.currentLevel ?? 0) < 1}
+          isLocked={!isAdmin && (journey?.aspects?.['Ni']?.currentLevel ?? 0) < 1}
+        />
+      )}
+
+      {/* Колесо БЭ с разбивкой по 4 архетипам БЭ (Дипломат, Духовник,
+          Хранитель Рода, Друг) — только на странице БЭ.
+          Заблокировано до прохождения L0 БЭ (currentLevel >= 1). */}
+      {aspect === 'Fi' && (
+        <FiWheel
+          skills={journey?.skills ?? {}}
+          color={color}
+          onContinueSurveys={onGoToFiSurveys}
+          isLocked={!isAdmin && (journey?.aspects?.['Fi']?.currentLevel ?? 0) < 1}
+        />
+      )}
+
+      {/* Колесо ЧЛ с разбивкой по 4 архетипам ЧЛ (Виртуоз, Технолог,
+          Организатор, Инженер) — только на странице ЧЛ.
+          Заблокировано до прохождения L0 ЧЛ (currentLevel >= 1). */}
+      {aspect === 'Te' && (
+        <TeWheel
+          skills={journey?.skills ?? {}}
+          color={color}
+          onContinueSurveys={onGoToTeSurveys}
+          isLocked={!isAdmin && (journey?.aspects?.['Te']?.currentLevel ?? 0) < 1}
+        />
+      )}
+
+      {/* Колесо ЧС с разбивкой по 4 архетипам ЧС (Защитник, Правитель,
+          Строитель, Герой) — только на странице ЧС.
+          Заблокировано до прохождения L0 ЧС (currentLevel >= 1). */}
+      {aspect === 'Se' && (
+        <SeWheel
+          skills={journey?.skills ?? {}}
+          color={color}
+          onContinueSurveys={onGoToSeSurveys}
+          isLocked={!isAdmin && (journey?.aspects?.['Se']?.currentLevel ?? 0) < 1}
+        />
+      )}
+
+      {/* Колесо БЛ с разбивкой по 4 архетипам БЛ (Аналитик, Архитектор,
+          Хранитель Порядка, Энциклопедист) — только на странице БЛ.
+          Заблокировано до прохождения L0 БЛ (currentLevel >= 1). */}
+      {aspect === 'Ti' && (
+        <TiWheel
+          skills={journey?.skills ?? {}}
+          color={color}
+          onContinueSurveys={onGoToTiSurveys}
+          isLocked={!isAdmin && (journey?.aspects?.['Ti']?.currentLevel ?? 0) < 1}
         />
       )}
 
@@ -206,7 +272,7 @@ function AspectHeader({ aspect, data, color, score, onScoreChange, onBack, compa
       {!compact && (
         <div className={styles.aspectHeaderBody}>
           <div className={styles.aspectHeaderTitle}>
-            <span className={styles.aspectHeaderCode} style={{ color, textShadow: `0 0 40px ${color}88` }}>{aspect}</span>
+            <span className={styles.aspectHeaderCode} style={{ color, textShadow: `0 0 40px ${color}88` }}>{ASPECT_DISPLAY_KEY[aspect]}</span>
             <div>
               <h1 className={styles.aspectHeaderName}>{data.name}</h1>
               <p className={styles.aspectHeaderSub}>{data.sub}</p>
@@ -304,7 +370,7 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
           <span>все блоки</span>
         </button>
         <div className={styles.sidebarAspect}>
-          <span className={styles.sidebarAspectCode} style={{ color }}>{aspect}</span>
+          <span className={styles.sidebarAspectCode} style={{ color }}>{ASPECT_DISPLAY_KEY[aspect]}</span>
           <span className={styles.sidebarAspectName}>{data.name}</span>
         </div>
         <nav className={styles.sidebarNav}>

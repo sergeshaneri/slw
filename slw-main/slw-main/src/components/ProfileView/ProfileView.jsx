@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
+import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import {
   fetchMyProfile,
   updateMyProfile,
@@ -263,7 +263,7 @@ export default function ProfileView({
                         className={styles.subsChip}
                         style={{ color: ASPECT_COLORS[a], borderColor: `${ASPECT_COLORS[a]}55` }}
                       >
-                        {a}
+                        {ASPECT_DISPLAY_KEY[a] ?? a}
                       </span>
                     ))}
                   </li>
@@ -353,7 +353,7 @@ export default function ProfileView({
                 onClick={() => toggleFocus(key)}
                 disabled={!active && focusAspects.length >= 3}
               >
-                {key} · {ASPECT_DATA[key].name}
+                {ASPECT_DISPLAY_KEY[key]} · {ASPECT_DATA[key].name}
               </button>
             )
           })}
@@ -421,7 +421,7 @@ export default function ProfileView({
                 >
                   <option value="">— без аспекта —</option>
                   {ASPECT_KEYS.map(k => (
-                    <option key={k} value={k}>{k}</option>
+                    <option key={k} value={k}>{ASPECT_DISPLAY_KEY[k]}</option>
                   ))}
                 </select>
                 <button
@@ -524,7 +524,7 @@ export default function ProfileView({
               className={styles.select}
             >
               {ASPECT_KEYS.map(k => (
-                <option key={k} value={k}>{k} · {ASPECT_DATA[k].name}</option>
+                <option key={k} value={k}>{ASPECT_DISPLAY_KEY[k]} · {ASPECT_DATA[k].name}</option>
               ))}
             </select>
             <select

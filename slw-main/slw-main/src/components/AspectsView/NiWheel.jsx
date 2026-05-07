@@ -2,12 +2,12 @@ import {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE,
   calcNiArchetypeAvg, calcNiScoreFromSkills, getNiSkillProgress
 } from '../../data/journey/skills/ni-skills'
-import styles from './BSWheel.module.css'
+import styles from './SiWheel.module.css'
 
 // Колесо БИ — реальное колесо баланса по 4 архетипам (Мифотворец, Провидец,
 // Разоблачитель, Шаман) + 3 общих базовых навыка, входящих в каждый архетип.
 //
-// Структура и стадии — те же, что и в BSWheel/CheWheel: лепестки по avg,
+// Структура и стадии — те же, что и в SiWheel/FeWheel: лепестки по avg,
 // звёзды по пройденным анкетам, эволюция украшений per-архетип и глобально.
 //
 // Стадии per-архетип:
@@ -224,7 +224,7 @@ export default function NiWheel({ skills, color, onContinueSurveys, isLocked = f
   const showGlow        = globalStageIdx >= STAGE_ORDER.indexOf('strong')
 
   const stageLabel = isLocked
-    ? 'Пройди уровень 1, чтобы открыть оценку навыков'
+    ? 'Пройди уровень 0, чтобы открыть колесо навыков'
     : 'Изучай свои навыки чутья для эволюции колеса'
 
   return (

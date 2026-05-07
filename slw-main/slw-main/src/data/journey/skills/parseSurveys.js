@@ -24,20 +24,20 @@
 // маппинги не переданы, импортируем дефолтные из ./tree.
 
 import {
-  SKILL_BY_RUS_NAME as BS_SKILL_BY_RUS_NAME,
-  SKILL_TO_ARCHETYPE as BS_SKILL_TO_ARCHETYPE,
-  BLOCK_RUS_TO_KEY as BS_BLOCK_RUS_TO_KEY,
-  SURVEY_BLOCK_KEYS as BS_SURVEY_BLOCK_KEYS
+  SKILL_BY_RUS_NAME as SI_SKILL_BY_RUS_NAME,
+  SKILL_TO_ARCHETYPE as SI_SKILL_TO_ARCHETYPE,
+  BLOCK_RUS_TO_KEY as SI_BLOCK_RUS_TO_KEY,
+  SURVEY_BLOCK_KEYS as SI_SURVEY_BLOCK_KEYS
 } from './tree'
 
 // Парсит весь md и возвращает мапу skillId → survey-объект.
 // mappings — { skillByRusName, skillToArchetype, blockRusToKey, surveyBlockKeys }.
 // Если не передан — берём БС-маппинги (обратная совместимость).
 export function parseSurveys(md, mappings) {
-  const skillByRusName = mappings?.skillByRusName ?? BS_SKILL_BY_RUS_NAME
-  const skillToArchetype = mappings?.skillToArchetype ?? BS_SKILL_TO_ARCHETYPE
-  const blockRusToKey = mappings?.blockRusToKey ?? BS_BLOCK_RUS_TO_KEY
-  const surveyBlockKeys = mappings?.surveyBlockKeys ?? BS_SURVEY_BLOCK_KEYS
+  const skillByRusName = mappings?.skillByRusName ?? SI_SKILL_BY_RUS_NAME
+  const skillToArchetype = mappings?.skillToArchetype ?? SI_SKILL_TO_ARCHETYPE
+  const blockRusToKey = mappings?.blockRusToKey ?? SI_BLOCK_RUS_TO_KEY
+  const surveyBlockKeys = mappings?.surveyBlockKeys ?? SI_SURVEY_BLOCK_KEYS
 
   const out = {}
 
@@ -53,12 +53,10 @@ export function parseSurveys(md, mappings) {
       console.warn(`[parseSurveys] Навык не найден в маппинге: "${rusName}"`)
       continue
     }
-    const archetype = skillToArchetype[id]
-    if (!archetype) {
-      // eslint-disable-next-line no-console
-      console.warn(`[parseSurveys] Архетип не найден для навыка: ${id}`)
-      continue
-    }
+    // Общие базовые (signals/interoception/honesty у БС, attention-essence/
+    // metacognition/mindfulness у ЧИ и т.п.) не имеют конкретного архетипа —
+    // они входят в каждый архетип сквозным слоем. Помечаем их как 'common'.
+    const archetype = skillToArchetype[id] ?? 'common'
 
     const start = matches[i].index + matches[i][0].length
     const end = i + 1 < matches.length ? matches[i + 1].index : md.length

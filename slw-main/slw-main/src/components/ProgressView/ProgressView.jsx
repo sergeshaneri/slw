@@ -1,5 +1,5 @@
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
-import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
+import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import styles from './ProgressView.module.css'
 
 // Пасхалка: клик по «ь» в слове «увидеть» (в no-data сообщении) — toggle
@@ -122,7 +122,7 @@ export default function ProgressView({ history, scores, t, onToggleDevAdmin, dev
                   boxShadow: `0 0 8px ${ASPECT_COLORS[key]}aa`
                 }}
               />
-              <span style={{ color: ASPECT_COLORS[key] }}>{key}</span>
+              <span style={{ color: ASPECT_COLORS[key] }}>{ASPECT_DISPLAY_KEY[key]}</span>
             </div>
           ))}
         </div>
@@ -142,7 +142,7 @@ export default function ProgressView({ history, scores, t, onToggleDevAdmin, dev
               style={{ '--accent': ASPECT_COLORS[key] }}
             >
               <div className={styles.statTop}>
-                <span className={styles.statCode} style={{ color: ASPECT_COLORS[key] }}>{key}</span>
+                <span className={styles.statCode} style={{ color: ASPECT_COLORS[key] }}>{ASPECT_DISPLAY_KEY[key]}</span>
                 <span className={styles.statName}>{ASPECT_DATA[key].name}</span>
               </div>
               <div className={styles.statValueRow}>

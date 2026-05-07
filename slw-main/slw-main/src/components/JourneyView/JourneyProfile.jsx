@@ -10,7 +10,7 @@ const ACHIEVEMENTS = [
   { code: 'master_l0',   name: 'Первый Мастер',      desc: 'Завершил Уровень 0',                 test: (s, n) => n != null && s.currentScriptIndex >= n }
 ]
 
-export default function JourneyProfile({ state, accent, totalSteps, progressPct, levelTitle, planet, onContinue, onReset }) {
+export default function JourneyProfile({ state, accent, totalSteps, progressPct, levelTitle, planet, aspectName, onContinue, onReset, onOpenPlanetMap }) {
   return (
     <>
       <div className={styles.topbar}>
@@ -22,11 +22,29 @@ export default function JourneyProfile({ state, accent, totalSteps, progressPct,
       </div>
 
       <div className={styles.profileScroll}>
-        <div className={styles.profileHero}>
-          <div className={styles.profilePlanet}>◐</div>
-          <div className={styles.profileTitle}>Белая Сенсорика</div>
-          <div className={styles.profileSubtitle}>{planet} · Уровень {state.currentLevel}</div>
-        </div>
+        {onOpenPlanetMap ? (
+          <button
+            type="button"
+            className={styles.profileHero}
+            onClick={onOpenPlanetMap}
+            aria-label="Сменить планету"
+            title="Карта планет"
+            style={{ cursor: 'pointer', background: 'transparent', border: 0, width: '100%', textAlign: 'inherit', color: 'inherit', padding: 0 }}
+          >
+            <div className={styles.profilePlanet}>◐</div>
+            <div className={styles.profileTitle}>
+              {aspectName ?? 'Путешествие'}{' '}
+              <span className={styles.topbarChevron} aria-hidden="true">▾</span>
+            </div>
+            <div className={styles.profileSubtitle}>{planet} · Уровень {state.currentLevel}</div>
+          </button>
+        ) : (
+          <div className={styles.profileHero}>
+            <div className={styles.profilePlanet}>◐</div>
+            <div className={styles.profileTitle}>{aspectName ?? 'Путешествие'}</div>
+            <div className={styles.profileSubtitle}>{planet} · Уровень {state.currentLevel}</div>
+          </div>
+        )}
 
         <div className={styles.statsGrid}>
           <Stat val={state.xp} lbl="Опыт XP" accent={accent} />
@@ -65,6 +83,16 @@ export default function JourneyProfile({ state, accent, totalSteps, progressPct,
         {state.currentScriptIndex < totalSteps && (
           <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`} onClick={onContinue}>
             Продолжить путешествие
+          </button>
+        )}
+
+        {onOpenPlanetMap && (
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnGhost} ${styles.btnFull}`}
+            onClick={onOpenPlanetMap}
+          >
+            🪐 Сменить планету
           </button>
         )}
 

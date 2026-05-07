@@ -32,12 +32,15 @@ import {
 export function parseSurveys(md) {
   const out = {}
 
-  // Разбиваем по `### Навык:` — каждый кусок начинается с одного навыка.
-  const skillRegex = /^###\s*Навык:\s*(.+?)\s*$/gm
+  // Разбиваем по `### Навык:` (старый формат БС) или `### Навык N.` (формат Fe-файла,
+  // где после номера может идти суффикс · ЯДЕРНЫЙ / · доп. для … — отбрасываем его).
+  const skillRegex = /^###\s*Навык(?::|\s*\d+\.)\s*(.+?)\s*$/gm
   const matches = [...md.matchAll(skillRegex)]
 
   for (let i = 0; i < matches.length; i++) {
-    const rusName = matches[i][1].trim()
+    const fullName = matches[i][1].trim()
+    // Отрезаем суффикс после ` · ` (например "Эмоциональная осознанность · ЯДЕРНЫЙ").
+    const rusName = fullName.split(/\s*·\s*/)[0].trim()
     const id = SKILL_BY_RUS_NAME[rusName]
     if (!id) {
       // eslint-disable-next-line no-console

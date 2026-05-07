@@ -1,4 +1,5 @@
 import { getAllPlanets } from '../../data/journey/registry'
+import { ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import styles from './PlanetMap.module.css'
 
 // PlanetMap — экран выбора планеты (аспекта).
@@ -100,7 +101,7 @@ function PlanetCard({ planet, status, isActive, onClick }) {
     >
       <div className={styles.cardHead}>
         <span className={styles.glyph} aria-hidden="true">◍</span>
-        <span className={styles.aspectKey}>{aspect}</span>
+        <span className={styles.aspectKey}>{ASPECT_DISPLAY_KEY[aspect]}</span>
       </div>
 
       <div className={styles.cardBody}>
