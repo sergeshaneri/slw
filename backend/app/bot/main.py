@@ -14,7 +14,7 @@ from app.bot.fsm import IN_SCRIPT, WAITING_OPEN_ANSWER, WAITING_SCORE, WAITING_T
 from app.bot.handlers.admin import cmd_reload, cmd_reset
 from app.bot.handlers.aspect import cmd_aspect, on_aspect_pick
 from app.bot.handlers.note import cmd_note
-from app.bot.handlers.profile import cmd_profile, on_profile_resume
+from app.bot.handlers.profile import cmd_profile, on_profile_resume, on_profile_switch_aspect
 from app.bot.handlers.progress import cmd_progress
 from app.bot.handlers.script import (
     cmd_go,
@@ -64,6 +64,7 @@ def build() -> "Application":
     app.add_handler(CommandHandler("note", cmd_note))
     app.add_handler(CommandHandler("progress", cmd_progress))
     app.add_handler(CallbackQueryHandler(on_profile_resume, pattern=r"^profile:resume$"))
+    app.add_handler(CallbackQueryHandler(on_profile_switch_aspect, pattern=r"^profile:switch_aspect$"))
     app.add_handler(MessageHandler(BTN_PROFILE & ~filters.COMMAND, cmd_profile))
 
     script_conv = ConversationHandler(

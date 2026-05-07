@@ -2,6 +2,7 @@ from sqlalchemy import select
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
+from app.bot.handlers.start import ASPECT_TAGLINES, show_aspect_picker
 from app.content.loader import load_steps
 from app.db.models import Answer, DiaryEntry, UserState
 from app.db.session import AsyncSessionLocal
@@ -25,7 +26,13 @@ async def cmd_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     done = len({a.step_id for a in answers})
     pct = int(done / total * 100) if total else 0
 
-    lines = [f"Профиль\n\nПрогресс: {done}/{total} шагов ({pct}%)"]
+    lines = ["Профиль"]
+    current_aspect = state.current_aspect if state else None
+    if current_aspect and current_aspect != "onboarding":
+        tagline = ASPECT_TAGLINES.get(current_aspect, "")
+        suffix = f" — {tagline}" if tagline else ""
+        lines.append(f"\nТекущая планета: {current_aspect}{suffix}")
+    lines.append(f"\nПрогресс: {done}/{total} шагов ({pct}%)")
 
     scores = [(a.step_id, a.value_num) for a in answers if a.kind == "question" and a.value_num is not None]
     if scores:
@@ -58,6 +65,7 @@ async def cmd_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     markup = InlineKeyboardMarkup([
         [InlineKeyboardButton("▶ Продолжить путешествие", callback_data="profile:resume")],
+        [InlineKeyboardButton("🪐 Сменить планету", callback_data="profile:switch_aspect")],
         [InlineKeyboardButton("🌐 Открыть на сайте", url="https://sergeshaneri.github.io/slw/")],
     ])
 
@@ -69,3 +77,13 @@ async def on_profile_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await query.answer()
     await query.edit_message_reply_markup(reply_markup=None)
     await query.message.reply_text("Продолжаем! Напиши /resume")
+
+
+async def on_profile_switch_aspect(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Кнопка «🪐 Сменить планету» в профиле — отдаёт пикер планет.
+    Тот же UX что и /aspect, но кликом из профиля.
+    """
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_reply_markup(reply_markup=None)
+    await show_aspect_picker(update, context)
