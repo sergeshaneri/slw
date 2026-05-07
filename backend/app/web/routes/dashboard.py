@@ -10,9 +10,12 @@ ticked_today, scores, прогресс уровня для актуальног�
 подписок ИЛИ топ-авторы для рекомендации, мини-heatmap 30 дней,
 слово дня, текущий "active aspect" (для приветственного блока).
 """
+import logging
 from collections import Counter
 from datetime import date, datetime, timedelta
 from random import Random
+
+log = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import and_, func, or_, select
@@ -527,39 +530,57 @@ async def get_dashboard(
 
     # DiscoverMore: количество публичных инсайтов + срез сегодняшних
     # дневниковых записей по источникам (для карточки "запиши день"
-    # ищем 'daily-review' в этой мапе).
-    pub_insights_count = int((
-        await session.execute(
-            select(func.count())
-            .select_from(AspectInsight)
-            .where(
-                AspectInsight.web_user_id == current_user.id,
-                AspectInsight.is_public.is_(True),
-            )
-        )
-    ).scalar_one())
+    # ищем 'daily-review' в этой мапе). Любой из этих блоков — best-effort:
+    # если запрос упал (например, новая колонка в БД ещё не создана при
+    # первом старте после деплоя) — не валим весь dashboard, просто
+    # отдаём дефолты.
+    pub_insights_count = 0
+    diary_today_count_by_source: dict[str, int] = {}
+    following_count = 0
 
-    today_iso = date.today().isoformat()
-    diary_today_rows = (
-        await session.execute(
-            select(WebDiaryEntry.source, func.count())
-            .where(
-                WebDiaryEntry.web_user_id == current_user.id,
-                func.date(WebDiaryEntry.created_at) == today_iso,
+    try:
+        pub_insights_count = int((
+            await session.execute(
+                select(func.count())
+                .select_from(AspectInsight)
+                .where(
+                    AspectInsight.web_user_id == current_user.id,
+                    AspectInsight.is_public.is_(True),
+                )
             )
-            .group_by(WebDiaryEntry.source)
-        )
-    ).all()
-    diary_today_count_by_source = {row[0]: int(row[1]) for row in diary_today_rows}
+        ).scalar_one())
+    except Exception as e:
+        log.warning("dashboard pub_insights_count failed: %s", e)
 
-    # Подписки (количество) — нужно DiscoverMore-карточке "subscribe".
-    following_count = int((
-        await session.execute(
-            select(func.count())
-            .select_from(Subscription)
-            .where(Subscription.follower_id == current_user.id)
-        )
-    ).scalar_one())
+    try:
+        # Передаём date-объект, а не ISO-строку: postgres иначе может
+        # ругнуться `operator does not exist: date = unknown` (asyncpg
+        # bind-param приходит без типа).
+        today_date = date.today()
+        diary_today_rows = (
+            await session.execute(
+                select(WebDiaryEntry.source, func.count())
+                .where(
+                    WebDiaryEntry.web_user_id == current_user.id,
+                    func.date(WebDiaryEntry.created_at) == today_date,
+                )
+                .group_by(WebDiaryEntry.source)
+            )
+        ).all()
+        diary_today_count_by_source = {row[0]: int(row[1]) for row in diary_today_rows}
+    except Exception as e:
+        log.warning("dashboard diary_today_count_by_source failed: %s", e)
+
+    try:
+        following_count = int((
+            await session.execute(
+                select(func.count())
+                .select_from(Subscription)
+                .where(Subscription.follower_id == current_user.id)
+            )
+        ).scalar_one())
+    except Exception as e:
+        log.warning("dashboard following_count failed: %s", e)
 
     # Кладём bio/avatar в data.user, чтобы DiscoverMore мог понять,
     # заполнен ли профиль (карточка "Заполни профиль").
