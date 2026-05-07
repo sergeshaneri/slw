@@ -100,6 +100,8 @@ def _user_out(user: WebUser, token: str | None = None) -> dict:
         "telegram_first_name": user.telegram_first_name,
         "display_name": user.display_name,
         "is_admin": user.is_admin,
+        "onboarding_done": bool(getattr(user, "onboarding_done", False)),
+        "hints_seen": dict(getattr(user, "hints_seen", None) or {}),
     }
     if token:
         out["token"] = token

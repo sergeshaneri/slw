@@ -90,7 +90,16 @@ export function parseJourneyMd(md) {
     // skill: <id> — для type='survey' указывает на анкету в SURVEYS.
     // Текст утверждений берётся из SURVEYS[skill]; тело шага в md можно
     // оставлять пустым или давать короткое описание навыка.
+    // Также используется в type='question' (B-вопросы со scale): если есть
+    // skill+block, ответ юзера пишется в state.skills[skill].answers[block][0]
+    // (соответствует pass=1, statementIndex=0). После 5 таких ответов из 5
+    // разных блоков навык получает result, и колесо аспекта обновляется
+    // через calc*ScoreFromSkills. Это синхронизирует L0-чат с деревом
+    // навыков: SURV-карточка в дереве потом предложит «продолжить с pass 2».
     if (metadata.skill) script.skill = metadata.skill
+    // block: knowledge | practice | awareness | priority | confidence —
+    // ключ блока для записи ответа в state.skills (см. SURVEY_BLOCK_KEYS).
+    if (metadata.block) script.block = metadata.block
     // scale: 1-10 (или просто truthy) — пометка, что этот вопрос —
     // самооценка по шкале 1–10. UI будет показывать ползунок вместо
     // текстового ввода. Срабатывает даже без followUp-блоков.

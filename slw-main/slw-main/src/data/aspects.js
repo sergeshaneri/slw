@@ -14,7 +14,7 @@
 //   Ti → pearl platinum (светлый кристалл, ясность мысли)
 //   Fe → luminous crimson rose (страстный рубиновый огонь)
 //   Fi → radiant honey gold (золото нравственной ценности, тёплое)
-//   Se → vibrant moss-bronze (глубокая зелень с бронзовым отливом, сила земли)
+//   Se → luminous burnt sienna (земля + огонь, активная природная воля)
 //   Si → fresh pistachio (мягкая природа, уют, тело)
 //   Ne → luminous electric indigo (искра видения, третий глаз)
 //   Ni → luminous amethyst (мистика, время, подсознание)
@@ -23,7 +23,7 @@ export const ASPECT_COLORS = {
   Ti: '#DCE2EB',  // pearl platinum (bright crystal)
   Fe: '#D85160',  // luminous crimson rose
   Fi: '#E6C158',  // radiant honey gold
-  Se: '#92B85A',  // vibrant moss-bronze
+  Se: '#CC7152',  // luminous burnt sienna
   Si: '#A8D97B',  // fresh pistachio (без изменений)
   Ne: '#8975DD',  // luminous electric indigo
   Ni: '#B97FD2'   // luminous amethyst

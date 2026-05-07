@@ -583,4 +583,22 @@ export async function fetchCoachHistory(limit = 20) {
   return translateAspectsInResponse(data)
 }
 
+// ── Onboarding (3-layer) ─────────────────────────────────────────────────
+// Layer 1 — Quick Tour: ставит web_users.onboarding_done.
+// Layer 2 — Hints: ключ → hints_seen[key] = true.
+// Layer 3 — DiscoverMore: ключ → hints_seen['discover-' + key] = true.
+// Чистые флаговые апдейты, без аспект-перевода.
+
+export async function markOnboardingDone() {
+  return request('POST', '/api/onboarding/complete')
+}
+
+export async function markHintSeen(key) {
+  return request('POST', '/api/onboarding/hint', { key })
+}
+
+export async function dismissDiscoverCard(key) {
+  return request('POST', '/api/onboarding/dismiss-card', { key })
+}
+
 export { getToken, setToken }

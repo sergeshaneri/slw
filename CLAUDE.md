@@ -488,6 +488,82 @@ XP за анкету: 10 за каждый закрытый проход. 3 ми
 
 Все блоки опциональны в Daily Review — юзер заполняет только то, что хочется. На «Сохранить день»: создаются отдельные diary-записи (`source: 'daily-review'`) для каждого заполненного блока + sync галочек привычек через `tickHabit/untickHabit`.
 
+### Premium aspect palette
+
+`ASPECT_COLORS` (data/aspects.js) подобраны как единая премиум-палитра для тёмного UI: все цвета сидят в полосе HSL L\* 56-67%, чтобы ни один не «выпадал» по яркости. Каждый цвет несёт психологическую семантику аспекта.
+
+```
+Te → #5F7081 → slate steel        (cool blue-grey, металл, индустриал)
+                Note: текущий вариант мог быть бампнут до #8FA8BD luminous
+Ti → #DCE2EB → pearl platinum     (светлый кристалл, ясность мысли)
+Fe → #D85160 → luminous crimson   (страстный рубиновый огонь)
+Fi → #E6C158 → radiant honey gold (золото нравственной ценности)
+Se → #CC7152 → luminous burnt sienna (земля + огонь, активная воля)
+Si → #A8D97B → fresh pistachio    (мягкая природа, уют, тело)
+Ne → #8975DD → luminous indigo    (искра видения, третий глаз)
+Ni → #B97FD2 → luminous amethyst  (мистика, время, подсознание)
+```
+
+**Принципы при подборе нового цвета:**
+- Целевая яркость L\* 56-67% (не темнее — иначе сольётся с фоном `#0A0A0F`/`#15161C` тёмной темы)
+- Высокая насыщенность без флуоресценции (S 40-60% в HSL)
+- Соседние на колесе аспекты (Te-Ti, Fe-Fi, Se-Si, Ne-Ni) разделены по светлоте/насыщенности, не сливаются
+- Семантика: огонь/страсть → красные тона; земля/тело → зелёный/коричневый; ум/металл → серо-синий; интуиция/время → фиолетовый
+
+### Aspect content gating (AspectsView)
+
+`blocks.js` определяет 24 секции теории аспекта с полем `level: 0|1|2|3` (отображаются группами под `LEVEL_LABELS`). Доступ к полному контенту блока зависит от прогресса юзера в путешествии **по этому конкретному аспекту**:
+
+```js
+accessLevel = isAdmin ? 99 : (journey?.aspects?.[aspect]?.currentLevel ?? 0)
+isUnlocked = block.level <= accessLevel
+```
+
+Расклад блоков по уровням (см. `BLOCKS` в blocks.js):
+- **L0 «Первый контакт»** — `essence`, `archetypes` (Тени и Дары)
+- **L1 «Эпоха племён»** — `archetypePath`, `skills`, `coachTips`, `goals`, `assessment`, `historicalFigures`, `art`
+- **L2 «Эпоха цивилизаций»** — `superpower`, `integration`, `synergy`, `polysemy`, `resources`, `practices`, `myths`, `quotes`
+- **L3 «Эпоха алхимии»** — `dilemmas`, `redFlags`, `fears`, `somatic`, `culturalDifferences`, `childRaising`
+
+**Tеaser-механика для locked-блоков:** даже если блок заблокирован, юзеру показывается **N первых элементов** + ниже размытый silhouette + lock-overlay с CTA. Это даёт пользу всем, включая тех кто не прошёл journey, но при этом видит что глубже есть ещё контент. Реализация — `teaseBlockData(block, data)` в `blocks.js` (возвращает обрезанную копию data, ниже которой рендерится silhouette).
+
+`TEASER_BY_KIND` defaults:
+- `list/numberedList/titledList` → 2 элемента
+- `archetypes/somatic` → 1 пара (1 shadow + 1 gift)
+- `dilemmas/practices/archetypePath` → 1 элемент
+- `synergy/polysemy` → 2 элемента
+- `assessment` → 1 микрополе (5 вопросов)
+- `fears` → 1 (показываем страхи, защиты прячем)
+- `text/textItalic` → 0 (тело прячется, остаётся только заголовок+lead)
+- `integration` → 0 (показываем `desc + opposite`, скрываем `practices[]`)
+
+Per-block override через `block.teaserCount` если нужно.
+
+**UI:**
+- В **Toc** (оглавление аспекта) locked-блоки помечаются 🔒 и приглушаются (opacity 0.62). Кликабельны.
+- В **BlockReader** locked-блок: тизер сверху → ниже `.blockSilhouette` (5 размытых grey-полос за `blur(6px)`) → поверх `.blockLockOverlay` с замочком, плашкой `LEVEL_LABELS[block.level].code` и подсказкой «Достигни Уровня X в путешествии этого аспекта».
+- В **сайдбаре** BlockReader locked-пункты тоже мутно с 🔒.
+
+`isAdmin` (включая `devAdmin` пасхалку) полностью обходит гейт — видит весь контент.
+
+### B-question → skill auto-sync (parseScripts metadata)
+
+В L0/L1 чате есть B-вопросы (`type: 'question'`) с `scale: 1-10`, которые юзер отвечает ползунком. У такого вопроса можно указать `skill:` + `block:` метаданные — тогда ответ автоматически пишется в `state.skills[skill].answers[block][0]` (соответствует pass=1, statementIndex=0).
+
+```md
+## B-1 · question · Тонкое восприятие тела
+xp: 5
+scale: 1-10
+skill: body-listening
+block: knowledge
+```
+
+Парсер (`parseScripts.js`): читает `metadata.skill` → `script.skill`, `metadata.block` → `script.block`.
+
+Эффект: после 5 таких ответов из 5 разных блоков (`knowledge`/`practice`/`awareness`/`priority`/`confidence`) навык получает `result` через `calcSurveyResult`, и колесо аспекта обновляется через `calc*ScoreFromSkills`. Это синхронизирует L0-чат с деревом навыков: SURV-карточка в дереве потом предложит «продолжить с pass 2», уже видя что pass 1 закрыт через L0-чат.
+
+Используется для COMMON_BASE_SKILLS аспекта (Si: 4 universal, Ni: 3 universal) и потенциально для других навыков, которые хочется собрать через диалог в чате, а не через отдельный анкета-flow.
+
 ### Wheel визуал в дашборде
 
 `MiniWheel.jsx` на дашборде:

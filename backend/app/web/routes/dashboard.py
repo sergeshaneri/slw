@@ -11,7 +11,7 @@ ticked_today, scores, прогресс уровня для актуальног�
 слово дня, текущий "active aspect" (для приветственного блока).
 """
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from random import Random
 
 from fastapi import APIRouter, Depends
@@ -525,13 +525,55 @@ async def get_dashboard(
     # Слово дня.
     word = _word_of_day(focus_aspects)
 
+    # DiscoverMore: количество публичных инсайтов + срез сегодняшних
+    # дневниковых записей по источникам (для карточки "запиши день"
+    # ищем 'daily-review' в этой мапе).
+    pub_insights_count = int((
+        await session.execute(
+            select(func.count())
+            .select_from(AspectInsight)
+            .where(
+                AspectInsight.web_user_id == current_user.id,
+                AspectInsight.is_public.is_(True),
+            )
+        )
+    ).scalar_one())
+
+    today_iso = date.today().isoformat()
+    diary_today_rows = (
+        await session.execute(
+            select(WebDiaryEntry.source, func.count())
+            .where(
+                WebDiaryEntry.web_user_id == current_user.id,
+                func.date(WebDiaryEntry.created_at) == today_iso,
+            )
+            .group_by(WebDiaryEntry.source)
+        )
+    ).all()
+    diary_today_count_by_source = {row[0]: int(row[1]) for row in diary_today_rows}
+
+    # Подписки (количество) — нужно DiscoverMore-карточке "subscribe".
+    following_count = int((
+        await session.execute(
+            select(func.count())
+            .select_from(Subscription)
+            .where(Subscription.follower_id == current_user.id)
+        )
+    ).scalar_one())
+
+    # Кладём bio/avatar в data.user, чтобы DiscoverMore мог понять,
+    # заполнен ли профиль (карточка "Заполни профиль").
     return {
         "today": today,
         "user": {
             "user_id": current_user.id,
             "display_name": _display_name(current_user),
             "avatar": (pp.avatar if pp else None),
+            "bio": (pp.bio if pp else None),
             "focus_aspects": focus_aspects,
+            "following_count": following_count,
+            "onboarding_done": bool(getattr(current_user, "onboarding_done", False)),
+            "hints_seen": dict(getattr(current_user, "hints_seen", None) or {}),
         },
         "streak": streak_payload,
         "habits": habits_payload,
@@ -546,4 +588,6 @@ async def get_dashboard(
         "suggested_authors": suggested,
         "heatmap_30d": heatmap,
         "word_of_day": word,
+        "published_insights_count": pub_insights_count,
+        "diary_today_count_by_source": diary_today_count_by_source,
     }

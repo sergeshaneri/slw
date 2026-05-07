@@ -187,7 +187,30 @@ import styles from './JourneyView.module.css'
 //     Все 8 аспектов теперь имеют контент уровней. Существующие
 //     юзеры получат сброс чат-истории по другим аспектам, прогресс
 //     XP/streak/skills сохранится.
-export const CONTENT_VERSION = 18
+// 19 — унификация формата L0-оценки на B-вопросы со scale (по образцу
+//     Ni/Ne). Новый механизм: `parseScripts.js` читает metadata
+//     `skill:`/`block:` для type='question'; `handleSend` (number)
+//     пишет ответ в `state.skills[skill].answers[block][0]`,
+//     пересчитывает `result`/`passes`/`blocks` через `calcSurveyResult`
+//     и общий score аспекта через `calc*ScoreFromSkills`. Это
+//     синхронизирует L0-чат с деревом талантов: SURV-анкета сразу
+//     знает «pass 1 пройден». Стартовый rollout: Se переписан, Ne/Ni
+//     получили `block:`.
+// 20 — финальная унификация L0 для всех 6 аспектов с skill-tree:
+//     Si (4 раунда — body-listening, needs-awareness, timely-care,
+//     details), Te (4 — work-vs-busyness, goal-holding,
+//     cost-benefit-vision, technological-thinking), Fe (3 —
+//     fe-awareness, fe-expressiveness, fe-congruence), Fi (2 —
+//     fi-trust, fi-values-check + narrative-раунд об архетипах),
+//     Ti (3 — structural-thinking, modality-distinction,
+//     mental-discipline; pool B-4..B-6/U-4..U-5/S-4..S-6 удалён —
+//     B-нумерация переехала на core).
+//     Все B-вопросы со skill+block — тексты взяты как первое
+//     утверждение каждого блока из соответствующего {aspect}-surveys.md.
+//     Существующие SURV-карточки в дереве талантов автоматически
+//     синхронизируются: после L0 navык получает passes=1, дерево
+//     предложит «продолжить с pass 2» через getNextPass.
+export const CONTENT_VERSION = 20
 
 // Миграция id навыков после ревизии дерева (v9). Старый id → новый.
 // Если у юзера уже есть запись по новому id, старая отбрасывается
@@ -531,6 +554,20 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     }
   }, [a.messages, isTyping, state.screen, a.awaitingInput])
 
+  // Авто-открытие ползунка для question со шкалой (1-10).
+  // Покрывает все кейсы появления такого вопроса: deliverScript на следующий
+  // шаг, handleSwitchAspect → инжект первого скрипта, перезагрузка state.
+  // Юзер видит сразу ползунок и кнопку «Ответить · X/10», без лишнего тыка.
+  useEffect(() => {
+    if (state.screen !== 'chat') return
+    if (a.awaitingInput) return
+    const sc = scripts[a.currentScriptIndex]
+    if (!sc || sc.type !== 'question') return
+    const hasScale = !!sc.followUp || !!sc.scale
+    if (!hasScale) return
+    setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: 'number' })))
+  }, [state.screen, a.currentScriptIndex, a.awaitingInput, scripts, setState])
+
   const showToast = useCallback((msg) => {
     setToast(msg)
     setTimeout(() => setToast(null), 2800)
@@ -705,8 +742,11 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   }, [scripts, a.currentScriptIndex, state.skills, addBotMessage, addUserMessage, awardXP, deliverScript, enqueueTask, removePending])
 
   // ─── Ввод текста / числа ─────────────────────────────────────
-  const handleSend = useCallback(async () => {
-    const val = inputVal.trim()
+  // override — опциональный аргумент с уже известным значением (используется
+  // в Chat для слайдера, чтобы обойти race condition с setInputVal).
+  const handleSend = useCallback(async (override) => {
+    const raw = typeof override === 'string' ? override : inputVal
+    const val = raw.trim()
     if (!val) return
     const script = scripts[a.currentScriptIndex]
     if (a.awaitingInput === 'number') {
@@ -720,8 +760,53 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: null })))
       if (script?.followUp) await addBotMessage(script.followUp(val), 700)
       else await addBotMessage(`Записал: ${val}/10.`, 500)
-      // Сайд-эффект: оценка вопроса → score аспекта
-      onScoresChange({ ...scores, [state.currentAspect]: num })
+
+      // Если у скрипта есть skill+block — пишем ответ в state.skills как
+      // statementIndex=0 (соответствует pass=1) и пересчитываем score
+      // аспекта через calc*ScoreFromSkills. Иначе — старое поведение:
+      // прямая запись в scores[aspect] (последний ответ перетирает).
+      if (script?.skill && script?.block) {
+        const aspect = state.currentAspect
+        const prevSkills = state.skills ?? {}
+        const prevEntry = prevSkills[script.skill] ?? { answers: {}, blocks: {}, insights: [], passes: 0 }
+        const prevAnswers = prevEntry.answers ?? {}
+        const blockArr = [...(prevAnswers[script.block] ?? [])]
+        blockArr[0] = num
+        const newAnswers = { ...prevAnswers, [script.block]: blockArr }
+        const result = calcSurveyResult(newAnswers)
+        let passes = 0
+        for (const k of SURVEY_BLOCK_KEYS) {
+          const arr = newAnswers[k] ?? []
+          const len = arr.filter(n => Number.isFinite(n)).length
+          if (len > passes) passes = len
+        }
+        const newEntry = {
+          ...prevEntry,
+          answers: newAnswers,
+          blocks: result.blocks,
+          result: Number.isFinite(result.skill) ? result.skill : prevEntry.result,
+          passes: Math.min(3, passes),
+          completedAt: Date.now(),
+        }
+        const newSkills = { ...prevSkills, [script.skill]: newEntry }
+        setState(s => ({ ...s, skills: newSkills }))
+
+        const calcByAspect = {
+          Si: calcSiScoreFromSkills, Se: calcSeScoreFromSkills,
+          Ti: calcTiScoreFromSkills, Te: calcTeScoreFromSkills,
+          Fi: calcFiScoreFromSkills, Fe: calcFeScoreFromSkills,
+          Ne: calcNeScoreFromSkills, Ni: calcNiScoreFromSkills,
+        }
+        const calcFn = calcByAspect[aspect]
+        const aspScore = calcFn?.(newSkills)
+        if (Number.isFinite(aspScore)) {
+          onScoresChange({ ...scores, [aspect]: Math.round(aspScore) })
+        }
+      } else {
+        // Старый путь: запись напрямую в scores[aspect]
+        onScoresChange({ ...scores, [state.currentAspect]: num })
+      }
+
       if (script?.id) removePending(script.id)
       awardXP(script?.xp ?? 10, 0, script?.id ?? null)
       setTimeout(() => deliverScript(a.currentScriptIndex + 1), 700)

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
-import { BLOCKS, LEVEL_LABELS, getBlockItems } from './blocks'
+import { BLOCKS, LEVEL_LABELS, getBlockItems, teaseBlockData } from './blocks'
 import SiWheel from './SiWheel'
 import FeWheel from './FeWheel'
 import NeWheel from './NeWheel'
@@ -51,6 +51,8 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, on
         onDiaryChange={onDiaryChange}
         onBack={() => setBlockId(null)}
         onGoto={setBlockId}
+        journey={journey}
+        isAdmin={isAdmin}
       />
     )
   }
@@ -106,6 +108,14 @@ function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSe
     available.forEach(b => m[b.level].push(b))
     return m
   }, [available])
+
+  // Уровень доступа = текущий уровень путешествия по этому аспекту.
+  // Admin видит всё (99 — sentinel). При гостевом state и без journey
+  // считаем 0 — тогда L1+ заблюрится в BlockReader, в Toc мы помечаем
+  // карточки lock-иконкой.
+  const accessLevel = isAdmin
+    ? 99
+    : (journey?.aspects?.[aspect]?.currentLevel ?? 0)
 
   return (
     <div className={`${styles.tocPage} ${styles.fadeIn}`}>
@@ -231,23 +241,31 @@ function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSe
               <span className={styles.tocLevelCount}>{byLevel[lvl].length}</span>
             </header>
             <ul className={styles.tocList}>
-              {byLevel[lvl].map((b, i) => (
-                <li key={b.id} className={styles.stagger} style={{ '--i': i }}>
-                  <button
-                    type="button"
-                    className={styles.tocItem}
-                    style={{ '--accent': color }}
-                    onClick={() => onOpenBlock(b.id)}
-                  >
-                    <span className={styles.tocItemIdx}>{String(i + 1).padStart(2, '0')}</span>
-                    <span className={styles.tocItemBody}>
-                      <span className={styles.tocItemTitle}>{b.title}</span>
-                      <span className={styles.tocItemLead}>{b.lead}</span>
-                    </span>
-                    <span className={styles.tocItemArrow} aria-hidden="true">→</span>
-                  </button>
-                </li>
-              ))}
+              {byLevel[lvl].map((b, i) => {
+                const isUnlocked = b.level <= accessLevel
+                return (
+                  <li key={b.id} className={styles.stagger} style={{ '--i': i }}>
+                    <button
+                      type="button"
+                      className={`${styles.tocItem} ${isUnlocked ? '' : styles.tocItemLocked}`}
+                      style={{ '--accent': color }}
+                      onClick={() => onOpenBlock(b.id)}
+                    >
+                      <span className={styles.tocItemIdx}>{String(i + 1).padStart(2, '0')}</span>
+                      <span className={styles.tocItemBody}>
+                        <span className={styles.tocItemTitle}>
+                          {b.title}
+                          {!isUnlocked && (
+                            <span className={styles.tocItemLockIcon} aria-hidden="true">🔒</span>
+                          )}
+                        </span>
+                        <span className={styles.tocItemLead}>{b.lead}</span>
+                      </span>
+                      <span className={styles.tocItemArrow} aria-hidden="true">→</span>
+                    </button>
+                  </li>
+                )
+              })}
             </ul>
           </section>
         )
@@ -311,12 +329,22 @@ function AspectHeader({ aspect, data, color, score, onScoreChange, onBack, compa
 
 // ─── Чтение одного блока (с sidebar) ───────────────────────────────────────
 
-function BlockReader({ aspect, data, color, block, available, prev, next, diary, onDiaryChange, onBack, onGoto }) {
+function BlockReader({ aspect, data, color, block, available, prev, next, diary, onDiaryChange, onBack, onGoto, journey, isAdmin = false }) {
   const byLevel = useMemo(() => {
     const m = { 0: [], 1: [], 2: [], 3: [] }
     available.forEach(b => m[b.level].push(b))
     return m
   }, [available])
+
+  // Уровень доступа по этому аспекту. Admin видит всё.
+  const accessLevel = isAdmin
+    ? 99
+    : (journey?.aspects?.[aspect]?.currentLevel ?? 0)
+  const isBlockUnlocked = block.level <= accessLevel
+  const teaserData = useMemo(
+    () => isBlockUnlocked ? data : teaseBlockData(block, data),
+    [isBlockUnlocked, block, data]
+  )
 
   const [noteOpen, setNoteOpen] = useState(false)
   const [noteText, setNoteText] = useState('')
@@ -384,15 +412,17 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
                 <ul className={styles.sidebarList}>
                   {byLevel[lvl].map(b => {
                     const active = b.id === block.id
+                    const sidebarLocked = b.level > accessLevel
                     return (
                       <li key={b.id}>
                         <button
                           type="button"
-                          className={`${styles.sidebarItem} ${active ? styles.sidebarItemActive : ''}`}
+                          className={`${styles.sidebarItem} ${active ? styles.sidebarItemActive : ''} ${sidebarLocked ? styles.sidebarItemLocked : ''}`}
                           onClick={() => onGoto(b.id)}
                           style={active ? { color, borderLeftColor: color, background: `${color}14` } : {}}
                         >
                           {b.title}
+                          {sidebarLocked && <span className={styles.sidebarLock} aria-hidden="true"> 🔒</span>}
                         </button>
                       </li>
                     )
@@ -420,7 +450,33 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
         </header>
 
         <div className={styles.readerBody}>
-          <BlockBody block={block} data={data} color={color} />
+          {isBlockUnlocked ? (
+            <BlockBody block={block} data={data} color={color} />
+          ) : (
+            <div className={styles.blockLocked}>
+              <BlockBody block={block} data={teaserData} color={color} />
+              <div className={styles.blockSilhouette} aria-hidden="true">
+                <div className={styles.silhouetteLine} style={{ width: '88%' }} />
+                <div className={styles.silhouetteLine} style={{ width: '72%' }} />
+                <div className={styles.silhouetteLine} style={{ width: '94%' }} />
+                <div className={styles.silhouetteLine} style={{ width: '64%' }} />
+                <div className={styles.silhouetteLine} style={{ width: '80%' }} />
+              </div>
+              <div className={styles.blockLockOverlay} style={{ '--accent': color }}>
+                <div className={styles.blockLockIcon} aria-hidden="true">🔒</div>
+                <div className={styles.blockLockHead}>
+                  Откроется на{' '}
+                  <strong style={{ color }}>
+                    {LEVEL_LABELS[block.level].code} · {LEVEL_LABELS[block.level].name}
+                  </strong>
+                </div>
+                <div className={styles.blockLockHint}>
+                  Достигни Уровня {block.level} в путешествии этого аспекта,
+                  чтобы открыть весь раздел.
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {onDiaryChange && (

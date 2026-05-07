@@ -26,10 +26,13 @@ export default function Chat({
   }, [state.awaitingInput, currentScript?.id])
 
   const handleSendNumber = () => {
-    // Передаём через inputVal — handleSend в JourneyView парсит inputVal.
-    setInputVal(String(sliderVal))
-    // Микро-задержка чтобы setInputVal успел применить значение в стейт.
-    setTimeout(onSend, 0)
+    // Передаём значение напрямую в onSend (override-аргумент). Так избегаем
+    // race condition: onSend замыкается на inputVal в момент создания
+    // callback'а, и setInputVal+setTimeout не помогали (первый клик не
+    // срабатывал, второй уже видел обновлённое значение).
+    const val = String(sliderVal)
+    setInputVal(val)
+    onSend(val)
   }
 
   const isNumber = state.awaitingInput === 'number'

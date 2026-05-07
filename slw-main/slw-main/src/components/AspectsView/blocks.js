@@ -141,6 +141,95 @@ export const LEVEL_LABELS = {
   3: { code: 'IV', name: 'Эпоха алхимии', hint: 'Тени, страхи, соматика, трансформация' }
 }
 
+// Default teaser count per block kind. Используется когда блок заблокирован
+// доступом по уровню — пользователю показывается N первых элементов как
+// «попробуй вкус», остальное скрывается под blur+overlay.
+const TEASER_BY_KIND = {
+  text: 0,
+  textItalic: 0,
+  list: 2,
+  numberedList: 2,
+  titledList: 2,
+  archetypes: 1,
+  dilemmas: 1,
+  integration: 0, // показываем описание + opposite, прячем practices
+  synergy: 2,
+  polysemy: 2,
+  practices: 1,
+  archetypePath: 1,
+  fears: 1,
+  somatic: 1,
+  assessment: 1,
+}
+
+// Возвращает «обрезанную» копию data — с первыми N элементами для блока,
+// остальное скрыто. Используется для тизер-режима заблокированного блока.
+// `n` берётся из block.teaserCount (опционально per-block override) или
+// TEASER_BY_KIND[kind].
+export function teaseBlockData(block, data) {
+  const n = block.teaserCount ?? TEASER_BY_KIND[block.kind] ?? 2
+  const out = { ...data }
+  switch (block.kind) {
+    case 'list':
+    case 'numberedList':
+      out[block.field] = (data[block.field] ?? []).slice(0, n)
+      break
+    case 'titledList':
+      out[block.field] = (data[block.field] ?? []).slice(0, n)
+      break
+    case 'archetypes':
+      out.archetypes = {
+        shadow: (data.archetypes?.shadow ?? []).slice(0, n),
+        gift: (data.archetypes?.gift ?? []).slice(0, n)
+      }
+      break
+    case 'dilemmas':
+      out.dilemmas = (data.dilemmas ?? []).slice(0, n)
+      break
+    case 'integration':
+      // Показываем описание, скрываем практики (они под лок-плашкой).
+      out.integration = data.integration
+        ? { ...data.integration, practices: [] }
+        : data.integration
+      break
+    case 'synergy':
+      out.synergy = (data.synergy ?? []).slice(0, n)
+      break
+    case 'polysemy':
+      out.polysemy = (data.polysemy ?? []).slice(0, n)
+      break
+    case 'practices':
+      out.practices = (data.practices ?? []).slice(0, n)
+      break
+    case 'archetypePath':
+      out.archetypePath = (data.archetypePath ?? []).slice(0, n)
+      break
+    case 'fears':
+      // Показываем страхи, защиты прячем (под блюром).
+      out.defenses = null
+      break
+    case 'somatic':
+      out.somatic = {
+        shadow: (data.somatic?.shadow ?? []).slice(0, n),
+        gift: (data.somatic?.gift ?? []).slice(0, n)
+      }
+      break
+    case 'assessment':
+      out.selfAssessment = (data.selfAssessment ?? []).slice(0, n)
+      break
+    case 'text':
+      // Заголовок + лид остаются. Тело полностью прячется до разблокировки.
+      out.essence = ''
+      break
+    case 'textItalic':
+      out.superpower = ''
+      break
+    default:
+      break
+  }
+  return out
+}
+
 export const BLOCKS = [
   // ── Уровень 0 ─────────────────────────────────────────────
   {

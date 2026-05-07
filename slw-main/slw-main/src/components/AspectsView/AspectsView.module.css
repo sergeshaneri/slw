@@ -465,6 +465,101 @@
   transform: translateX(0);
 }
 
+/* Заблокированная карточка в Toc — мутно, с замочком. Кликабельна:
+   откроет BlockReader, где будет тизер + блюр-силуэт остального. */
+.tocItemLocked {
+  opacity: 0.62;
+}
+.tocItemLocked:hover {
+  opacity: 0.78;
+}
+.tocItemLockIcon {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 11px;
+  vertical-align: middle;
+  opacity: 0.7;
+}
+
+/* Locked block в BlockReader — тизер виден, ниже силуэт + overlay. */
+.blockLocked {
+  position: relative;
+}
+
+.blockSilhouette {
+  margin-top: 18px;
+  padding: 14px 18px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.005) 100%);
+  border-radius: 12px;
+  filter: blur(6px);
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+}
+
+.silhouetteLine {
+  height: 12px;
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 4px;
+}
+
+.blockLockOverlay {
+  --accent: #9d4edd;
+  position: relative;
+  margin-top: -90px;          /* перекрываем силуэт сверху */
+  padding: 28px 24px 24px;
+  text-align: center;
+  background:
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(15, 16, 28, 0.78) 35%,
+      rgba(15, 16, 28, 0.96) 100%
+    );
+  border-radius: 0 0 12px 12px;
+  border-top: 1px solid color-mix(in srgb, var(--accent) 25%, rgba(255,255,255,0.08));
+}
+
+.blockLockIcon {
+  font-size: 28px;
+  opacity: 0.7;
+  margin-bottom: 10px;
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--accent) 40%, transparent));
+}
+
+.blockLockHead {
+  font-size: 15px;
+  font-weight: 500;
+  color: #d8dae0;
+  margin-bottom: 6px;
+  letter-spacing: 0.2px;
+}
+
+.blockLockHint {
+  font-size: 13px;
+  color: #8a8d96;
+  max-width: 380px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+/* Заблокированные пункты в сайдбаре — мутно + лок. */
+.sidebarItemLocked {
+  opacity: 0.55;
+}
+.sidebarItemLocked:hover {
+  opacity: 0.75;
+}
+.sidebarLock {
+  font-size: 10px;
+  margin-left: 4px;
+  vertical-align: middle;
+  opacity: 0.7;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    4. ЧТЕНИЕ: SIDEBAR + КОНТЕНТ
 ═══════════════════════════════════════════════════════════════════════ */

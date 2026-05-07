@@ -18,6 +18,7 @@ from app.web.routes.hall import router as hall_router
 from app.web.routes.leaderboard import router as leaderboard_router
 from app.web.routes.me import router as me_router
 from app.web.routes.notifications import router as notifications_router
+from app.web.routes.onboarding import router as onboarding_router
 from app.web.routes.profile import router as profile_router
 from app.web.routes.scores import router as scores_router
 from app.web.routes.search import router as search_router
@@ -70,6 +71,7 @@ app.include_router(bookmarks_router, prefix="/api")
 app.include_router(search_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(sync_vault_router, prefix="/api")
+app.include_router(onboarding_router, prefix="/api")
 
 
 @app.get("/healthz")

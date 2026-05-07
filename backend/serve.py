@@ -447,6 +447,27 @@ async def apply_ddl() -> None:
     except Exception as e:
         log.warning("Q&A/bookmarks DDL failed: %s", e)
 
+    # Onboarding: server flag «прошёл Quick Tour» + JSONB карта закрытых
+    # подсказок/карточек DiscoverMore. Идемпотентны (IF NOT EXISTS), отдельная
+    # транзакция + 15-секундный timeout — чтобы один зависший ALTER не валил
+    # весь старт.
+    try:
+        async with asyncio.timeout(15):
+            async with engine.connect() as conn:
+                await conn.execute(text(
+                    "ALTER TABLE web_users "
+                    "ADD COLUMN IF NOT EXISTS onboarding_done "
+                    "BOOLEAN DEFAULT FALSE NOT NULL"
+                ))
+                await conn.execute(text(
+                    "ALTER TABLE web_users "
+                    "ADD COLUMN IF NOT EXISTS hints_seen "
+                    "JSONB DEFAULT '{}'::jsonb NOT NULL"
+                ))
+                await conn.commit()
+    except Exception as e:
+        log.warning("onboarding flags DDL failed: %s", e)
+
     # user_aspect_state — мульти-аспектный прогресс бота. Одна строка на
     # пару (юзер, аспект). Source of truth для current_step_id внутри
     # аспекта; user_state.current_step_id остаётся как денормализованная
