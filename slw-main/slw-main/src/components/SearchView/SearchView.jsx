@@ -79,7 +79,7 @@ export default function SearchView({ initialQuery = '', onOpenProfile }) {
                   <div key={`mi-${it.id}`} className={styles.card}>
                     <div className={styles.cardHead}>
                       <span style={{ color: ASPECT_COLORS[it.aspect] }} className={styles.cardAspect}>
-                        {it.aspect}
+                        {ASPECT_DISPLAY_KEY[it.aspect] ?? it.aspect}
                       </span>
                       <span className={styles.cardKind}>
                         {it.kind === 'recommendation' ? 'рекомендация' : 'инсайт'}
@@ -103,7 +103,7 @@ export default function SearchView({ initialQuery = '', onOpenProfile }) {
                     <div className={styles.cardHead}>
                       {it.aspect && (
                         <span style={{ color: ASPECT_COLORS[it.aspect] }} className={styles.cardAspect}>
-                          {it.aspect}
+                          {ASPECT_DISPLAY_KEY[it.aspect] ?? it.aspect}
                         </span>
                       )}
                       <span className={styles.cardMuted}>{formatDate(it.created_at)}</span>
@@ -123,7 +123,7 @@ export default function SearchView({ initialQuery = '', onOpenProfile }) {
                   <div key={`c-${it.id}`} className={styles.card}>
                     <div className={styles.cardHead}>
                       <span style={{ color: ASPECT_COLORS[it.aspect] }} className={styles.cardAspect}>
-                        {it.aspect}
+                        {ASPECT_DISPLAY_KEY[it.aspect] ?? it.aspect}
                       </span>
                       <button
                         type="button"
