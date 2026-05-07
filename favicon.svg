@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- 8 цветных кругов по аспектам, в порядке часовой стрелки от 12:00.
+       Цвета синхронизированы с ASPECT_COLORS из data/aspects.js.
+       Радиус кольца 22, радиус круга 7 — кольцо хорошо читается даже на 16×16. -->
+  <circle cx="32"    cy="10"    r="7" fill="#8FA8BD"/> <!-- Te (ЧЛ) — slate steel -->
+  <circle cx="47.55" cy="16.45" r="7" fill="#DCE2EB"/> <!-- Ti (БЛ) — pearl platinum -->
+  <circle cx="54"    cy="32"    r="7" fill="#D85160"/> <!-- Fe (ЧЭ) — crimson rose -->
+  <circle cx="47.55" cy="47.55" r="7" fill="#E6C158"/> <!-- Fi (БЭ) — honey gold -->
+  <circle cx="32"    cy="54"    r="7" fill="#CC7152"/> <!-- Se (ЧС) — burnt sienna -->
+  <circle cx="16.45" cy="47.55" r="7" fill="#A8D97B"/> <!-- Si (БС) — pistachio -->
+  <circle cx="10"    cy="32"    r="7" fill="#8975DD"/> <!-- Ne (ЧИ) — electric indigo -->
+  <circle cx="16.45" cy="16.45" r="7" fill="#B97FD2"/> <!-- Ni (БИ) — amethyst -->
+</svg>
