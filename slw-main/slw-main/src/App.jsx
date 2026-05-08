@@ -105,6 +105,18 @@ export default function App() {
   // Re-open из Profile через кнопку «📖 Гид».
   const [showIntroTour, setShowIntroTour] = useState(false)
 
+  // Аватар юзера из public_profiles. Источник правды — бэк
+  // (/api/profile/me). Фетчим при логине, обновляем после save в ProfileView.
+  const [myAvatar, setMyAvatar] = useState('')
+  useEffect(() => {
+    if (!user) { setMyAvatar(''); return }
+    let cancelled = false
+    fetchMyProfile()
+      .then(p => { if (!cancelled) setMyAvatar(p.avatar ?? '') })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [user?.id])
+
   // Скроллим `.main` наверх при смене view или selectedAspect.
   // Без этого позиция сохраняется и страница может оказаться на середине/внизу.
   // Чат (journey) сам управляет скроллом — его не трогаем.
@@ -706,7 +718,7 @@ export default function App() {
         onViewChange={handleViewChange}
         journeyPendingCount={journey?.aspects?.[journey?.currentAspect]?.pendingTasks?.length ?? 0}
         user={user}
-        userAvatar={journey?.avatar}
+        userAvatar={myAvatar}
         onLogin={() => setShowAuth(true)}
         onLogout={logout}
         onOpenMyProfile={() => handleViewChange('profile')}
@@ -848,6 +860,7 @@ export default function App() {
             onOpenTour={() => setShowIntroTour(true)}
             journey={journey}
             onJourneyChange={saveJourney}
+            onAvatarChange={setMyAvatar}
           />
         )}
 

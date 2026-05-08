@@ -847,7 +847,12 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         ...(diary ?? [])
       ])
       if (script?.id) removePending(script.id)
-      awardXP(script?.xp ?? 10, 0, script?.id ?? null)
+      // Word-скрипты («Слово дня: X») имеют stardust: 1 — начисляем его и
+      // через answer_text, чтобы запись ответа не «съедала» стардаст
+      // относительно ветки `next`. Для других типов (reflection, question)
+      // stardust не задаётся, и он естественно равен 0.
+      const stardust = script?.type === 'word' ? (script?.stardust ?? 0) : 0
+      awardXP(script?.xp ?? 10, stardust, script?.id ?? null)
       setTimeout(() => deliverScript(a.currentScriptIndex + 1), 700)
     } else if (a.awaitingInput === 'exercise_note') {
       // Завершение упражнения с обязательным комментарием.

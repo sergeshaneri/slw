@@ -124,13 +124,14 @@ export default function Chat({
           <ScriptButtons script={currentScript} onAction={onAction} />
         )}
 
-        {state.awaitingInput && (
+        {/* Хинт-бабл показываем только для слайдера (у него нет placeholder'а).
+           Для text/exercise_note достаточно placeholder'а в textarea — иначе
+           на мобиле получается «2 текста в одной зоне» (hint + placeholder). */}
+        {isNumber && (
           <div className={styles.msg}>
             <div className={styles.msgAvatar}>◐</div>
             <div className={`${styles.msgBubble} ${styles.msgHint}`}>
-              {isNumber && 'Поставь оценку от 1 до 10'}
-              {state.awaitingInput === 'exercise_note' && 'Кратко опиши, как прошло упражнение'}
-              {state.awaitingInput === 'text' && 'Напиши свой ответ'}
+              Поставь оценку от 1 до 10
             </div>
           </div>
         )}
@@ -158,7 +159,7 @@ export default function Chat({
             className={styles.inputField}
             placeholder={
               state.awaitingInput === 'exercise_note'
-                ? 'Что вышло…'
+                ? 'Кратко: как прошло упражнение?'
                 : 'Твой ответ…'
             }
             value={inputVal}

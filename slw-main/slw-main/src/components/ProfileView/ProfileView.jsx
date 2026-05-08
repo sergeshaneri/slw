@@ -43,6 +43,7 @@ export default function ProfileView({
   onOpenTour,
   journey,
   onJourneyChange,
+  onAvatarChange,
 }) {
   const [profile, setProfile] = useState(null)
   const [busy, setBusy] = useState(true)
@@ -170,6 +171,9 @@ export default function ProfileView({
       })
       setProfile(updated)
       setSavedAt(Date.now())
+      // Обновляем аватарку в шапке App-уровня — иначе там остаётся старая
+      // (Header читает из App.myAvatar, а не из локального ProfileView state).
+      if (onAvatarChange) onAvatarChange(updated.avatar ?? '')
     } catch (e) {
       setError(e.message ?? 'Не удалось сохранить')
     } finally {

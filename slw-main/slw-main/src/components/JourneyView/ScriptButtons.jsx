@@ -39,9 +39,17 @@ export default function ScriptButtons({ script, onAction }) {
         </div>
       )
     case 'word':
+      // Word-скрипты («слова дня») заканчиваются прямым «Подумай: …»-вопросом.
+      // Это микро-рефлексия, не задача — её не «откладывают», над ней либо
+      // думают и записывают инсайт, либо пропускают сейчас и возвращаются
+      // позже (просто не нажимая кнопку, скрипт остаётся в чате открытым).
+      // Поэтому здесь одна кнопка: «Подумал об этом» открывает текстовый
+      // ввод (action='answer_text'), запись уходит в дневник с привязкой
+      // к слову дня (prompt = текст, promptTitle = «Слово дня: X»),
+      // XP+stardust начисляются после записи (см. handleSend).
       return (
         <div className={styles.btnRow}>
-          <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => act('next')}>Подумал об этом</button>
+          <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => act('answer_text')}>Подумал об этом</button>
         </div>
       )
     case 'reflection':

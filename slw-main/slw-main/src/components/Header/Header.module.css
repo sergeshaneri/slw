@@ -183,10 +183,12 @@
   .authBtn { font-size: 11px; padding: 6px 11px; }
 }
 
-/* Мобильный layout: две строки.
+/* Мобильный + landscape phone (до ~1024). Две строки:
    1) Заголовок + auth.
-   2) Nav на всю ширину, свайп-скролл. */
-@media (max-width: 720px) {
+   2) Nav на всю ширину, свайп-скролл.
+   Раньше брейк стоял на 720px, и горизонтальный телефон (~800-932px)
+   попадал в десктоп-расклад: title наезжал на nav и аватар. */
+@media (max-width: 1024px) {
   .header {
     flex-wrap: wrap;
     padding: 12px 16px;
@@ -194,8 +196,20 @@
   }
 
   .title { flex: 1; min-width: 0; }
-  .mainTitle { font-size: 15px; letter-spacing: 1px; }
-  .subtitle  { font-size: 10px; letter-spacing: 4px; }
+  .mainTitle {
+    font-size: 15px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .subtitle {
+    font-size: 10px;
+    letter-spacing: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
   .nav {
     order: 3;
@@ -260,7 +274,7 @@
   max-width: 120px;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 1024px) {
   .avatarName { display: none; }
   .avatarBtn { padding: 4px; }
 }

@@ -1,6 +1,6 @@
 export const ru = {
   app: {
-    title: 'Соционика',
+    title: 'Соционическое',
     subtitle: 'Колесо Баланса',
   },
   nav: {

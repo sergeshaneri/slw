@@ -1,10 +1,24 @@
-/* Карта планет — экран выбора аспекта. */
+/* Карта планет — экран выбора аспекта.
+
+   Родительский JourneyView.shell имеет overflow:hidden + flex-column,
+   поэтому PlanetMap должна сама быть scroll-контейнером, иначе на мобиле
+   ниже viewport контент недоступен (нельзя скроллить — было до фикса). */
 
 .shell {
-  max-width: 880px;
-  margin: 0 auto;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 16px 16px 40px;
   color: #f1f2f5;
+}
+
+/* Внутренние блоки центрируются по 880px без потери scroll-обёртки. */
+.shell > * {
+  max-width: 880px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .topBar {
