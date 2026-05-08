@@ -108,3 +108,19 @@
   font-size: 11px;
   color: #5f6169;
 }
+
+/* На узких экранах колокольчик стоит не у правого края вьюпорта (рядом
+   аватар/логин), поэтому absolute+right:0 анкорится к bell, и панель
+   шириной 360px вылезает за левый край. Прижимаемся к вьюпорту через
+   fixed на мобильной ширине. */
+@media (max-width: 720px) {
+  .dropdown {
+    position: fixed;
+    top: 64px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+    max-height: calc(100vh - 80px);
+  }
+}
