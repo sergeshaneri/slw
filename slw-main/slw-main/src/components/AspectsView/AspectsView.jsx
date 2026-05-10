@@ -763,6 +763,17 @@ function BlockBody({ block, data, color }) {
         </div>
       )
 
+    case 'skillBlocks': {
+      const items = data[field] || []
+      return (
+        <div className={styles.skillBlockList}>
+          {items.map((sk, i) => (
+            <SkillBlockCard key={sk.skillId || i} sk={sk} color={color} />
+          ))}
+        </div>
+      )
+    }
+
     default:
       return null
   }
@@ -785,6 +796,67 @@ function PolarBlock({ label, tone, items }) {
       </ul>
     </div>
   )
+}
+
+// Карточка одного навыка с 4 блоками психодинамики:
+// вытеснение / защита / убеждения / родовые программы.
+// Простая bold-разметка `**текст**` подсвечивается курсивом-жирным;
+// списки рендерятся как ul.
+function SkillBlockCard({ sk, color }) {
+  if (!sk) return null
+  return (
+    <div className={styles.skillBlockCard} style={{ borderColor: `${color}33` }}>
+      <h3 className={styles.skillBlockName} style={{ color }}>{sk.name}</h3>
+
+      {sk.suppression && (
+        <div className={styles.skillBlockRow}>
+          <div className={styles.skillBlockLabel}>1. Вытеснение</div>
+          <p className={styles.skillBlockText}>{renderBoldRich(sk.suppression)}</p>
+        </div>
+      )}
+
+      {sk.defense && (
+        <div className={styles.skillBlockRow}>
+          <div className={styles.skillBlockLabel}>2. Психологическая защита</div>
+          <p className={styles.skillBlockText}>{renderBoldRich(sk.defense)}</p>
+        </div>
+      )}
+
+      {sk.beliefs?.length > 0 && (
+        <div className={styles.skillBlockRow}>
+          <div className={styles.skillBlockLabel}>3. Ограничивающие убеждения</div>
+          <ul className={styles.skillBlockList2}>
+            {sk.beliefs.map((b, i) => (
+              <li key={i} className={styles.skillBlockItem}>{renderBoldRich(b)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {sk.family?.length > 0 && (
+        <div className={styles.skillBlockRow}>
+          <div className={styles.skillBlockLabel}>4. Родовые программы</div>
+          <ul className={styles.skillBlockList2}>
+            {sk.family.map((f, i) => (
+              <li key={i} className={styles.skillBlockItem}>{renderBoldRich(f)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Минимальный inline-парсер `**bold**` для выделений в текстах блоков.
+// Возвращает массив React-элементов / строк.
+function renderBoldRich(text) {
+  if (!text) return null
+  const parts = String(text).split(/(\*\*[^*]+\*\*)/g)
+  return parts.map((p, i) => {
+    const m = /^\*\*(.+)\*\*$/.exec(p)
+    if (m) return <strong key={i}>{m[1]}</strong>
+    return p
+  })
 }
 
 function PracticeItem({ name, desc, color, index }) {

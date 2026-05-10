@@ -1,31 +1,46 @@
 import { useState } from 'react'
-import { ARCHETYPES, SKILL_TO_ARCHETYPE, SKILL_TREE } from '../../data/journey/skills'
-import { getSkillContent, getUnlockedSkillLevel } from '../../data/skills/skillsContent'
+import {
+  getSkillContent,
+  getUnlockedSkillLevel,
+  getSkillName,
+  getArchetypeNameForSkill
+} from '../../data/skills'
+import InsightInput from './InsightInput'
 import styles from './JourneyView.module.css'
 
-// SkillDetail — экран подробного разбора одного навыка.
+// SkillDetail — экран «Как развить» для одного навыка.
 //
 // Показывает три уровня (1, 2, 3). Каждый уровень открывается по двум
 // условиям: пройден соответствующий уровень путешествия по аспекту И
 // пройдено N анкетных проходов по этому навыку (1/2/3, см. skillsContent.js).
 //
+// На каждом открытом уровне:
+//   - typage (Чувствующий / Выражающий / Излучающий) — если есть в данных
+//   - essence + gift/shadow + Как развить (actions/practices/criteria/pitfalls)
+//   - precaution (только L3, если есть)
+//   - InsightInput («✎ Записать инсайт»)
+//
+// Внизу — кнопка «Какие психологические черты это развивает →» (ведёт в SkillTraits).
+//
 // Props:
 //   skillId       — id навыка из tree.js
-//   currentLevel  — state.currentLevel (0..3)
+//   currentLevel  — уровень путешествия по аспекту (0..3)
 //   passes        — getCompletedPasses(state.skills[skillId]) (0..3)
 //   accent        — цвет аспекта
 //   onClose       — назад в дерево навыков
-export default function SkillDetail({ skillId, currentLevel, passes, accent, onClose }) {
+//   onOpenTraits?: (skillId) => void  — открыть SkillTraits
+//   onSaveInsight?: (skillId, level, source, text) => void
+export default function SkillDetail({
+  skillId, currentLevel, passes, accent, onClose,
+  onOpenTraits, onSaveInsight
+}) {
   const content = getSkillContent(skillId)
   const cl = currentLevel ?? 0
   const p  = passes ?? 0
   const unlockedLevel = getUnlockedSkillLevel(cl, p)
 
-  // Найдём базовое имя из tree.js (даже если детального контента ещё нет).
-  const archeKey = SKILL_TO_ARCHETYPE[skillId]
-  const treeSkill = (SKILL_TREE[archeKey] ?? []).find(s => s.id === skillId)
-  const skillName = content?.name ?? treeSkill?.name ?? skillId
-  const archeName = ARCHETYPES[archeKey]?.name
+  const skillName = getSkillName(skillId)
+  const archeName = getArchetypeNameForSkill(skillId)
 
   return (
     <div className={styles.treeShell} style={{ '--accent': accent }}>
@@ -40,7 +55,7 @@ export default function SkillDetail({ skillId, currentLevel, passes, accent, onC
           <span>Навыки</span>
         </button>
         <div className={styles.treeHeaderTitleBlock}>
-          <div className={styles.treeHeaderTitle}>{skillName}</div>
+          <div className={styles.treeHeaderTitle}>Как развить: {skillName}</div>
           <div className={styles.treeHeaderSub}>
             {content?.domain && `${content.domain} · `}
             {archeName}
@@ -76,8 +91,11 @@ export default function SkillDetail({ skillId, currentLevel, passes, accent, onC
                   level={lvl}
                   data={lvlData}
                   unlocked={isUnlocked}
+                  skillId={skillId}
                   currentLevel={cl}
                   passes={p}
+                  accent={accent}
+                  onSaveInsight={onSaveInsight}
                 />
               )
             })}
@@ -85,8 +103,19 @@ export default function SkillDetail({ skillId, currentLevel, passes, accent, onC
             {unlockedLevel < 3 && (
               <div className={styles.skillDetailReturn}>
                 <span aria-hidden="true">↩</span>
-                <span>Закрытые уровни откроются, когда выполнишь оба условия выше.</span>
+                <span>Закрытые уровни откроются на следующих этапах путешествия.</span>
               </div>
+            )}
+
+            {unlockedLevel >= 1 && onOpenTraits && (
+              <button
+                type="button"
+                className={styles.skillTraitsCta}
+                onClick={() => onOpenTraits(skillId)}
+              >
+                <span>Какие психологические черты это развивает</span>
+                <span aria-hidden="true">→</span>
+              </button>
             )}
           </>
         )}
@@ -120,7 +149,7 @@ function lockMessage(level, currentLevel, passes) {
 }
 
 // Карточка одного уровня с гейтингом.
-function SkillLevelCard({ level, data, unlocked, currentLevel, passes }) {
+function SkillLevelCard({ level, data, unlocked, skillId, currentLevel, passes, accent, onSaveInsight }) {
   const [showHow, setShowHow] = useState(false)
 
   if (!unlocked) {
@@ -154,24 +183,29 @@ function SkillLevelCard({ level, data, unlocked, currentLevel, passes }) {
     <section className={styles.skillLevelCard}>
       <div className={styles.skillLevelHead}>
         <span className={styles.skillLevelBadge}>Уровень {level}</span>
+        {data.typage && <span className={styles.skillLevelTypage}>{data.typage}</span>}
       </div>
 
       {data.essence && (
         <p className={styles.skillLevelEssence}>{data.essence}</p>
       )}
 
-      <div className={styles.skillTraits}>
-        <div className={`${styles.skillTrait} ${styles.skillTraitGift}`}>
-          <div className={styles.skillTraitLabel}>Что развиваешь</div>
-          <div className={styles.skillTraitTitle}>{data.gift.title}</div>
-          <p className={styles.skillTraitDesc}>{data.gift.desc}</p>
+      {data.gift && (
+        <div className={styles.skillTraits}>
+          <div className={`${styles.skillTrait} ${styles.skillTraitGift}`}>
+            <div className={styles.skillTraitLabel}>Что развиваешь</div>
+            <div className={styles.skillTraitTitle}>{data.gift.title}</div>
+            <p className={styles.skillTraitDesc}>{data.gift.desc}</p>
+          </div>
+          {data.shadow && (
+            <div className={`${styles.skillTrait} ${styles.skillTraitShadow}`}>
+              <div className={styles.skillTraitLabel}>От чего уходишь</div>
+              <div className={styles.skillTraitTitle}>{data.shadow.title}</div>
+              <p className={styles.skillTraitDesc}>{data.shadow.desc}</p>
+            </div>
+          )}
         </div>
-        <div className={`${styles.skillTrait} ${styles.skillTraitShadow}`}>
-          <div className={styles.skillTraitLabel}>От чего уходишь</div>
-          <div className={styles.skillTraitTitle}>{data.shadow.title}</div>
-          <p className={styles.skillTraitDesc}>{data.shadow.desc}</p>
-        </div>
-      </div>
+      )}
 
       <button
         type="button"
@@ -234,6 +268,21 @@ function SkillLevelCard({ level, data, unlocked, currentLevel, passes }) {
             </div>
           )}
         </div>
+      )}
+
+      {level === 3 && data.precaution && (
+        <div className={styles.skillPrecaution}>
+          <div className={styles.skillPrecautionTitle}>Меры предосторожности</div>
+          <p className={styles.skillPrecautionText}>{data.precaution}</p>
+        </div>
+      )}
+
+      {onSaveInsight && (
+        <InsightInput
+          accent={accent}
+          placeholder="Что заметил про этот уровень? Где видно у себя?"
+          onSave={(text) => onSaveInsight(skillId, level, 'detail', text)}
+        />
       )}
     </section>
   )

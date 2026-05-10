@@ -8,7 +8,9 @@ export default function LevelComplete({
   wheelLabel,
   onProfile,
   nextLevelTitle, onNextLevel,
-  onOpenWheel
+  onOpenWheel,
+  onOpenCoreOverview,
+  coreOverviewLabel
 }) {
   const levelNum = state.currentLevel ?? 0
   const planet = planetName ?? 'Terra Harmonia'
@@ -70,9 +72,21 @@ export default function LevelComplete({
           </button>
         )}
 
+        {/* Опциональная третья кнопка — «Изучить универсальные навыки»
+            (для Fe на L0). Открывает FeCoreOverview с 3 ядерными карточками. */}
+        {onOpenCoreOverview && (
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnGhost} ${styles.btnFull}`}
+            onClick={onOpenCoreOverview}
+          >
+            {coreOverviewLabel ?? 'Изучить универсальные навыки'}
+          </button>
+        )}
+
         <button
           type="button"
-          className={`${styles.btn} ${(onNextLevel || onOpenWheel) ? styles.btnGhost : styles.btnPrimary} ${styles.btnFull}`}
+          className={`${styles.btn} ${(onNextLevel || onOpenWheel || onOpenCoreOverview) ? styles.btnGhost : styles.btnPrimary} ${styles.btnFull}`}
           onClick={onProfile}
         >
           Посмотреть профиль

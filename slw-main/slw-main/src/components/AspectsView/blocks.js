@@ -1,3 +1,5 @@
+import { FE_CORE_BLOCKS, FE_NON_CORE_BLOCKS } from '../../data/skills/Fe/skill-blocks'
+
 // Утилита для блоков
 const truncate = (s, n) => {
   if (!s) return ''
@@ -121,6 +123,13 @@ export function getBlockItems(block, data) {
           text: `Микрополе «${mp.pole}»\n\n${q}`
         }))
       )
+    case 'skillBlocks': {
+      const items = data[block.field] ?? []
+      return items.flatMap((sk, i) => [
+        { id: `${blockId}-${i}-suppression`, label: `${sk.name} — вытеснение`, text: sk.suppression },
+        { id: `${blockId}-${i}-defense`, label: `${sk.name} — защита`, text: sk.defense }
+      ])
+    }
     case 'text':
     case 'textItalic':
     default:
@@ -160,6 +169,7 @@ const TEASER_BY_KIND = {
   fears: 1,
   somatic: 1,
   assessment: 1,
+  skillBlocks: 1,
 }
 
 // Возвращает «обрезанную» копию data — с первыми N элементами для блока,
@@ -217,6 +227,9 @@ export function teaseBlockData(block, data) {
     case 'assessment':
       out.selfAssessment = (data.selfAssessment ?? []).slice(0, n)
       break
+    case 'skillBlocks':
+      out[block.field] = (data[block.field] ?? []).slice(0, n)
+      break
     case 'text':
       // Заголовок + лид остаются. Тело полностью прячется до разблокировки.
       out.essence = ''
@@ -247,6 +260,15 @@ export const BLOCKS = [
     lead: 'Два полюса — то, во что аспект соскальзывает в тени, и то, каким становится в даре.',
     kind: 'archetypes',
     has: d => !!d.archetypes
+  },
+  {
+    id: 'feSkillBlocksCore',
+    level: 0,
+    title: 'Защиты ядерных навыков',
+    lead: 'Психодинамика сопротивления развитию трёх ядерных навыков ЧЭ — вытеснение, защиты, ограничивающие убеждения, родовые программы. Открыто с самого начала.',
+    kind: 'skillBlocks',
+    field: 'feSkillBlocksCore',
+    has: d => d.feSkillBlocksCore?.length > 0
   },
 
   // ── Уровень 1 ─────────────────────────────────────────────
@@ -432,5 +454,14 @@ export const BLOCKS = [
     kind: 'titledList',
     field: 'childRaising',
     has: d => d.childRaising?.length > 0
+  },
+  {
+    id: 'feSkillBlocks',
+    level: 3,
+    title: 'Защиты и родовые программы по навыкам',
+    lead: 'Глубинные блоки сопротивления для каждого из 31 архетипного и дополнительного навыка ЧЭ. Открывается на третьем уровне путешествия.',
+    kind: 'skillBlocks',
+    field: 'feSkillBlocks',
+    has: d => d.feSkillBlocks?.length > 0
   }
 ]

@@ -1,3 +1,5 @@
+import { FE_CORE_BLOCKS as FE_CORE_BLOCKS_DATA, FE_NON_CORE_BLOCKS as FE_NON_CORE_BLOCKS_DATA } from './skills/Fe/skill-blocks'
+
 // Палитра аспектов — премиум tier для тёмного UI.
 //
 // Принципы:
@@ -663,7 +665,12 @@ ASPECT_DATA.Fe = {
       'Заразительный смех и способность поднимать настроение окружающим',
       'Яркое, харизматичное присутствие'
     ]
-  }
+  },
+  // Психодинамика сопротивления развитию навыков ЧЭ.
+  // Источник: Fe/блоки навыков ЧЭ.md → data/skills/Fe/skill-blocks.js.
+  // Ядерные (3) — открыты всегда (level 0); архетипные/доп (31) — на L3.
+  feSkillBlocksCore: FE_CORE_BLOCKS_DATA,
+  feSkillBlocks: FE_NON_CORE_BLOCKS_DATA
 }
 
 // БЭ, ЧС, БС, ЧИ, БИ - базовая структура (будет дополнена)

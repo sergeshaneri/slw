@@ -9,10 +9,17 @@
 // Fe с префиксом 'fe-'.
 
 import { CORE } from './core'
+import { ZAVODILA } from './zavodila'
+import { ORATOR } from './orator'
+import { ARTIST } from './artist'
+import { MASTER_ATMO } from './master-atmo'
 
 export const FE_CONTENT = {
-  ...CORE
-  // ...ZAVODILA, ...ORATOR, ...ARTIST, ...MASTER_ATMO добавятся по ходу.
+  ...CORE,
+  ...ZAVODILA,
+  ...ORATOR,
+  ...ARTIST,
+  ...MASTER_ATMO
 }
 
 export function getFeContent(skillId) {

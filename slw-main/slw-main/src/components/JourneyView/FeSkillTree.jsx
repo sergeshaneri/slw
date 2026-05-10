@@ -168,6 +168,15 @@ export default function FeSkillTree({ accent, skills, onClose, onStartSkill, onO
                               ⓘ
                             </button>
                           )}
+                          {hasPasses && onOpenSkillDetail && (
+                            <button
+                              type="button"
+                              className={styles.treeSkillDevBtn}
+                              onClick={() => onOpenSkillDetail(skill.id)}
+                            >
+                              Узнать, как развить →
+                            </button>
+                          )}
                         </li>
                       )
                     })}

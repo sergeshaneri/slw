@@ -902,6 +902,80 @@
   margin: 0;
 }
 
+/* ── блоки сопротивления навыков (skillBlocks) ──────────────────────────
+   Карточка-навык с 4 блоками: вытеснение / защита / убеждения / родовые. */
+
+.skillBlockList {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.skillBlockCard {
+  padding: 22px 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.skillBlockName {
+  font-size: 19px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.skillBlockRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skillBlockLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.skillBlockText {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  margin: 0;
+}
+
+.skillBlockList2 {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skillBlockItem {
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--text);
+  padding-left: 14px;
+  position: relative;
+}
+
+.skillBlockItem::before {
+  content: '·';
+  position: absolute;
+  left: 0;
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
+  top: 1px;
+}
+
 /* ── дилеммы ──────────────────────────────────────────── */
 
 .dilemmaList {
