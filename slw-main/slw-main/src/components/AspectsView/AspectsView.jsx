@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
+import { HALL_CONTENT } from '../../data/hallContent'
 import { BLOCKS, LEVEL_LABELS, getBlockItems, teaseBlockData } from './blocks'
 import SiWheel from './SiWheel'
 import FeWheel from './FeWheel'
@@ -27,7 +28,7 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, on
 
   const data = ASPECT_DATA[selectedAspect]
   const color = ASPECT_COLORS[selectedAspect]
-  const available = BLOCKS.filter(b => b.has(data))
+  const available = BLOCKS.filter(b => b.has(data, selectedAspect))
 
   if (blockId) {
     const idx = available.findIndex(b => b.id === blockId)
@@ -55,6 +56,7 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, on
         journey={journey}
         isAdmin={isAdmin}
         user={user}
+        onEnterHall={onEnterHall}
       />
     )
   }
@@ -227,6 +229,32 @@ function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSe
 
       <HabitSection aspect={aspect} color={color} />
 
+      {onEnterHall && (() => {
+        const hall = HALL_CONTENT?.[aspect]
+        const counts = [
+          hall?.figures?.length > 0 && `${hall.figures.length} личностей`,
+          hall?.arts?.length > 0 && `${hall.arts.length} произведений искусства`,
+          hall?.quotes?.length > 0 && `${hall.quotes.length} цитат`,
+          hall?.interestingFacts?.length > 0 && `${hall.interestingFacts.length} интересных фактов`
+        ].filter(Boolean)
+        if (counts.length === 0) return null
+        return (
+          <button
+            type="button"
+            className={styles.tocHallCta}
+            onClick={() => onEnterHall(aspect)}
+            style={{ '--accent': color }}
+          >
+            <span className={styles.tocHallCtaIcon}>🏛</span>
+            <span className={styles.tocHallCtaBody}>
+              <span className={styles.tocHallCtaTitle}>Обсудить {data.name} с сообществом</span>
+              <span className={styles.tocHallCtaCounts}>В Холле: {counts.join(' · ')}</span>
+            </span>
+            <span className={styles.tocHallCtaArrow} aria-hidden="true">→</span>
+          </button>
+        )
+      })()}
+
       <div className={styles.tocIntro}>
         <p className={styles.tocIntroText}>{data.essence}</p>
       </div>
@@ -331,7 +359,7 @@ function AspectHeader({ aspect, data, color, score, onScoreChange, onBack, compa
 
 // ─── Чтение одного блока (с sidebar) ───────────────────────────────────────
 
-function BlockReader({ aspect, data, color, block, available, prev, next, diary, onDiaryChange, onBack, onGoto, journey, isAdmin = false, user }) {
+function BlockReader({ aspect, data, color, block, available, prev, next, diary, onDiaryChange, onBack, onGoto, journey, isAdmin = false, user, onEnterHall }) {
   const byLevel = useMemo(() => {
     const m = { 0: [], 1: [], 2: [], 3: [] }
     available.forEach(b => m[b.level].push(b))
@@ -453,13 +481,13 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
 
         <div className={styles.readerBody}>
           {isBlockUnlocked ? (
-            <BlockBody block={block} data={data} color={color} />
+            <BlockBody block={block} data={data} color={color} aspect={aspect} onEnterHall={onEnterHall} />
           ) : (
             <div className={styles.blockLocked}>
               <Hint id="aspect-locked-intro" user={user}>
                 Часть теории закрыта замком. Дойди до соответствующего уровня в путешествии этого аспекта — откроются.
               </Hint>
-              <BlockBody block={block} data={teaserData} color={color} />
+              <BlockBody block={block} data={teaserData} color={color} aspect={aspect} onEnterHall={onEnterHall} />
               <div className={styles.blockSilhouette} aria-hidden="true">
                 <div className={styles.silhouetteLine} style={{ width: '88%' }} />
                 <div className={styles.silhouetteLine} style={{ width: '72%' }} />
@@ -580,9 +608,59 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
 
 // ─── Рендереры для каждого вида блока ──────────────────────────────────────
 
-function BlockBody({ block, data, color }) {
+function BlockBody({ block, data, color, aspect, onEnterHall }) {
   const { kind, field } = block
   switch (kind) {
+    case 'hallStub': {
+      const section = block.hallSection
+      const hall = HALL_CONTENT?.[aspect] ?? {}
+      const items = hall[section] ?? []
+      // Тизер: первые 3 элемента — короткими карточками.
+      const teaser = items.slice(0, 3)
+      const remaining = Math.max(0, items.length - teaser.length)
+      const sectionLabel = {
+        figures: 'личностей',
+        arts: 'произведений',
+        quotes: 'цитат',
+        interestingFacts: 'фактов'
+      }[section] ?? 'элементов'
+      return (
+        <div className={styles.hallStubBlock}>
+          <p className={styles.hallStubLead}>
+            Полная коллекция и обсуждение — в Холле. Здесь — короткий тизер.
+          </p>
+          <ul className={styles.hallStubList}>
+            {teaser.map((item, i) => {
+              const title = item.text ?? item.title ?? item.name ?? '—'
+              const sub = item.author ?? item.note ?? item.desc ?? ''
+              return (
+                <li key={i} className={styles.hallStubItem}>
+                  <span className={styles.hallStubItemTitle}>{title}</span>
+                  {sub && <span className={styles.hallStubItemSub}>{sub}</span>}
+                </li>
+              )
+            })}
+          </ul>
+          {remaining > 0 && (
+            <div className={styles.hallStubMore}>
+              + ещё {remaining} {sectionLabel} в Холле
+            </div>
+          )}
+          {onEnterHall && (
+            <button
+              type="button"
+              className={styles.hallStubCta}
+              onClick={() => onEnterHall(aspect, section)}
+              style={{ '--accent': color }}
+            >
+              <span>🏛 Открыть в Холле</span>
+              <span aria-hidden="true">→</span>
+            </button>
+          )}
+        </div>
+      )
+    }
+
     case 'text':
       return <Prose>{data.essence}</Prose>
 

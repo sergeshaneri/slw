@@ -1,4 +1,5 @@
 import { FE_CORE_BLOCKS, FE_NON_CORE_BLOCKS } from '../../data/skills/Fe/skill-blocks'
+import { HALL_CONTENT } from '../../data/hallContent'
 
 // Утилита для блоков
 const truncate = (s, n) => {
@@ -325,6 +326,15 @@ export const BLOCKS = [
     has: d => d.historicalFigures?.length > 0
   },
   {
+    id: 'hallFigures',
+    level: 1,
+    title: 'Известные личности — в Холле',
+    lead: 'Биографии и их связь с аспектом обсуждаются с сообществом в Холле.',
+    kind: 'hallStub',
+    hallSection: 'figures',
+    has: (d, aspect) => (HALL_CONTENT?.[aspect]?.figures?.length ?? 0) > 0
+  },
+  {
     id: 'art',
     level: 1,
     title: 'Искусство',
@@ -332,6 +342,15 @@ export const BLOCKS = [
     kind: 'titledList',
     field: 'art',
     has: d => d.art?.length > 0
+  },
+  {
+    id: 'hallArts',
+    level: 1,
+    title: 'Искусство — в Холле',
+    lead: 'Книги, фильмы и музыка по этому аспекту обсуждаются с сообществом в Холле.',
+    kind: 'hallStub',
+    hallSection: 'arts',
+    has: (d, aspect) => (HALL_CONTENT?.[aspect]?.arts?.length ?? 0) > 0
   },
 
   // ── Уровень 2 ─────────────────────────────────────────────
@@ -385,6 +404,15 @@ export const BLOCKS = [
     has: d => d.practices?.length > 0
   },
   {
+    id: 'professions',
+    level: 2,
+    title: 'Профессии',
+    lead: 'Где этот аспект становится профессиональным инструментом — от ремесленных ролей до публичных.',
+    kind: 'titledList',
+    field: 'professions',
+    has: d => d.professions?.length > 0
+  },
+  {
     id: 'myths',
     level: 2,
     title: 'Мифы и Боги',
@@ -401,6 +429,15 @@ export const BLOCKS = [
     kind: 'titledList',
     field: 'quotes',
     has: d => d.quotes?.length > 0
+  },
+  {
+    id: 'hallQuotes',
+    level: 2,
+    title: 'Цитаты — в Холле',
+    lead: 'Подборка цитат обсуждается с сообществом в Холле.',
+    kind: 'hallStub',
+    hallSection: 'quotes',
+    has: (d, aspect) => (HALL_CONTENT?.[aspect]?.quotes?.length ?? 0) > 0
   },
 
   // ── Уровень 3 ─────────────────────────────────────────────
@@ -454,6 +491,15 @@ export const BLOCKS = [
     kind: 'titledList',
     field: 'childRaising',
     has: d => d.childRaising?.length > 0
+  },
+  {
+    id: 'childhoodQuestions',
+    level: 3,
+    title: 'Вопросы про своё детство',
+    lead: 'Вопросы для самоанализа: как этот аспект формировался в детстве, что в семейной истории его поддерживало или подавляло.',
+    kind: 'numberedList',
+    field: 'childhoodQuestions',
+    has: d => d.childhoodQuestions?.length > 0
   },
   {
     id: 'feSkillBlocks',
