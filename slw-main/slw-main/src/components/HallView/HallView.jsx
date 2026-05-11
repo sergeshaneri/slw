@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { HALL_CONTENT } from '../../data/hallContent'
 import {
@@ -506,10 +506,44 @@ function InsightsTab({ aspect, currentUserId, onOpenProfile }) {
 
 // ── Community ───────────────────────────────────────────────────────────────
 
+// Утилита: вернуть n случайных уникальных элементов массива (или меньше, если
+// массив короче). Seed используется для детерминированности на одно «обновление».
+function pickRandom(arr, n, seed) {
+  if (!Array.isArray(arr) || arr.length === 0) return []
+  // Простой PRNG на seed (Mulberry32) — детерминированный для конкретного seed.
+  let s = seed | 0
+  const rand = () => {
+    s = (s + 0x6D2B79F5) | 0
+    let t = s
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+  const pool = arr.map((item, i) => ({ item, k: rand() + i * 1e-9 }))
+  pool.sort((a, b) => a.k - b.k)
+  return pool.slice(0, n).map(x => x.item)
+}
+
 function CommunityTab({ aspect, content, currentUserId, onOpenProfile }) {
   const [top, setTop] = useState([])
   const [inspirations, setInspirations] = useState([])
   const [error, setError] = useState(null)
+  const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9))
+  const refresh = () => setSeed(Math.floor(Math.random() * 1e9))
+
+  // Случайные подборки: 3 цитаты, 1 Дар + 1 Тень из figures, 3 произведения.
+  const quotesSample = useMemo(() => pickRandom(content.quotes ?? [], 3, seed), [content.quotes, seed])
+  const figuresSample = useMemo(() => {
+    const all = content.figures ?? []
+    const gifts = all.filter(f => /^Дар\./i.test(f.name ?? ''))
+    const shadows = all.filter(f => /^Тень\./i.test(f.name ?? ''))
+    const giftPick = pickRandom(gifts, 1, seed)
+    const shadowPick = pickRandom(shadows, 1, seed + 1)
+    // Если разметка «Дар./Тень.» отсутствует — берём 2 случайных.
+    if (giftPick.length + shadowPick.length === 0) return pickRandom(all, 2, seed)
+    return [...giftPick, ...shadowPick]
+  }, [content.figures, seed])
+  const artsSample = useMemo(() => pickRandom(content.arts ?? [], 3, seed), [content.arts, seed])
 
   useEffect(() => {
     Promise.all([fetchHallLeaderboard(aspect), fetchHallInspirations(aspect)])
@@ -577,39 +611,66 @@ function CommunityTab({ aspect, content, currentUserId, onOpenProfile }) {
         )}
       </Section>
 
-      {(content.quotes ?? []).length > 0 && (
-        <Section label="Цитаты">
+      {(content.quotes?.length || content.figures?.length || content.arts?.length) > 0 && (
+        <div className={styles.curatedHead}>
+          <span className={styles.curatedHeadText}>
+            Случайные подборки для обсуждения. Нажми «🔀 Другая подборка», чтобы получить новый набор.
+          </span>
+          <button type="button" className={styles.curatedShuffle} onClick={refresh}>
+            🔀 Другая подборка
+          </button>
+        </div>
+      )}
+
+      {quotesSample.length > 0 && (
+        <Section label={`Цитаты дня — ${quotesSample.length} из ${content.quotes.length}`}>
           <div className={styles.quoteList}>
-            {content.quotes.map((q, i) => (
-              <blockquote key={i} className={styles.quote}>
+            {quotesSample.map((q, i) => (
+              <blockquote key={`${seed}-q-${i}`} className={styles.quote}>
                 «{q.text}»
                 <footer className={styles.quoteAuthor}>— {q.author}</footer>
+                {q.note && <div className={styles.curatedNote}>{q.note}</div>}
+                <DiscussCuratedItem
+                  aspect={aspect}
+                  quoteBlock={`📜 «${q.text}» — ${q.author}`}
+                  itemLabel="цитату"
+                />
               </blockquote>
             ))}
           </div>
         </Section>
       )}
 
-      {(content.figures ?? []).length > 0 && (
-        <Section label="Личности">
+      {figuresSample.length > 0 && (
+        <Section label={`Личности дня — ${figuresSample.length} из ${content.figures.length}`}>
           <ul className={styles.figureList}>
-            {content.figures.map((f, i) => (
-              <li key={i} className={styles.figureItem}>
+            {figuresSample.map((f, i) => (
+              <li key={`${seed}-f-${i}`} className={styles.figureItem}>
                 <strong>{f.name}</strong>
                 {f.note && <span className={styles.muted}> — {f.note}</span>}
+                <DiscussCuratedItem
+                  aspect={aspect}
+                  quoteBlock={`👤 ${f.name}${f.note ? ` — ${f.note}` : ''}`}
+                  itemLabel="личность"
+                />
               </li>
             ))}
           </ul>
         </Section>
       )}
 
-      {(content.arts ?? []).length > 0 && (
-        <Section label="Искусство">
+      {artsSample.length > 0 && (
+        <Section label={`Произведения дня — ${artsSample.length} из ${content.arts.length}`}>
           <div className={styles.artList}>
-            {content.arts.map((a, i) => (
-              <div key={i} className={styles.artItem}>
+            {artsSample.map((a, i) => (
+              <div key={`${seed}-a-${i}`} className={styles.artItem}>
                 <span className={styles.inspirationIcon}>{INSPIRATION_ICON[a.type] ?? '✦'}</span>
                 <span><strong>{a.title}</strong>{a.note ? ` — ${a.note}` : ''}</span>
+                <DiscussCuratedItem
+                  aspect={aspect}
+                  quoteBlock={`🎨 ${a.title}${a.note ? ` — ${a.note}` : ''}`}
+                  itemLabel="произведение"
+                />
               </div>
             ))}
           </div>
@@ -835,6 +896,102 @@ function QuestionsTab({ aspect, currentUserId, onOpenProfile }) {
             <div className={styles.insightText}>{q.text}</div>
           </button>
         ))}
+      </div>
+    </div>
+  )
+}
+
+// Inline-форма «Обсудить» для случайно выбранного объекта (цитата / личность /
+// произведение). При отправке делает 2 POST параллельно:
+//  - postInsight — попадает в ленту инсайтов аспекта и в ленту юзера
+//  - postHallMessage — попадает в чат по аспекту (для оживления процесса)
+// В тексте поста цитата идёт первой строкой (через markdown blockquote/префикс)
+// чтобы было ясно, какой именно объект обсуждается.
+function DiscussCuratedItem({ aspect, quoteBlock, itemLabel }) {
+  const [open, setOpen] = useState(false)
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(false)
+  const [error, setError] = useState(null)
+
+  const canSubmit = text.trim().length > 0 && !busy
+
+  const submit = async () => {
+    if (!canSubmit) return
+    setBusy(true)
+    setError(null)
+    const composed = `${quoteBlock}\n\n${text.trim()}`
+    try {
+      await Promise.all([
+        postInsight({ aspect, kind: 'insight', text: composed, isPublic: true }),
+        postHallMessage(aspect, composed)
+      ])
+      setDone(true)
+      setText('')
+      setOpen(false)
+      setTimeout(() => setDone(false), 4000)
+    } catch (e) {
+      setError(e?.message ?? 'Не удалось опубликовать')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (done) {
+    return (
+      <div className={styles.discussSuccess}>
+        ✓ Опубликовано. Найдёшь в Чате этого аспекта, в Ленте инсайтов аспекта
+        и в Своих инсайтах в твоём профиле.
+      </div>
+    )
+  }
+
+  if (!open) {
+    return (
+      <div className={styles.curatedActions}>
+        <button
+          type="button"
+          className={styles.discussToggleBtn}
+          onClick={() => setOpen(true)}
+        >
+          💬 Обсудить эту {itemLabel}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className={styles.discussBox}>
+      <textarea
+        className={styles.discussTextarea}
+        placeholder="Твой комментарий, наблюдение, вопрос…"
+        value={text}
+        onChange={e => setText(e.target.value)}
+        disabled={busy}
+        autoFocus
+      />
+      <div className={styles.discussHint}>
+        Цитируемый объект автоматически добавится к посту. Появится в трёх местах:
+        чат аспекта, лента инсайтов аспекта, твоя лента инсайтов.
+      </div>
+      {error && <div className={styles.discussError}>{error}</div>}
+      <div className={styles.discussActions}>
+        <button
+          type="button"
+          className={styles.discussCancel}
+          onClick={() => { setOpen(false); setText(''); setError(null) }}
+          disabled={busy}
+        >
+          Отмена
+        </button>
+        <button
+          type="button"
+          className={styles.discussSubmit}
+          onClick={submit}
+          disabled={!canSubmit}
+        >
+          {busy ? 'Публикую…' : 'Опубликовать'}
+        </button>
       </div>
     </div>
   )
