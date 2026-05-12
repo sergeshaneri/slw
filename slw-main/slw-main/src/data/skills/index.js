@@ -1,25 +1,30 @@
 // Aspect-aware lookup для контента навыков.
 //
-// Контент аспекта Si (БС) лежит в ./skillsContent.js (исторически).
-// Контент аспекта Fe (ЧЭ) — в ./Fe/ (по архетипным файлам).
+// Контент по аспектам разложен по подпапкам:
+//   ./Si/ — БС (4 универсальных + 47 архетипных по 4 архетипам)
+//   ./Fe/ — ЧЭ (3 ядерных + 34 архетипных по 4 архетипам)
+//   ./skillsContent.js — устаревший пилотный контент БС (пока `scan` —
+//        для совместимости со старым state.skills, до полной выписки в Si/)
 //
-// ID навыков не пересекаются: Si без префикса (`scan`, `interoception`...),
+// ID навыков не пересекаются: Si без префикса (`signals`, `body-listening`...),
 // Fe с префиксом `fe-` (`fe-awareness`, `fe-pause`...). Поэтому единый lookup
-// через две таблицы безопасен.
+// через эти таблицы безопасен.
 //
-// Когда добавятся реальные tree-контенты для Te/Ti/Ne/Ni/Se/Fi — расширим
-// этот файл новыми импортами.
+// Когда добавятся контенты для Te/Ti/Ne/Ni/Se/Fi — расширим этот файл
+// новыми импортами в том же паттерне.
 
 import {
-  SKILLS_CONTENT,
-  hasSkillContent as hasSiContent,
+  SKILLS_CONTENT as LEGACY_SI_CONTENT,
   getUnlockedSkillLevel
 } from './skillsContent'
+import { SI_CONTENT } from './Si'
 import { FE_CONTENT } from './Fe'
 import {
   ARCHETYPES as SI_ARCHETYPES,
   SKILL_TO_ARCHETYPE as SI_SKILL_TO_ARCHETYPE,
-  SKILL_TREE as SI_SKILL_TREE
+  SKILL_TREE as SI_SKILL_TREE,
+  COMMON_BASE_SKILLS as SI_COMMON_BASE_SKILLS,
+  COMMON_BASE_SKILL_IDS as SI_COMMON_BASE_IDS
 } from '../journey/skills'
 import {
   ARCHETYPES as FE_ARCHETYPES,
@@ -30,14 +35,14 @@ import {
 } from '../journey/fe-skills/tree'
 
 export function getSkillContent(skillId) {
-  return SKILLS_CONTENT[skillId] ?? FE_CONTENT[skillId] ?? null
+  return SI_CONTENT[skillId] ?? FE_CONTENT[skillId] ?? LEGACY_SI_CONTENT[skillId] ?? null
 }
 
 export function hasSkillContent(skillId) {
-  return hasSiContent(skillId) || (skillId in FE_CONTENT)
+  return (skillId in SI_CONTENT) || (skillId in FE_CONTENT) || (skillId in LEGACY_SI_CONTENT)
 }
 
-// Вернуть имя навыка из любого источника: контент → Si tree → Fe tree → fallback на id.
+// Вернуть имя навыка из любого источника: контент → Si tree → Fe tree → COMMON_BASE → fallback на id.
 export function getSkillName(skillId) {
   const content = getSkillContent(skillId)
   if (content?.name) return content.name
@@ -51,6 +56,11 @@ export function getSkillName(skillId) {
   const feKey = FE_SKILL_TO_ARCHETYPE[skillId]
   if (feKey) {
     const skill = (FE_SKILL_TREE[feKey] ?? []).find(s => s.id === skillId)
+    if (skill?.name) return skill.name
+  }
+
+  if (SI_COMMON_BASE_IDS?.has(skillId)) {
+    const skill = SI_COMMON_BASE_SKILLS.find(s => s.id === skillId)
     if (skill?.name) return skill.name
   }
 
