@@ -1989,6 +1989,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           skills={state.skills ?? {}}
           onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
           onStartSkill={handleStartSkillSurvey}
+          onOpenSkillDetail={handleOpenSkillDetail}
           onOpenPlanetMap={handleOpenPlanetMap}
         />
       )}

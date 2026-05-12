@@ -11,10 +11,16 @@
 
 import { NE_CORE } from './core'
 import { SAGE } from './sage'
+import { PIONEER } from './pioneer'
+import { CATALYST } from './catalyst'
+import { VISIONARY } from './visionary'
 
 export const NE_CONTENT = {
   ...NE_CORE,
-  ...SAGE
+  ...SAGE,
+  ...PIONEER,
+  ...CATALYST,
+  ...VISIONARY
 }
 
 export function getNeContent(skillId) {

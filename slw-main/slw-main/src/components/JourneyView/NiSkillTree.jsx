@@ -37,7 +37,7 @@ function statusFor(skillState) {
   return { kind: 'light', avg: skillState.result }
 }
 
-export default function NiSkillTree({ accent, skills, onClose, onStartSkill, onOpenPlanetMap }) {
+export default function NiSkillTree({ accent, skills, onClose, onStartSkill, onOpenSkillDetail, onOpenPlanetMap }) {
   const progress = getNiSkillProgress(skills ?? {})
 
   // По умолчанию все ветки свёрнуты — 43 навыка сразу пугают.
@@ -148,6 +148,7 @@ export default function NiSkillTree({ accent, skills, onClose, onStartSkill, onO
                         st.kind === 'light'  ? styles.treeSkillLight :
                         st.kind === 'draft'  ? styles.treeSkillDraft :
                         ''
+                      const hasPasses = st.kind === 'light' || st.kind === 'medium' || st.kind === 'full'
                       return (
                         <li key={skill.id} className={styles.treeSkillRow}>
                           <button
@@ -170,6 +171,26 @@ export default function NiSkillTree({ accent, skills, onClose, onStartSkill, onO
                               {st.kind === 'draft'  && `${st.mode === 'full' ? 'полный' : 'короткий'} · продолжить`}
                             </span>
                           </button>
+                          {hasPasses && onOpenSkillDetail && (
+                            <button
+                              type="button"
+                              className={styles.treeSkillInfoBtn}
+                              onClick={() => onOpenSkillDetail(skill.id)}
+                              aria-label={`Детальный разбор: ${skill.name}`}
+                              title="Что развиваешь и как"
+                            >
+                              ⓘ
+                            </button>
+                          )}
+                          {hasPasses && onOpenSkillDetail && (
+                            <button
+                              type="button"
+                              className={styles.treeSkillDevBtn}
+                              onClick={() => onOpenSkillDetail(skill.id)}
+                            >
+                              Узнать, как развить →
+                            </button>
+                          )}
                         </li>
                       )
                     })}
