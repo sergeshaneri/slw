@@ -1,5 +1,7 @@
 import { FE_CORE_BLOCKS, FE_NON_CORE_BLOCKS } from '../../data/skills/Fe/skill-blocks'
 import { SI_CORE_BLOCKS, SI_NON_CORE_BLOCKS } from '../../data/skills/Si/skill-blocks'
+import { NE_CORE_BLOCKS, NE_NON_CORE_BLOCKS } from '../../data/skills/Ne/skill-blocks'
+import { FI_CORE_BLOCKS, FI_NON_CORE_BLOCKS } from '../../data/skills/Fi/skill-blocks'
 import { HALL_CONTENT } from '../../data/hallContent'
 
 // Утилита для блоков
@@ -290,6 +292,33 @@ export const BLOCKS = [
     field: 'siSkillBlocksCore',
     has: d => d.siSkillBlocksCore?.length > 0
   },
+  {
+    id: 'teSkillBlocksCore',
+    level: 0,
+    title: 'Защиты универсальных навыков',
+    lead: 'Психодинамика сопротивления развитию семи универсальных навыков ЧЛ — 4 сквозных (различение работы и суеты, удержание цели, видение затрат и отдачи, технологичность мышления) и 3 распределённых (прагматическое мышление, тайм-менеджмент, доведение до конца). Вытеснение, защиты, ограничивающие убеждения, родовые программы. Открыто с самого начала.',
+    kind: 'skillBlocks',
+    field: 'teSkillBlocksCore',
+    has: d => d.teSkillBlocksCore?.length > 0
+  },
+  {
+    id: 'neSkillBlocksCore',
+    level: 0,
+    title: 'Защиты общих базовых навыков',
+    lead: 'Психодинамика сопротивления развитию трёх общих базовых навыков ЧИ — Внимание к сути, Метапознание, Mindfulness (зазор между стимулом и реакцией). Вытеснение, защиты, ограничивающие убеждения, родовые программы. Открыто с самого начала.',
+    kind: 'skillBlocks',
+    field: 'neSkillBlocksCore',
+    has: d => d.neSkillBlocksCore?.length > 0
+  },
+  {
+    id: 'fiSkillBlocksCore',
+    level: 0,
+    title: 'Защиты корневых навыков',
+    lead: 'Психодинамика сопротивления развитию двух корневых навыков БЭ — Установление Доверия и Внутренняя Сверка с Ценностями. Вытеснение, защиты, ограничивающие убеждения, родовые программы. Открыто с самого начала.',
+    kind: 'skillBlocks',
+    field: 'fiSkillBlocksCore',
+    has: d => d.fiSkillBlocksCore?.length > 0
+  },
 
   // ── Уровень 1 ─────────────────────────────────────────────
   {
@@ -546,5 +575,32 @@ export const BLOCKS = [
     kind: 'skillBlocks',
     field: 'siSkillBlocks',
     has: d => d.siSkillBlocks?.length > 0
+  },
+  {
+    id: 'teSkillBlocks',
+    level: 3,
+    title: 'Защиты и родовые программы по навыкам',
+    lead: 'Глубинные блоки сопротивления для каждого из 55 архетипных навыков ЧЛ — у Виртуоза (12), Технолога (14), Организатора (18, включая 4 финансовых навыка с расширенной денежной психологией) и Инженера (11). Вытеснение, защиты, ограничивающие убеждения, родовые программы. Открывается на третьем уровне путешествия.',
+    kind: 'skillBlocks',
+    field: 'teSkillBlocks',
+    has: d => d.teSkillBlocks?.length > 0
+  },
+  {
+    id: 'neSkillBlocks',
+    level: 3,
+    title: 'Защиты и родовые программы по навыкам',
+    lead: 'Глубинные блоки сопротивления для каждого из 33 архетипных навыков ЧИ — у Мудреца (7), Первооткрывателя (7), Катализатора (10) и Визионера (9). Вытеснение, защиты, ограничивающие убеждения, родовые программы. Открывается на третьем уровне путешествия.',
+    kind: 'skillBlocks',
+    field: 'neSkillBlocks',
+    has: d => d.neSkillBlocks?.length > 0
+  },
+  {
+    id: 'fiSkillBlocks',
+    level: 3,
+    title: 'Защиты и родовые программы по навыкам',
+    lead: 'Глубинные блоки сопротивления для каждого из 56 архетипных навыков БЭ — у Дипломата (17), Духовника (14), Хранителя Рода (9) и Друга (16). Вытеснение, защиты, ограничивающие убеждения, родовые программы. Опираются на теорию привязанности (Боулби, Эйнсуорт), системную семейную терапию (Боуэн), schema therapy, трансгенерационную передачу (Шутценбергер, Хеллингер). Открывается на третьем уровне путешествия.',
+    kind: 'skillBlocks',
+    field: 'fiSkillBlocks',
+    has: d => d.fiSkillBlocks?.length > 0
   }
 ]

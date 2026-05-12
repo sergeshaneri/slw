@@ -1,6 +1,9 @@
 import { FE_CORE_BLOCKS as FE_CORE_BLOCKS_DATA, FE_NON_CORE_BLOCKS as FE_NON_CORE_BLOCKS_DATA } from './skills/Fe/skill-blocks'
+import { NE_CORE_BLOCKS as NE_CORE_BLOCKS_DATA, NE_NON_CORE_BLOCKS as NE_NON_CORE_BLOCKS_DATA } from './skills/Ne/skill-blocks'
 import { NI_CORE_BLOCKS_DATA, NI_NON_CORE_BLOCKS_DATA } from './skills/Ni/skill-blocks'
 import { SI_CORE_BLOCKS as SI_CORE_BLOCKS_DATA, SI_NON_CORE_BLOCKS as SI_NON_CORE_BLOCKS_DATA } from './skills/Si/skill-blocks'
+import { TE_CORE_BLOCKS as TE_CORE_BLOCKS_DATA, TE_NON_CORE_BLOCKS as TE_NON_CORE_BLOCKS_DATA, TE_MONEY_PSYCHOLOGY_BLOCK as TE_MONEY_PSYCHOLOGY_DATA } from './skills/Te/skill-blocks'
+import { FI_CORE_BLOCKS as FI_CORE_BLOCKS_DATA, FI_NON_CORE_BLOCKS as FI_NON_CORE_BLOCKS_DATA } from './skills/Fi/skill-blocks'
 
 // Палитра аспектов — премиум tier для тёмного UI.
 //
@@ -275,7 +278,16 @@ export const ASPECT_DATA = {
         'Способность к быстрому восстановлению — умение эффективно отдыхать',
         'Спокойное, ровное дыхание даже при интенсивной работе'
       ]
-    }
+    },
+    // Психодинамика сопротивления развитию навыков ЧЛ.
+    // Источник: Te/блоки навыков ЧЛ.md → data/skills/Te/skill-blocks.js.
+    // Универсальные (7) — открыты всегда (level 0); архетипные (55) — на L3.
+    // teMoneyPsychology — особый вводный блок «Психология денег» перед
+    // четырьмя финансовыми навыками Организатора (financial-literacy,
+    // budget-management, money-tracking, monetization).
+    teSkillBlocksCore: TE_CORE_BLOCKS_DATA,
+    teSkillBlocks: TE_NON_CORE_BLOCKS_DATA,
+    teMoneyPsychology: TE_MONEY_PSYCHOLOGY_DATA
   },
   Ti: {
     name: 'Белая Логика',
@@ -3821,7 +3833,9 @@ ASPECT_DATA.Ne = {
     { name: 'Теоретический физик', desc: 'Видит математические структуры за физическими явлениями; через мысленные эксперименты строит теории, опережающие экспериментальные данные на десятилетия.' },
     { name: 'Археолог', desc: 'По нескольким фрагментам костей или керамики восстанавливает целые культуры, образ жизни, верования. Реконструкция программы через минимум следов.' },
     { name: 'Учёный — генератор парадигм', desc: 'Тот, кто меняет рамку, в которой работает целая наука: Коперник, Эйнштейн, Кун. Высшая форма ЧИ-Визионерства — переписывание программы поля.' }
-  ]
+  ],
+  neSkillBlocksCore: NE_CORE_BLOCKS_DATA,
+  neSkillBlocks: NE_NON_CORE_BLOCKS_DATA
 }
 
 ASPECT_DATA.Ni = {
