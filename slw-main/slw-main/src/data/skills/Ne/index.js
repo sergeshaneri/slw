@@ -10,9 +10,11 @@
 // (read-program, variants, socratic, ...).
 
 import { NE_CORE } from './core'
+import { SAGE } from './sage'
 
 export const NE_CONTENT = {
-  ...NE_CORE
+  ...NE_CORE,
+  ...SAGE
 }
 
 export function getNeContent(skillId) {
