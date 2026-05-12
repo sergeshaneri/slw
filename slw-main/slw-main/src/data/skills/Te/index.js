@@ -14,22 +14,26 @@
 //       cost-benefit-vision, technological-thinking. archetype: 'common'.
 //     - Подгруппа B (распределённые): pragmatic-thinking (virtuoso),
 //       time-management (organizer), completion (virtuoso). role: 'core'.
-//   VIRTUOSO — 12 архетипных Виртуоза (TODO)
-//   TECHNOLOGIST — 14 архетипных Технолога (TODO)
-//   ORGANIZER — 18 архетипных Организатора (TODO)
-//   ENGINEER — 11 архетипных Инженера (TODO)
+//   VIRTUOSO — 12 архетипных Виртуоза (5 ядерных ★ + 7 расширяющих)
+//   TECHNOLOGIST — 14 архетипных Технолога (5 ядерных ★ + 9 расширяющих)
+//   ORGANIZER — 18 архетипных Организатора (5 ядерных ★ + 13 расширяющих,
+//     включая 4 финансовых с расширенной денежной психологией)
+//   ENGINEER — 11 архетипных Инженера (5 ядерных ★ + 6 расширяющих)
+//
+// Итого 62 навыка: 7 + 12 + 14 + 18 + 11.
 
 import { CORE } from './core'
 import { VIRTUOSO } from './virtuoso'
 import { TECHNOLOGIST } from './technologist'
 import { ORGANIZER } from './organizer'
+import { ENGINEER } from './engineer'
 
 export const TE_CONTENT = {
   ...CORE,
   ...VIRTUOSO,
   ...TECHNOLOGIST,
-  ...ORGANIZER
-  // ...ENGINEER
+  ...ORGANIZER,
+  ...ENGINEER
 }
 
 export function getTeContent(skillId) {
