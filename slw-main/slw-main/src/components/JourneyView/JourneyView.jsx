@@ -241,7 +241,12 @@ function SkillTreeIntroHint({ user }) {
 //     source ('survey'|'detail'|'traits') и level (1|2|3).
 //     Migration data-preserving: старые записи получают source='survey'.
 //     Чат НЕ сбрасывается (только структурное расширение).
-export const CONTENT_VERSION = 21
+// v22 — БЭ-контент: расширение ASPECT_DATA.Fi 12 полями (skills, archetypePath,
+//     historicalFigures, art, professions, myths, quotes, culturalDifferences,
+//     childRaising, childhoodQuestions, fiSkillBlocksCore, fiSkillBlocks).
+//     Источник — 11 .md-файлов в Fi/. data/skills/Fi/skill-blocks.js с 58
+//     навыками × 4 блока психодинамики. Чат НЕ сбрасывается.
+export const CONTENT_VERSION = 22
 
 // Миграция id навыков после ревизии дерева (v9). Старый id → новый.
 // Если у юзера уже есть запись по новому id, старая отбрасывается
