@@ -10,19 +10,17 @@
 // собственные — см. ni-tree.js).
 
 import { NI_CORE } from './core'
-// TODO: добавить файлы mythmaker.js / seer.js / debunker.js / shaman.js
-// и раскомментировать импорты ниже. Пока в Ni залит только core.
-// import { MYTHMAKER } from './mythmaker'
-// import { SEER } from './seer'
-// import { DEBUNKER } from './debunker'
-// import { SHAMAN } from './shaman'
+import { MYTHMAKER } from './mythmaker'
+import { SEER } from './seer'
+import { DEBUNKER } from './debunker'
+import { SHAMAN } from './shaman'
 
 export const NI_CONTENT = {
   ...NI_CORE,
-  // ...MYTHMAKER,
-  // ...SEER,
-  // ...DEBUNKER,
-  // ...SHAMAN
+  ...MYTHMAKER,
+  ...SEER,
+  ...DEBUNKER,
+  ...SHAMAN
 }
 
 export function getNiContent(skillId) {

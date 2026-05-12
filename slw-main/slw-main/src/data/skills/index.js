@@ -5,15 +5,19 @@
 //   ./Fe/ — ЧЭ (3 ядерных + 34 архетипных по 4 архетипам)
 //   ./Ne/ — ЧИ (3 общих базовых + 33 архетипных по 4 архетипам = 36)
 //   ./Ni/ — БИ (3 общих базовых + 40 архетипных по 4 архетипам = 43)
+//   ./Te/ — ЧЛ (7 универсальных + 55 архетипных по 4 архетипам = 62)
+//   ./Ti/ — БЛ (3 универсальных + 38 архетипных по 4 архетипам = 41)
 //   ./skillsContent.js — устаревший пилотный контент БС (пока `scan` —
 //        для совместимости со старым state.skills, до полной выписки в Si/)
 //
 // ID навыков не пересекаются: Si без префикса (`signals`, `body-listening`...),
 // Fe с префиксом `fe-` (`fe-awareness`, `fe-pause`...), Ne без префикса
 // (`attention-essence`, `read-program`...), Ni без префикса (`attunement`,
-// `meaning-making`...). Поэтому единый lookup безопасен.
+// `meaning-making`...), Te без префикса (`work-vs-busyness`,
+// `pragmatic-thinking`...), Ti без префикса (`structural-thinking`,
+// `critical-analysis`...). Поэтому единый lookup безопасен.
 //
-// Когда добавятся контенты для Te/Ti/Se/Fi — расширим этот файл
+// Когда добавятся контенты для Se/Fi — расширим этот файл
 // новыми импортами в том же паттерне.
 
 import {
@@ -24,6 +28,8 @@ import { SI_CONTENT } from './Si'
 import { FE_CONTENT } from './Fe'
 import { NE_CONTENT } from './Ne'
 import { NI_CONTENT } from './Ni'
+import { TE_CONTENT } from './Te'
+import { TI_CONTENT } from './Ti'
 import {
   ARCHETYPES as SI_ARCHETYPES,
   SKILL_TO_ARCHETYPE as SI_SKILL_TO_ARCHETYPE,
@@ -52,16 +58,30 @@ import {
   COMMON_BASE_SKILLS as NI_COMMON_BASE_SKILLS,
   COMMON_BASE_SKILL_IDS as NI_COMMON_BASE_IDS
 } from '../journey/skills/ni-tree'
+import {
+  ARCHETYPES as TE_ARCHETYPES,
+  SKILL_TO_ARCHETYPE as TE_SKILL_TO_ARCHETYPE,
+  SKILL_TREE as TE_SKILL_TREE,
+  COMMON_BASE_SKILLS as TE_COMMON_BASE_SKILLS,
+  COMMON_BASE_SKILL_IDS as TE_COMMON_BASE_IDS
+} from '../journey/skills/te-tree'
+import {
+  ARCHETYPES as TI_ARCHETYPES,
+  SKILL_TO_ARCHETYPE as TI_SKILL_TO_ARCHETYPE,
+  SKILL_TREE as TI_SKILL_TREE,
+  COMMON_BASE_SKILLS as TI_COMMON_BASE_SKILLS,
+  COMMON_BASE_SKILL_IDS as TI_COMMON_BASE_IDS
+} from '../journey/skills/ti-tree'
 
 export function getSkillContent(skillId) {
-  return SI_CONTENT[skillId] ?? FE_CONTENT[skillId] ?? NE_CONTENT[skillId] ?? NI_CONTENT[skillId] ?? LEGACY_SI_CONTENT[skillId] ?? null
+  return SI_CONTENT[skillId] ?? FE_CONTENT[skillId] ?? NE_CONTENT[skillId] ?? NI_CONTENT[skillId] ?? TE_CONTENT[skillId] ?? TI_CONTENT[skillId] ?? LEGACY_SI_CONTENT[skillId] ?? null
 }
 
 export function hasSkillContent(skillId) {
-  return (skillId in SI_CONTENT) || (skillId in FE_CONTENT) || (skillId in NE_CONTENT) || (skillId in NI_CONTENT) || (skillId in LEGACY_SI_CONTENT)
+  return (skillId in SI_CONTENT) || (skillId in FE_CONTENT) || (skillId in NE_CONTENT) || (skillId in NI_CONTENT) || (skillId in TE_CONTENT) || (skillId in TI_CONTENT) || (skillId in LEGACY_SI_CONTENT)
 }
 
-// Вернуть имя навыка из любого источника: контент → Si tree → Fe tree → Ne tree → Ni tree → COMMON_BASE → fallback на id.
+// Вернуть имя навыка из любого источника: контент → Si tree → Fe tree → Ne tree → Ni tree → Te tree → Ti tree → COMMON_BASE → fallback на id.
 export function getSkillName(skillId) {
   const content = getSkillContent(skillId)
   if (content?.name) return content.name
@@ -90,6 +110,18 @@ export function getSkillName(skillId) {
     if (skill?.name) return skill.name
   }
 
+  const teKey = TE_SKILL_TO_ARCHETYPE[skillId]
+  if (teKey) {
+    const skill = (TE_SKILL_TREE[teKey] ?? []).find(s => s.id === skillId)
+    if (skill?.name) return skill.name
+  }
+
+  const tiKey = TI_SKILL_TO_ARCHETYPE[skillId]
+  if (tiKey) {
+    const skill = (TI_SKILL_TREE[tiKey] ?? []).find(s => s.id === skillId)
+    if (skill?.name) return skill.name
+  }
+
   if (SI_COMMON_BASE_IDS?.has(skillId)) {
     const skill = SI_COMMON_BASE_SKILLS.find(s => s.id === skillId)
     if (skill?.name) return skill.name
@@ -110,11 +142,21 @@ export function getSkillName(skillId) {
     if (skill?.name) return skill.name
   }
 
+  if (TE_COMMON_BASE_IDS?.has(skillId)) {
+    const skill = TE_COMMON_BASE_SKILLS.find(s => s.id === skillId)
+    if (skill?.name) return skill.name
+  }
+
+  if (TI_COMMON_BASE_IDS?.has(skillId)) {
+    const skill = TI_COMMON_BASE_SKILLS.find(s => s.id === skillId)
+    if (skill?.name) return skill.name
+  }
+
   return skillId
 }
 
-// Вернуть человекочитаемое имя архетипа навыка («Целитель», «Заводила», «Мифотворец», ...).
-// Для общих ядерных навыков Fe/Ne/Ni — null (отображать пустоту вместо «общий»).
+// Вернуть человекочитаемое имя архетипа навыка («Целитель», «Заводила», «Виртуоз», ...).
+// Для общих ядерных / сквозных навыков Fe/Ne/Ni/Te/Ti — null (отображать пустоту вместо «общий»).
 export function getArchetypeNameForSkill(skillId) {
   const siKey = SI_SKILL_TO_ARCHETYPE[skillId]
   if (siKey) return SI_ARCHETYPES[siKey]?.name ?? null
@@ -127,6 +169,12 @@ export function getArchetypeNameForSkill(skillId) {
 
   const niKey = NI_SKILL_TO_ARCHETYPE[skillId]
   if (niKey) return NI_ARCHETYPES[niKey]?.name ?? null
+
+  const teKey = TE_SKILL_TO_ARCHETYPE[skillId]
+  if (teKey) return TE_ARCHETYPES[teKey]?.name ?? null
+
+  const tiKey = TI_SKILL_TO_ARCHETYPE[skillId]
+  if (tiKey) return TI_ARCHETYPES[tiKey]?.name ?? null
 
   return null
 }

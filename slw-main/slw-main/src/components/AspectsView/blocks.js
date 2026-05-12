@@ -271,6 +271,15 @@ export const BLOCKS = [
     field: 'feSkillBlocksCore',
     has: d => d.feSkillBlocksCore?.length > 0
   },
+  {
+    id: 'niSkillBlocksCore',
+    level: 0,
+    title: 'Защиты общих базовых навыков',
+    lead: 'Психодинамика сопротивления развитию трёх общих базовых навыков БИ — Сонастройки, Слушания Подсознания и Внутренней Тишины. Вытеснение, защиты, ограничивающие убеждения, родовые программы. Открыто с самого начала.',
+    kind: 'skillBlocks',
+    field: 'niSkillBlocksCore',
+    has: d => d.niSkillBlocksCore?.length > 0
+  },
 
   // ── Уровень 1 ─────────────────────────────────────────────
   {
@@ -509,5 +518,14 @@ export const BLOCKS = [
     kind: 'skillBlocks',
     field: 'feSkillBlocks',
     has: d => d.feSkillBlocks?.length > 0
+  },
+  {
+    id: 'niSkillBlocks',
+    level: 3,
+    title: 'Защиты и родовые программы по навыкам',
+    lead: 'Глубинные блоки сопротивления для каждого из 40 архетипных навыков БИ — по 10 у Мифотворца, Провидца, Разоблачителя и Шамана. Открывается на третьем уровне путешествия.',
+    kind: 'skillBlocks',
+    field: 'niSkillBlocks',
+    has: d => d.niSkillBlocks?.length > 0
   }
 ]
