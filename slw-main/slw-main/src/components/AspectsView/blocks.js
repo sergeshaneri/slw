@@ -1,4 +1,5 @@
 import { FE_CORE_BLOCKS, FE_NON_CORE_BLOCKS } from '../../data/skills/Fe/skill-blocks'
+import { SI_CORE_BLOCKS, SI_NON_CORE_BLOCKS } from '../../data/skills/Si/skill-blocks'
 import { HALL_CONTENT } from '../../data/hallContent'
 
 // Утилита для блоков
@@ -280,6 +281,15 @@ export const BLOCKS = [
     field: 'niSkillBlocksCore',
     has: d => d.niSkillBlocksCore?.length > 0
   },
+  {
+    id: 'siSkillBlocksCore',
+    level: 0,
+    title: 'Защиты общих базовых навыков',
+    lead: 'Психодинамика сопротивления развитию четырёх общих базовых навыков БС — Слушать тело, Осознавать потребности, Своевременно заботиться, Внимание к мелким деталям. Вытеснение, защиты, ограничивающие убеждения, родовые программы. Открыто с самого начала.',
+    kind: 'skillBlocks',
+    field: 'siSkillBlocksCore',
+    has: d => d.siSkillBlocksCore?.length > 0
+  },
 
   // ── Уровень 1 ─────────────────────────────────────────────
   {
@@ -527,5 +537,14 @@ export const BLOCKS = [
     kind: 'skillBlocks',
     field: 'niSkillBlocks',
     has: d => d.niSkillBlocks?.length > 0
+  },
+  {
+    id: 'siSkillBlocks',
+    level: 3,
+    title: 'Защиты и родовые программы по навыкам',
+    lead: 'Глубинные блоки сопротивления для каждого из 47 архетипных навыков БС — у Целителя (17), Эстета (8), Мастера Наслаждения (13) и Хранителя Очага (9). Вытеснение, защиты, ограничивающие убеждения, родовые программы. Открывается на третьем уровне путешествия.',
+    kind: 'skillBlocks',
+    field: 'siSkillBlocks',
+    has: d => d.siSkillBlocks?.length > 0
   }
 ]
