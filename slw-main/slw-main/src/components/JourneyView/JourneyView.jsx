@@ -246,7 +246,13 @@ function SkillTreeIntroHint({ user }) {
 //     childRaising, childhoodQuestions, fiSkillBlocksCore, fiSkillBlocks).
 //     Источник — 11 .md-файлов в Fi/. data/skills/Fi/skill-blocks.js с 58
 //     навыками × 4 блока психодинамики. Чат НЕ сбрасывается.
-export const CONTENT_VERSION = 22
+// v23 — БЭ Фаза 2: data/skills/Fi/ — 5 файлов (core, diplomat, confessor,
+//     ancestor, friend) с детальным контентом всех 58 навыков по 3 уровням
+//     (gift/shadow/actions/practices/criteria/pitfalls + precaution/dilemma на L3).
+//     Подключение в data/skills/index.js (getSkillContent / getSkillName /
+//     getArchetypeNameForSkill). Расширение HALL_CONTENT.Fi: 15 цитат, 18
+//     личностей, 36 произведений, 4 архетипа. Чат НЕ сбрасывается.
+export const CONTENT_VERSION = 23
 
 // Миграция id навыков после ревизии дерева (v9). Старый id → новый.
 // Если у юзера уже есть запись по новому id, старая отбрасывается
