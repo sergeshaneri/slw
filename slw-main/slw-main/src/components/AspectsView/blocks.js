@@ -359,6 +359,15 @@ export const BLOCKS = [
     field: 'fiSkillBlocksCore',
     has: d => d.fiSkillBlocksCore?.length > 0
   },
+  {
+    id: 'tiSkillBlocksCore',
+    level: 0,
+    title: 'Защиты универсальных базовых навыков',
+    lead: 'Психодинамика сопротивления развитию трёх универсальных базовых навыков БЛ — Структурное мышление, Различение модальностей высказывания, Дисциплина Ума. Вытеснение, защиты, ограничивающие убеждения, родовые программы. Открыто с самого начала.',
+    kind: 'skillBlocks',
+    field: 'tiSkillBlocksCore',
+    has: d => d.tiSkillBlocksCore?.length > 0
+  },
 
   // ── Уровень 1 ─────────────────────────────────────────────
   {
@@ -509,6 +518,15 @@ export const BLOCKS = [
     field: 'professions',
     has: d => d.professions?.length > 0
   },
+{
+    id: 'characterTraits',
+    level: 2,
+    title: 'Психологический портрет',
+    lead: 'Двенадцать ключевых черт зрелого носителя аспекта — с дарами и теневыми двойниками.',
+    kind: 'titledList',
+    field: 'characterTraits',
+    has: d => d.characterTraits?.length > 0
+  },
   {
     id: 'myths',
     level: 2,
@@ -535,6 +553,15 @@ export const BLOCKS = [
     kind: 'hallStub',
     hallSection: 'quotes',
     has: (d, aspect) => (HALL_CONTENT?.[aspect]?.quotes?.length ?? 0) > 0
+  },
+  {
+    id: 'facts',
+    level: 2,
+    title: 'Интересные факты и исследования',
+    lead: 'Факты из нейробиологии, психологии, культуры и истории, расширяющие понимание аспекта.',
+    kind: 'titledList',
+    field: 'facts',
+    has: d => d.facts?.length > 0
   },
 
   // ── Уровень 3 ─────────────────────────────────────────────
@@ -660,5 +687,14 @@ export const BLOCKS = [
     kind: 'skillBlocks',
     field: 'fiSkillBlocks',
     has: d => d.fiSkillBlocks?.length > 0
+  },
+  {
+    id: 'tiSkillBlocks',
+    level: 3,
+    title: 'Защиты и родовые программы по навыкам',
+    lead: 'Глубинные блоки сопротивления для каждого из 38 архетипных навыков БЛ — у Аналитика (8), Архитектора (7), Хранителя Порядка (11) и Энциклопедиста (12). Вытеснение, защиты, ограничивающие убеждения, родовые программы. Открывается на третьем уровне путешествия.',
+    kind: 'skillBlocks',
+    field: 'tiSkillBlocks',
+    has: d => d.tiSkillBlocks?.length > 0
   }
 ]

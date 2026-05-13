@@ -252,7 +252,13 @@ function SkillTreeIntroHint({ user }) {
 //     Подключение в data/skills/index.js (getSkillContent / getSkillName /
 //     getArchetypeNameForSkill). Расширение HALL_CONTENT.Fi: 15 цитат, 18
 //     личностей, 36 произведений, 4 архетипа. Чат НЕ сбрасывается.
-export const CONTENT_VERSION = 23
+// v24 — БЭ Фаза 3: допереносы контента в aspects-fi-extension.js до полного
+//     покрытия исходных .md. Расширения: professions 17→107, art 18→102,
+//     childRaising 20→100, quotes 14→80, myths 20→50, culturalDifferences
+//     17→50, childhoodQuestions 20→50. Новое поле facts (90) + новый блок
+//     'facts' в blocks.js (L2). Источник — 8 .md-файлов в Fi/. Чат НЕ
+//     сбрасывается (только наполнение блоков теории аспекта).
+export const CONTENT_VERSION = 24
 
 // Миграция id навыков после ревизии дерева (v9). Старый id → новый.
 // Если у юзера уже есть запись по новому id, старая отбрасывается
