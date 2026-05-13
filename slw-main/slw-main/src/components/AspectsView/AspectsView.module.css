@@ -1244,6 +1244,49 @@
   margin: 0;
 }
 
+/* Опциональный блок «Ключевые навыки» для записей titledList (используется в Профессиях). */
+.practiceKeySkills {
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border-left: 2px solid currentColor;
+  border-radius: 0 8px 8px 0;
+  opacity: 0.92;
+}
+
+.practiceKeySkillsLabel {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.practiceKeySkillsList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.practiceKeySkillsItem {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+
+.practiceKeySkillsName {
+  font-weight: 500;
+  font-style: italic;
+  color: var(--text);
+}
+
+.practiceKeySkillsNote {
+  color: var(--text-dim);
+}
+
 /* ── путь архетипов ───────────────────────────────────── */
 
 .pathList {

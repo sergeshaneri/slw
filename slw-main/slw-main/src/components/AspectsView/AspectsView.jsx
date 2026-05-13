@@ -727,7 +727,7 @@ function BlockBody({ block, data, color, aspect, onEnterHall }) {
     case 'titledList': {
       const items = data[field] || []
       return items.map((p, i) => (
-        <PracticeItem key={i} name={p.name} desc={p.desc} color={color} index={i + 1} />
+        <PracticeItem key={i} name={p.name} desc={p.desc} color={color} index={i + 1} keySkills={p.keySkills} />
       ))
     }
 
@@ -1026,7 +1026,7 @@ function renderBoldRich(text) {
   })
 }
 
-function PracticeItem({ name, desc, color, index }) {
+function PracticeItem({ name, desc, color, index, keySkills }) {
   return (
     <div className={styles.practiceItem}>
       <h3 className={styles.practiceName} style={{ color }}>
@@ -1034,6 +1034,19 @@ function PracticeItem({ name, desc, color, index }) {
         {name}
       </h3>
       <p className={styles.practiceDesc}>{desc}</p>
+      {Array.isArray(keySkills) && keySkills.length > 0 && (
+        <div className={styles.practiceKeySkills}>
+          <div className={styles.practiceKeySkillsLabel} style={{ color }}>Ключевые навыки</div>
+          <ul className={styles.practiceKeySkillsList}>
+            {keySkills.map((ks, i) => (
+              <li key={i} className={styles.practiceKeySkillsItem}>
+                <span className={styles.practiceKeySkillsName}>{ks.skill}</span>
+                {ks.note && <span className={styles.practiceKeySkillsNote}> — {ks.note}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
