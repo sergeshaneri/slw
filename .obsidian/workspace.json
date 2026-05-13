@@ -50,259 +50,35 @@
             }
           },
           {
-            "id": "7fbc2c4a48ed36aa",
+            "id": "afcca602866b0d20",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "план инфы по аспекту.md",
+                "file": "тезаурус с определениями/Белая Сенсорика (БС) — новые слова черновик.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "план инфы по аспекту"
+              "title": "Белая Сенсорика (БС) — новые слова черновик"
             }
           },
           {
-            "id": "2574722170d9c0f7",
+            "id": "020fe953ec01cea6",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "черновое.md",
+                "file": "тезаурус с определениями/ЧС — дополнения (черновик).md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "черновое"
-            }
-          },
-          {
-            "id": "1476d9ec7b1f9956",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "черновое.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "черновое"
-            }
-          },
-          {
-            "id": "b93aa93cef9d791c",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Si/список навыков БС.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "список навыков БС"
-            }
-          },
-          {
-            "id": "51c7c96ad62b3f54",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Si/цитаты бс.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "цитаты бс"
-            }
-          },
-          {
-            "id": "c4d66198abddae6e",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Si/Мифы и Боги БС.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Мифы и Боги БС"
-            }
-          },
-          {
-            "id": "892088296367f868",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Si/Культурные отличия БС.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Культурные отличия БС"
-            }
-          },
-          {
-            "id": "e10070094dcd9751",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Si/интересные факты по БС.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "интересные факты по БС"
-            }
-          },
-          {
-            "id": "727a4fbc8f268e44",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Si/исторические личности БС.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "исторические личности БС"
-            }
-          },
-          {
-            "id": "54f958e9710b85b0",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Si/Искусство БС.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Искусство БС"
-            }
-          },
-          {
-            "id": "f548e0706480d21a",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Si/разное неопределенное.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "разное неопределенное"
-            }
-          },
-          {
-            "id": "15b719e11b513303",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Si/план навыков.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "план навыков"
-            }
-          },
-          {
-            "id": "31c11596d2cf7f21",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Si/план навыков.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "план навыков"
-            }
-          },
-          {
-            "id": "c6c630d13416f4d9",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Ti/черновое бл.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "черновое бл"
-            }
-          },
-          {
-            "id": "2484fc3098ba3185",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Si/план навыков.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "план навыков"
-            }
-          },
-          {
-            "id": "4b1f88e51531d3b9",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Ti/скб БЛ гем флэш.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "скб БЛ гем флэш"
-            }
-          },
-          {
-            "id": "92a19c41146fd2e4",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Ti/скб БЛ гем флэш.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "скб БЛ гем флэш"
-            }
-          },
-          {
-            "id": "110580d4a17e6feb",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Si/вопросы для оценки навыков БС.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "вопросы для оценки навыков БС"
+              "title": "ЧС — дополнения (черновик)"
             }
           }
         ],
-        "currentTab": 19
+        "currentTab": 3
       }
     ],
     "direction": "vertical"
@@ -334,7 +110,7 @@
             "state": {
               "type": "search",
               "state": {
-                "query": "",
+                "query": "черновик",
                 "matchingCase": false,
                 "explainSearch": false,
                 "collapseAll": false,
@@ -437,13 +213,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Ti/скб БЛ гем флэш.md",
+                "file": "тезаурус с определениями/Белая Сенсорика (БС) — новые слова черновик.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of скб БЛ гем флэш"
+              "title": "Outline of Белая Сенсорика (БС) — новые слова черновик"
             }
           }
         ],
@@ -455,6 +231,7 @@
   },
   "left-ribbon": {
     "hiddenItems": {
+      "vault-2-book:Obsidian 2 Book: Generate a book from a specified folder": false,
       "switcher:Open quick switcher": false,
       "graph:Open graph view": false,
       "canvas:Create new canvas": false,
@@ -464,43 +241,43 @@
       "bases:Create new base": false
     }
   },
-  "active": "92a19c41146fd2e4",
+  "active": "afcca602866b0d20",
   "lastOpenFiles": [
-    "Ti/черновое бл.md",
-    "Ti/скб БЛ гем флэш.md",
-    "Ti/план от gemini.md",
-    "Si/вопросы для оценки навыков БС.md",
-    "Si/псих черты БС.md",
-    "Si/список навыков БС.md",
-    "ARCHITECTURE.md",
-    "Si/план навыков.md",
-    "Ti/скб бл гем про.md",
-    "Ti",
-    "slw-main/slw-main/src/components/AspectsView/blocks.js",
-    "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_3/theory.md",
-    "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_3/practices.md",
-    "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_3/mastery_criteria.md",
-    "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_3/actions.md",
-    "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_2/theory.md",
-    "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_2/practices.md",
-    "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_2/mastery_criteria.md",
-    "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_2/actions.md",
-    "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_1/theory.md",
-    "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_1/practices.md",
-    "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_1/mastery_criteria.md",
-    "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_1/actions.md",
-    "Si/Si_skills/_archive/d4_skill_04_mind_body_spirit_WRONG/level_3/theory.md",
-    "Si/Si_skills/_archive/d4_skill_04_mind_body_spirit_WRONG/level_3/practices.md",
-    "Si/Si_skills/_archive/d4_skill_04_mind_body_spirit_WRONG/level_3/mastery_criteria.md",
-    "Si/Si_skills/_archive/d4_skill_04_mind_body_spirit_WRONG/level_3/actions.md",
-    "Si/Si_skills/_archive/d4_skill_04_mind_body_spirit_WRONG/level_2/theory.md",
-    "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_3",
-    "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_2",
-    "Si/Si_skills/_archive/d4_skill_05_somatic_presence_WRONG/level_1",
-    "Si/Si_skills/_archive/d4_skill_04_mind_body_spirit_WRONG/level_3",
-    "Si/Si_skills/_archive/d4_skill_04_mind_body_spirit_WRONG/level_2",
-    "Si/Si_skills/_archive/d4_skill_04_mind_body_spirit_WRONG/level_1",
-    "Si/Si_skills/_archive/d4_skill_03_authentic_movement_WRONG/level_3",
-    "Si/Si_skills/_archive/d4_skill_03_authentic_movement_WRONG/level_2"
+    "тезаурус с определениями/ЧС — дополнения (черновик).md",
+    "тезаурус с определениями/Белая Сенсорика (БС) — новые слова черновик.md",
+    "тезаурус с определениями/Черная Сенсорика (ЧС).md",
+    "тезаурус с определениями/Белая Интуиция (БИ) — черновик новых слов.md",
+    "тезаурус с определениями/Белая Сенсорика (БС).md",
+    "тезаурус с определениями/Белая Логика (БЛ) - новые слова (черновик).md",
+    "тезаурус с определениями/Белая Логика (БЛ) - упорядоченная.md",
+    "тезаурус с определениями/Белая Логика (БЛ).md",
+    "тезаурус с определениями/Белая Интуиция (БИ).backup.md",
+    "тезаурус с определениями/Белая Интуиция (БИ).md",
+    "тезаурус с определениями/Черная Этика (ЧЭ) — черновик новых слов.md",
+    "тезаурус с определениями/ЧИ — черновик новых слов.md",
+    "тезаурус с определениями/Белая Этика (БЭ) — черновик новых слов.md",
+    "Ti/Цитаты БЛ.md",
+    "Ti/Список навыков БЛ.md",
+    "Ti/Психологический портрет БЛ — очерки.md",
+    "Ti/Профессии БЛ.md",
+    "Ti/Мифы и Боги БЛ.md",
+    "Ti/Культурные отличия БЛ.md",
+    "Ti/Как привить ребёнку БЛ.md",
+    "Ti/Исторические личности БЛ.md",
+    "Ti/Искусство БЛ.md",
+    "Ti/Интересные факты по БЛ.md",
+    "Ti/Вопросы про детство БЛ.md",
+    "Ti/Блоки навыков БЛ.md",
+    "Te/цитаты ЧЛ.md",
+    "slw-main/slw-main/src/data/skills/Si/keeper.js",
+    "slw-main/slw-main/src/data/skills/Si/index.js",
+    "slw-main/slw-main/src/data/skills/Si/hedonist.js",
+    "slw-main/slw-main/src/data/skills/Si/healer.js",
+    "slw-main/slw-main/src/data/skills/Si/core.js",
+    "slw-main/slw-main/src/data/skills/Si/aesthete.js",
+    "slw-main/slw-main/src/data/skills/Si",
+    "Si/_archive_handoff_and_levels/level_3/theory",
+    "Si/_archive_handoff_and_levels/level_3/questions",
+    "Si/_archive_handoff_and_levels/level_3/exercises_now"
   ]
 }
