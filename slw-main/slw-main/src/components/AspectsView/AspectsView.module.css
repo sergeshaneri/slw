@@ -1022,6 +1022,31 @@
   border-color: color-mix(in srgb, var(--accent) 65%, var(--line));
 }
 
+/* Вторичная кнопка «🎲 Показать другие» — рандомизирует тизер.
+   Визуально тише hallStubCta: прозрачный фон, тонкая граница. */
+.hallStubShuffle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  margin-top: 4px;
+  background: transparent;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-radius: 999px;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.hallStubShuffle:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--line));
+  color: var(--text);
+}
+
 /* ── блоки сопротивления навыков (skillBlocks) ──────────────────────────
    Карточка-навык с 4 блоками: вытеснение / защита / убеждения / родовые. */
 

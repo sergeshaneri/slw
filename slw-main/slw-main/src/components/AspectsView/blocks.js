@@ -134,6 +134,33 @@ export function getBlockItems(block, data) {
         { id: `${blockId}-${i}-defense`, label: `${sk.name} — защита`, text: sk.defense }
       ])
     }
+    case 'moneyPsychology': {
+      const mp = data[block.field]
+      if (!mp) return []
+      const out = []
+      if (mp.intro) out.push({ id: `${blockId}-intro`, label: 'Вводный текст', text: mp.intro })
+      mp.sections?.forEach((s, i) => out.push({
+        id: `${blockId}-section-${i}`,
+        label: s.title,
+        text: `${s.title}\n\n${s.desc}`
+      }))
+      mp.scenarios?.forEach((s, i) => out.push({
+        id: `${blockId}-scenario-${i}`,
+        label: s.title,
+        text: `${s.title}\n\n${s.desc}`
+      }))
+      mp.signs?.forEach((sign, i) => out.push({
+        id: `${blockId}-sign-${i}`,
+        label: `Признак: ${truncate(sign, 50)}`,
+        text: sign
+      }))
+      mp.practices?.forEach((p, i) => out.push({
+        id: `${blockId}-practice-${i}`,
+        label: p.title,
+        text: `${p.title}\n\n${p.desc}`
+      }))
+      return out
+    }
     case 'text':
     case 'textItalic':
     default:
@@ -174,6 +201,7 @@ const TEASER_BY_KIND = {
   somatic: 1,
   assessment: 1,
   skillBlocks: 1,
+  moneyPsychology: 1,
 }
 
 // Возвращает «обрезанную» копию data — с первыми N элементами для блока,
@@ -234,6 +262,18 @@ export function teaseBlockData(block, data) {
     case 'skillBlocks':
       out[block.field] = (data[block.field] ?? []).slice(0, n)
       break
+    case 'moneyPsychology': {
+      // Тизер: только intro + первая секция, остальное скрыто под лок-оверлеем.
+      const mp = data[block.field]
+      out[block.field] = mp ? {
+        ...mp,
+        sections: (mp.sections ?? []).slice(0, n),
+        scenarios: [],
+        signs: [],
+        practices: []
+      } : mp
+      break
+    }
     case 'text':
       // Заголовок + лид остаются. Тело полностью прячется до разблокировки.
       out.essence = ''
@@ -399,6 +439,15 @@ export const BLOCKS = [
     kind: 'hallStub',
     hallSection: 'arts',
     has: (d, aspect) => (HALL_CONTENT?.[aspect]?.arts?.length ?? 0) > 0
+  },
+  {
+    id: 'hallInterestingFacts',
+    level: 2,
+    title: 'Интересные факты — в Холле',
+    lead: 'Научные, исторические и инженерные факты, расширяющие понимание аспекта. Показывается случайная тройка с возможностью обновить.',
+    kind: 'hallStub',
+    hallSection: 'interestingFacts',
+    has: (d, aspect) => (HALL_CONTENT?.[aspect]?.interestingFacts?.length ?? 0) > 0
   },
 
   // ── Уровень 2 ─────────────────────────────────────────────
@@ -584,6 +633,15 @@ export const BLOCKS = [
     kind: 'skillBlocks',
     field: 'teSkillBlocks',
     has: d => d.teSkillBlocks?.length > 0
+  },
+  {
+    id: 'teMoneyPsychology',
+    level: 3,
+    title: 'Психология денег',
+    lead: 'Общий пласт денежных блоков, проходящий через всю ЧЛ-практику Организатора. Деньги как символ собственной ценности и мера контакта с обществом; шесть глубинных сценариев; признаки блокировок; восемь практик проработки. Открывается на третьем уровне путешествия.',
+    kind: 'moneyPsychology',
+    field: 'teMoneyPsychology',
+    has: d => !!d.teMoneyPsychology?.sections?.length
   },
   {
     id: 'neSkillBlocks',

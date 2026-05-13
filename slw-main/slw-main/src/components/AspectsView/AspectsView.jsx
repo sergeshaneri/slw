@@ -611,55 +611,9 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
 function BlockBody({ block, data, color, aspect, onEnterHall }) {
   const { kind, field } = block
   switch (kind) {
-    case 'hallStub': {
-      const section = block.hallSection
-      const hall = HALL_CONTENT?.[aspect] ?? {}
-      const items = hall[section] ?? []
-      // Тизер: первые 3 элемента — короткими карточками.
-      const teaser = items.slice(0, 3)
-      const remaining = Math.max(0, items.length - teaser.length)
-      const sectionLabel = {
-        figures: 'личностей',
-        arts: 'произведений',
-        quotes: 'цитат',
-        interestingFacts: 'фактов'
-      }[section] ?? 'элементов'
-      return (
-        <div className={styles.hallStubBlock}>
-          <p className={styles.hallStubLead}>
-            Полная коллекция и обсуждение — в Холле. Здесь — короткий тизер.
-          </p>
-          <ul className={styles.hallStubList}>
-            {teaser.map((item, i) => {
-              const title = item.text ?? item.title ?? item.name ?? '—'
-              const sub = item.author ?? item.note ?? item.desc ?? ''
-              return (
-                <li key={i} className={styles.hallStubItem}>
-                  <span className={styles.hallStubItemTitle}>{title}</span>
-                  {sub && <span className={styles.hallStubItemSub}>{sub}</span>}
-                </li>
-              )
-            })}
-          </ul>
-          {remaining > 0 && (
-            <div className={styles.hallStubMore}>
-              + ещё {remaining} {sectionLabel} в Холле
-            </div>
-          )}
-          {onEnterHall && (
-            <button
-              type="button"
-              className={styles.hallStubCta}
-              onClick={() => onEnterHall(aspect, section)}
-              style={{ '--accent': color }}
-            >
-              <span>🏛 Открыть в Холле</span>
-              <span aria-hidden="true">→</span>
-            </button>
-          )}
-        </div>
-      )
-    }
+    case 'hallStub':
+      return <HallStubBlock block={block} color={color} aspect={aspect} onEnterHall={onEnterHall} />
+
 
     case 'text':
       return <Prose>{data.essence}</Prose>
@@ -852,6 +806,59 @@ function BlockBody({ block, data, color, aspect, onEnterHall }) {
       )
     }
 
+    case 'moneyPsychology': {
+      const mp = data[field]
+      if (!mp) return null
+      return (
+        <div className={styles.pathList}>
+          {mp.intro && <Prose>{mp.intro}</Prose>}
+          {mp.sections?.length > 0 && (
+            <>
+              <h3 className={styles.dilemmaTitle} style={{ color }}>Деньги как символ и язык обмена</h3>
+              {mp.sections.map((s, i) => (
+                <div key={`s-${i}`} className={styles.pathBlock} style={{ borderColor: `${color}33` }}>
+                  <h3 className={styles.pathName} style={{ color }}>{s.title}</h3>
+                  <div className={styles.pathText}>{s.desc}</div>
+                </div>
+              ))}
+            </>
+          )}
+          {mp.scenarios?.length > 0 && (
+            <>
+              <h3 className={styles.dilemmaTitle} style={{ color }}>Шесть глубинных сценариев денежных блоков</h3>
+              {mp.scenarios.map((s, i) => (
+                <div key={`sc-${i}`} className={styles.pathBlock} style={{ borderColor: `${color}33` }}>
+                  <h3 className={styles.pathName} style={{ color }}>{s.title}</h3>
+                  <div className={styles.pathText}>{s.desc}</div>
+                </div>
+              ))}
+            </>
+          )}
+          {mp.signs?.length > 0 && (
+            <>
+              <h3 className={styles.dilemmaTitle} style={{ color }}>Признаки денежных блокировок</h3>
+              <ul className={styles.bulletList}>
+                {mp.signs.map((sign, i) => (
+                  <li key={`sg-${i}`} className={styles.bulletItem}>
+                    <span className={styles.bulletMark} style={{ background: color, boxShadow: `0 0 8px ${color}99` }} />
+                    <span>{sign}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {mp.practices?.length > 0 && (
+            <>
+              <h3 className={styles.dilemmaTitle} style={{ color }}>Практики проработки</h3>
+              {mp.practices.map((p, i) => (
+                <PracticeItem key={`p-${i}`} name={p.title} desc={p.desc} color={color} index={i + 1} />
+              ))}
+            </>
+          )}
+        </div>
+      )
+    }
+
     default:
       return null
   }
@@ -872,6 +879,88 @@ function PolarBlock({ label, tone, items }) {
       <ul className={styles.polarList}>
         {items.map((it, i) => <li key={i} className={styles.polarItem}>{it}</li>)}
       </ul>
+    </div>
+  )
+}
+
+// Утилита: взять N случайных индексов из массива длины `total`.
+function pickRandomIndexes(total, n) {
+  if (total <= n) return Array.from({ length: total }, (_, i) => i)
+  const pool = Array.from({ length: total }, (_, i) => i)
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[pool[i], pool[j]] = [pool[j], pool[i]]
+  }
+  return pool.slice(0, n)
+}
+
+// Тизер-блок hallStub с рандомизацией. Показывает 3 случайных элемента
+// из секции холла (figures / arts / quotes / interestingFacts) с кнопкой
+// «🎲 Показать другие», которая перевыбирает случайную тройку.
+function HallStubBlock({ block, color, aspect, onEnterHall }) {
+  const section = block.hallSection
+  const hall = HALL_CONTENT?.[aspect] ?? {}
+  const items = hall[section] ?? []
+  const teaserSize = 3
+  const [seed, setSeed] = useState(0)
+  const indexes = useMemo(
+    () => pickRandomIndexes(items.length, teaserSize),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items.length, seed]
+  )
+  const teaser = indexes.map(i => items[i])
+  const remaining = Math.max(0, items.length - teaser.length)
+  const sectionLabel = {
+    figures: 'личностей',
+    arts: 'произведений',
+    quotes: 'цитат',
+    interestingFacts: 'фактов'
+  }[section] ?? 'элементов'
+  return (
+    <div className={styles.hallStubBlock}>
+      <p className={styles.hallStubLead}>
+        Полная коллекция и обсуждение — в Холле. Здесь — случайная тройка.
+      </p>
+      <ul className={styles.hallStubList}>
+        {teaser.map((item, i) => {
+          if (!item) return null
+          const title = item.text ?? item.title ?? item.name ?? '—'
+          const sub = item.author ?? item.note ?? item.desc ?? ''
+          return (
+            <li key={`${seed}-${i}`} className={styles.hallStubItem}>
+              <span className={styles.hallStubItemTitle}>{title}</span>
+              {sub && <span className={styles.hallStubItemSub}>{sub}</span>}
+            </li>
+          )
+        })}
+      </ul>
+      {items.length > teaserSize && (
+        <button
+          type="button"
+          className={styles.hallStubShuffle}
+          onClick={() => setSeed(s => s + 1)}
+          style={{ '--accent': color }}
+          aria-label="Показать другую случайную тройку"
+        >
+          <span>🎲 Показать другие</span>
+        </button>
+      )}
+      {remaining > 0 && (
+        <div className={styles.hallStubMore}>
+          + ещё {remaining} {sectionLabel} в Холле
+        </div>
+      )}
+      {onEnterHall && (
+        <button
+          type="button"
+          className={styles.hallStubCta}
+          onClick={() => onEnterHall(aspect, section)}
+          style={{ '--accent': color }}
+        >
+          <span>🏛 Открыть в Холле</span>
+          <span aria-hidden="true">→</span>
+        </button>
+      )}
     </div>
   )
 }

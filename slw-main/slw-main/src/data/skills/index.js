@@ -30,6 +30,7 @@ import { NE_CONTENT } from './Ne'
 import { NI_CONTENT } from './Ni'
 import { TE_CONTENT } from './Te'
 import { TI_CONTENT } from './Ti'
+import { FI_CONTENT } from './Fi'
 import {
   ARCHETYPES as SI_ARCHETYPES,
   SKILL_TO_ARCHETYPE as SI_SKILL_TO_ARCHETYPE,
@@ -72,13 +73,20 @@ import {
   COMMON_BASE_SKILLS as TI_COMMON_BASE_SKILLS,
   COMMON_BASE_SKILL_IDS as TI_COMMON_BASE_IDS
 } from '../journey/skills/ti-tree'
+import {
+  ARCHETYPES as FI_ARCHETYPES,
+  SKILL_TO_ARCHETYPE as FI_SKILL_TO_ARCHETYPE,
+  SKILL_TREE as FI_SKILL_TREE,
+  COMMON_BASE_SKILLS as FI_COMMON_BASE_SKILLS,
+  COMMON_BASE_SKILL_IDS as FI_COMMON_BASE_IDS
+} from '../journey/skills/fi-tree'
 
 export function getSkillContent(skillId) {
-  return SI_CONTENT[skillId] ?? FE_CONTENT[skillId] ?? NE_CONTENT[skillId] ?? NI_CONTENT[skillId] ?? TE_CONTENT[skillId] ?? TI_CONTENT[skillId] ?? LEGACY_SI_CONTENT[skillId] ?? null
+  return SI_CONTENT[skillId] ?? FE_CONTENT[skillId] ?? NE_CONTENT[skillId] ?? NI_CONTENT[skillId] ?? TE_CONTENT[skillId] ?? TI_CONTENT[skillId] ?? FI_CONTENT[skillId] ?? LEGACY_SI_CONTENT[skillId] ?? null
 }
 
 export function hasSkillContent(skillId) {
-  return (skillId in SI_CONTENT) || (skillId in FE_CONTENT) || (skillId in NE_CONTENT) || (skillId in NI_CONTENT) || (skillId in TE_CONTENT) || (skillId in TI_CONTENT) || (skillId in LEGACY_SI_CONTENT)
+  return (skillId in SI_CONTENT) || (skillId in FE_CONTENT) || (skillId in NE_CONTENT) || (skillId in NI_CONTENT) || (skillId in TE_CONTENT) || (skillId in TI_CONTENT) || (skillId in FI_CONTENT) || (skillId in LEGACY_SI_CONTENT)
 }
 
 // Вернуть имя навыка из любого источника: контент → Si tree → Fe tree → Ne tree → Ni tree → Te tree → Ti tree → COMMON_BASE → fallback на id.
@@ -122,6 +130,12 @@ export function getSkillName(skillId) {
     if (skill?.name) return skill.name
   }
 
+  const fiKey = FI_SKILL_TO_ARCHETYPE[skillId]
+  if (fiKey) {
+    const skill = (FI_SKILL_TREE[fiKey] ?? []).find(s => s.id === skillId)
+    if (skill?.name) return skill.name
+  }
+
   if (SI_COMMON_BASE_IDS?.has(skillId)) {
     const skill = SI_COMMON_BASE_SKILLS.find(s => s.id === skillId)
     if (skill?.name) return skill.name
@@ -152,6 +166,11 @@ export function getSkillName(skillId) {
     if (skill?.name) return skill.name
   }
 
+  if (FI_COMMON_BASE_IDS?.has(skillId)) {
+    const skill = FI_COMMON_BASE_SKILLS.find(s => s.id === skillId)
+    if (skill?.name) return skill.name
+  }
+
   return skillId
 }
 
@@ -175,6 +194,9 @@ export function getArchetypeNameForSkill(skillId) {
 
   const tiKey = TI_SKILL_TO_ARCHETYPE[skillId]
   if (tiKey) return TI_ARCHETYPES[tiKey]?.name ?? null
+
+  const fiKey = FI_SKILL_TO_ARCHETYPE[skillId]
+  if (fiKey) return FI_ARCHETYPES[fiKey]?.name ?? null
 
   return null
 }
