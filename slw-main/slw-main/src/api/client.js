@@ -644,4 +644,41 @@ export async function adminRollbackRestore({ user_id, telegram_id, email }) {
   })
 }
 
+export async function adminStats() {
+  return request('GET', '/api/admin/stats')
+}
+
+export async function adminBulkRestore({ threshold = 10, dry_run = true, bump_levels = true, limit = 100 } = {}) {
+  return request('POST', '/api/admin/bulk-restore', {
+    threshold, dry_run, bump_levels, limit,
+  })
+}
+
+export async function adminUserDiary(userId, { limit = 100, offset = 0 } = {}) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+  return request('GET', `/api/admin/user/${userId}/diary?${params}`)
+}
+
+export async function adminPatchUserState(userId, journey) {
+  return request('PATCH', `/api/admin/user/${userId}/state`, { journey })
+}
+
+export async function adminListInsights({ limit = 50, offset = 0, aspect = null, only_public = false } = {}) {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+    only_public: String(only_public),
+  })
+  if (aspect) params.set('aspect', aspect)
+  return request('GET', `/api/admin/insights?${params}`)
+}
+
+export async function adminDeleteInsight(insightId) {
+  return request('DELETE', `/api/admin/insight/${insightId}`)
+}
+
+export async function adminPatchInsight(insightId, patch) {
+  return request('PATCH', `/api/admin/insight/${insightId}`, patch)
+}
+
 export { getToken, setToken }

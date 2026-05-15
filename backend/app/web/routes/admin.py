@@ -22,11 +22,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
     Answer,
+    AspectInsight,
+    InsightLike,
     JourneyEvent,
     ScriptStep,
     User,
     UserAspectState,
     UserState,
+    UserStreak,
     WebDiaryEntry,
     WebState,
     WebUser,
@@ -833,4 +836,522 @@ async def rollback_restore(
         "user_id": target.id,
         "rolled_back_to": backup.get("at"),
         "by_admin_id": backup.get("by_admin_id"),
+    }
+
+
+# ── Stats ───────────────────────────────────────────────────────────────────
+
+@router.get("/stats")
+async def admin_stats(
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Сводная статистика по проекту: DAU/WAU/MAU, регистрации, ретеншн,
+    drift-юзеры. Базовые метрики, без графиков по дням — это для UI.
+    """
+    _require_admin(current_user)
+
+    from datetime import timedelta
+    now = datetime.utcnow()
+
+    # ─── Регистрации ────────────────────────────────────────────────────────
+    total_users = (await session.execute(
+        select(func.count(WebUser.id))
+    )).scalar_one() or 0
+
+    last_24h = (await session.execute(
+        select(func.count(WebUser.id))
+        .where(WebUser.created_at >= now - timedelta(hours=24))
+    )).scalar_one() or 0
+    last_7d = (await session.execute(
+        select(func.count(WebUser.id))
+        .where(WebUser.created_at >= now - timedelta(days=7))
+    )).scalar_one() or 0
+    last_30d = (await session.execute(
+        select(func.count(WebUser.id))
+        .where(WebUser.created_at >= now - timedelta(days=30))
+    )).scalar_one() or 0
+
+    # ─── Активность (по UserStreak.last_active_date) ────────────────────────
+    today = now.strftime("%Y-%m-%d")
+    d_minus_1 = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    d_minus_7 = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+    d_minus_30 = (now - timedelta(days=30)).strftime("%Y-%m-%d")
+
+    try:
+        dau = (await session.execute(
+            select(func.count(UserStreak.web_user_id))
+            .where(UserStreak.last_active_date >= d_minus_1)
+        )).scalar_one() or 0
+        wau = (await session.execute(
+            select(func.count(UserStreak.web_user_id))
+            .where(UserStreak.last_active_date >= d_minus_7)
+        )).scalar_one() or 0
+        mau = (await session.execute(
+            select(func.count(UserStreak.web_user_id))
+            .where(UserStreak.last_active_date >= d_minus_30)
+        )).scalar_one() or 0
+    except Exception as e:
+        log.warning("stats DAU/WAU/MAU failed: %s", e)
+        dau = wau = mau = 0
+
+    # ─── Контент: дневник, инсайты ──────────────────────────────────────────
+    try:
+        diary_total = (await session.execute(
+            select(func.count(WebDiaryEntry.id))
+        )).scalar_one() or 0
+        diary_7d = (await session.execute(
+            select(func.count(WebDiaryEntry.id))
+            .where(WebDiaryEntry.created_at >= now - timedelta(days=7))
+        )).scalar_one() or 0
+    except Exception:
+        diary_total = diary_7d = 0
+
+    try:
+        insights_total = (await session.execute(
+            select(func.count(AspectInsight.id))
+        )).scalar_one() or 0
+        insights_7d = (await session.execute(
+            select(func.count(AspectInsight.id))
+            .where(AspectInsight.created_at >= now - timedelta(days=7))
+        )).scalar_one() or 0
+    except Exception:
+        insights_total = insights_7d = 0
+
+    # ─── TG-linked ──────────────────────────────────────────────────────────
+    tg_linked = (await session.execute(
+        select(func.count(WebUser.id)).where(WebUser.telegram_id.isnot(None))
+    )).scalar_one() or 0
+    admins = (await session.execute(
+        select(func.count(WebUser.id)).where(WebUser.is_admin.is_(True))
+    )).scalar_one() or 0
+
+    # ─── Drift-юзеры (totalCompleted ≫ sum completedScripts) ────────────────
+    # PostgreSQL-only: парсим JSONB. Точный count лучше через SQL, но
+    # для простоты пройдёмся по выборке. Ограничим первыми 500 юзеров,
+    # этого хватит для оценки масштаба.
+    drift_users: list[dict[str, Any]] = []
+    try:
+        state_rows = (await session.execute(
+            select(WebState, WebUser)
+            .join(WebUser, WebUser.id == WebState.web_user_id)
+            .limit(500)
+        )).all()
+        for state_row, user_row in state_rows:
+            journey = state_row.journey or {}
+            total_completed = journey.get("totalCompleted") or 0
+            aspects = journey.get("aspects") or {}
+            sum_completed = sum(
+                len((folder or {}).get("completedScripts") or [])
+                for folder in aspects.values()
+            )
+            drift = total_completed - sum_completed
+            if drift > 10:
+                drift_users.append({
+                    "user_id": user_row.id,
+                    "email": user_row.email,
+                    "telegram_username": user_row.telegram_username,
+                    "totalCompleted": total_completed,
+                    "sum_completedScripts": sum_completed,
+                    "drift": drift,
+                })
+        drift_users.sort(key=lambda x: -x["drift"])
+    except Exception as e:
+        log.warning("drift scan failed: %s", e)
+
+    return {
+        "registrations": {
+            "total": total_users,
+            "last_24h": last_24h,
+            "last_7d": last_7d,
+            "last_30d": last_30d,
+        },
+        "activity": {
+            "dau": dau,
+            "wau": wau,
+            "mau": mau,
+        },
+        "content": {
+            "diary_total": diary_total,
+            "diary_last_7d": diary_7d,
+            "insights_total": insights_total,
+            "insights_last_7d": insights_7d,
+        },
+        "system": {
+            "tg_linked": tg_linked,
+            "admins": admins,
+        },
+        "drift_users": drift_users[:50],  # TOP 50 по drift
+        "drift_users_count": len(drift_users),
+    }
+
+
+# ── Bulk restore ────────────────────────────────────────────────────────────
+
+@router.post("/bulk-restore")
+async def bulk_restore_from_diary(
+    payload: dict = Body(...),
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Массовый restore-from-diary для всех юзеров с data_drift > threshold.
+
+    Тело:
+        {
+            "threshold": 10,       // минимальное превышение totalCompleted над sum
+            "dry_run": true,
+            "bump_levels": true,
+            "limit": 100           // максимум обработанных юзеров за вызов
+        }
+    """
+    _require_admin(current_user)
+
+    threshold = int(payload.get("threshold", 10))
+    dry_run = bool(payload.get("dry_run", True))
+    bump_levels = bool(payload.get("bump_levels", True))
+    limit = int(payload.get("limit", 100))
+
+    # Получаем кандидатов с drift
+    state_rows = (await session.execute(
+        select(WebState, WebUser)
+        .join(WebUser, WebUser.id == WebState.web_user_id)
+        .limit(1000)
+    )).all()
+
+    candidates: list[tuple[Any, Any, int]] = []
+    for state_row, user_row in state_rows:
+        journey = state_row.journey or {}
+        total_completed = journey.get("totalCompleted") or 0
+        aspects = journey.get("aspects") or {}
+        sum_completed = sum(
+            len((folder or {}).get("completedScripts") or [])
+            for folder in aspects.values()
+        )
+        drift = total_completed - sum_completed
+        if drift > threshold:
+            candidates.append((user_row, state_row, drift))
+
+    candidates.sort(key=lambda x: -x[2])
+    candidates = candidates[:limit]
+
+    results: list[dict[str, Any]] = []
+
+    for user_row, state_row, drift in candidates:
+        # Соберём scriptId из дневника
+        diary_rows = (await session.execute(
+            select(WebDiaryEntry).where(WebDiaryEntry.web_user_id == user_row.id)
+        )).scalars().all()
+
+        scripts_by_aspect: dict[str, set[str]] = {}
+        for row in diary_rows:
+            extra = row.extra or {}
+            script_id = extra.get("scriptId")
+            cyr_aspect = row.aspect
+            if not script_id or not cyr_aspect:
+                continue
+            lat_aspect = CYR_TO_LAT_ASPECT.get(cyr_aspect)
+            if not lat_aspect:
+                continue
+            scripts_by_aspect.setdefault(lat_aspect, set()).add(script_id)
+
+        if not scripts_by_aspect:
+            results.append({
+                "user_id": user_row.id,
+                "email": user_row.email,
+                "drift": drift,
+                "any_changes": False,
+                "applied": False,
+                "reason": "no diary script refs",
+            })
+            continue
+
+        journey = dict(state_row.journey or {})
+        journey_aspects = dict(journey.get("aspects") or {})
+        any_changes = False
+        added_count = 0
+        bumped_aspects = []
+
+        for lat_aspect, diary_scripts in scripts_by_aspect.items():
+            folder = dict(journey_aspects.get(lat_aspect) or {})
+            existing = set(folder.get("completedScripts") or [])
+            merged = existing | diary_scripts
+            new_count = len(merged) - len(existing)
+
+            current_level_before = folder.get("currentLevel") or 0
+            detected_level = _detect_completed_level(merged)
+            current_level_after = (
+                max(current_level_before, detected_level) if bump_levels else current_level_before
+            )
+
+            if new_count > 0 or current_level_after != current_level_before:
+                any_changes = True
+                added_count += new_count
+                if current_level_after != current_level_before:
+                    bumped_aspects.append({
+                        "aspect": lat_aspect,
+                        "from": current_level_before,
+                        "to": current_level_after,
+                    })
+
+            folder["completedScripts"] = sorted(merged)
+            if bump_levels and current_level_after != current_level_before:
+                folder["currentLevel"] = current_level_after
+            journey_aspects[lat_aspect] = folder
+
+        journey["aspects"] = journey_aspects
+
+        applied = False
+        if not dry_run and any_changes:
+            original_journey = {
+                k: v for k, v in (state_row.journey or {}).items()
+                if k != "_backup_before_restore"
+            }
+            journey["_backup_before_restore"] = {
+                "at": datetime.utcnow().isoformat(),
+                "by_admin_id": current_user.id,
+                "via": "bulk-restore",
+                "previous_journey": original_journey,
+            }
+            state_row.journey = journey
+            state_row.updated_at = datetime.utcnow()
+            applied = True
+
+        results.append({
+            "user_id": user_row.id,
+            "email": user_row.email,
+            "drift": drift,
+            "any_changes": any_changes,
+            "added_scripts_total": added_count,
+            "bumped_aspects": bumped_aspects,
+            "applied": applied,
+        })
+
+    if not dry_run:
+        await session.commit()
+
+    return {
+        "threshold": threshold,
+        "dry_run": dry_run,
+        "bump_levels": bump_levels,
+        "candidates_count": len(candidates),
+        "results": results,
+        "summary": {
+            "users_affected": sum(1 for r in results if r["any_changes"]),
+            "total_scripts_added": sum(r.get("added_scripts_total", 0) for r in results),
+            "users_applied": sum(1 for r in results if r["applied"]),
+        },
+    }
+
+
+# ── User diary full ─────────────────────────────────────────────────────────
+
+@router.get("/user/{user_id}/diary")
+async def user_diary_full(
+    user_id: int,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Полный дневник конкретного юзера с пагинацией."""
+    _require_admin(current_user)
+
+    target = await session.get(WebUser, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Юзер не найден")
+
+    total = (await session.execute(
+        select(func.count(WebDiaryEntry.id)).where(WebDiaryEntry.web_user_id == user_id)
+    )).scalar_one() or 0
+
+    rows = (await session.execute(
+        select(WebDiaryEntry)
+        .where(WebDiaryEntry.web_user_id == user_id)
+        .order_by(WebDiaryEntry.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )).scalars().all()
+
+    return {
+        "user_id": user_id,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "entries": [
+            {
+                "id": e.id,
+                "aspect": e.aspect,
+                "source": e.source,
+                "text": e.text,
+                "extra": e.extra,
+                "created_at": e.created_at.isoformat() if e.created_at else None,
+            }
+            for e in rows
+        ],
+    }
+
+
+# ── State edit ──────────────────────────────────────────────────────────────
+
+@router.patch("/user/{user_id}/state")
+async def patch_user_state(
+    user_id: int,
+    payload: dict = Body(...),
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Прямая правка web_state.journey.
+
+    Тело: { "journey": <полный новый journey-объект> }
+
+    Старое состояние сохраняется в _backup_before_state_edit внутри journey
+    для отката. Будь осторожен — невалидный journey может сломать UI юзера.
+    """
+    _require_admin(current_user)
+
+    new_journey = payload.get("journey")
+    if not isinstance(new_journey, dict):
+        raise HTTPException(status_code=400, detail="payload.journey должен быть объектом")
+
+    target = await session.get(WebUser, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Юзер не найден")
+
+    web_state = await session.get(WebState, user_id)
+    if not web_state:
+        raise HTTPException(status_code=409, detail="Нет web_state для юзера")
+
+    # Бэкап старого journey
+    original_journey = {
+        k: v for k, v in (web_state.journey or {}).items()
+        if k != "_backup_before_state_edit"
+    }
+    new_journey["_backup_before_state_edit"] = {
+        "at": datetime.utcnow().isoformat(),
+        "by_admin_id": current_user.id,
+        "previous_journey": original_journey,
+    }
+
+    web_state.journey = new_journey
+    web_state.updated_at = datetime.utcnow()
+    await session.commit()
+
+    log.warning(
+        "admin state-edit: %s patched user_id=%s journey",
+        current_user.email or current_user.id, user_id,
+    )
+    return {
+        "user_id": user_id,
+        "applied": True,
+        "previous_journey_size": len(str(original_journey)),
+        "new_journey_size": len(str(new_journey)),
+    }
+
+
+# ── Moderation: insights ────────────────────────────────────────────────────
+
+@router.get("/insights")
+async def admin_list_insights(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    aspect: str | None = Query(None, description="Фильтр по аспекту (кириллица)"),
+    only_public: bool = Query(False),
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Лента последних инсайтов всех юзеров для модерации."""
+    _require_admin(current_user)
+
+    base = select(AspectInsight, WebUser).join(
+        WebUser, WebUser.id == AspectInsight.web_user_id
+    ).order_by(AspectInsight.created_at.desc())
+
+    if aspect:
+        base = base.where(AspectInsight.aspect == aspect)
+    if only_public:
+        base = base.where(AspectInsight.is_public.is_(True))
+
+    rows = (await session.execute(base.limit(limit).offset(offset))).all()
+
+    total = (await session.execute(
+        select(func.count(AspectInsight.id))
+        .where(AspectInsight.aspect == aspect if aspect else True)
+    )).scalar_one() or 0
+
+    return {
+        "limit": limit,
+        "offset": offset,
+        "total": total,
+        "insights": [
+            {
+                "id": insight.id,
+                "user_id": user.id,
+                "user_email": user.email,
+                "user_display_name": user.display_name,
+                "user_telegram_username": user.telegram_username,
+                "aspect": insight.aspect,
+                "kind": insight.kind,
+                "text": insight.text,
+                "is_public": insight.is_public,
+                "created_at": insight.created_at.isoformat() if insight.created_at else None,
+            }
+            for insight, user in rows
+        ],
+    }
+
+
+@router.delete("/insight/{insight_id}")
+async def admin_delete_insight(
+    insight_id: int,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Удалить инсайт (включая все реакции на него)."""
+    _require_admin(current_user)
+
+    insight = await session.get(AspectInsight, insight_id)
+    if not insight:
+        raise HTTPException(status_code=404, detail="Инсайт не найден")
+
+    # Сначала удаляем реакции
+    likes = (await session.execute(
+        select(InsightLike).where(InsightLike.insight_id == insight_id)
+    )).scalars().all()
+    for like in likes:
+        await session.delete(like)
+
+    await session.delete(insight)
+    await session.commit()
+
+    log.warning(
+        "admin delete-insight: %s deleted insight_id=%s (user_id=%s, aspect=%s)",
+        current_user.email or current_user.id, insight_id, insight.web_user_id, insight.aspect,
+    )
+    return {
+        "deleted_insight_id": insight_id,
+        "removed_likes": len(likes),
+    }
+
+
+@router.patch("/insight/{insight_id}")
+async def admin_patch_insight(
+    insight_id: int,
+    payload: dict = Body(...),
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Изменить флаг is_public у инсайта (модерация: скрыть без удаления)."""
+    _require_admin(current_user)
+
+    insight = await session.get(AspectInsight, insight_id)
+    if not insight:
+        raise HTTPException(status_code=404, detail="Инсайт не найден")
+
+    if "is_public" in payload:
+        insight.is_public = bool(payload["is_public"])
+
+    await session.commit()
+    return {
+        "insight_id": insight_id,
+        "is_public": insight.is_public,
     }
