@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
+from app.web.routes.admin import router as admin_router
 from app.web.routes.auth import router as auth_router
 from app.web.routes.bookmarks import router as bookmarks_router
 from app.web.routes.coach import router as coach_router
@@ -72,6 +73,7 @@ app.include_router(search_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(sync_vault_router, prefix="/api")
 app.include_router(onboarding_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
 
 
 @app.get("/healthz")
