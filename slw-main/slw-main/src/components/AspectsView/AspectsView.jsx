@@ -15,7 +15,7 @@ import HabitSection from './HabitSection'
 import Hint from '../Onboarding/Hint'
 import styles from './AspectsView.module.css'
 
-export default function AspectsView({ selectedAspect, onAspectSelect, scores, onScoreChange, diary, onDiaryChange, journey, onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys, onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys, onEnterHall, isAdmin = false, t, user }) {
+export default function AspectsView({ selectedAspect, onAspectSelect, scores, diary, onDiaryChange, journey, onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys, onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys, onEnterHall, isAdmin = false, t, user }) {
   const [blockId, setBlockId] = useState(null)
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, on
     const block = available[idx]
     if (!block) {
       return <Toc aspect={selectedAspect} data={data} color={color} available={available}
-        scores={scores} onScoreChange={onScoreChange} onAspectSelect={onAspectSelect}
+        scores={scores} onAspectSelect={onAspectSelect}
         journey={journey} onGoToSiSurveys={onGoToSiSurveys} onGoToFeSurveys={onGoToFeSurveys} onGoToNeSurveys={onGoToNeSurveys} onGoToNiSurveys={onGoToNiSurveys} onGoToFiSurveys={onGoToFiSurveys} onGoToTeSurveys={onGoToTeSurveys} onGoToTiSurveys={onGoToTiSurveys} onGoToSeSurveys={onGoToSeSurveys} onOpenBlock={setBlockId}
     onEnterHall={onEnterHall} isAdmin={isAdmin} />
     }
@@ -106,7 +106,7 @@ function AspectsGrid({ scores, onAspectSelect }) {
 
 // ─── Оглавление аспекта ────────────────────────────────────────────────────
 
-function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSelect, journey, onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys, onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys, onOpenBlock, onEnterHall, isAdmin = false }) {
+function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys, onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys, onOpenBlock, onEnterHall, isAdmin = false }) {
   const byLevel = useMemo(() => {
     const m = { 0: [], 1: [], 2: [], 3: [] }
     available.forEach(b => m[b.level].push(b))
@@ -127,8 +127,6 @@ function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSe
         aspect={aspect}
         data={data}
         color={color}
-        score={scores[aspect]}
-        onScoreChange={v => onScoreChange({ ...scores, [aspect]: v })}
         onBack={() => onAspectSelect(null)}
         onEnterHall={onEnterHall ? () => onEnterHall(aspect) : null}
       />
@@ -306,7 +304,7 @@ function Toc({ aspect, data, color, available, scores, onScoreChange, onAspectSe
 
 // ─── Шапка аспекта (одинаковая в оглавлении и чтении) ──────────────────────
 
-function AspectHeader({ aspect, data, color, score, onScoreChange, onBack, compact, onEnterHall }) {
+function AspectHeader({ aspect, data, color, onBack, compact, onEnterHall }) {
   return (
     <header className={`${styles.aspectHeader} ${compact ? styles.aspectHeaderCompact : ''}`} style={{ '--accent': color }}>
       <div
@@ -326,21 +324,8 @@ function AspectHeader({ aspect, data, color, score, onScoreChange, onBack, compa
               <p className={styles.aspectHeaderSub}>{data.sub}</p>
             </div>
           </div>
-          <div className={styles.scoreBox}>
-            <span className={styles.scoreLabel}>моя оценка</span>
-            <div className={styles.scoreRow}>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={score}
-                onChange={e => onScoreChange(+e.target.value)}
-                style={{ accentColor: color }}
-                className={styles.scoreRange}
-              />
-              <span className={styles.scoreValue} style={{ color }}>{score}</span>
-            </div>
-            {onEnterHall && (
+          {onEnterHall && (
+            <div className={styles.scoreBox}>
               <button
                 type="button"
                 className={styles.hallBtn}
@@ -349,8 +334,8 @@ function AspectHeader({ aspect, data, color, score, onScoreChange, onBack, compa
               >
                 ✦ Войти в холл
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </header>

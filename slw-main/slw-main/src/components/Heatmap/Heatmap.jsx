@@ -62,7 +62,10 @@ export default function Heatmap({ userId, days = 180 }) {
   return (
     <div className={styles.wrap}>
       <div className={styles.header}>
-        <span>{totalActiveDays} активных дней · {totalEvents} событий за {days} дней</span>
+        <span>
+          {totalActiveDays} активных дней · {totalEvents} событий за {days} дне
+          <DevAdminEggLetter />
+        </span>
       </div>
       <div className={styles.grid}>
         {weeks.map((week, wi) => (
@@ -99,4 +102,30 @@ function levelFor(count) {
   if (count <= 3) return 2
   if (count <= 6) return 3
   return 4
+}
+
+// Пасхалка: 5 кликов по букве «й» в конце фразы «… дней» → toggle dev-admin.
+// Триггер для админ-режима без бэка. Хранится в localStorage.
+function DevAdminEggLetter() {
+  const [count, setCount] = useState(0)
+  const handleTap = () => {
+    const next = count + 1
+    if (next >= 5) {
+      const cur = localStorage.getItem('slw_dev_admin') === '1'
+      if (cur) localStorage.removeItem('slw_dev_admin')
+      else localStorage.setItem('slw_dev_admin', '1')
+      window.location.reload()
+    } else {
+      setCount(next)
+    }
+  }
+  return (
+    <span
+      onClick={handleTap}
+      style={{ cursor: 'default', userSelect: 'none' }}
+      aria-hidden="true"
+    >
+      й
+    </span>
+  )
 }

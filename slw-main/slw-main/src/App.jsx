@@ -84,9 +84,9 @@ export default function App() {
   const [welcomeDismissed, setWelcomeDismissed] = useState(
     () => localStorage.getItem('welcome_seen') === '1'
   )
-  // devAdmin: «пасхалочный» админский режим без бэка. Включается кликом по
-  // невидимой точке внизу ProfileView (5 тапов). Хранится в localStorage,
-  // переживает logout и новые сессии. ИЛИ-сложение с user.is_admin.
+  // devAdmin: «пасхалочный» админский режим без бэка. Включается 5 кликами
+  // по букве «й» в конце фразы «… дней» в Heatmap-заголовке (DashboardView).
+  // Хранится в localStorage, переживает logout. ИЛИ-сложение с user.is_admin.
   const [devAdmin, setDevAdmin] = useState(
     () => localStorage.getItem('slw_dev_admin') === '1'
   )
@@ -825,7 +825,6 @@ export default function App() {
             selectedAspect={selectedAspect}
             onAspectSelect={setSelectedAspect}
             scores={scores}
-            onScoreChange={saveScores}
             diary={diary}
             onDiaryChange={saveDiary}
             journey={journey}
