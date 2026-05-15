@@ -210,13 +210,20 @@ export async function fetchEvents(sinceId = 0) {
 export async function fetchState() {
   const data = await request('GET', '/api/state')
   // journey-blob НЕ трогаем (миграция в JourneyView.migrateState).
+  // updated_at — для optimistic locking (см. saveState).
   return translateAspectsInResponse(data, { skipJourneyBlob: true })
 }
 
-export async function saveState({ journey, history } = {}) {
+export async function saveState({ journey, history, expected_updated_at } = {}) {
   // journey хранится как JSONB — бэкенд только пишет/читает as-is, без
   // фильтров по ключам. Поэтому отправляем латинские ключи как есть.
-  return request('PUT', '/api/state', { journey, history })
+  //
+  // Optimistic locking: если expected_updated_at передан и не совпадает
+  // с серверным значением — бэк отвечает 409. Это значит, что пока фронт
+  // держал state в памяти, кто-то ещё (другая вкладка, admin-операция,
+  // impersonation) изменил БД. Чтобы не перетереть — клиент должен
+  // перечитать state.
+  return request('PUT', '/api/state', { journey, history, expected_updated_at })
 }
 
 // ── Scores ────────────────────────────────────────────────────────────────────

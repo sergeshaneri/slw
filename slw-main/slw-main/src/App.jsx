@@ -151,6 +151,12 @@ export default function App() {
         fetchEvents(0).catch(() => ({ events: [] })),
       ])
 
+      // Запоминаем версию state с сервера для optimistic locking.
+      // При следующем PUT отправим её как expected_updated_at — если кто-то
+      // успел изменить state между нашим GET и PUT, бэк ответит 409 и мы
+      // перечитаем свежую версию вместо перетирания чужих изменений.
+      stateVersionRef.current = stateRes?.updated_at ?? null
+
       // Bot → Web sync. Multi-aspect модель:
       //   • bs.aspects[] — массив прогресса по каждому аспекту, в котором
       //     юзер был в боте. Для каждого делаем Math.max-бамп
@@ -313,10 +319,43 @@ export default function App() {
     }
   }
 
+  // Optimistic locking. Хранит версию (updated_at) последнего успешно
+  // загруженного/сохранённого state. Шлётся обратно на бэк в expected_updated_at
+  // при PUT /state. При mismatch бэк возвращает 409 → мы перечитываем state.
+  const stateVersionRef = useRef(null)
+
+  // Гvardованный save: гарантирует, что если кто-то ещё (admin-операция,
+  // другая вкладка, impersonation) изменил state — мы не перетрём.
+  const saveStateGuarded = async (patch) => {
+    try {
+      const res = await saveState({
+        ...patch,
+        expected_updated_at: stateVersionRef.current,
+      })
+      if (res?.updated_at) stateVersionRef.current = res.updated_at
+      return res
+    } catch (e) {
+      if (e.status === 409) {
+        console.warn('State conflict — reloading from server', e)
+        setToasts(prev => [...prev, {
+          id: `state-conflict-${Date.now()}`,
+          kind: 'warning',
+          icon: '🔄',
+          title: 'Прогресс обновился',
+          desc: 'Перезагружаю свежий с сервера…',
+        }])
+        // Перечитываем стейт. setJourney/setHistory обновятся, ref тоже.
+        await loadFromApi()
+        return null
+      }
+      throw e
+    }
+  }
+
   const saveHistory = async (newHistory) => {
     setHistory(newHistory)
     if (user) {
-      try { await saveState({ history: newHistory }) } catch (e) { console.error(e) }
+      try { await saveStateGuarded({ history: newHistory }) } catch (e) { console.error(e) }
     } else {
       lsSet(LS.history, newHistory)
     }
@@ -350,7 +389,7 @@ export default function App() {
   const saveJourney = async (newJourney) => {
     setJourney(newJourney)
     if (user) {
-      try { await saveState({ journey: newJourney }) } catch (e) { console.error(e) }
+      try { await saveStateGuarded({ journey: newJourney }) } catch (e) { console.error(e) }
     } else {
       lsSet(LS.journey, newJourney)
     }
@@ -625,7 +664,7 @@ export default function App() {
         if (grant > 0) {
           setJourney(j => {
             const updated = { ...j, stardust: (j?.stardust ?? 0) + grant }
-            saveState({ journey: updated }).catch(() => {})
+            saveStateGuarded({ journey: updated }).catch(() => {})
             return updated
           })
         }
