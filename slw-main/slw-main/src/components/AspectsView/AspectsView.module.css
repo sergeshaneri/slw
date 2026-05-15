@@ -256,23 +256,35 @@
   min-width: 180px;
 }
 
+/* Filled-вариант с цветом аспекта. Inline style передаёт:
+   - --btn-bg: цвет аспекта (фон)
+   - --btn-glow: тот же цвет с alpha для свечения
+   Текст тёмный, чтобы был контраст с ярким фоном. */
 .hallBtn {
   margin-top: 8px;
-  background: transparent;
-  border: 1px solid;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-bg);
+  color: #0a0a0f;
   font: inherit;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   letter-spacing: 0.04em;
-  padding: 8px 16px;
+  padding: 11px 22px;
   border-radius: 999px;
   cursor: pointer;
-  transition: background .15s, transform .12s;
+  transition: transform .12s, box-shadow .15s, filter .15s;
+  box-shadow: 0 4px 18px -4px var(--btn-glow), 0 0 0 1px rgba(255,255,255,0.06) inset;
 }
 
 .hallBtn:hover {
-  background: rgba(255,255,255,0.04);
   transform: translateY(-1px);
+  filter: brightness(1.08);
+  box-shadow: 0 8px 26px -4px var(--btn-glow), 0 0 0 1px rgba(255,255,255,0.12) inset;
+}
+
+.hallBtn:active {
+  transform: translateY(0);
+  filter: brightness(0.95);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -879,49 +891,71 @@
 /* ── Карточка-CTA «Обсудить с сообществом» в Toc ──────────────────────── */
 
 .tocHallCta {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 18px 22px;
-  margin-bottom: 22px;
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--line));
-  border-radius: 16px;
+  gap: 16px;
+  padding: 20px 24px;
+  margin-bottom: 26px;
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--line));
+  border-radius: 18px;
   color: var(--text);
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background .15s, border-color .15s, transform .1s;
+  transition: background .15s, border-color .15s, transform .1s, box-shadow .2s;
   width: 100%;
+  box-shadow: 0 6px 24px -8px color-mix(in srgb, var(--accent) 70%, transparent);
+  overflow: hidden;
+}
+.tocHallCta::before {
+  /* Мягкое свечение слева — добавляет ощущение «двери» в холл */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 0% 50%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 60%);
+  pointer-events: none;
 }
 .tocHallCta:hover {
-  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
-  border-color: color-mix(in srgb, var(--accent) 70%, var(--line));
+  background: color-mix(in srgb, var(--accent) 28%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 85%, var(--line));
+  box-shadow: 0 10px 30px -8px color-mix(in srgb, var(--accent) 80%, transparent);
+  transform: translateY(-1px);
 }
 .tocHallCta:active { transform: scale(0.99); }
 .tocHallCtaIcon {
-  font-size: 28px;
+  font-size: 32px;
   flex-shrink: 0;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 60%, transparent));
+  position: relative;
 }
 .tocHallCtaBody {
   display: flex;
   flex-direction: column;
   gap: 4px;
   flex: 1;
+  position: relative;
 }
 .tocHallCtaTitle {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 700;
   color: var(--text);
+  letter-spacing: 0.01em;
 }
 .tocHallCtaCounts {
   font-size: 13px;
-  color: var(--text-dim);
+  color: color-mix(in srgb, var(--accent) 60%, var(--text-soft));
 }
 .tocHallCtaArrow {
-  font-size: 22px;
-  color: color-mix(in srgb, var(--accent) 80%, var(--text-dim));
+  font-size: 24px;
+  color: color-mix(in srgb, var(--accent) 90%, var(--text));
   flex-shrink: 0;
+  position: relative;
+  transition: transform .15s;
+}
+.tocHallCta:hover .tocHallCtaArrow {
+  transform: translateX(3px);
 }
 
 /* ── Блок-заглушка hallStub (вместо art/figures/quotes в карточке) ─────── */

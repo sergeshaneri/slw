@@ -330,9 +330,12 @@ function AspectHeader({ aspect, data, color, onBack, compact, onEnterHall }) {
                 type="button"
                 className={styles.hallBtn}
                 onClick={onEnterHall}
-                style={{ borderColor: `${color}aa`, color }}
+                style={{
+                  '--btn-bg': color,
+                  '--btn-glow': `${color}aa`,
+                }}
               >
-                ✦ Войти в холл
+                🏛 Войти в холл
               </button>
             </div>
           )}
