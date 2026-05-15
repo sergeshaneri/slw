@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { postStepCompleted } from '../../api/client'
+import { postStepCompleted, chooseHabit } from '../../api/client'
 import { ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
 import { ONBOARDING } from '../../data/journey/onboarding'
 import { getJourney } from '../../data/journey/registry'
@@ -816,8 +816,26 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     if (action === 'next' || action === 'done' || action === 'skip') {
       if (action === 'skip') addUserMessage('Пропустить')
       else if (action === 'done') {
-        addUserMessage('Взял задание')
-        await addBotMessage('Задание добавлено в активные. Открой раздел «Активные задания», когда выполнишь.', 500)
+        // Для exercise — «взять в ежедневные практики» (привычка аспекта).
+        // Для question (B) — просто «взял задание» в активные.
+        if (script.type === 'exercise') {
+          addUserMessage('Беру в ежедневные практики')
+          await addBotMessage(
+            `Упражнение «${script.title}» теперь твоя ежедневная практика для этого аспекта. Открой дашборд, чтобы ставить галочку каждый день.`,
+            500
+          )
+          // Best-effort: пишем в user_habits, чтобы упражнение появилось
+          // в блоке «Сегодня» на дашборде. Ошибки игнорируем — фронт
+          // пока всё равно хранит в pendingTasks (enqueueTask ниже).
+          chooseHabit({
+            aspect: state.currentAspect,
+            title: script.title,
+            exerciseId: script.id,
+          }).catch(err => console.warn('chooseHabit failed:', err?.message))
+        } else {
+          addUserMessage('Взял задание')
+          await addBotMessage('Задание добавлено в активные. Открой раздел «Активные задания», когда выполнишь.', 500)
+        }
       } else addUserMessage('Позже')
 
       if (isDeferrable && (action === 'done' || action === 'next')) {

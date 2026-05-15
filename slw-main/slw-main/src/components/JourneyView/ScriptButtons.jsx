@@ -31,11 +31,20 @@ export default function ScriptButtons({ script, onAction }) {
     case 'exercise':
       return (
         <div className={styles.btnRow}>
-          {/* «Выполнил + записать» — после нажатия откроется поле для
-              обязательного комментария. См. handleScriptAction. */}
-          <button type="button" className={`${styles.btn} ${styles.btnAccent}`} onClick={() => act('complete_exercise')}>Выполнил + записать</button>
-          <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => act('done')}>Взял задание</button>
-          <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => act('next')}>Позже</button>
+          {/* «Сделал, записать» — открывает обязательный insight о результате.
+              См. handleScriptAction → complete_exercise → awaitingInput=exercise_note. */}
+          <button type="button" className={`${styles.btn} ${styles.btnAccent}`} onClick={() => act('complete_exercise')}>
+            ✓ Сделал, записать инсайт
+          </button>
+          {/* «Взять в практики» — заносит упражнение в активные задания
+              и одновременно делает его ежедневной практикой аспекта
+              (POST /api/habits/choose в handleScriptAction). */}
+          <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => act('done')}>
+            🪐 Взять в ежедневные практики
+          </button>
+          <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => act('next')}>
+            Позже
+          </button>
         </div>
       )
     case 'word':
