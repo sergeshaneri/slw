@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { postStepCompleted } from '../../api/client'
 import { ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
 import { ONBOARDING } from '../../data/journey/onboarding'
 import { getJourney } from '../../data/journey/registry'
@@ -690,6 +691,20 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   const awardXP = useCallback((xp, stardust = 0, scriptId = null) => {
     if (xp <= 0 && stardust <= 0) return
     setState(s => {
+      // Append-only журнал: страховка от потери completedScripts при
+      // CONTENT_VERSION-бампах. Best-effort, ошибки игнорим. Идемпотентно
+      // на бэке через dedupe-проверку.
+      const aspectKey = s.currentAspect
+      const folder = aspectOf(s)
+      const completedId = scriptId || folder.currentScriptId
+      if (completedId && aspectKey) {
+        postStepCompleted({
+          aspect: aspectKey,
+          level: folder.currentLevel ?? 0,
+          short_id: completedId,
+        }).catch(err => console.warn('event log failed:', err))
+      }
+
       // Глобальные счётчики (XP/streak/...).
       const globals = {
         ...s,

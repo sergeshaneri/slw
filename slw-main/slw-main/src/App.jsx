@@ -264,13 +264,18 @@ export default function App() {
         }
       }
 
-      // Bot → Web events: дописываем в каждую папку journey.aspects[X]
-      // .completedScripts события `step_completed` от бота для этого
-      // аспекта. Web хранит short_id (`T-1`/`intro-1`) — бэк уже отдаёт
-      // распарсенные. Фильтруем по аспекту, но НЕ по level — иначе после
-      // скачка на L1 ачивки L0 пропадают.
+      // Bot/Web → completedScripts: дописываем в каждую папку
+      // journey.aspects[X].completedScripts все step_completed события для
+      // этого юзера (и от бота, и от веба — журнал append-only, и тот и
+      // другой источник истины). Фильтруем по аспекту, но НЕ по level —
+      // иначе после скачка на L1 ачивки L0 пропадают.
+      //
+      // Зачем мёрджить ВЕБ-события обратно в свой state? Это страховка
+      // от сбросов: при CONTENT_VERSION-бампе локальный state может
+      // обнулиться, а журнал в БД останется — и при следующей загрузке
+      // мы пересоберём полный список завершённых скриптов.
       const botEvents = (eventsRes?.events ?? []).filter(
-        e => e.source === 'bot' && e.type === 'step_completed' && e.short_id && e.aspect
+        e => e.type === 'step_completed' && e.short_id && e.aspect
       )
       if (botEvents.length > 0) {
         // Группируем по аспекту → раскладываем по папкам.

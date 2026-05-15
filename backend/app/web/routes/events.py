@@ -10,7 +10,8 @@
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends
+from pydantic import BaseModel
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +23,14 @@ from app.web.deps import get_current_user
 log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/events")
+
+
+class StepCompletedIn(BaseModel):
+    aspect: str          # 'БС' / 'ЧЭ' / ... (cyrillic — фронт переводит)
+    level: int           # 0/1/2/3
+    short_id: str        # 'T-1' / 'S-1' / etc
+    step_id: str | None = None
+    payload: dict | None = None
 
 
 async def _maybe_backfill(session: AsyncSession, telegram_id: int) -> int:
@@ -114,3 +123,62 @@ async def get_events(
         ],
         "last_id": rows[-1].id if rows else since_id,
     }
+
+
+@router.post("/step-completed")
+async def post_step_completed(
+    body: StepCompletedIn,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Записать факт прохождения скрипта в append-only journey_events.
+    Идемпотентно по (web_user_id, source='web', aspect, short_id) — повторный
+    вызов с теми же параметрами не дублирует.
+
+    Это страховка: если web_state.journey.completedScripts когда-то сбросится
+    (миграция CONTENT_VERSION, race с другой вкладкой, …), точный список
+    пройденных скриптов восстанавливается из этой таблицы.
+    """
+    # Идемпотентность через explicit-проверку. UNIQUE-constraint мы не
+    # создаём отдельной миграцией, чтобы избежать DDL-сложностей на Railway:
+    # при гонке вероятность дубля минимальна, и периодический DEDUPE-скрипт
+    # может почистить остатки (если когда-то понадобится).
+    try:
+        existing = (await session.execute(
+            select(JourneyEvent.id)
+            .where(JourneyEvent.web_user_id == current_user.id)
+            .where(JourneyEvent.source == "web")
+            .where(JourneyEvent.type == "step_completed")
+            .where(JourneyEvent.aspect == body.aspect)
+            .where(JourneyEvent.short_id == body.short_id)
+            .where(JourneyEvent.level == body.level)
+            .limit(1)
+        )).first()
+    except Exception as e:
+        log.warning("step-completed dedupe check failed: %s", e)
+        existing = None
+
+    if existing:
+        return {"ok": True, "deduped": True, "event_id": existing[0]}
+
+    event = JourneyEvent(
+        web_user_id=current_user.id,
+        telegram_id=current_user.telegram_id,
+        source="web",
+        type="step_completed",
+        aspect=body.aspect,
+        level=body.level,
+        short_id=body.short_id,
+        step_id=body.step_id,
+        payload=body.payload,
+        created_at=datetime.utcnow(),
+    )
+    session.add(event)
+    try:
+        await session.commit()
+    except Exception as e:
+        log.warning("step-completed insert failed: %s", e)
+        await session.rollback()
+        return {"ok": False, "error": str(e)}
+
+    return {"ok": True, "deduped": False, "event_id": event.id}

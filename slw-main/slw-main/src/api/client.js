@@ -205,6 +205,22 @@ export async function fetchEvents(sinceId = 0) {
   return translateAspectsInResponse(data)
 }
 
+// Web → backend step-completed запись в journey_events (append-only).
+// Идемпотентно по (user, aspect, short_id, level). Шлём после каждого
+// зачёта completedScripts — это страховка от потери прогресса при
+// CONTENT_VERSION-бампах или конфликтах PUT /api/state.
+//
+// aspect передаём в кириллице (бэкенд так хранит aspect-колонку).
+export async function postStepCompleted({ aspect, level, short_id, step_id }) {
+  const cyrAspect = latToCyr(aspect)
+  return request('POST', '/api/events/step-completed', {
+    aspect: cyrAspect,
+    level,
+    short_id,
+    step_id: step_id ?? null,
+  })
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 export async function fetchState() {
