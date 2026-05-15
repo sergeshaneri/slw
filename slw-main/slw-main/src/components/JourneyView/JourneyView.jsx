@@ -817,13 +817,21 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         // Задание уехало в активные — XP даётся только при реальном выполнении
         // (через TasksScreen или через answer_number / complete_exercise).
         enqueueTask(script, action === 'done' ? 'taken' : 'deferred')
-      } else if ((script.type === 'theory' || script.type === 'word') && action === 'next') {
-        // Чтение теории/слова дня — единственный «терминальный» вариант через next.
-        awardXP(script.xp, script.stardust ?? 0, script.id)
+        setTimeout(() => deliverScript(a.currentScriptIndex + 1), 600)
+      } else if (
+        (script.type === 'theory' || script.type === 'word' || script.type === 'reflection')
+        && action === 'next'
+      ) {
+        // Обязательный insight: открываем поле для записи в дневник.
+        // XP/diary/advance произойдёт в handleSend для awaitingInput='step-insight'.
+        // Сохраняем «прошлое сообщение от юзера» = «Дальше», как и раньше,
+        // но не двигаем чат — ждём ввод инсайта.
+        setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: 'step-insight' })))
+        setTimeout(() => inputRef.current?.focus(), 50)
+      } else {
+        // Прочие случаи (например skip на reflection без insight) — без XP, advance.
+        setTimeout(() => deliverScript(a.currentScriptIndex + 1), 600)
       }
-      // Для reflection skip и любого «next» на отложенных — XP не даём.
-
-      setTimeout(() => deliverScript(a.currentScriptIndex + 1), 600)
     } else if (action === 'answer_number') {
       setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: 'number' })))
       setTimeout(() => inputRef.current?.focus(), 50)
@@ -975,6 +983,33 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       if (script?.id) removePending(script.id)
       awardXP(script?.xp ?? 15, script?.stardust ?? 0, script?.id ?? null)
       setTimeout(() => deliverScript(a.currentScriptIndex + 1), 700)
+    } else if (a.awaitingInput === 'step-insight') {
+      // Обязательный инсайт после T/S/R — раньше эти типы давали XP сразу
+      // на «Дальше». Теперь юзер обязан записать рефлексию, она уходит в
+      // дневник со scriptId, и только потом chat двигается дальше.
+      // Это гарантирует, что каждый пройденный шаг оставляет видимый след.
+      addUserMessage(val)
+      setInputVal('')
+      setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: null })))
+      await addBotMessage('Записано в дневник.', 400)
+      onDiaryChange([
+        {
+          id: Date.now(),
+          date: new Date().toLocaleDateString('ru-RU'),
+          ts: Date.now(),
+          aspect: state.currentAspect,
+          text: val,
+          source: 'journey-step-insight',
+          scriptId: script?.id ?? null,
+          promptTitle: script?.title ?? null,
+          prompt: script?.text ?? null,
+        },
+        ...(diary ?? [])
+      ])
+      // XP/stardust по типу скрипта. Word даёт stardust как и раньше.
+      const stardust = script?.type === 'word' ? (script?.stardust ?? 0) : (script?.stardust ?? 0)
+      awardXP(script?.xp ?? 10, stardust, script?.id ?? null)
+      setTimeout(() => deliverScript(a.currentScriptIndex + 1), 600)
     }
   }, [inputVal, a.awaitingInput, a.currentScriptIndex, state.currentAspect, scripts, scores, diary, addBotMessage, addUserMessage, awardXP, deliverScript, onDiaryChange, onScoresChange, removePending])
 

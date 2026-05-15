@@ -539,6 +539,49 @@
   backdrop-filter: blur(14px);
 }
 
+/* Обязательный insight после T/S/R (или U-«сделал»). */
+.stepInsightArea {
+  padding: 16px 16px 18px;
+  background: rgba(13,15,22,.78);
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 5;
+  flex-shrink: 0;
+  backdrop-filter: blur(14px);
+}
+
+.stepInsightLabel {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted, #8f929c);
+  font-weight: 600;
+}
+
+.stepInsightInput {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+  min-height: 80px;
+  outline: none;
+}
+.stepInsightInput:focus {
+  border-color: rgba(179,157,219,0.55);
+}
+
+.stepInsightHint {
+  font-size: 11px;
+  color: var(--text-dim, #5f6169);
+  text-align: right;
+}
+
 .inputField {
   flex: 1;
   background: var(--surface);

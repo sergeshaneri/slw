@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import ScriptCard from './ScriptCard'
 import ScriptButtons from './ScriptButtons'
 import Slider from './Slider'
+import StepInsightPrompt from './StepInsightPrompt'
 import Hint from '../Onboarding/Hint'
 import styles from './JourneyView.module.css'
 
@@ -38,6 +39,7 @@ export default function Chat({
 
   const isNumber = state.awaitingInput === 'number'
   const isText = state.awaitingInput === 'text' || state.awaitingInput === 'exercise_note'
+  const isStepInsight = state.awaitingInput === 'step-insight'
 
   return (
     <>
@@ -176,6 +178,16 @@ export default function Chat({
             ↑
           </button>
         </div>
+      )}
+
+      {/* Обязательный insight после T/S/R-шага. Передаём текст напрямую в
+          onSend через override-аргумент — handleSend в JourneyView
+          обработает ветку awaitingInput='step-insight'. */}
+      {isStepInsight && currentScript && (
+        <StepInsightPrompt
+          kind={currentScript.type}
+          onSubmit={text => onSend(text)}
+        />
       )}
     </>
   )
