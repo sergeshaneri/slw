@@ -1282,10 +1282,20 @@ async def set_aspect_position(
 
     if "currentLevel" in payload:
         folder["currentLevel"] = int(payload["currentLevel"])
+    # Любая смена позиции должна сбросить awaitingInput, иначе UI зависает
+    # на старом ползунке/textarea предыдущего шага. Сохраняем resetMessages
+    # как отдельный жёсткий флаг для случаев когда нужно прибить и чат.
+    position_changed = "currentScriptId" in payload or "currentScriptIndex" in payload
     if "currentScriptId" in payload:
         folder["currentScriptId"] = payload["currentScriptId"]
     if "currentScriptIndex" in payload:
         folder["currentScriptIndex"] = int(payload["currentScriptIndex"])
+    if position_changed:
+        # Сбрасываем awaitingInput всегда — иначе старый ползунок останется
+        # активным и юзер не сможет двинуться дальше.
+        folder["awaitingInput"] = None
+        # pendingTasks могут ссылаться на устаревшие скрипты — чистим.
+        folder["pendingTasks"] = []
     if payload.get("resetMessages"):
         folder["messages"] = []
         folder["currentScriptIndex"] = 0
@@ -1399,6 +1409,10 @@ async def auto_position_from_diary(
 
         folder["currentScriptId"] = last_sid
         folder["currentLevel"] = detected_level
+        # Сбрасываем awaitingInput — после смены позиции UI не должен
+        # ожидать ввод от старого скрипта (ползунок/textarea).
+        folder["awaitingInput"] = None
+        folder["pendingTasks"] = []
         aspects[lat] = folder
 
         changes.append({
