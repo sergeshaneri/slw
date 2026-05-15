@@ -23,7 +23,7 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, di
   }, [selectedAspect])
 
   if (!selectedAspect) {
-    return <AspectsGrid scores={scores} onAspectSelect={onAspectSelect} />
+    return <AspectsGrid scores={scores} onAspectSelect={onAspectSelect} journey={journey} />
   }
 
   const data = ASPECT_DATA[selectedAspect]
@@ -69,12 +69,15 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, di
 
 // ─── Сетка 8 аспектов ──────────────────────────────────────────────────────
 
-function AspectsGrid({ scores, onAspectSelect }) {
+function AspectsGrid({ scores, onAspectSelect, journey }) {
   return (
     <div className={`${styles.aspectsGrid} ${styles.fadeIn}`}>
       {ASPECT_KEYS.map((key, i) => {
         const d = ASPECT_DATA[key]
         const color = ASPECT_COLORS[key]
+        const folder = journey?.aspects?.[key]
+        const currentLevel = folder?.currentLevel ?? 0
+        const completed = (folder?.completedScripts ?? []).length
         return (
           <button
             key={key}
@@ -90,6 +93,9 @@ function AspectsGrid({ scores, onAspectSelect }) {
             </div>
             <div className={styles.aspectName}>{d.name}</div>
             <div className={styles.aspectSub}>{d.sub}</div>
+            {d.metaphor && (
+              <div className={styles.aspectMetaphor}>{d.metaphor}</div>
+            )}
             <div className={styles.aspectMeter}>
               <div className={styles.aspectMeterFill} style={{
                 width: `${scores[key] * 10}%`,
@@ -97,11 +103,27 @@ function AspectsGrid({ scores, onAspectSelect }) {
                 boxShadow: `0 0 12px ${color}88`
               }} />
             </div>
+            <div className={styles.aspectProgress}>
+              <span className={styles.aspectLevelPill} style={{ borderColor: `${color}88`, color }}>
+                L{currentLevel}
+              </span>
+              <span className={styles.aspectStepsCount}>
+                {completed > 0 ? `${completed} ${pluralSteps(completed)} пройдено` : 'не начато'}
+              </span>
+            </div>
           </button>
         )
       })}
     </div>
   )
+}
+
+function pluralSteps(n) {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return 'шаг'
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'шага'
+  return 'шагов'
 }
 
 // ─── Оглавление аспекта ────────────────────────────────────────────────────

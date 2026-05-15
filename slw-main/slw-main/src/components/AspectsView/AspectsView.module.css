@@ -148,12 +148,26 @@
   position: relative;
 }
 
+.aspectMetaphor {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim, #8f929c);
+  margin-top: 6px;
+  font-style: italic;
+  position: relative;
+  /* metaphor может быть длинной (4 пункта через ·) — даём ей дышать */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .aspectMeter {
   height: 4px;
   background: rgba(255,255,255,0.07);
   border-radius: 3px;
   overflow: hidden;
-  margin-top: 8px;
+  margin-top: 10px;
   position: relative;
 }
 
@@ -161,6 +175,31 @@
   height: 100%;
   border-radius: 3px;
   transition: width .3s ease;
+}
+
+.aspectProgress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  position: relative;
+  font-size: 11px;
+}
+
+.aspectLevelPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  background: rgba(0,0,0,0.18);
+}
+
+.aspectStepsCount {
+  color: var(--text-muted, #8f929c);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
