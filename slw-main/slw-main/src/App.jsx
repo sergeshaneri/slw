@@ -331,33 +331,56 @@ export default function App() {
     }
   }
 
-  // Гvardованный save: гарантирует, что если кто-то ещё (admin-операция,
-  // другая вкладка, impersonation) изменил state — мы не перетрём.
-  // stateVersionRef объявлен выше (до loadFromApi) — см. там.
-  const saveStateGuarded = async (patch) => {
-    try {
-      const res = await saveState({
-        ...patch,
-        expected_updated_at: stateVersionRef.current,
-      })
-      if (res?.updated_at) stateVersionRef.current = res.updated_at
-      return res
-    } catch (e) {
-      if (e.status === 409) {
-        console.warn('State conflict — reloading from server', e)
-        setToasts(prev => [...prev, {
-          id: `state-conflict-${Date.now()}`,
-          kind: 'warning',
-          icon: '🔄',
-          title: 'Прогресс обновился',
-          desc: 'Перезагружаю свежий с сервера…',
-        }])
-        // Перечитываем стейт. setJourney/setHistory обновятся, ref тоже.
-        await loadFromApi()
+  // Гvardованный save с дебаунсом. Решает две проблемы:
+  // 1. Race condition: за 1 шаг в чате state меняется 3-5 раз — без дебаунса
+  //    каждое изменение шлёт PUT, ref не успевает обновиться, второй PUT
+  //    получает 409, фронт срабатывает на loadFromApi, локальный progress
+  //    откатывается. Юзер видит «загрузку» и застрявший ползунок.
+  // 2. Network spam: 5 PUT-ов в секунду — лишняя нагрузка.
+  //
+  // Реальный 409 (от admin-операции / другой вкладки) сейчас просто
+  // обновляет ref из тела ответа и продолжает. Если бы был настоящий
+  // конфликт — следующий save отправит свежий ref. Полный reload через
+  // loadFromApi оказался слишком агрессивным — он триггерил «загрузку».
+  const saveDebounceRef = useRef(null)
+  const lastSavePromiseRef = useRef(Promise.resolve())
+
+  const saveStateGuarded = (patch) => {
+    // Сохраняем последний патч, чтобы при дебаунсе слать актуальный.
+    saveDebounceRef.current = { ...(saveDebounceRef.current ?? {}), ...patch }
+
+    // Если предыдущий save ещё в полёте — отложимся за ним.
+    lastSavePromiseRef.current = lastSavePromiseRef.current.then(async () => {
+      const merged = saveDebounceRef.current
+      saveDebounceRef.current = null
+      if (!merged) return null
+      try {
+        const res = await saveState({
+          ...merged,
+          expected_updated_at: stateVersionRef.current,
+        })
+        if (res?.updated_at) stateVersionRef.current = res.updated_at
+        return res
+      } catch (e) {
+        if (e.status === 409) {
+          // Обновляем ref свежим значением из тела 409 — следующий save
+          // пойдёт с ним. Loading-индикатор не показываем, тост не сыпем.
+          // Если на самом деле что-то поменялось снаружи (admin) — следующая
+          // ручная перезагрузка страницы подтянет свежий state.
+          const detail = (e && e.detail) || null
+          const fresh = detail && typeof detail === 'object'
+            ? detail.current_updated_at
+            : null
+          if (fresh) stateVersionRef.current = fresh
+          console.warn('state PUT 409, ref refreshed to', fresh)
+          return null
+        }
+        console.error('saveState failed', e)
         return null
       }
-      throw e
-    }
+    })
+
+    return lastSavePromiseRef.current
   }
 
   const saveHistory = async (newHistory) => {

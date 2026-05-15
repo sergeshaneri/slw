@@ -115,7 +115,16 @@ async function request(method, path, body) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw Object.assign(new Error(err.detail ?? 'Request failed'), { status: res.status })
+    // Сохраняем оригинальный detail отдельно: бэк может вернуть структуру
+    // (например 409 со state_conflict). new Error() принимает только строку,
+    // поэтому объект-detail терялся бы при сериализации в message.
+    const messageStr = typeof err.detail === 'string'
+      ? err.detail
+      : (err.detail?.message || JSON.stringify(err.detail || {}))
+    throw Object.assign(new Error(messageStr || 'Request failed'), {
+      status: res.status,
+      detail: err.detail,
+    })
   }
 
   return res.json()

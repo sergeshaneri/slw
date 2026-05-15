@@ -690,19 +690,17 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
   const awardXP = useCallback((xp, stardust = 0, scriptId = null) => {
     if (xp <= 0 && stardust <= 0) return
+
+    // Захватываем текущий state ДО setState — чтобы знать какой шаг
+    // только что завершён (для append-only журнала событий).
+    let completedSnapshot = null
     setState(s => {
-      // Append-only журнал: страховка от потери completedScripts при
-      // CONTENT_VERSION-бампах. Best-effort, ошибки игнорим. Идемпотентно
-      // на бэке через dedupe-проверку.
-      const aspectKey = s.currentAspect
+      // Запоминаем что закрылось — отправим в журнал после setState.
       const folder = aspectOf(s)
-      const completedId = scriptId || folder.currentScriptId
-      if (completedId && aspectKey) {
-        postStepCompleted({
-          aspect: aspectKey,
-          level: folder.currentLevel ?? 0,
-          short_id: completedId,
-        }).catch(err => console.warn('event log failed:', err))
+      completedSnapshot = {
+        aspect: s.currentAspect,
+        level: folder.currentLevel ?? 0,
+        short_id: scriptId || folder.currentScriptId,
       }
 
       // Глобальные счётчики (XP/streak/...).
@@ -722,6 +720,15 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           : (cur.currentScriptId ? [...cur.completedScripts, cur.currentScriptId] : cur.completedScripts)
       }))
     })
+
+    // Append-only журнал: страховка от потери completedScripts при сбросах
+    // state. Best-effort, ошибки игнорируем — идемпотентно на бэке.
+    // ВНЕ setState чтобы не вызывать side-effect в React 18 strict mode.
+    if (completedSnapshot?.short_id && completedSnapshot?.aspect) {
+      postStepCompleted(completedSnapshot)
+        .catch(err => console.warn('event log failed:', err?.message))
+    }
+
     const parts = []
     if (xp > 0) parts.push(`+${xp} XP`)
     if (stardust > 0) parts.push(`+${stardust} ✦`)
