@@ -45,12 +45,15 @@ async def _find_target(
     tg_username: str | None,
     display_name: str | None,
     user_id: int | None,
+    telegram_id: int | None,
 ) -> WebUser | None:
     """Найти юзера по любому из переданных критериев. Возвращает первого совпавшего."""
     if user_id is not None:
         return await session.get(WebUser, user_id)
 
     conditions = []
+    if telegram_id is not None:
+        conditions.append(WebUser.telegram_id == telegram_id)
     if email:
         conditions.append(WebUser.email == email.strip().lower())
     if tg_username:
@@ -108,6 +111,7 @@ def _summarize_journey(journey: dict | None) -> dict[str, Any]:
 async def user_diagnostic(
     email: str | None = Query(None, description="email юзера в web_users"),
     tg_username: str | None = Query(None, description="telegram username (с/без @)"),
+    telegram_id: int | None = Query(None, description="прямой telegram user_id"),
     display_name: str | None = Query(None, description="часть display_name (ILIKE)"),
     user_id: int | None = Query(None, description="web_users.id если известен"),
     current_user: WebUser = Depends(get_current_user),
@@ -115,17 +119,17 @@ async def user_diagnostic(
 ) -> dict[str, Any]:
     """Срез прогресса юзера для диагностики «сбился прогресс».
 
-    Один из параметров (email / tg_username / display_name / user_id) обязателен.
+    Один из параметров (email / tg_username / telegram_id / display_name / user_id) обязателен.
     """
     _require_admin(current_user)
 
-    if not any([email, tg_username, display_name, user_id]):
+    if not any([email, tg_username, telegram_id, display_name, user_id]):
         raise HTTPException(
             status_code=400,
-            detail="Нужен хотя бы один из: email, tg_username, display_name, user_id",
+            detail="Нужен хотя бы один из: email, tg_username, telegram_id, display_name, user_id",
         )
 
-    target = await _find_target(session, email, tg_username, display_name, user_id)
+    target = await _find_target(session, email, tg_username, display_name, user_id, telegram_id)
     if not target:
         raise HTTPException(status_code=404, detail="Юзер не найден")
 
