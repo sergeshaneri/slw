@@ -9,9 +9,10 @@
   answers, web_diary_entries). Возвращает чистый JSON.
 """
 import logging
+from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -375,3 +376,182 @@ def _build_recommendation(
             "web_content_version": web_state.get("contentVersion"),
         },
     }
+
+
+# ── Restore from diary ──────────────────────────────────────────────────────
+# Маппинг кириллических кодов аспектов из web_diary_entries.aspect на латинские
+# ключи в web_state.journey.aspects.
+CYR_TO_LAT_ASPECT = {
+    "БС": "Si",
+    "ЧС": "Se",
+    "БЛ": "Ti",
+    "ЧЛ": "Te",
+    "БЭ": "Fi",
+    "ЧЭ": "Fe",
+    "БИ": "Ni",
+    "ЧИ": "Ne",
+}
+
+# Скрипты «итог уровня» — их наличие в дневнике говорит о факте закрытия L0.
+# R-1..R-3 — стандартные имена рефлексий в L0 каждого аспекта.
+LEVEL_COMPLETE_MARKERS = {0: {"R-2", "R-3"}}
+
+
+def _detect_completed_level(scripts: set[str]) -> int:
+    """Возвращает максимально подтверждённый L по набору пройденных скриптов.
+
+    Эвристика: для L0 — наличие R-2 («Итоги уровня») или R-3 («Намерение»)
+    означает закрытие уровня. L1/L2/L3 — не реализовано (нужен контент-маркер).
+    """
+    if scripts & LEVEL_COMPLETE_MARKERS[0]:
+        return 1  # L0 закрыт → следующий уровень 1
+    return 0
+
+
+@router.post("/restore-from-diary")
+async def restore_from_diary(
+    payload: dict = Body(...),
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Восстановить web_state.journey.aspects[X].completedScripts из дневника.
+
+    Тело запроса:
+        {
+            "telegram_id": 2057105065,  // или email, или user_id
+            "dry_run": true,            // default true
+            "bump_levels": true,        // default true — поднимать currentLevel при R-2/R-3
+        }
+
+    Действие:
+    1. Находит юзера
+    2. Собирает все extra.scriptId из web_diary_entries, группирует по аспекту
+    3. Маппит кириллицу → латиницу
+    4. Мёрджит в completedScripts (set-объединение, не дубли)
+    5. Если bump_levels=true и есть R-2/R-3 → currentLevel = max(current, 1)
+    6. Если не dry_run → пишет в БД, бэкап старого journey в _backup_before_restore
+    7. Возвращает diff: per-aspect added scripts, level before/after, applied flag
+
+    Гейтится по is_admin.
+    """
+    _require_admin(current_user)
+
+    email = payload.get("email")
+    tg_username = payload.get("tg_username")
+    telegram_id = payload.get("telegram_id")
+    display_name = payload.get("display_name")
+    user_id = payload.get("user_id")
+    dry_run = payload.get("dry_run", True)
+    bump_levels = payload.get("bump_levels", True)
+
+    if not any([email, tg_username, telegram_id, display_name, user_id]):
+        raise HTTPException(
+            status_code=400,
+            detail="Нужен хотя бы один из: email, tg_username, telegram_id, display_name, user_id",
+        )
+
+    target = await _find_target(session, email, tg_username, display_name, user_id, telegram_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Юзер не найден")
+
+    web_state = await session.get(WebState, target.id)
+    if not web_state or not web_state.journey:
+        raise HTTPException(
+            status_code=409,
+            detail="У юзера нет web_state.journey — нечего восстанавливать (juniety пуст)",
+        )
+
+    # 1. Собрать scriptId из дневника
+    diary_rows = (await session.execute(
+        select(WebDiaryEntry).where(WebDiaryEntry.web_user_id == target.id)
+    )).scalars().all()
+
+    scripts_by_aspect: dict[str, set[str]] = {}
+    diary_aspects_seen: set[str] = set()
+    for row in diary_rows:
+        extra = row.extra or {}
+        script_id = extra.get("scriptId")
+        cyr_aspect = row.aspect
+        if not script_id or not cyr_aspect:
+            continue
+        diary_aspects_seen.add(cyr_aspect)
+        lat_aspect = CYR_TO_LAT_ASPECT.get(cyr_aspect)
+        if not lat_aspect:
+            # Например 'general', 'onboarding' — пропускаем
+            continue
+        scripts_by_aspect.setdefault(lat_aspect, set()).add(script_id)
+
+    # 2. Сформировать diff и новый journey
+    journey = dict(web_state.journey)
+    journey_aspects = dict(journey.get("aspects") or {})
+
+    per_aspect_diff: list[dict[str, Any]] = []
+    any_changes = False
+
+    for lat_aspect, diary_scripts in scripts_by_aspect.items():
+        folder = dict(journey_aspects.get(lat_aspect) or {})
+        existing_scripts = set(folder.get("completedScripts") or [])
+        merged_scripts = existing_scripts | diary_scripts
+        added_scripts = sorted(diary_scripts - existing_scripts)
+
+        current_level_before = folder.get("currentLevel") or 0
+        detected_level = _detect_completed_level(merged_scripts)
+        current_level_after = (
+            max(current_level_before, detected_level) if bump_levels else current_level_before
+        )
+
+        if added_scripts or current_level_after != current_level_before:
+            any_changes = True
+
+        per_aspect_diff.append({
+            "aspect": lat_aspect,
+            "completedScripts_before": sorted(existing_scripts),
+            "completedScripts_added": added_scripts,
+            "completedScripts_after": sorted(merged_scripts),
+            "currentLevel_before": current_level_before,
+            "currentLevel_after": current_level_after,
+        })
+
+        # Готовим обновлённую папку для записи (использвается только если не dry_run)
+        folder["completedScripts"] = sorted(merged_scripts)
+        if bump_levels and current_level_after != current_level_before:
+            folder["currentLevel"] = current_level_after
+        journey_aspects[lat_aspect] = folder
+
+    journey["aspects"] = journey_aspects
+
+    # 3. Список аспектов из дневника, которые мы не смогли смаппить
+    unmapped_aspects = sorted(
+        a for a in diary_aspects_seen
+        if a not in CYR_TO_LAT_ASPECT and a not in ("general", "onboarding")
+    )
+
+    result: dict[str, Any] = {
+        "user": {
+            "id": target.id,
+            "email": target.email,
+            "telegram_id": target.telegram_id,
+        },
+        "dry_run": dry_run,
+        "bump_levels": bump_levels,
+        "applied": False,
+        "any_changes": any_changes,
+        "diff_by_aspect": per_aspect_diff,
+        "unmapped_diary_aspects": unmapped_aspects,
+    }
+
+    # 4. Применить, если не dry_run и есть изменения
+    if not dry_run and any_changes:
+        # Бэкап старого journey в audit-поле перед перезаписью
+        original_journey = web_state.journey or {}
+        journey["_backup_before_restore"] = {
+            "at": datetime.utcnow().isoformat(),
+            "by_admin_id": current_user.id,
+            "previous_journey": original_journey,
+        }
+        web_state.journey = journey
+        web_state.updated_at = datetime.utcnow()
+        await session.commit()
+        result["applied"] = True
+
+    return result
