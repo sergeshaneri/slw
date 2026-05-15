@@ -1,19 +1,23 @@
-"""Admin-only диагностические эндпоинты.
+"""Admin-only эндпоинты для саппорта и операций.
 
-Используется для разбора кейсов «у юзера сбился прогресс». Гейтится по
-`web_users.is_admin`. Все эндпоинты read-only.
+Гейтится по `web_users.is_admin`. Включает read-only диагностику + ряд
+write-операций (restore, promote, impersonate). Все мутации логируют
+старое состояние в audit-поля JSONB.
 
 Эндпоинты:
-- GET /api/admin/user-diagnostic — найти юзера по email/tg-username/имени и
-  собрать срез его прогресса (web_state, journey_events, user_aspect_state,
-  answers, web_diary_entries). Возвращает чистый JSON.
+- GET  /api/admin/user-diagnostic — диагностика прогресса юзера
+- POST /api/admin/restore-from-diary — восстановить completedScripts из дневника
+- GET  /api/admin/users — пагинированный список юзеров
+- POST /api/admin/promote — выдать/забрать is_admin
+- POST /api/admin/impersonate — выдать JWT от имени другого юзера
+- POST /api/admin/rollback-restore — откатить последний restore-from-diary
 """
 import logging
 from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from sqlalchemy import func, or_, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
@@ -28,6 +32,7 @@ from app.db.models import (
     WebUser,
 )
 from app.db.session import get_session
+from app.web.auth import create_token
 from app.web.deps import get_current_user
 
 log = logging.getLogger(__name__)
@@ -318,13 +323,35 @@ def _build_recommendation(
         (bot.get("user_state") or {}).get("current_step_id") if isinstance(bot.get("user_state"), dict) else False
     )
     journey_present = web_state.get("present", False)
-    has_web_progress = any(
-        (folder.get("completedScripts") or 0) > 0
-        for folder in (web_state.get("aspects") or {}).values()
+    aspects = web_state.get("aspects") or {}
+    sum_completed_scripts = sum(
+        (folder.get("completedScripts") or 0) for folder in aspects.values()
     )
+    has_web_progress = sum_completed_scripts > 0
+    total_completed = web_state.get("totalCompleted") or 0
+    # Drift = глобальный totalCompleted сильно больше суммы completedScripts
+    # по аспектам. Это значит, что прогресс был, но completedScripts стёрся
+    # (например при CONTENT_VERSION bump до v25). Порог 10 — чтобы не ловить
+    # шумные расхождения на 1-2 скрипта.
+    data_drift = total_completed - sum_completed_scripts > 10
     diary_has_script_refs = len(diary.get("with_script_refs_last_50") or []) > 0
 
-    if events_count > 0 and not has_web_progress:
+    if data_drift and diary_has_script_refs:
+        scenario = "data_drift_recoverable"
+        action = (
+            f"totalCompleted={total_completed} сильно больше суммы completedScripts="
+            f"{sum_completed_scripts} — прогресс был стёрт (вероятно при бампе "
+            "CONTENT_VERSION). В дневнике есть scriptId — восстанавливаемо через "
+            "POST /api/admin/restore-from-diary."
+        )
+    elif data_drift and not diary_has_script_refs:
+        scenario = "data_drift_partial"
+        action = (
+            f"totalCompleted={total_completed} больше суммы completedScripts="
+            f"{sum_completed_scripts}, но scriptId-ссылок в дневнике нет. "
+            "Восстановить точные шаги нельзя, можно поднять currentLevel вручную."
+        )
+    elif events_count > 0 and not has_web_progress:
         scenario = "events_present_but_not_merged"
         action = (
             "В journey_events есть записи, но web_state.completedScripts пуст. "
@@ -371,6 +398,9 @@ def _build_recommendation(
             "has_bot_progress": has_bot_progress,
             "events_count": events_count,
             "has_web_progress": has_web_progress,
+            "sum_completedScripts": sum_completed_scripts,
+            "totalCompleted": total_completed,
+            "data_drift": data_drift,
             "diary_has_script_refs": diary_has_script_refs,
             "web_state_present": journey_present,
             "web_content_version": web_state.get("contentVersion"),
@@ -542,8 +572,13 @@ async def restore_from_diary(
 
     # 4. Применить, если не dry_run и есть изменения
     if not dry_run and any_changes:
-        # Бэкап старого journey в audit-поле перед перезаписью
-        original_journey = web_state.journey or {}
+        # Бэкап старого journey в audit-поле перед перезаписью.
+        # Очищаем _backup_before_restore из original_journey, чтобы вложенные
+        # бэкапы не разрастались (последний restore «съест» предыдущие).
+        original_journey = {
+            k: v for k, v in (web_state.journey or {}).items()
+            if k != "_backup_before_restore"
+        }
         journey["_backup_before_restore"] = {
             "at": datetime.utcnow().isoformat(),
             "by_admin_id": current_user.id,
@@ -555,3 +590,247 @@ async def restore_from_diary(
         result["applied"] = True
 
     return result
+
+
+# ── Users list ──────────────────────────────────────────────────────────────
+
+@router.get("/users")
+async def list_users(
+    limit: int = Query(50, ge=1, le=200, description="Сколько вернуть (max 200)"),
+    offset: int = Query(0, ge=0),
+    search: str | None = Query(
+        None, description="Подстрока для поиска по email/display_name/tg_username"
+    ),
+    sort: str = Query(
+        "recent",
+        description="recent | xp | created — порядок сортировки",
+    ),
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Пагинированный список юзеров с метриками: XP, completedScripts, lastActiveDate.
+
+    Гейтится по is_admin. Берёт данные из web_users LEFT JOIN web_state.
+    """
+    _require_admin(current_user)
+
+    base = select(WebUser, WebState).outerjoin(WebState, WebState.web_user_id == WebUser.id)
+
+    if search:
+        pattern = f"%{search.strip()}%"
+        base = base.where(or_(
+            WebUser.email.ilike(pattern),
+            WebUser.display_name.ilike(pattern),
+            WebUser.telegram_username.ilike(pattern),
+            WebUser.telegram_first_name.ilike(pattern),
+        ))
+
+    if sort == "created":
+        base = base.order_by(desc(WebUser.created_at))
+    elif sort == "xp":
+        # JSONB-сортировка по xp — fallback на created_at при null.
+        base = base.order_by(
+            desc(WebState.journey["xp"].astext.cast_to(__import__("sqlalchemy").Integer)),
+            desc(WebUser.created_at),
+        )
+    else:
+        # recent — по updated_at WebState, затем по created_at юзера
+        base = base.order_by(desc(WebState.updated_at), desc(WebUser.created_at))
+
+    total = (await session.execute(
+        select(func.count(WebUser.id)).where(
+            WebUser.id.in_(select(WebUser.id).where(
+                or_(
+                    WebUser.email.ilike(f"%{search.strip()}%") if search else True,
+                    WebUser.display_name.ilike(f"%{search.strip()}%") if search else True,
+                    WebUser.telegram_username.ilike(f"%{search.strip()}%") if search else True,
+                    WebUser.telegram_first_name.ilike(f"%{search.strip()}%") if search else True,
+                ) if search else True
+            ))
+        )
+    )).scalar_one() or 0
+
+    rows = (await session.execute(base.limit(limit).offset(offset))).all()
+
+    users_out: list[dict[str, Any]] = []
+    for user_row, state_row in rows:
+        journey = (state_row.journey if state_row else None) or {}
+        aspects = journey.get("aspects") or {}
+        sum_completed = sum(
+            len((folder or {}).get("completedScripts") or [])
+            for folder in aspects.values()
+        )
+        users_out.append({
+            "id": user_row.id,
+            "email": user_row.email,
+            "telegram_id": user_row.telegram_id,
+            "telegram_username": user_row.telegram_username,
+            "telegram_first_name": user_row.telegram_first_name,
+            "display_name": user_row.display_name,
+            "is_admin": user_row.is_admin,
+            "created_at": user_row.created_at.isoformat() if user_row.created_at else None,
+            "updated_at": (
+                state_row.updated_at.isoformat()
+                if state_row and state_row.updated_at else None
+            ),
+            "xp": journey.get("xp") or 0,
+            "totalCompleted": journey.get("totalCompleted") or 0,
+            "sum_completedScripts": sum_completed,
+            "currentAspect": journey.get("currentAspect"),
+            "lastActiveDate": journey.get("lastActiveDate"),
+            "contentVersion": journey.get("contentVersion"),
+            "skillsCount": len(journey.get("skills") or {}),
+        })
+
+    return {
+        "users": users_out,
+        "limit": limit,
+        "offset": offset,
+        "total": total,
+    }
+
+
+# ── Promote / demote admin ──────────────────────────────────────────────────
+
+@router.post("/promote")
+async def promote_user(
+    payload: dict = Body(...),
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Выдать или забрать is_admin у другого юзера.
+
+    Тело: { "user_id" | "email" | "telegram_id" | "tg_username", "is_admin": bool }
+
+    Защита от самовыстрела: нельзя забрать админа у себя через этот endpoint.
+    """
+    _require_admin(current_user)
+
+    target = await _find_target(
+        session,
+        email=payload.get("email"),
+        tg_username=payload.get("tg_username"),
+        display_name=None,
+        user_id=payload.get("user_id"),
+        telegram_id=payload.get("telegram_id"),
+    )
+    if not target:
+        raise HTTPException(status_code=404, detail="Юзер не найден")
+
+    new_value = bool(payload.get("is_admin", True))
+
+    if target.id == current_user.id and not new_value:
+        raise HTTPException(
+            status_code=400,
+            detail="Нельзя самому себе забрать админа через этот endpoint",
+        )
+
+    old_value = target.is_admin
+    target.is_admin = new_value
+    await session.commit()
+
+    log.info(
+        "admin promote: %s set is_admin=%s for user_id=%s (was %s)",
+        current_user.email or current_user.id, new_value, target.id, old_value,
+    )
+    return {
+        "user_id": target.id,
+        "email": target.email,
+        "telegram_id": target.telegram_id,
+        "is_admin_before": old_value,
+        "is_admin_after": new_value,
+    }
+
+
+# ── Impersonate ─────────────────────────────────────────────────────────────
+
+@router.post("/impersonate")
+async def impersonate_user(
+    payload: dict = Body(...),
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Выдать JWT от имени другого юзера — позволяет админу увидеть UI так,
+    как видит юзер. Используй с осторожностью: токен реален и пишет от его лица.
+
+    Тело: { "user_id" | "email" | "telegram_id" | "tg_username" }
+    """
+    _require_admin(current_user)
+
+    target = await _find_target(
+        session,
+        email=payload.get("email"),
+        tg_username=payload.get("tg_username"),
+        display_name=None,
+        user_id=payload.get("user_id"),
+        telegram_id=payload.get("telegram_id"),
+    )
+    if not target:
+        raise HTTPException(status_code=404, detail="Юзер не найден")
+
+    token = create_token(target.id)
+    log.warning(
+        "admin impersonate: %s issued token for user_id=%s",
+        current_user.email or current_user.id, target.id,
+    )
+    return {
+        "user": {
+            "id": target.id,
+            "email": target.email,
+            "display_name": target.display_name,
+            "telegram_id": target.telegram_id,
+        },
+        "token": token,
+        "warning": "Этот токен действует как полноценный логин юзера. Не пиши от его имени.",
+    }
+
+
+# ── Rollback restore ────────────────────────────────────────────────────────
+
+@router.post("/rollback-restore")
+async def rollback_restore(
+    payload: dict = Body(...),
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Откатить последний restore-from-diary к сохранённому бэкапу.
+
+    Тело: { "user_id" | "email" | "telegram_id" | "tg_username" }
+    """
+    _require_admin(current_user)
+
+    target = await _find_target(
+        session,
+        email=payload.get("email"),
+        tg_username=payload.get("tg_username"),
+        display_name=None,
+        user_id=payload.get("user_id"),
+        telegram_id=payload.get("telegram_id"),
+    )
+    if not target:
+        raise HTTPException(status_code=404, detail="Юзер не найден")
+
+    web_state = await session.get(WebState, target.id)
+    if not web_state or not web_state.journey:
+        raise HTTPException(status_code=409, detail="Нет web_state для отката")
+
+    backup = (web_state.journey or {}).get("_backup_before_restore")
+    if not backup or not backup.get("previous_journey"):
+        raise HTTPException(
+            status_code=409,
+            detail="В web_state.journey нет _backup_before_restore — откатывать нечего",
+        )
+
+    web_state.journey = backup["previous_journey"]
+    web_state.updated_at = datetime.utcnow()
+    await session.commit()
+
+    log.info(
+        "admin rollback-restore: %s rolled back user_id=%s (backup made at %s)",
+        current_user.email or current_user.id, target.id, backup.get("at"),
+    )
+    return {
+        "user_id": target.id,
+        "rolled_back_to": backup.get("at"),
+        "by_admin_id": backup.get("by_admin_id"),
+    }

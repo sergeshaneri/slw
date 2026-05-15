@@ -601,4 +601,47 @@ export async function dismissDiscoverCard(key) {
   return request('POST', '/api/onboarding/dismiss-card', { key })
 }
 
+// ── Admin ─────────────────────────────────────────────────────────────────────
+// Гейтятся по is_admin на бэке. Используются в AdminView.
+
+export async function adminListUsers({ limit = 50, offset = 0, search = '', sort = 'recent' } = {}) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset), sort })
+  if (search) params.set('search', search)
+  return request('GET', `/api/admin/users?${params}`)
+}
+
+export async function adminUserDiagnostic({ user_id, email, tg_username, telegram_id, display_name }) {
+  const params = new URLSearchParams()
+  if (user_id != null) params.set('user_id', String(user_id))
+  if (email) params.set('email', email)
+  if (tg_username) params.set('tg_username', tg_username)
+  if (telegram_id != null) params.set('telegram_id', String(telegram_id))
+  if (display_name) params.set('display_name', display_name)
+  return request('GET', `/api/admin/user-diagnostic?${params}`)
+}
+
+export async function adminRestoreFromDiary({ user_id, telegram_id, email, dry_run = true, bump_levels = true }) {
+  return request('POST', '/api/admin/restore-from-diary', {
+    user_id, telegram_id, email, dry_run, bump_levels,
+  })
+}
+
+export async function adminPromote({ user_id, telegram_id, email, is_admin }) {
+  return request('POST', '/api/admin/promote', {
+    user_id, telegram_id, email, is_admin,
+  })
+}
+
+export async function adminImpersonate({ user_id, telegram_id, email }) {
+  return request('POST', '/api/admin/impersonate', {
+    user_id, telegram_id, email,
+  })
+}
+
+export async function adminRollbackRestore({ user_id, telegram_id, email }) {
+  return request('POST', '/api/admin/rollback-restore', {
+    user_id, telegram_id, email,
+  })
+}
+
 export { getToken, setToken }

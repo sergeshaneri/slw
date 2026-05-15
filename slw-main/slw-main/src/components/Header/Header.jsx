@@ -14,6 +14,7 @@ export default function Header({
   onOpenProfile,
   onOpenDM,
   onOpenHall,
+  onOpenAdmin,
 }) {
   const navItems = [
     // Главная: для залогиненных — Дашборд, гостям — сразу к Колесу.
@@ -70,6 +71,16 @@ export default function Header({
                 title="Добавить email и пароль к аккаунту"
               >
                 + email
+              </button>
+            )}
+            {user.is_admin && onOpenAdmin && (
+              <button
+                type="button"
+                onClick={onOpenAdmin}
+                className={styles.authBtn}
+                title="Admin Panel"
+              >
+                🛡 admin
               </button>
             )}
             {onOpenMyProfile && (

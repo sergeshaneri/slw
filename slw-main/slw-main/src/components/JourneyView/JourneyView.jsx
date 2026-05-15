@@ -258,7 +258,17 @@ function SkillTreeIntroHint({ user }) {
 //     17→50, childhoodQuestions 20→50. Новое поле facts (90) + новый блок
 //     'facts' в blocks.js (L2). Источник — 8 .md-файлов в Fi/. Чат НЕ
 //     сбрасывается (только наполнение блоков теории аспекта).
-export const CONTENT_VERSION = 24
+// v25 — Поведенческое изменение migrateState: при бампе CONTENT_VERSION
+//     теперь СОХРАНЯЕМ completedScripts и currentLevel каждого аспекта.
+//     Раньше сбрасывали полностью — это привело к кейсу, когда у юзера
+//     totalCompleted=114 а sum(completedScripts) свелся к 9 после бампа.
+//     Чат-история (messages) всё равно стирается под новый контент,
+//     pendingTasks тоже (они ссылаются на конкретные скрипты-задания).
+//     Раз сбрасывается только messages — пользователь увидит, как ему
+//     заново предложат продолжить с правильного уровня, но факты
+//     прохождения не потеряются. Если позже потребуется реально «начать
+//     с нуля» — это будет отдельная кнопка в UI.
+export const CONTENT_VERSION = 25
 
 // Миграция id навыков после ревизии дерева (v9). Старый id → новый.
 // Если у юзера уже есть запись по новому id, старая отбрасывается
@@ -515,14 +525,47 @@ function migrateState(stored) {
     }
   }
 
-  // Контент-версия не совпала — сбрасываем папки аспектов до дефолтов
-  // (как делал старый код: messages/completedScripts/pendingTasks/
-  // currentLevel обнулялись). Глобальные поля (XP/streak/skills/etc) —
-  // сохраняем.
+  // Контент-версия не совпала. С v25 (раньше — полный сброс папок) делаем
+  // partial reset: для каждого аспекта СОХРАНЯЕМ completedScripts и
+  // currentLevel (это факты прохождения, которые не меняются от правок
+  // текстов), но СБРАСЫВАЕМ messages/pendingTasks/currentScriptIndex/
+  // currentScriptId/awaitingInput — чат-история под старые тексты не
+  // совместима с новыми, лучше начать новый сценарий с правильного уровня.
+  // Глобальные поля (XP/streak/skills/etc) — сохраняем как раньше.
+  const preservedAspects = {}
+  const incomingForReset = {
+    ...(stored.aspects ?? {}),
+  }
+  // Если есть плоские legacy-поля — поглощаем их в активный аспект перед
+  // частичным сбросом, чтобы не потерять completedScripts/currentLevel
+  // у юзеров со старым плоским state.
+  if (hasFlatLegacy) {
+    const cur = incomingForReset[currentAspect] ?? {}
+    incomingForReset[currentAspect] = {
+      ...cur,
+      ...Object.fromEntries(
+        Object.entries(flatLegacy).filter(([, v]) => v !== undefined)
+      ),
+    }
+  }
+  for (const [aspectKey, folder] of Object.entries(incomingForReset)) {
+    const normalized = normalizeAspect(folder)
+    preservedAspects[aspectKey] = {
+      ...DEFAULT_ASPECT_STATE,
+      // Сохраняем факты прохождения.
+      currentLevel: normalized.currentLevel ?? 0,
+      completedScripts: normalized.completedScripts ?? [],
+      // messages / pendingTasks / currentScriptIndex / currentScriptId /
+      // awaitingInput — намеренно из DEFAULT_ASPECT_STATE (т.е. пустые).
+    }
+  }
+  if (!preservedAspects[currentAspect]) {
+    preservedAspects[currentAspect] = { ...DEFAULT_ASPECT_STATE }
+  }
   return {
     ...DEFAULT_JOURNEY,
     currentAspect,
-    aspects: { [currentAspect]: { ...DEFAULT_ASPECT_STATE } },
+    aspects: preservedAspects,
     onboardingStep: stored.onboardingStep ?? 0,
     screen: stored.screen ?? DEFAULT_JOURNEY.screen,
     xp: stored.xp ?? 0,

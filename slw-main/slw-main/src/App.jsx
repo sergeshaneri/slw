@@ -14,6 +14,7 @@ import DMView from './components/DMView/DMView'
 import SearchView from './components/SearchView/SearchView'
 import DashboardView from './components/DashboardView/DashboardView'
 import SettingsView from './components/SettingsView/SettingsView'
+import AdminView from './components/AdminView/AdminView'
 import AchievementToast from './components/Toast/AchievementToast'
 import IntroTour from './components/Onboarding/IntroTour'
 import { fetchMyProfile, markOnboardingDone } from './api/client'
@@ -725,6 +726,7 @@ export default function App() {
         onOpenProfile={openPublicProfile}
         onOpenDM={openDM}
         onOpenHall={enterHall}
+        onOpenAdmin={() => setView('admin')}
         t={t}
       />
 
@@ -923,6 +925,13 @@ export default function App() {
               setView('wheel')
             }}
             onLogout={logout}
+          />
+        )}
+
+        {view === 'admin' && user?.is_admin && (
+          <AdminView
+            onBack={() => setView('dashboard')}
+            onImpersonateApply={() => window.location.reload()}
           />
         )}
 
