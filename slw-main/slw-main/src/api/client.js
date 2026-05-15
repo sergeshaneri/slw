@@ -688,4 +688,22 @@ export async function adminPatchInsight(insightId, patch) {
   return request('PATCH', `/api/admin/insight/${insightId}`, patch)
 }
 
+export async function adminSetAspectPosition(userId, { aspect, currentLevel, currentScriptId, currentScriptIndex, resetMessages, addToCompleted }) {
+  return request('POST', `/api/admin/user/${userId}/set-aspect-position`, {
+    aspect, currentLevel, currentScriptId, currentScriptIndex, resetMessages, addToCompleted,
+  })
+}
+
+export async function adminAutoPositionFromDiary(userId) {
+  return request('POST', `/api/admin/user/${userId}/auto-position-from-diary`)
+}
+
+export async function adminResetAspectPosition(userId, aspect) {
+  return request('POST', `/api/admin/user/${userId}/reset-aspect-position`, { aspect })
+}
+
+export async function adminNormalizeCounters(userId) {
+  return request('POST', `/api/admin/user/${userId}/normalize-counters`)
+}
+
 export { getToken, setToken }

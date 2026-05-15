@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+  adminAutoPositionFromDiary,
   adminImpersonate,
   adminListUsers,
+  adminNormalizeCounters,
   adminPatchUserState,
   adminPromote,
+  adminResetAspectPosition,
   adminRestoreFromDiary,
   adminRollbackRestore,
+  adminSetAspectPosition,
   adminUserDiagnostic,
   adminUserDiary,
   setToken,
 } from '../../api/client'
+import { ASPECT_KEYS, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import styles from './AdminView.module.css'
 
 const SORT_OPTIONS = [
@@ -33,6 +38,8 @@ export default function UsersTab({ onImpersonateApply }) {
 
   const [fullDiary, setFullDiary] = useState(null)
   const [stateEditor, setStateEditor] = useState(null)  // { text, error } | null
+  // Position-editor: { aspect, currentLevel, currentScriptId, resetMessages } | null
+  const [positionEditor, setPositionEditor] = useState(null)
 
   const pushLog = useCallback(msg => {
     setActionLog(prev => [{ ts: Date.now(), msg }, ...prev].slice(0, 12))
@@ -166,6 +173,89 @@ export default function UsersTab({ onImpersonateApply }) {
     }
   }
 
+  // ─── Position editing ───────────────────────────────────────────────────
+  const refreshDiagnostic = async () => {
+    if (!selectedUser) return
+    try {
+      const fresh = await adminUserDiagnostic({ user_id: selectedUser.id })
+      setDiagnostic(fresh)
+    } catch (e) {
+      pushLog(`Diag refresh error: ${e.message}`)
+    }
+  }
+
+  const openPositionEditor = () => {
+    if (!diagnostic) return
+    const aspects = diagnostic.web_state?.aspects || {}
+    const firstAspect = Object.keys(aspects)[0] || 'Fe'
+    const folder = aspects[firstAspect] || {}
+    setPositionEditor({
+      aspect: firstAspect,
+      currentLevel: folder.currentLevel ?? 0,
+      currentScriptId: folder.currentScriptId ?? '',
+      resetMessages: false,
+    })
+  }
+
+  const applyPositionEdit = async () => {
+    if (!selectedUser || !positionEditor) return
+    if (!confirm(`Применить позицию для ${positionEditor.aspect}: L${positionEditor.currentLevel}, scriptId=${positionEditor.currentScriptId || '—'}?`)) return
+    try {
+      const r = await adminSetAspectPosition(selectedUser.id, {
+        aspect: positionEditor.aspect,
+        currentLevel: Number(positionEditor.currentLevel),
+        currentScriptId: positionEditor.currentScriptId || null,
+        resetMessages: positionEditor.resetMessages,
+      })
+      pushLog(`Position ${positionEditor.aspect}: L${r.before?.currentLevel}→L${r.after?.currentLevel}, sid=${r.before?.currentScriptId}→${r.after?.currentScriptId}`)
+      setPositionEditor(null)
+      await refreshDiagnostic()
+    } catch (e) {
+      pushLog(`Position error: ${e.message}`)
+    }
+  }
+
+  const autoPositionFromDiary = async () => {
+    if (!selectedUser) return
+    if (!confirm('Авто-проставить позицию по последним записям дневника для всех аспектов?')) return
+    try {
+      const r = await adminAutoPositionFromDiary(selectedUser.id)
+      if (r.applied) {
+        pushLog(`Auto-position: ${r.changes.length} аспектов обновлено`)
+      } else {
+        pushLog(`Auto-position: ${r.reason || 'no changes'}`)
+      }
+      await refreshDiagnostic()
+    } catch (e) {
+      pushLog(`Auto-position error: ${e.message}`)
+    }
+  }
+
+  const resetAspectPosition = async (aspect) => {
+    if (!selectedUser) return
+    if (!confirm(`Сбросить позицию ${aspect} на начало текущего уровня? Чат-история сотрётся, completedScripts и currentLevel остаются.`)) return
+    try {
+      const r = await adminResetAspectPosition(selectedUser.id, aspect)
+      pushLog(`Reset ${aspect}: ${r.before?.messages_count} сообщений стёрто`)
+      await refreshDiagnostic()
+    } catch (e) {
+      pushLog(`Reset error: ${e.message}`)
+    }
+  }
+
+  const normalizeCounters = async () => {
+    if (!selectedUser) return
+    if (!confirm('Синхронизировать totalCompleted с фактической суммой completedScripts?')) return
+    try {
+      const r = await adminNormalizeCounters(selectedUser.id)
+      pushLog(`Counters: ${r.totalCompleted_before}→${r.totalCompleted_after}${r.applied ? '' : ' (already synced)'}`)
+      await refreshDiagnostic()
+      await loadUsers()
+    } catch (e) {
+      pushLog(`Normalize error: ${e.message}`)
+    }
+  }
+
   const openStateEditor = () => {
     if (!diagnostic) return
     // Достаём актуальный journey через диагностику (web_state.aspects там
@@ -249,6 +339,7 @@ export default function UsersTab({ onImpersonateApply }) {
               restorePreview={restorePreview}
               fullDiary={fullDiary}
               stateEditor={stateEditor}
+              positionEditor={positionEditor}
               onClose={closeUser}
               onPreviewRestore={previewRestore}
               onApplyRestore={applyRestore}
@@ -260,6 +351,13 @@ export default function UsersTab({ onImpersonateApply }) {
               onChangeStateEditor={text => setStateEditor(s => ({ ...s, text, error: null }))}
               onApplyStateEditor={applyStateEditor}
               onCloseStateEditor={() => setStateEditor(null)}
+              onOpenPositionEditor={openPositionEditor}
+              onChangePositionEditor={setPositionEditor}
+              onApplyPositionEditor={applyPositionEdit}
+              onClosePositionEditor={() => setPositionEditor(null)}
+              onAutoPositionFromDiary={autoPositionFromDiary}
+              onResetAspectPosition={resetAspectPosition}
+              onNormalizeCounters={normalizeCounters}
             />
           ) : (
             <div className={styles.emptyDetail}>
@@ -329,11 +427,13 @@ function UserCard({ user, selected, onClick }) {
 }
 
 function UserDetail({
-  user, diagnostic, restorePreview, fullDiary, stateEditor,
+  user, diagnostic, restorePreview, fullDiary, stateEditor, positionEditor,
   onClose, onPreviewRestore, onApplyRestore,
   onPromote, onImpersonate, onRollbackRestore,
   onOpenFullDiary, onOpenStateEditor,
   onChangeStateEditor, onApplyStateEditor, onCloseStateEditor,
+  onOpenPositionEditor, onChangePositionEditor, onApplyPositionEditor, onClosePositionEditor,
+  onAutoPositionFromDiary, onResetAspectPosition, onNormalizeCounters,
 }) {
   return (
     <div>
@@ -405,11 +505,104 @@ function UserDetail({
               <button type="button" className={styles.action} onClick={onOpenFullDiary}>
                 📔 Полный дневник
               </button>
+              <button type="button" className={styles.action} onClick={onNormalizeCounters}>
+                🔢 Синхронизировать счётчик
+              </button>
+              <button type="button" className={styles.action} onClick={onOpenPositionEditor}>
+                📍 Править позицию аспекта
+              </button>
+              <button type="button" className={styles.action} onClick={onAutoPositionFromDiary}>
+                ⚡ Авто-позиция по дневнику
+              </button>
               <button type="button" className={styles.actionWarn} onClick={onOpenStateEditor}>
                 ✎ Править web_state (опасно)
               </button>
             </div>
           </Section>
+
+          {positionEditor && (
+            <Section title={`📍 Позиция аспекта · ${positionEditor.aspect}`}>
+              <div className={styles.subStats}>
+                Установи где юзер реально остановился. Текущий чат не стирается,
+                если не отметишь сброс. Скрипт-ID (например <code>S-2</code>) — поле
+                в L0 чата аспекта. Если не знаешь — оставь пустым и поставь только уровень.
+              </div>
+              <div className={styles.bulkForm}>
+                <label className={styles.bulkField}>
+                  <span>Аспект</span>
+                  <select
+                    className={styles.sortSelect}
+                    value={positionEditor.aspect}
+                    onChange={e => {
+                      const newAsp = e.target.value
+                      const folder = (diagnostic.web_state?.aspects || {})[newAsp] || {}
+                      onChangePositionEditor({
+                        aspect: newAsp,
+                        currentLevel: folder.currentLevel ?? 0,
+                        currentScriptId: folder.currentScriptId ?? '',
+                        resetMessages: false,
+                      })
+                    }}
+                  >
+                    {ASPECT_KEYS.map(k => (
+                      <option key={k} value={k}>
+                        {k} ({ASPECT_DISPLAY_KEY[k]})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={styles.bulkField}>
+                  <span>currentLevel</span>
+                  <select
+                    className={styles.sortSelect}
+                    value={positionEditor.currentLevel}
+                    onChange={e => onChangePositionEditor({
+                      ...positionEditor, currentLevel: e.target.value,
+                    })}
+                  >
+                    {[0, 1, 2, 3].map(l => <option key={l} value={l}>L{l}</option>)}
+                  </select>
+                </label>
+                <label className={styles.bulkField}>
+                  <span>currentScriptId</span>
+                  <input
+                    type="text"
+                    className={styles.input}
+                    value={positionEditor.currentScriptId}
+                    onChange={e => onChangePositionEditor({
+                      ...positionEditor, currentScriptId: e.target.value,
+                    })}
+                    placeholder="напр. S-2, T-1, R-3"
+                  />
+                </label>
+                <label className={styles.bulkField} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="checkbox"
+                    checked={positionEditor.resetMessages}
+                    onChange={e => onChangePositionEditor({
+                      ...positionEditor, resetMessages: e.target.checked,
+                    })}
+                  />
+                  <span>стереть чат-историю</span>
+                </label>
+              </div>
+              <div className={styles.actionGrid} style={{ marginTop: 12 }}>
+                <button type="button" className={styles.actionWarn} onClick={onApplyPositionEditor}>
+                  💾 Применить
+                </button>
+                <button
+                  type="button"
+                  className={styles.action}
+                  onClick={() => onResetAspectPosition(positionEditor.aspect)}
+                >
+                  ↺ Сбросить позицию аспекта {positionEditor.aspect}
+                </button>
+                <button type="button" className={styles.action} onClick={onClosePositionEditor}>
+                  ✕ Закрыть
+                </button>
+              </div>
+            </Section>
+          )}
 
           {restorePreview && (
             <Section title={`Restore ${restorePreview.applied ? '✓ применён' : '(preview)'}`}>

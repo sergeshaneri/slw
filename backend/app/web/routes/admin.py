@@ -1239,6 +1239,257 @@ async def user_journey_full(
 
 # ── State edit ──────────────────────────────────────────────────────────────
 
+@router.post("/user/{user_id}/set-aspect-position")
+async def set_aspect_position(
+    user_id: int,
+    payload: dict = Body(...),
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Ручная правка позиции юзера в конкретном аспекте.
+
+    Тело:
+        {
+            "aspect": "Fe",                   // латинский код
+            "currentLevel": 1,                // 0..3, опционально
+            "currentScriptId": "T-1",         // опционально
+            "currentScriptIndex": 0,          // опционально
+            "resetMessages": false,           // если true — стирает чат
+            "addToCompleted": ["B-1", "R-1"]  // опционально — добавить в completedScripts
+        }
+    """
+    _require_admin(current_user)
+
+    aspect = payload.get("aspect")
+    if not aspect:
+        raise HTTPException(status_code=400, detail="payload.aspect обязателен")
+
+    web_state = await session.get(WebState, user_id)
+    if not web_state or not web_state.journey:
+        raise HTTPException(status_code=409, detail="Нет web_state для юзера")
+
+    journey = dict(web_state.journey)
+    aspects = dict(journey.get("aspects") or {})
+    folder = dict(aspects.get(aspect) or {})
+
+    before = {
+        "currentLevel": folder.get("currentLevel"),
+        "currentScriptId": folder.get("currentScriptId"),
+        "currentScriptIndex": folder.get("currentScriptIndex"),
+        "messages_count": len(folder.get("messages") or []),
+        "completedScripts_count": len(folder.get("completedScripts") or []),
+    }
+
+    if "currentLevel" in payload:
+        folder["currentLevel"] = int(payload["currentLevel"])
+    if "currentScriptId" in payload:
+        folder["currentScriptId"] = payload["currentScriptId"]
+    if "currentScriptIndex" in payload:
+        folder["currentScriptIndex"] = int(payload["currentScriptIndex"])
+    if payload.get("resetMessages"):
+        folder["messages"] = []
+        folder["currentScriptIndex"] = 0
+        folder["awaitingInput"] = None
+    add_to_completed = payload.get("addToCompleted") or []
+    if add_to_completed:
+        existing = set(folder.get("completedScripts") or [])
+        merged = sorted(existing | set(add_to_completed))
+        folder["completedScripts"] = merged
+
+    aspects[aspect] = folder
+    journey["aspects"] = aspects
+
+    # Бэкап
+    original_journey = {
+        k: v for k, v in (web_state.journey or {}).items()
+        if not k.startswith("_backup_")
+    }
+    journey["_backup_before_position_edit"] = {
+        "at": datetime.utcnow().isoformat(),
+        "by_admin_id": current_user.id,
+        "aspect": aspect,
+        "previous_folder": before,
+    }
+
+    web_state.journey = journey
+    web_state.updated_at = datetime.utcnow()
+    await session.commit()
+
+    log.info(
+        "admin set-aspect-position: %s set user_id=%s aspect=%s level=%s scriptId=%s",
+        current_user.email or current_user.id, user_id, aspect,
+        folder.get("currentLevel"), folder.get("currentScriptId"),
+    )
+    return {
+        "user_id": user_id,
+        "aspect": aspect,
+        "before": before,
+        "after": {
+            "currentLevel": folder.get("currentLevel"),
+            "currentScriptId": folder.get("currentScriptId"),
+            "currentScriptIndex": folder.get("currentScriptIndex"),
+            "messages_count": len(folder.get("messages") or []),
+            "completedScripts_count": len(folder.get("completedScripts") or []),
+        },
+    }
+
+
+@router.post("/user/{user_id}/auto-position-from-diary")
+async def auto_position_from_diary(
+    user_id: int,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Авто-проставить currentScriptId в каждом аспекте на основе последнего
+    scriptId в дневнике. Уровень бампается по эвристике количества записей.
+
+    Логика:
+    - Найти последний (по created_at) scriptId в дневнике для каждого аспекта
+    - Поставить как currentScriptId
+    - Если в дневнике R-2/R-3 → currentLevel = max(current, 1)
+    - Если >= 6 уникальных scriptId по аспекту → тоже bump до 1 (эвристика
+      «прошла большую часть L0»)
+
+    Не трогает messages — она увидит свой чат + правильный «текущий шаг».
+    Бэкап в _backup_before_auto_position.
+    """
+    _require_admin(current_user)
+
+    web_state = await session.get(WebState, user_id)
+    if not web_state or not web_state.journey:
+        raise HTTPException(status_code=409, detail="Нет web_state для юзера")
+
+    diary_rows = (await session.execute(
+        select(WebDiaryEntry)
+        .where(WebDiaryEntry.web_user_id == user_id)
+        .order_by(WebDiaryEntry.created_at.asc())
+    )).scalars().all()
+
+    # Для каждого аспекта: последняя дата → scriptId, и множество всех scriptId
+    last_script_by_aspect: dict[str, str] = {}
+    all_scripts_by_aspect: dict[str, set[str]] = {}
+    for row in diary_rows:
+        extra = row.extra or {}
+        sid = extra.get("scriptId")
+        cyr = row.aspect
+        if not sid or not cyr:
+            continue
+        lat = CYR_TO_LAT_ASPECT.get(cyr)
+        if not lat:
+            continue
+        last_script_by_aspect[lat] = sid  # перезаписываем (asc-порядок → итог = последний)
+        all_scripts_by_aspect.setdefault(lat, set()).add(sid)
+
+    journey = dict(web_state.journey)
+    aspects = dict(journey.get("aspects") or {})
+    changes: list[dict[str, Any]] = []
+
+    for lat, last_sid in last_script_by_aspect.items():
+        folder = dict(aspects.get(lat) or {})
+        before_level = folder.get("currentLevel") or 0
+        before_sid = folder.get("currentScriptId")
+
+        # Bump уровня по эвристике
+        scripts = all_scripts_by_aspect.get(lat) or set()
+        detected_level = before_level
+        if scripts & {"R-2", "R-3"}:
+            detected_level = max(detected_level, 1)
+        if len(scripts) >= 6:
+            detected_level = max(detected_level, 1)
+
+        folder["currentScriptId"] = last_sid
+        folder["currentLevel"] = detected_level
+        aspects[lat] = folder
+
+        changes.append({
+            "aspect": lat,
+            "currentLevel_before": before_level,
+            "currentLevel_after": detected_level,
+            "currentScriptId_before": before_sid,
+            "currentScriptId_after": last_sid,
+            "diary_scripts_count": len(scripts),
+        })
+
+    if not changes:
+        return {
+            "user_id": user_id,
+            "applied": False,
+            "reason": "Нет scriptId в дневнике, нечего проставить",
+        }
+
+    journey["aspects"] = aspects
+    journey["_backup_before_auto_position"] = {
+        "at": datetime.utcnow().isoformat(),
+        "by_admin_id": current_user.id,
+        "changes": changes,
+    }
+
+    web_state.journey = journey
+    web_state.updated_at = datetime.utcnow()
+    await session.commit()
+
+    return {
+        "user_id": user_id,
+        "applied": True,
+        "changes": changes,
+    }
+
+
+@router.post("/user/{user_id}/reset-aspect-position")
+async def reset_aspect_position(
+    user_id: int,
+    payload: dict = Body(...),
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Сбросить позицию аспекта на начало его текущего уровня.
+
+    Тело: { "aspect": "Fe" }
+
+    Чистит messages, currentScriptId=null, currentScriptIndex=0,
+    awaitingInput=null. completedScripts и currentLevel остаются.
+    Полезно когда position разъехался с фактом прохождения.
+    """
+    _require_admin(current_user)
+
+    aspect = payload.get("aspect")
+    if not aspect:
+        raise HTTPException(status_code=400, detail="payload.aspect обязателен")
+
+    web_state = await session.get(WebState, user_id)
+    if not web_state or not web_state.journey:
+        raise HTTPException(status_code=409, detail="Нет web_state для юзера")
+
+    journey = dict(web_state.journey)
+    aspects = dict(journey.get("aspects") or {})
+    folder = dict(aspects.get(aspect) or {})
+
+    before = {
+        "currentScriptId": folder.get("currentScriptId"),
+        "currentScriptIndex": folder.get("currentScriptIndex"),
+        "messages_count": len(folder.get("messages") or []),
+    }
+
+    folder["messages"] = []
+    folder["currentScriptId"] = None
+    folder["currentScriptIndex"] = 0
+    folder["awaitingInput"] = None
+    folder["pendingTasks"] = []
+    aspects[aspect] = folder
+    journey["aspects"] = aspects
+
+    web_state.journey = journey
+    web_state.updated_at = datetime.utcnow()
+    await session.commit()
+
+    return {
+        "user_id": user_id,
+        "aspect": aspect,
+        "before": before,
+        "applied": True,
+    }
+
+
 @router.post("/user/{user_id}/normalize-counters")
 async def normalize_counters(
     user_id: int,
