@@ -62,7 +62,7 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, di
   }
 
   return <Toc aspect={selectedAspect} data={data} color={color} available={available}
-    scores={scores} onScoreChange={onScoreChange} onAspectSelect={onAspectSelect}
+    scores={scores} onAspectSelect={onAspectSelect}
     journey={journey} onGoToSiSurveys={onGoToSiSurveys} onGoToFeSurveys={onGoToFeSurveys} onGoToNeSurveys={onGoToNeSurveys} onGoToNiSurveys={onGoToNiSurveys} onGoToFiSurveys={onGoToFiSurveys} onGoToTeSurveys={onGoToTeSurveys} onGoToTiSurveys={onGoToTiSurveys} onGoToSeSurveys={onGoToSeSurveys} onOpenBlock={setBlockId}
     onEnterHall={onEnterHall} isAdmin={isAdmin} />
 }
