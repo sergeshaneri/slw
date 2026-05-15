@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
+import { getJourney } from '../../data/journey/registry'
 import { HALL_CONTENT } from '../../data/hallContent'
 import { BLOCKS, LEVEL_LABELS, getBlockItems, teaseBlockData } from './blocks'
 import SiWheel from './SiWheel'
@@ -78,6 +79,18 @@ function AspectsGrid({ scores, onAspectSelect, journey }) {
         const folder = journey?.aspects?.[key]
         const currentLevel = folder?.currentLevel ?? 0
         const completed = (folder?.completedScripts ?? []).length
+
+        // Прогресс по текущему уровню = сколько скриптов уровня пройдено.
+        // Берём из getJourney — для аспектов без контента (Se/Fi) вернётся 0.
+        const levelData = getJourney(key)?.levels?.[currentLevel]
+        const levelScripts = levelData?.core ?? levelData?.scripts ?? []
+        const levelTotal = levelScripts.length
+        // Сколько ID из уровня уже в completedScripts.
+        const completedSet = new Set(folder?.completedScripts ?? [])
+        const inLevel = levelScripts.filter(s => completedSet.has(s.id)).length
+        const levelPct = levelTotal > 0 ? Math.min(100, Math.round((inLevel / levelTotal) * 100)) : 0
+        const notStarted = completed === 0
+
         return (
           <button
             key={key}
@@ -93,14 +106,11 @@ function AspectsGrid({ scores, onAspectSelect, journey }) {
             </div>
             <div className={styles.aspectName}>{d.name}</div>
             <div className={styles.aspectSub}>{d.sub}</div>
-            {d.metaphor && (
-              <div className={styles.aspectMetaphor}>{d.metaphor}</div>
-            )}
             <div className={styles.aspectMeter}>
               <div className={styles.aspectMeterFill} style={{
-                width: `${scores[key] * 10}%`,
+                width: `${levelPct}%`,
                 background: `linear-gradient(90deg, ${color}, ${color}cc)`,
-                boxShadow: `0 0 12px ${color}88`
+                boxShadow: levelPct > 0 ? `0 0 12px ${color}88` : 'none'
               }} />
             </div>
             <div className={styles.aspectProgress}>
@@ -108,7 +118,11 @@ function AspectsGrid({ scores, onAspectSelect, journey }) {
                 L{currentLevel}
               </span>
               <span className={styles.aspectStepsCount}>
-                {completed > 0 ? `${completed} ${pluralSteps(completed)} пройдено` : 'не начато'}
+                {notStarted
+                  ? '→ начать путешествие'
+                  : levelTotal > 0
+                    ? `${inLevel} из ${levelTotal} шагов · ${levelPct}%`
+                    : `${completed} ${pluralSteps(completed)} пройдено`}
               </span>
             </div>
           </button>

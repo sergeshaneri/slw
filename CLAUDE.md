@@ -321,6 +321,18 @@ UPDATE web_users SET is_admin = true WHERE email = '...';
 - v14 — рефактор ключей кириллица → латиница (`migrateCyrAspectKeys` запускается ДО version-check, чат не сбрасывается)
 - v15 — добавлен аспект БИ (Tempum Spiralis)
 - v16 — пересборка COMMON_BASE_SKILLS БС: 3 → 4 (body-listening / needs-awareness / timely-care / details). Старые signals/interoception/honesty возвращены в SKILL_TREE.healer как обычные ядерные навыки Целителя (id сохраняется → state.skills.* по ним не теряется)
+- v25 — попытка фикса миграции: сохранять completedScripts и
+  currentLevel при бампе. Стирала только messages. **Сломало UI**: при
+  открытии активного аспекта Chat видел пустой `messages` и
+  инициализировал чат заново, перетирая восстановленный `currentLevel`
+  и `completedScripts`. Юзер видел L0 хотя в БД было L1.
+- v26 — **миграция полностью data-preserving** (как match-version
+  ветка): сохраняем ВСЕ поля каждого аспекта (messages, completedScripts,
+  currentLevel, currentScriptId, pendingTasks, awaitingInput). Чат-
+  историю под старые тексты юзер может увидеть в случае правок md, но
+  это редко критично. Если в будущем потребуется реально сбросить чат
+  при несовместимых правках — это будет отдельный механизм (per-user
+  флаг или whitelist аспектов).
 
 Если изменения только структурные (rename ключей, добавление полей) — миграция должна быть data-preserving, чтобы не терять чат пользователю. Пример — `migrateCyrAspectKeys` в v14.
 
@@ -612,5 +624,165 @@ block: knowledge
 | Маппинг между ботом и web | `web_users.telegram_id` |
 | Парсер диария | `backend/app/sync/parser.py` (бэк-side) + `tools/vault_sync.py` (CLI) |
 | Заглушка-колесо для аспектов без skill-tree | `AspectsView/PlaceholderWheel.jsx` |
+| Admin Panel + endpoints | `backend/app/web/routes/admin.py` + `slw-main/.../components/AdminView/` |
+| Append-only журнал прогресса | `backend/app/web/routes/events.py` + `JourneyEvent` модель |
+| Step-insight prompt после T/S/R | `JourneyView/StepInsightPrompt.jsx` |
+| Optimistic locking PUT /api/state | `state.py` (expected_updated_at) + `App.jsx` (`stateVersionRef`, `saveStateGuarded` queue) |
 
 Если меняешь домен фронта или username бота — все три места надо синхронить.
+
+### Append-only журнал прогресса (`journey_events`)
+
+С 2026-05 каждый завершённый шаг чата (T/S/U/B/R) идёт в `journey_events`
+двумя путями:
+- **Бот** — пишет напрямую при advance юзера в TG.
+- **Веб** — `POST /api/events/step-completed` из `JourneyView.awardXP`,
+  idempotently (dedupe по `web_user_id + source='web' + aspect + short_id + level`).
+
+При следующей загрузке `GET /api/events` отдаёт все события юзера, фронт
+в `App.jsx:loadFromApi` мёрджит **и web, и bot** события в
+`journey.aspects[X].completedScripts`. Это страховка от потери прогресса
+при сбросах `web_state` (CONTENT_VERSION-бамп, конфликт PUT, race
+condition). XP считается по `max(events count, completedScripts.length)`
+в `profile._xp()`.
+
+`/api/admin/restore-from-diary` использует extra.scriptId записей дневника,
+`/api/admin/auto-position-from-diary` ставит позицию по последнему
+scriptId дневника, `/api/admin/normalize-counters` синхронизирует
+`totalCompleted` с фактической суммой `completedScripts` когда восстановить
+точные ID больше неоткуда.
+
+### Optimistic locking для `PUT /api/state`
+
+`web_state.updated_at` теперь работает как ETag:
+- `GET /api/state` возвращает `updated_at`.
+- `PUT /api/state` принимает `expected_updated_at`; при mismatch → 409
+  с телом `{ code: 'state_conflict', current_updated_at, your_expected }`.
+- Если `expected_updated_at` не передан — проверка не делается
+  (обратная совместимость).
+
+**Фронт** (`App.jsx`):
+- `stateVersionRef` хранит последний known `updated_at`.
+- `saveStateGuarded(patch)` — **queue** через promise-chain
+  (`lastSavePromiseRef`). Множественные patch-и за один шаг мёрджатся в
+  один PUT через `saveDebounceRef`. PUT-ы идут строго последовательно —
+  ref всегда свежий между ними, race condition «сам с собой» исключён.
+- На 409: тихое обновление ref из тела 409 (без `loadFromApi` — он был
+  слишком агрессивным, триггерил «загрузку» и откатывал локальный state).
+- Все вызовы PUT /api/state в App.jsx идут через `saveStateGuarded`
+  (saveJourney/saveHistory/achievements-grant).
+
+### Обязательный insight после T/S/R-шага
+
+`handleScriptAction` для `theory/word/reflection` action='next' ставит
+`awaitingInput='step-insight'` вместо мгновенного `awardXP+advance`.
+Chat.jsx рендерит `<StepInsightPrompt kind={script.type} onSubmit={...}/>`
+— textarea с минимумом 10 символов, кнопка disabled пока пусто.
+В `handleSend` ветка `awaitingInput === 'step-insight'`: пишет в дневник
+`source='journey-step-insight'` + scriptId/promptTitle, потом `awardXP`
++ `deliverScript(next)`.
+
+Это гарантирует, что каждый теоретический/словарный/рефлексивный шаг
+оставляет видимый след в дневнике юзера.
+
+### U-упражнения: «🪐 Взять в ежедневные практики»
+
+ScriptButtons для `type='exercise'` показывает 3 кнопки:
+- **✓ Сделал, записать инсайт** → `complete_exercise` → обязательный
+  `exercise_note` → дневник + XP + advance.
+- **🪐 Взять в ежедневные практики** → `done` → `enqueueTask(taken)`
+  + `chooseHabit({aspect, title, exerciseId})` (запись в `user_habits`,
+  упражнение появляется в блоке «Сегодня» на дашборде).
+- **Позже** → `next` → `enqueueTask(deferred)`.
+
+### Admin Panel UI (`/admin`)
+
+Виден юзерам с `is_admin=true` (кнопка `🛡 admin` в шапке). 4 вкладки:
+- **👥 Юзеры** — поиск, список с метриками (XP, completedScripts, drift),
+  диагностика выбранного, действия: restore-preview/apply, promote,
+  impersonate, rollback, полный дневник, редактор `web_state.journey`
+  (JSON textarea), правка позиции аспекта (с dropdown скриптов уровня
+  по `getJourney(aspect).levels[L].core`), авто-позиция по дневнику,
+  сброс позиции аспекта, синхронизация счётчиков.
+- **📊 Статистика** — DAU/WAU/MAU, регистрации 24h/7d/30d, TG-linked,
+  drift-юзеры топ-50.
+- **⚙ Массовые операции** — bulk-restore с threshold/limit, preview/apply,
+  таблица результатов.
+- **🛡 Модерация** — лента всех инсайтов, фильтр по аспекту/only_public,
+  кнопки «скрыть/показать» и «удалить».
+
+Backend admin endpoints (`backend/app/web/routes/admin.py`):
+- `GET /admin/user-diagnostic` — recommendation эвристика
+  (`all_synced` / `data_drift_recoverable` / `bot_progress_no_events` / ...)
+- `POST /admin/restore-from-diary` — собирает scriptId из дневника
+  и мёрджит в completedScripts; опционально бампает уровень при наличии
+  R-2/R-3.
+- `POST /admin/bulk-restore` — то же массово для drift > threshold.
+- `POST /admin/normalize-counters` — `totalCompleted = sum completedScripts`.
+- `POST /admin/user/{id}/set-aspect-position` — ручная правка позиции
+  (currentLevel, currentScriptId). **Всегда сбрасывает awaitingInput**
+  и pendingTasks при смене scriptId — иначе застрявший ползунок.
+- `POST /admin/user/{id}/auto-position-from-diary` — для каждого аспекта
+  ставит currentScriptId = последний из дневника, бампает уровень
+  по эвристике (R-2/R-3 или ≥6 уникальных scriptId).
+- `POST /admin/user/{id}/reset-aspect-position` — чистит messages,
+  currentScriptId=null, currentScriptIndex=0, awaitingInput=null.
+  completedScripts и currentLevel остаются.
+- `POST /admin/rollback-restore` — откатывает к `_backup_before_restore`.
+- `POST /admin/promote` — toggle is_admin (защита от самовыстрела).
+- `POST /admin/impersonate` — выдать JWT от имени другого юзера
+  (`auth.create_token(target.id)`).
+- `GET  /admin/users` — пагинированный список с метриками.
+- `GET  /admin/user/{id}/diary` — полный дневник юзера.
+- `GET  /admin/user/{id}/journey` — полный JSON journey + сравнение
+  skills между текущим и `_backup_*` (для ручного merge при потере).
+- `POST /admin/user/{id}/merge-skills-from-backup` — слить skills
+  из бэкапа в текущий state (только новые ID).
+- `PATCH /admin/user/{id}/state` — прямая правка journey (опасно).
+- `GET  /admin/insights` + `DELETE /admin/insight/{id}` + `PATCH` —
+  модерация публичных инсайтов.
+- `GET  /admin/stats` — сводная статистика.
+
+Все mutation-эндпоинты пишут бэкап старого state в `_backup_*` поля
+внутри journey JSONB (соответственно `_backup_before_restore`,
+`_backup_before_normalize`, `_backup_before_position_edit`,
+`_backup_before_auto_position`, `_backup_before_state_edit`).
+Только последний бэкап сохраняется (вложенные не разрастаются).
+
+### Page Aspects: обогащённые карточки
+
+`AspectsGrid` (`AspectsView.jsx`) показывает на каждой плитке:
+- Код аспекта + scores[key]/10 (текущая оценка).
+- Название + sub (новые теглайны «мир X и Y», см. `aspects.js`).
+- **Прогресс-бар** — процент пройденности текущего уровня
+  (`completedScripts ∩ levelScripts / levelScripts.length`). Берётся
+  из `getJourney(key).levels[currentLevel].core`. Если уровень пустой
+  (Se/Fi пока без контента) — 0%.
+- **Бэдж уровня** (L0/L1/L2/L3) в цвете аспекта.
+- Подпись «X из Y шагов · N%» или «→ начать путешествие» если не начато.
+
+`metaphor` поле в ASPECT_DATA сейчас не выводится в карточках. План
+заменить его блоком «какие полезные навыки в жизни раскрываются» —
+TODO когда будет готов контент. Сейчас поле остаётся в данных для
+HallView.subline.
+
+### UI-рефактор 2026-05: убраны WheelView и ProgressView
+
+Старые view удалены целиком (949 строк deleted). Колесо живёт только
+как `MiniWheel` в дашборде. История оценок (line chart) не использовалась
+и удалена вместе с Recharts (–430 KB bundle). Гость после WelcomeScreen
+→ «Начать бесплатно» попадает в `AspectsView` (read-only с teaser-
+механикой из blocks.js). Default view для гостя: `aspects`. Для
+залогиненного: `dashboard`.
+
+Dev-admin пасхалка (5 кликов → toggle `localStorage.slw_dev_admin`)
+переехала из ProgressView в букву **«й»** в конце строки «X активных
+дней · Y событий за 30 дней» в Heatmap-заголовке дашборда.
+
+### Слайдер оценки в AspectsView убран (2026-05)
+
+В шапке аспекта раньше был `<input type=range min=1 max=10>` для ручной
+правки `scores[aspect]`. Удалён — scores теперь обновляются автоматически
+через прохождение анкет навыков (`calc*ScoreFromSkills` в
+`handleSurveyInsight`). Осталась только кнопка «🏛 Войти в холл» в
+filled-стиле с цветом аспекта и свечением.

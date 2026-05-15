@@ -148,20 +148,6 @@
   position: relative;
 }
 
-.aspectMetaphor {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--text-dim, #8f929c);
-  margin-top: 6px;
-  font-style: italic;
-  position: relative;
-  /* metaphor может быть длинной (4 пункта через ·) — даём ей дышать */
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 .aspectMeter {
   height: 4px;
   background: rgba(255,255,255,0.07);
