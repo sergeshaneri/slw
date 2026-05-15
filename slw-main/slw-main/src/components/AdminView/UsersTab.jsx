@@ -15,6 +15,7 @@ import {
   setToken,
 } from '../../api/client'
 import { ASPECT_KEYS, ASPECT_DISPLAY_KEY } from '../../data/aspects'
+import { getJourney } from '../../data/journey/registry'
 import styles from './AdminView.module.css'
 
 const SORT_OPTIONS = [
@@ -563,16 +564,15 @@ function UserDetail({
                     {[0, 1, 2, 3].map(l => <option key={l} value={l}>L{l}</option>)}
                   </select>
                 </label>
-                <label className={styles.bulkField}>
-                  <span>currentScriptId</span>
-                  <input
-                    type="text"
-                    className={styles.input}
+                <label className={styles.bulkField} style={{ gridColumn: '1 / -1' }}>
+                  <span>currentScriptId — скрипт уровня L{positionEditor.currentLevel}</span>
+                  <ScriptSelect
+                    aspect={positionEditor.aspect}
+                    level={Number(positionEditor.currentLevel)}
                     value={positionEditor.currentScriptId}
-                    onChange={e => onChangePositionEditor({
-                      ...positionEditor, currentScriptId: e.target.value,
+                    onChange={value => onChangePositionEditor({
+                      ...positionEditor, currentScriptId: value,
                     })}
-                    placeholder="напр. S-2, T-1, R-3"
                   />
                 </label>
                 <label className={styles.bulkField} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -737,6 +737,39 @@ function Section({ title, children }) {
       <div className={styles.sectionTitle}>{title}</div>
       {children}
     </div>
+  )
+}
+
+// Dropdown скриптов уровня. Подтягивает структуру из data/journey/registry.
+// Каждый option — "T-1 — Слово дня: Внимание". Если в текущем value нет
+// в списке — option «(других уровней / неизвестный) …» сверху, чтобы
+// текущее значение не терялось.
+function ScriptSelect({ aspect, level, value, onChange }) {
+  const journey = getJourney(aspect)
+  const levelData = journey?.levels?.[level]
+  const scripts = levelData?.core ?? levelData?.scripts ?? []
+  const knownIds = new Set(scripts.map(s => s.id))
+  const valueNotInList = value && !knownIds.has(value)
+
+  return (
+    <select
+      className={styles.sortSelect}
+      value={value || ''}
+      onChange={e => onChange(e.target.value)}
+    >
+      <option value="">— (пусто, фронт сам выберет первый)</option>
+      {valueNotInList && (
+        <option value={value}>{value} — (вне L{level}, оставить как есть)</option>
+      )}
+      {scripts.map(s => (
+        <option key={s.id} value={s.id}>
+          {s.id} — {s.title || '(без заголовка)'}
+        </option>
+      ))}
+      {scripts.length === 0 && (
+        <option value="" disabled>L{level} не имеет скриптов (или ещё не реализован)</option>
+      )}
+    </select>
   )
 }
 
