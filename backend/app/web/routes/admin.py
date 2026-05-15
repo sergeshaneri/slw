@@ -1239,6 +1239,72 @@ async def user_journey_full(
 
 # ── State edit ──────────────────────────────────────────────────────────────
 
+@router.post("/user/{user_id}/normalize-counters")
+async def normalize_counters(
+    user_id: int,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Синхронизировать `totalCompleted` с фактической суммой completedScripts
+    по аспектам. Убирает drift-флаг, когда восстанавливать точные ID
+    больше неоткуда (дневник без scriptId, события без бэкфилла).
+
+    Не трогает XP, skills, streak, stardust. Только глобальный counter.
+    Бэкап старого journey в `_backup_before_normalize`.
+    """
+    _require_admin(current_user)
+
+    web_state = await session.get(WebState, user_id)
+    if not web_state or not web_state.journey:
+        raise HTTPException(status_code=409, detail="Нет web_state для юзера")
+
+    journey = dict(web_state.journey)
+    aspects = journey.get("aspects") or {}
+    sum_completed = sum(
+        len((folder or {}).get("completedScripts") or [])
+        for folder in aspects.values()
+    )
+    total_before = journey.get("totalCompleted") or 0
+
+    if total_before == sum_completed:
+        return {
+            "user_id": user_id,
+            "totalCompleted_before": total_before,
+            "totalCompleted_after": sum_completed,
+            "drift_before": 0,
+            "applied": False,
+            "reason": "already in sync",
+        }
+
+    # Бэкап старого journey
+    original_journey = {
+        k: v for k, v in (web_state.journey or {}).items()
+        if not k.startswith("_backup_")
+    }
+    journey["_backup_before_normalize"] = {
+        "at": datetime.utcnow().isoformat(),
+        "by_admin_id": current_user.id,
+        "previous_totalCompleted": total_before,
+        "previous_journey": original_journey,
+    }
+    journey["totalCompleted"] = sum_completed
+    web_state.journey = journey
+    web_state.updated_at = datetime.utcnow()
+    await session.commit()
+
+    log.info(
+        "admin normalize-counters: %s set user_id=%s totalCompleted %d→%d",
+        current_user.email or current_user.id, user_id, total_before, sum_completed,
+    )
+    return {
+        "user_id": user_id,
+        "totalCompleted_before": total_before,
+        "totalCompleted_after": sum_completed,
+        "drift_before": total_before - sum_completed,
+        "applied": True,
+    }
+
+
 @router.post("/user/{user_id}/merge-skills-from-backup")
 async def merge_skills_from_backup(
     user_id: int,
