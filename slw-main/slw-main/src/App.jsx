@@ -127,6 +127,13 @@ export default function App() {
     if (mainRef.current) mainRef.current.scrollTop = 0
   }, [view, selectedAspect])
 
+  // Optimistic locking. Хранит updated_at последнего успешно загруженного/
+  // сохранённого state. При PUT отправляем как expected_updated_at — если
+  // кто-то ещё изменил (admin restore, другая вкладка, impersonation) —
+  // бэк ответит 409 и мы перечитаем свежее значение.
+  // ОБЪЯВЛЕНО ДО loadFromApi, чтобы избежать TDZ при использовании в closure.
+  const stateVersionRef = useRef(null)
+
   // Загрузка данных при изменении статуса auth.
   // Залогинен → API. Гость → localStorage.
   useEffect(() => {
@@ -319,13 +326,9 @@ export default function App() {
     }
   }
 
-  // Optimistic locking. Хранит версию (updated_at) последнего успешно
-  // загруженного/сохранённого state. Шлётся обратно на бэк в expected_updated_at
-  // при PUT /state. При mismatch бэк возвращает 409 → мы перечитываем state.
-  const stateVersionRef = useRef(null)
-
   // Гvardованный save: гарантирует, что если кто-то ещё (admin-операция,
   // другая вкладка, impersonation) изменил state — мы не перетрём.
+  // stateVersionRef объявлен выше (до loadFromApi) — см. там.
   const saveStateGuarded = async (patch) => {
     try {
       const res = await saveState({
