@@ -262,13 +262,14 @@ function SkillTreeIntroHint({ user }) {
 //     теперь СОХРАНЯЕМ completedScripts и currentLevel каждого аспекта.
 //     Раньше сбрасывали полностью — это привело к кейсу, когда у юзера
 //     totalCompleted=114 а sum(completedScripts) свелся к 9 после бампа.
-//     Чат-история (messages) всё равно стирается под новый контент,
-//     pendingTasks тоже (они ссылаются на конкретные скрипты-задания).
-//     Раз сбрасывается только messages — пользователь увидит, как ему
-//     заново предложат продолжить с правильного уровня, но факты
-//     прохождения не потеряются. Если позже потребуется реально «начать
-//     с нуля» — это будет отдельная кнопка в UI.
-export const CONTENT_VERSION = 25
+// v26 — Доразработка v25: миграция полностью data-preserving (как
+//     match-version ветка). Стирание messages в v25 приводило к тому,
+//     что UI активного аспекта видел messages=[] и инициализировал чат
+//     заново, перетирая восстановленный currentLevel и completedScripts.
+//     Теперь messages, pendingTasks, currentScriptId — всё сохраняется.
+//     Если потребуется реально сбросить чат при несовместимых правках
+//     контента — это будет отдельный механизм (per-user флаг).
+export const CONTENT_VERSION = 26
 
 // Миграция id навыков после ревизии дерева (v9). Старый id → новый.
 // Если у юзера уже есть запись по новому id, старая отбрасывается
@@ -525,57 +526,45 @@ function migrateState(stored) {
     }
   }
 
-  // Контент-версия не совпала. С v25 (раньше — полный сброс папок) делаем
-  // partial reset: для каждого аспекта СОХРАНЯЕМ completedScripts и
-  // currentLevel (это факты прохождения, которые не меняются от правок
-  // текстов), но СБРАСЫВАЕМ messages/pendingTasks/currentScriptIndex/
-  // currentScriptId/awaitingInput — чат-история под старые тексты не
-  // совместима с новыми, лучше начать новый сценарий с правильного уровня.
-  // Глобальные поля (XP/streak/skills/etc) — сохраняем как раньше.
-  const preservedAspects = {}
-  const incomingForReset = {
-    ...(stored.aspects ?? {}),
+  // Контент-версия не совпала. С v26 миграция полностью data-preserving:
+  // сохраняем ВСЕ поля каждого аспекта (messages, completedScripts,
+  // currentLevel, currentScriptId, pendingTasks, etc.). Раньше стирали
+  // messages — это приводило к UI-логике «начать L0 заново» при открытии
+  // активного аспекта и перетирало восстановленный прогресс.
+  // Если в будущем потребуется реально сбросить чат (например, при
+  // несовместимых правках контента) — это будет отдельный механизм
+  // (per-user флаг или whitelist аспектов).
+  const aspects = {}
+  for (const [k, v] of Object.entries(incomingAspects)) {
+    aspects[k] = normalizeAspect(v)
   }
-  // Если есть плоские legacy-поля — поглощаем их в активный аспект перед
-  // частичным сбросом, чтобы не потерять completedScripts/currentLevel
-  // у юзеров со старым плоским state.
   if (hasFlatLegacy) {
-    const cur = incomingForReset[currentAspect] ?? {}
-    incomingForReset[currentAspect] = {
+    const cur = aspects[currentAspect] ?? { ...DEFAULT_ASPECT_STATE }
+    aspects[currentAspect] = normalizeAspect({
       ...cur,
       ...Object.fromEntries(
         Object.entries(flatLegacy).filter(([, v]) => v !== undefined)
       ),
-    }
+    })
   }
-  for (const [aspectKey, folder] of Object.entries(incomingForReset)) {
-    const normalized = normalizeAspect(folder)
-    preservedAspects[aspectKey] = {
-      ...DEFAULT_ASPECT_STATE,
-      // Сохраняем факты прохождения.
-      currentLevel: normalized.currentLevel ?? 0,
-      completedScripts: normalized.completedScripts ?? [],
-      // messages / pendingTasks / currentScriptIndex / currentScriptId /
-      // awaitingInput — намеренно из DEFAULT_ASPECT_STATE (т.е. пустые).
-    }
+  if (!aspects[currentAspect]) {
+    aspects[currentAspect] = { ...DEFAULT_ASPECT_STATE }
   }
-  if (!preservedAspects[currentAspect]) {
-    preservedAspects[currentAspect] = { ...DEFAULT_ASPECT_STATE }
-  }
+  // eslint-disable-next-line no-unused-vars
+  const {
+    currentLevel: _l, currentScriptIndex: _i, currentScriptId: _id,
+    awaitingInput: _ai, messages: _m, completedScripts: _cs, pendingTasks: _pt,
+    mode: _mode,
+    ...rest
+  } = stored
   return {
     ...DEFAULT_JOURNEY,
+    ...rest,
+    aspects,
     currentAspect,
-    aspects: preservedAspects,
-    onboardingStep: stored.onboardingStep ?? 0,
-    screen: stored.screen ?? DEFAULT_JOURNEY.screen,
-    xp: stored.xp ?? 0,
-    stardust: stored.stardust ?? 0,
-    streak: stored.streak ?? 0,
-    totalCompleted: stored.totalCompleted ?? 0,
-    lastActiveDate: stored.lastActiveDate ?? null,
     skills: migrateSkills(stored.skills),
     activeSurvey: stored.activeSurvey ?? null,
-    contentVersion: CONTENT_VERSION
+    contentVersion: CONTENT_VERSION,
   }
 }
 
