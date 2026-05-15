@@ -1191,7 +1191,103 @@ async def user_diary_full(
     }
 
 
+# ── User journey full ───────────────────────────────────────────────────────
+
+@router.get("/user/{user_id}/journey")
+async def user_journey_full(
+    user_id: int,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Полный journey-JSON юзера, включая `_backup_before_restore` и
+    `_backup_before_state_edit` (если есть). Полезно для ручного merge
+    skills из бэкапа.
+    """
+    _require_admin(current_user)
+
+    target = await session.get(WebUser, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Юзер не найден")
+
+    web_state = await session.get(WebState, user_id)
+    if not web_state or not web_state.journey:
+        raise HTTPException(status_code=409, detail="Нет web_state для юзера")
+
+    journey = web_state.journey or {}
+    backup_restore = journey.get("_backup_before_restore", {})
+    backup_state_edit = journey.get("_backup_before_state_edit", {})
+
+    return {
+        "user_id": user_id,
+        "updated_at": web_state.updated_at.isoformat() if web_state.updated_at else None,
+        "journey": journey,
+        "skills_summary": {
+            "current_count": len(journey.get("skills") or {}),
+            "current_ids": list((journey.get("skills") or {}).keys()),
+            "backup_restore_count": len(
+                (backup_restore.get("previous_journey") or {}).get("skills") or {}
+            ),
+            "backup_restore_ids": list(
+                ((backup_restore.get("previous_journey") or {}).get("skills") or {}).keys()
+            ),
+            "backup_state_edit_count": len(
+                (backup_state_edit.get("previous_journey") or {}).get("skills") or {}
+            ),
+        },
+    }
+
+
 # ── State edit ──────────────────────────────────────────────────────────────
+
+@router.post("/user/{user_id}/merge-skills-from-backup")
+async def merge_skills_from_backup(
+    user_id: int,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Слить skills из `_backup_before_restore.previous_journey.skills` в
+    текущие `journey.skills`. Если есть совпадения по ID — текущая запись
+    остаётся (как «более свежая»), бэкап добавляет только то, чего нет.
+    """
+    _require_admin(current_user)
+
+    web_state = await session.get(WebState, user_id)
+    if not web_state or not web_state.journey:
+        raise HTTPException(status_code=409, detail="Нет web_state для юзера")
+
+    journey = dict(web_state.journey)
+    current_skills = dict(journey.get("skills") or {})
+    backup = (journey.get("_backup_before_restore") or {}).get("previous_journey") or {}
+    backup_skills = dict(backup.get("skills") or {})
+
+    if not backup_skills:
+        raise HTTPException(
+            status_code=409,
+            detail="В _backup_before_restore нет skills — нечего сливать",
+        )
+
+    added: list[str] = []
+    for sid, payload in backup_skills.items():
+        if sid not in current_skills:
+            current_skills[sid] = payload
+            added.append(sid)
+
+    journey["skills"] = current_skills
+    web_state.journey = journey
+    web_state.updated_at = datetime.utcnow()
+    await session.commit()
+
+    log.info(
+        "admin merge-skills-from-backup: %s merged %d skills for user_id=%s",
+        current_user.email or current_user.id, len(added), user_id,
+    )
+    return {
+        "user_id": user_id,
+        "added_count": len(added),
+        "added_skill_ids": added,
+        "total_after": len(current_skills),
+    }
+
 
 @router.patch("/user/{user_id}/state")
 async def patch_user_state(
