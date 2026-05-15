@@ -69,7 +69,6 @@ export default function DashboardView({
   journey,
   onOpenAspect,
   onOpenAspects,
-  onOpenWheel,
   onOpenJourney,
   onOpenCoach,
   onOpenDiary,
@@ -275,7 +274,6 @@ export default function DashboardView({
             scores={data.scores}
             size={220}
             onAspectClick={(a) => onOpenAspect?.(a)}
-            onCenterClick={onOpenWheel}
           />
           <div className={styles.scoresLine}>
             {ASPECT_KEYS.map(k => (

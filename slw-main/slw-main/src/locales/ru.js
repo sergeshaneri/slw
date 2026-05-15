@@ -5,27 +5,15 @@ export const ru = {
   },
   nav: {
     dashboard: '◉ Главная',
-    wheel: '◎ Колесо',
     journey: '◐ Путешествие',
     aspects: '⬡ Аспекты',
     diary: '✎ Дневник',
-    progress: '↗ Прогресс',
     coach: '✦ Коуч',
     profile: '☆ Профиль',
     leaderboard: '⚜ Топ',
     dm: '✉ Сообщения',
     search: '🔍 Поиск',
     settings: '⚙ Настройки',
-  },
-  wheel: {
-    currentBalance: 'Текущий баланс',
-    saveToHistory: 'Сохранить в историю',
-    saved: 'Сохранено ✓',
-    sphereHint: 'Тыкни в любую сферу — почитать или начать путешествие',
-    journeyTitle: 'Готов к путешествию?',
-    journeySub: 'Коуч-бот проведёт по сферам жизни шаг за шагом. Сейчас открыта первая планета — Terra Harmonia.',
-    journeyCta: '→ Начать путешествие',
-    journeyContinue: '↻ Продолжить',
   },
   aspects: {
     back: '← Назад',
@@ -61,10 +49,6 @@ export const ru = {
     save: 'Записать',
     filterAll: 'Все',
     noEntries: 'Записей пока нет',
-  },
-  progress: {
-    title: 'История Баланса',
-    noData: 'Сохраните оценки как минимум дважды, чтобы увидеть прогресс',
   },
   loading: 'ЗАГРУЗКА...',
 }

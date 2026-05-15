@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Header from './components/Header/Header'
-import WheelView from './components/WheelView/WheelView'
 import AspectsView from './components/AspectsView/AspectsView'
 import DiaryView from './components/DiaryView/DiaryView'
-import ProgressView from './components/ProgressView/ProgressView'
 import JourneyView, { DEFAULT_JOURNEY } from './components/JourneyView/JourneyView'
 import CoachView from './components/CoachView/CoachView'
 import ProfileView from './components/ProfileView/ProfileView'
@@ -62,7 +60,9 @@ export default function App() {
 
   // Дефолт: залогиненным — дашборд, гостям — колесо.
   // Конкретный view выставится в useEffect после того как `user` определится.
-  const [view, setView] = useState('wheel')
+  // Дефолтный view. Для гостя — 'aspects' (read-only с teaser-механикой).
+  // Залогиненный сразу перекидывается на 'dashboard' (см. useEffect ниже).
+  const [view, setView] = useState('aspects')
   const [scores, setScores] = useState(initScores())
   const [history, setHistory] = useState([])
   const [diary, setDiary] = useState([])
@@ -85,8 +85,8 @@ export default function App() {
     () => localStorage.getItem('welcome_seen') === '1'
   )
   // devAdmin: «пасхалочный» админский режим без бэка. Включается кликом по
-  // невидимой точке (см. ProgressView → onToggleDevAdmin). Хранится в
-  // localStorage, переживает logout и новые сессии. ИЛИ-сложение с user.is_admin.
+  // невидимой точке внизу ProfileView (5 тапов). Хранится в localStorage,
+  // переживает logout и новые сессии. ИЛИ-сложение с user.is_admin.
   const [devAdmin, setDevAdmin] = useState(
     () => localStorage.getItem('slw_dev_admin') === '1'
   )
@@ -140,8 +140,8 @@ export default function App() {
     if (user === null) return  // ещё проверяем токен — ничего не делаем
     if (user) {
       loadFromApi()
-      // При первом логине переключаем на дашборд (если ещё на стартовом 'wheel').
-      setView(v => v === 'wheel' ? 'dashboard' : v)
+      // При первом логине переключаем на дашборд (если ещё на стартовом 'aspects').
+      setView(v => v === 'aspects' ? 'dashboard' : v)
     } else {
       loadFromLocal()
     }
@@ -794,7 +794,6 @@ export default function App() {
               setView('aspects')
             }}
             onOpenAspects={() => handleViewChange('aspects')}
-            onOpenWheel={() => handleViewChange('wheel')}
             onOpenJourney={() => handleViewChange('journey')}
             onOpenCoach={() => handleViewChange('coach')}
             onOpenDiary={() => handleViewChange('diary')}
@@ -804,39 +803,6 @@ export default function App() {
             onOpenDM={openDM}
             onOpenDMList={() => openDM(null)}
             onOpenLeaderboard={() => handleViewChange('leaderboard')}
-          />
-        )}
-
-        {view === 'wheel' && !user && (
-          <div className={styles.guestBanner}>
-            <div className={styles.guestBannerTitle}>Ознакомься со сферами жизни</div>
-            <p className={styles.guestBannerText}>
-              Колесо показывает 8 аспектов соционики — каждый отвечает за свою сферу твоей жизни. Тыкни в любой сектор, чтобы прочитать.
-              Когда захочешь начать путешествие по уровням — зарегистрируйся, и большинство закрытых сейчас уровней откроется.
-            </p>
-            <button
-              type="button"
-              className={styles.guestBannerCta}
-              onClick={() => setShowAuth(true)}
-            >
-              Войти / Зарегистрироваться
-            </button>
-          </div>
-        )}
-
-        {view === 'wheel' && (
-          <WheelView
-            scores={scores}
-            onSaveHistory={saveHistory}
-            history={history}
-            journey={journey}
-            onAspectClick={(aspect) => {
-              setSelectedAspect(aspect)
-              setView('aspects')
-            }}
-            onStartJourney={() => goToJourney(null)}
-            onOpenTasks={() => goToJourney('tasks')}
-            t={t}
           />
         )}
 
@@ -948,23 +914,13 @@ export default function App() {
           />
         )}
 
-        {view === 'progress' && (
-          <ProgressView
-            history={history}
-            scores={scores}
-            t={t}
-            onToggleDevAdmin={toggleDevAdmin}
-            devAdmin={devAdmin}
-          />
-        )}
-
         {view === 'settings' && (
           <SettingsView
             user={user}
             onUserUpdate={onAuthSuccess}
             onAccountDeleted={() => {
               logout()
-              setView('wheel')
+              setView('aspects')
             }}
             onLogout={logout}
           />

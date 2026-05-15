@@ -17,19 +17,18 @@ export default function Header({
   onOpenAdmin,
 }) {
   const navItems = [
-    // Главная: для залогиненных — Дашборд, гостям — сразу к Колесу.
+    // Главная: для залогиненных — Дашборд, гостям — сразу Аспекты (read-only).
     ...(user ? [{ id: 'dashboard', label: t.nav.dashboard }] : []),
-    { id: 'wheel', label: t.nav.wheel },
     { id: 'journey', label: t.nav.journey, badge: journeyPendingCount },
     { id: 'aspects', label: t.nav.aspects },
     { id: 'diary', label: t.nav.diary },
-    { id: 'progress', label: t.nav.progress },
     // Топ публичный (без auth) — виден всем.
     { id: 'leaderboard', label: t.nav.leaderboard },
     // Коуч гейтится в App.jsx:handleViewChange — без логина откроется AuthModal.
     { id: 'coach', label: t.nav.coach },
-    // Сообщения и Профиль вынесены на дашборд (карточки) +
-    // профиль доступен по клику на аватар справа.
+    // Колесо и Прогресс убраны (2026-05). Функционал колеса — в MiniWheel
+    // на дашборде; история оценок не использовалась — функционал удалён.
+    // Сообщения и Профиль на дашборде + аватар справа.
   ]
 
   return (

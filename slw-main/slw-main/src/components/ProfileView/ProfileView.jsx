@@ -629,7 +629,33 @@ export default function ProfileView({
           )}
         </div>
       </Section>
+
+      <DevAdminEgg />
     </div>
+  )
+}
+
+// Невидимая зона внизу профиля. 5 кликов → toggle dev-admin.
+// Раньше жила в ProgressView; перенесена сюда (2026-05).
+function DevAdminEgg() {
+  const [count, setCount] = useState(0)
+  const handleTap = () => {
+    const next = count + 1
+    if (next >= 5) {
+      const cur = localStorage.getItem('slw_dev_admin') === '1'
+      if (cur) localStorage.removeItem('slw_dev_admin')
+      else localStorage.setItem('slw_dev_admin', '1')
+      window.location.reload()
+    } else {
+      setCount(next)
+    }
+  }
+  return (
+    <div
+      onClick={handleTap}
+      style={{ width: '100%', height: 30, marginTop: 60, cursor: 'default' }}
+      aria-hidden="true"
+    />
   )
 }
 
