@@ -16,13 +16,18 @@
 import { CORE } from './core'
 import { DEFENDER } from './defender'
 import { RULER } from './ruler'
+import { BUILDER } from './builder'
+import { HERO } from './hero'
 
 export const SE_CONTENT = {
   ...CORE,
   ...DEFENDER,
-  ...RULER
-  // builder.js и hero.js (включая radical-acceptance) добавятся
-  // по мере их написания и будут подмешаны сюда.
+  ...RULER,
+  ...BUILDER,
+  ...HERO
+  // Все 47 навыков ЧС подключены: 4 универсальных + 12 Защитник +
+  // 9 Правитель + 10 Строитель + 12 Герой (11 архетипных +
+  // radical-acceptance как синергическая вершина).
 }
 
 export function getSeContent(skillId) {

@@ -88,11 +88,18 @@ export function getBlockItems(block, data) {
       }))
     case 'titledList': {
       const items = data[field] || []
-      return items.map((p, i) => ({
-        id: `${blockId}-${i}`,
-        label: p.name,
-        text: `${p.name}\n\n${p.desc}`
-      }))
+      return items.map((p, i) => {
+        // Если у пункта есть keySkills — включаем их в commentable-text,
+        // чтобы пользователь мог сослаться на ключевой навык в заметке.
+        const ks = Array.isArray(p.keySkills) && p.keySkills.length
+          ? '\n\nКлючевые навыки:\n' + p.keySkills.map(k => `• ${k.skill}${k.note ? ' — ' + k.note : ''}`).join('\n')
+          : ''
+        return {
+          id: `${blockId}-${i}`,
+          label: p.name,
+          text: `${p.name}\n\n${p.desc}${ks}`
+        }
+      })
     }
     case 'archetypePath':
       return (data.archetypePath ?? []).map((p, i) => ({
