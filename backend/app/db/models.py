@@ -527,3 +527,47 @@ class UserHabit(Base):
     # Опциональный id скрипта-упражнения, когда контент уровней появится.
     exercise_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+# ── TG-нотификации (2026-05) ────────────────────────────────────────────────
+# Глобальный config + лог отправок. Управляются через /api/admin/notify/*.
+
+class NotificationSettings(Base):
+    """Singleton (id=1). Глобальный кран и тонкая настройка типов.
+    Управляется через admin endpoint GET/PATCH /api/admin/notify/config.
+    """
+    __tablename__ = "notification_settings"
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, default=1)
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    notify_hour_utc: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=15, server_default="15"
+    )
+    type_pending_task_reminder: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    type_practice_check: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    type_continue_journey: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    updated_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class NotificationLog(Base):
+    """Журнал каждой отправки уведомления. Видно в Admin UI: кому, какой
+    тип, текст, ошибка. Для аудита и дебага."""
+    __tablename__ = "notification_log"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    web_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("web_users.id"), nullable=True
+    )
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    type: Mapped[str] = mapped_column(Text)
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sent_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)

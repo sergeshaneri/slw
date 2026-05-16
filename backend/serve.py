@@ -494,6 +494,46 @@ async def apply_ddl() -> None:
     except Exception as e:
         log.warning("notifications DDL failed: %s", e)
 
+    # Admin-настройки TG-нотификаций: singleton-таблица (одна строка id=1).
+    # Глобальный enable, час отправки, какие типы включены, бэклог.
+    # + Лог отправок (notification_log) — для аудита и UI.
+    try:
+        async with asyncio.timeout(15):
+            async with engine.connect() as conn:
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS notification_settings (
+                        id                            SMALLINT PRIMARY KEY DEFAULT 1,
+                        enabled                       BOOLEAN NOT NULL DEFAULT true,
+                        notify_hour_utc               SMALLINT NOT NULL DEFAULT 15,
+                        type_pending_task_reminder    BOOLEAN NOT NULL DEFAULT true,
+                        type_practice_check           BOOLEAN NOT NULL DEFAULT true,
+                        type_continue_journey         BOOLEAN NOT NULL DEFAULT true,
+                        updated_at                    TIMESTAMPTZ NOT NULL DEFAULT now()
+                    )
+                """))
+                await conn.execute(text(
+                    "INSERT INTO notification_settings (id) VALUES (1) "
+                    "ON CONFLICT (id) DO NOTHING"
+                ))
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS notification_log (
+                        id           BIGSERIAL PRIMARY KEY,
+                        web_user_id  INTEGER REFERENCES web_users(id),
+                        telegram_id  BIGINT,
+                        type         TEXT NOT NULL,
+                        text         TEXT,
+                        sent_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        error        TEXT
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS notification_log_sent_at_idx "
+                    "ON notification_log (sent_at DESC)"
+                ))
+                await conn.commit()
+    except Exception as e:
+        log.warning("notification_settings/log DDL failed: %s", e)
+
     # user_aspect_state — мульти-аспектный прогресс бота. Одна строка на
     # пару (юзер, аспект). Source of truth для current_step_id внутри
     # аспекта; user_state.current_step_id остаётся как денормализованная

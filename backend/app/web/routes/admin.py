@@ -25,6 +25,8 @@ from app.db.models import (
     AspectInsight,
     InsightLike,
     JourneyEvent,
+    NotificationLog,
+    NotificationSettings,
     ScriptStep,
     User,
     UserAspectState,
@@ -1782,3 +1784,197 @@ async def admin_patch_insight(
         "insight_id": insight_id,
         "is_public": insight.is_public,
     }
+
+
+# ── TG-нотификации: управление ─────────────────────────────────────────────
+
+@router.get("/notify/config")
+async def notify_get_config(
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Текущая конфигурация TG-нотификаций (singleton notification_settings)."""
+    _require_admin(current_user)
+    ns = await session.get(NotificationSettings, 1)
+    if ns is None:
+        ns = NotificationSettings(id=1)
+        session.add(ns)
+        await session.commit()
+        await session.refresh(ns)
+    return {
+        "enabled": ns.enabled,
+        "notify_hour_utc": ns.notify_hour_utc,
+        "type_pending_task_reminder": ns.type_pending_task_reminder,
+        "type_practice_check": ns.type_practice_check,
+        "type_continue_journey": ns.type_continue_journey,
+        "updated_at": ns.updated_at.isoformat() if ns.updated_at else None,
+    }
+
+
+@router.patch("/notify/config")
+async def notify_patch_config(
+    payload: dict = Body(...),
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Изменить конфигурацию. Все поля опциональные — меняется только то,
+    что передано. Применяется к следующей итерации scheduler-loop'а
+    (раз в 1 час)."""
+    _require_admin(current_user)
+    ns = await session.get(NotificationSettings, 1)
+    if ns is None:
+        ns = NotificationSettings(id=1)
+        session.add(ns)
+    if "enabled" in payload:
+        ns.enabled = bool(payload["enabled"])
+    if "notify_hour_utc" in payload:
+        h = int(payload["notify_hour_utc"])
+        if not (0 <= h <= 23):
+            raise HTTPException(400, "notify_hour_utc must be 0..23")
+        ns.notify_hour_utc = h
+    if "type_pending_task_reminder" in payload:
+        ns.type_pending_task_reminder = bool(payload["type_pending_task_reminder"])
+    if "type_practice_check" in payload:
+        ns.type_practice_check = bool(payload["type_practice_check"])
+    if "type_continue_journey" in payload:
+        ns.type_continue_journey = bool(payload["type_continue_journey"])
+    ns.updated_at = datetime.utcnow()
+    await session.commit()
+    await session.refresh(ns)
+    log.info("admin notify config updated by %s", current_user.email or current_user.id)
+    return {
+        "enabled": ns.enabled,
+        "notify_hour_utc": ns.notify_hour_utc,
+        "type_pending_task_reminder": ns.type_pending_task_reminder,
+        "type_practice_check": ns.type_practice_check,
+        "type_continue_journey": ns.type_continue_journey,
+        "updated_at": ns.updated_at.isoformat() if ns.updated_at else None,
+    }
+
+
+@router.post("/notify/run-now")
+async def notify_run_now(
+    current_user: WebUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Запустить дневной раунд рассылки сейчас, без ожидания scheduler'а.
+    Cool-down per-type-per-day защищает от дублей — тех, кому сегодня уже
+    отправили, пропустим."""
+    _require_admin(current_user)
+    from app.bot.main import get_app
+    from app.bot.notifications import _send_daily_round
+    bot = get_app()
+    if bot is None:
+        raise HTTPException(503, "bot Application is not ready yet")
+    result = await _send_daily_round(bot)
+    log.info("admin notify run-now by %s: %s", current_user.email or current_user.id, result)
+    return result
+
+
+@router.post("/notify/test")
+async def notify_test(
+    current_user: WebUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Отправить себе тестовое уведомление (3 типа подряд) — посмотреть
+    как выглядят сообщения в TG."""
+    _require_admin(current_user)
+    if not current_user.telegram_id:
+        raise HTTPException(400, "У тебя не залинкован Telegram — некому слать тест")
+    from app.bot.notifications import send_test_notification
+    return await send_test_notification(current_user.id)
+
+
+@router.post("/notify/broadcast")
+async def notify_broadcast(
+    payload: dict = Body(...),
+    current_user: WebUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Кастомная рассылка всем залогиненным с TG. Игнорирует cool-down.
+    Тело: { "text": "...", "target": "all"|"tg_linked"|"recent_30d" }
+    "tg_linked" — только те, у кого notifications_enabled=true (рекомендуется).
+    """
+    _require_admin(current_user)
+    text_msg = payload.get("text", "").strip()
+    if not text_msg:
+        raise HTTPException(400, "text не может быть пустым")
+    if len(text_msg) > 4000:
+        raise HTTPException(400, "text слишком длинный (макс 4000)")
+    target = payload.get("target", "tg_linked")
+    if target not in ("all", "tg_linked", "recent_30d"):
+        raise HTTPException(400, "target must be all|tg_linked|recent_30d")
+    from app.bot.notifications import broadcast_message
+    result = await broadcast_message(text_msg, target=target)
+    log.info(
+        "admin broadcast by %s: target=%s result=%s",
+        current_user.email or current_user.id, target, result,
+    )
+    return result
+
+
+@router.get("/notify/log")
+async def notify_get_log(
+    limit: int = Query(100, ge=1, le=500),
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Последние N отправок (для UI-аудита)."""
+    _require_admin(current_user)
+    rows = (await session.execute(
+        select(NotificationLog, WebUser.email, WebUser.display_name)
+        .outerjoin(WebUser, WebUser.id == NotificationLog.web_user_id)
+        .order_by(NotificationLog.sent_at.desc())
+        .limit(limit)
+    )).all()
+    total = (await session.execute(
+        select(func.count(NotificationLog.id))
+    )).scalar_one() or 0
+    return {
+        "total": total,
+        "limit": limit,
+        "entries": [
+            {
+                "id": entry.id,
+                "web_user_id": entry.web_user_id,
+                "telegram_id": entry.telegram_id,
+                "user_email": email,
+                "user_display_name": display_name,
+                "type": entry.type,
+                "text": entry.text,
+                "error": entry.error,
+                "sent_at": entry.sent_at.isoformat() if entry.sent_at else None,
+            }
+            for entry, email, display_name in rows
+        ],
+    }
+
+
+@router.post("/notify/clear-cooldowns")
+async def notify_clear_cooldowns(
+    payload: dict = Body(default={}),
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Сбросить cooldown'ы — для одного юзера (по user_id) или для ВСЕХ
+    (если user_id не указан). После сброса юзер снова попадёт в раунд
+    рассылки, даже если ему сегодня уже отправляли."""
+    _require_admin(current_user)
+    user_id = payload.get("user_id")
+    affected = 0
+    if user_id is not None:
+        target = await session.get(WebUser, int(user_id))
+        if not target:
+            raise HTTPException(404, "Юзер не найден")
+        target.notification_cooldowns = {}
+        affected = 1
+    else:
+        rows = (await session.execute(
+            select(WebUser).where(WebUser.telegram_id.isnot(None))
+        )).scalars().all()
+        for u in rows:
+            u.notification_cooldowns = {}
+            affected += 1
+    await session.commit()
+    log.info(
+        "admin clear-cooldowns by %s: affected=%d user_id=%s",
+        current_user.email or current_user.id, affected, user_id,
+    )
+    return {"affected": affected, "user_id": user_id}

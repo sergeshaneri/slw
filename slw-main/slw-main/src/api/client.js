@@ -717,6 +717,36 @@ export async function adminPatchInsight(insightId, patch) {
   return request('PATCH', `/api/admin/insight/${insightId}`, patch)
 }
 
+// ── Admin: TG notifications ───────────────────────────────────────────────
+
+export async function adminNotifyGetConfig() {
+  return request('GET', '/api/admin/notify/config')
+}
+
+export async function adminNotifyPatchConfig(patch) {
+  return request('PATCH', '/api/admin/notify/config', patch)
+}
+
+export async function adminNotifyRunNow() {
+  return request('POST', '/api/admin/notify/run-now', {})
+}
+
+export async function adminNotifyTest() {
+  return request('POST', '/api/admin/notify/test', {})
+}
+
+export async function adminNotifyBroadcast({ text, target = 'tg_linked' }) {
+  return request('POST', '/api/admin/notify/broadcast', { text, target })
+}
+
+export async function adminNotifyGetLog({ limit = 100 } = {}) {
+  return request('GET', `/api/admin/notify/log?limit=${limit}`)
+}
+
+export async function adminNotifyClearCooldowns({ user_id = null } = {}) {
+  return request('POST', '/api/admin/notify/clear-cooldowns', { user_id })
+}
+
 export async function adminSetAspectPosition(userId, { aspect, currentLevel, currentScriptId, currentScriptIndex, resetMessages, addToCompleted }) {
   return request('POST', `/api/admin/user/${userId}/set-aspect-position`, {
     aspect, currentLevel, currentScriptId, currentScriptIndex, resetMessages, addToCompleted,

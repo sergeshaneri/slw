@@ -3,6 +3,7 @@ import UsersTab from './UsersTab'
 import StatsTab from './StatsTab'
 import BulkTab from './BulkTab'
 import ModerationTab from './ModerationTab'
+import NotifyTab from './NotifyTab'
 import styles from './AdminView.module.css'
 
 const TABS = [
@@ -10,6 +11,7 @@ const TABS = [
   { id: 'stats',      label: '📊 Статистика' },
   { id: 'bulk',       label: '⚙ Массовые операции' },
   { id: 'moderation', label: '🛡 Модерация' },
+  { id: 'notify',     label: '🔔 Уведомления' },
 ]
 
 /**
@@ -52,6 +54,7 @@ export default function AdminView({ onBack, onImpersonateApply }) {
         {tab === 'stats' && <StatsTab />}
         {tab === 'bulk' && <BulkTab />}
         {tab === 'moderation' && <ModerationTab />}
+        {tab === 'notify' && <NotifyTab />}
       </div>
     </div>
   )
