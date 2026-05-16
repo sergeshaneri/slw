@@ -747,6 +747,10 @@ export async function adminNotifyClearCooldowns({ user_id = null } = {}) {
   return request('POST', '/api/admin/notify/clear-cooldowns', { user_id })
 }
 
+export async function adminNotifySendToUser({ user_id, text }) {
+  return request('POST', '/api/admin/notify/send-to-user', { user_id, text })
+}
+
 export async function adminSetAspectPosition(userId, { aspect, currentLevel, currentScriptId, currentScriptIndex, resetMessages, addToCompleted }) {
   return request('POST', `/api/admin/user/${userId}/set-aspect-position`, {
     aspect, currentLevel, currentScriptId, currentScriptIndex, resetMessages, addToCompleted,

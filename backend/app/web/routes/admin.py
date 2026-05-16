@@ -1947,6 +1947,35 @@ async def notify_get_log(
     }
 
 
+@router.post("/notify/send-to-user")
+async def notify_send_to_user(
+    payload: dict = Body(...),
+    current_user: WebUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Адресная отправка кастомного сообщения одному юзеру.
+    Тело: { "user_id": 11, "text": "Привет!" }
+    Игнорирует cool-down. Уважает notifications_enabled — если юзер
+    выключил уведомления, не шлём.
+    """
+    _require_admin(current_user)
+    user_id = payload.get("user_id")
+    text_msg = (payload.get("text") or "").strip()
+    if user_id is None:
+        raise HTTPException(400, "user_id обязателен")
+    if not text_msg:
+        raise HTTPException(400, "text не может быть пустым")
+    if len(text_msg) > 4000:
+        raise HTTPException(400, "text слишком длинный (макс 4000)")
+
+    from app.bot.notifications import send_admin_direct
+    result = await send_admin_direct(
+        int(user_id),
+        text_msg,
+        admin_email=current_user.email or str(current_user.id),
+    )
+    return result
+
+
 @router.post("/notify/clear-cooldowns")
 async def notify_clear_cooldowns(
     payload: dict = Body(default={}),

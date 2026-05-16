@@ -312,6 +312,43 @@ async def broadcast_message(
     return {"sent": sent_count, "errors": error_count, "target": target}
 
 
+async def send_admin_direct(user_id: int, text_msg: str, admin_email: str | None = None) -> dict:
+    """Адресная отправка кастомного сообщения одному юзеру админом.
+    Игнорирует cool-down, но проверяет notifications_enabled — если
+    юзер выключил уведомления, не шлём (иначе админская функция
+    становится средством злоупотребления).
+
+    Возвращает {ok, error?, log_id?}.
+    """
+    bot = get_app()
+    if bot is None:
+        return {"ok": False, "error": "bot not ready"}
+
+    async with AsyncSessionLocal() as session:
+        user = await session.get(WebUser, user_id)
+        if not user:
+            return {"ok": False, "error": "user not found"}
+        if not user.telegram_id:
+            return {"ok": False, "error": "user has no telegram_id"}
+        if not user.notifications_enabled:
+            return {
+                "ok": False,
+                "error": "user disabled notifications",
+                "user_blocked_notifications": True,
+            }
+
+        # Шлём через общую _send_notification — она логирует в БД.
+        ntype = "admin_direct"
+        ok = await _send_notification(bot, session, user, ntype, text_msg)
+        await session.commit()
+
+    log.info(
+        "admin_direct by %s → user_id=%s: ok=%s",
+        admin_email or "unknown", user_id, ok,
+    )
+    return {"ok": ok}
+
+
 async def send_test_notification(user_id: int) -> dict:
     """Тест: шлёт админу сразу все 3 типа подряд (с заглушечным
     текстом). Используется для проверки внешнего вида сообщений."""

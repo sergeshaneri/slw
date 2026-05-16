@@ -4,6 +4,7 @@ import {
   adminImpersonate,
   adminListUsers,
   adminNormalizeCounters,
+  adminNotifySendToUser,
   adminPatchUserState,
   adminPromote,
   adminResetAspectPosition,
@@ -41,6 +42,8 @@ export default function UsersTab({ onImpersonateApply }) {
   const [stateEditor, setStateEditor] = useState(null)  // { text, error } | null
   // Position-editor: { aspect, currentLevel, currentScriptId, resetMessages } | null
   const [positionEditor, setPositionEditor] = useState(null)
+  // Адресное TG-сообщение: { text } | null
+  const [tgMessage, setTgMessage] = useState(null)
 
   const pushLog = useCallback(msg => {
     setActionLog(prev => [{ ts: Date.now(), msg }, ...prev].slice(0, 12))
@@ -257,6 +260,32 @@ export default function UsersTab({ onImpersonateApply }) {
     }
   }
 
+  const openTgMessage = () => {
+    if (!selectedUser?.telegram_id) {
+      pushLog('У юзера не залинкован TG — некуда слать')
+      return
+    }
+    setTgMessage({ text: '' })
+  }
+
+  const sendTgMessage = async () => {
+    if (!selectedUser || !tgMessage) return
+    const text = (tgMessage.text || '').trim()
+    if (!text) return
+    if (!confirm(`Отправить юзеру ${selectedUser.email || selectedUser.id} это сообщение в TG?\n\n${text}`)) return
+    try {
+      const r = await adminNotifySendToUser({ user_id: selectedUser.id, text })
+      if (r.ok) {
+        pushLog(`TG → ${selectedUser.email || selectedUser.id}: отправлено ✓`)
+        setTgMessage(null)
+      } else {
+        pushLog(`TG → ${selectedUser.email || selectedUser.id}: ${r.error || 'не удалось'}`)
+      }
+    } catch (e) {
+      pushLog(`TG send error: ${e.message}`)
+    }
+  }
+
   const openStateEditor = () => {
     if (!diagnostic) return
     // Достаём актуальный journey через диагностику (web_state.aspects там
@@ -341,6 +370,7 @@ export default function UsersTab({ onImpersonateApply }) {
               fullDiary={fullDiary}
               stateEditor={stateEditor}
               positionEditor={positionEditor}
+              tgMessage={tgMessage}
               onClose={closeUser}
               onPreviewRestore={previewRestore}
               onApplyRestore={applyRestore}
@@ -359,6 +389,10 @@ export default function UsersTab({ onImpersonateApply }) {
               onAutoPositionFromDiary={autoPositionFromDiary}
               onResetAspectPosition={resetAspectPosition}
               onNormalizeCounters={normalizeCounters}
+              onOpenTgMessage={openTgMessage}
+              onChangeTgMessage={text => setTgMessage(s => ({ ...s, text }))}
+              onSendTgMessage={sendTgMessage}
+              onCloseTgMessage={() => setTgMessage(null)}
             />
           ) : (
             <div className={styles.emptyDetail}>
@@ -428,13 +462,14 @@ function UserCard({ user, selected, onClick }) {
 }
 
 function UserDetail({
-  user, diagnostic, restorePreview, fullDiary, stateEditor, positionEditor,
+  user, diagnostic, restorePreview, fullDiary, stateEditor, positionEditor, tgMessage,
   onClose, onPreviewRestore, onApplyRestore,
   onPromote, onImpersonate, onRollbackRestore,
   onOpenFullDiary, onOpenStateEditor,
   onChangeStateEditor, onApplyStateEditor, onCloseStateEditor,
   onOpenPositionEditor, onChangePositionEditor, onApplyPositionEditor, onClosePositionEditor,
   onAutoPositionFromDiary, onResetAspectPosition, onNormalizeCounters,
+  onOpenTgMessage, onChangeTgMessage, onSendTgMessage, onCloseTgMessage,
 }) {
   return (
     <div>
@@ -515,11 +550,46 @@ function UserDetail({
               <button type="button" className={styles.action} onClick={onAutoPositionFromDiary}>
                 ⚡ Авто-позиция по дневнику
               </button>
+              {user.telegram_id && (
+                <button type="button" className={styles.action} onClick={onOpenTgMessage}>
+                  📨 Сообщение в TG
+                </button>
+              )}
               <button type="button" className={styles.actionWarn} onClick={onOpenStateEditor}>
                 ✎ Править web_state (опасно)
               </button>
             </div>
           </Section>
+
+          {tgMessage && (
+            <Section title="📨 Отправить сообщение в Telegram">
+              <div className={styles.subStats} style={{ marginBottom: 8 }}>
+                Адресная отправка через бот. Идёт от лица «Терры Гармонии»
+                с кнопкой «🎯 Открыть приложение». Игнорирует cool-down,
+                но если юзер выключил уведомления — не отправится.
+              </div>
+              <textarea
+                className={styles.stateEditor}
+                value={tgMessage.text || ''}
+                onChange={e => onChangeTgMessage(e.target.value)}
+                placeholder="Текст сообщения. Можно эмодзи и переносы строк. Макс 4000 символов."
+                rows={5}
+              />
+              <div className={styles.actionGrid} style={{ marginTop: 10 }}>
+                <button
+                  type="button"
+                  className={styles.actionWarn}
+                  onClick={onSendTgMessage}
+                  disabled={!tgMessage.text?.trim()}
+                >
+                  📨 Отправить
+                </button>
+                <button type="button" className={styles.action} onClick={onCloseTgMessage}>
+                  ✕ Закрыть
+                </button>
+              </div>
+            </Section>
+          )}
 
           {positionEditor && (
             <Section title={`📍 Позиция аспекта · ${positionEditor.aspect}`}>
