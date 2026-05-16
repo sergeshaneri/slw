@@ -1,9 +1,16 @@
 from datetime import datetime
 
 from sqlalchemy import select
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, Update
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ReplyKeyboardMarkup,
+    Update,
+    WebAppInfo,
+)
 from telegram.ext import ContextTypes
 
+from app.bot.handlers.app_button import WEBAPP_URL
 from app.content.loader import available_aspects, first_step_for_aspect, get_step
 from app.db.models import User, UserAspectState, UserState
 from app.db.session import AsyncSessionLocal
@@ -32,6 +39,31 @@ ASPECT_TAGLINES = {
 }
 
 ONBOARDING_ASPECT = "onboarding"
+
+
+def _webapp_inline_kb() -> InlineKeyboardMarkup:
+    """Inline-кнопка для запуска Mini App. Шлём отдельным сообщением
+    после основного приветствия — чтобы reply-клавиатура (Продолжить/
+    Профиль) осталась внизу, и inline-кнопка не конфликтовала с ней."""
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton(
+            "🌟 Открыть приложение",
+            web_app=WebAppInfo(url=WEBAPP_URL),
+        )
+    ]])
+
+
+async def _send_webapp_invite(update: Update, text: str) -> None:
+    """Отправляет короткое сообщение с inline-кнопкой WebApp. Best-effort:
+    падение шлёт лог и не валит conv-flow."""
+    msg = update.effective_message
+    if not msg:
+        return
+    try:
+        await msg.reply_text(text, reply_markup=_webapp_inline_kb())
+    except Exception:
+        # Не критично — у юзера всё равно есть menu-button слева от поля ввода.
+        pass
 
 
 async def _is_onboarding_finished(user_id: int) -> bool:
@@ -141,6 +173,11 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             "Жми «Продолжить» или /aspect чтобы сменить планету.",
             reply_markup=MAIN_KEYBOARD,
         )
+        await _send_webapp_invite(
+            update,
+            "Полная версия доступна в приложении — там колесо, дашборд, "
+            "дневник, ИИ-коуч и сообщество:",
+        )
         return IN_SCRIPT
 
     # 2. Онбординг ещё не пройден — стартуем (или продолжаем) его.
@@ -149,6 +186,11 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             f"Привет, {name}!\n\n"
             "Я СКБ-коуч — помогу тебе исследовать Соционическое Колесо Баланса.",
             reply_markup=MAIN_KEYBOARD,
+        )
+        await _send_webapp_invite(
+            update,
+            "Можно пройти курс прямо здесь в чате, а можно открыть приложение — "
+            "там визуальное колесо, карта планет, дашборд и дневник:",
         )
         # Если уже шёл по онбордингу — продолжим с того же шага.
         step = None
@@ -166,6 +208,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(
         f"Привет, {name}! Выбери планету для путешествия.",
         reply_markup=MAIN_KEYBOARD,
+    )
+    await _send_webapp_invite(
+        update,
+        "Или открой приложение — там вся карта аспектов сразу:",
     )
     await show_aspect_picker(update, context)
     return IN_SCRIPT
