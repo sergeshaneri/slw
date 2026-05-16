@@ -6,6 +6,7 @@ export default function Header({
   onViewChange,
   journeyPendingCount = 0,
   journeyHighlight = false,
+  aspectsHighlight = false,
   user,
   userAvatar,
   onLogin,
@@ -41,7 +42,10 @@ export default function Header({
 
       <nav className={styles.nav}>
         {navItems.map(item => {
-          const isHighlight = item.id === 'journey' && journeyHighlight
+          let highlightLabel = null
+          if (item.id === 'journey' && journeyHighlight) highlightLabel = '👈 Тут начинается игра'
+          else if (item.id === 'aspects' && aspectsHighlight) highlightLabel = '👆 Тут больше информации по сферам жизни'
+          const isHighlight = !!highlightLabel
           return (
             <button
               key={item.id}
@@ -53,7 +57,7 @@ export default function Header({
               {item.badge > 0 && <span className={styles.navBadge}>{item.badge}</span>}
               {isHighlight && (
                 <span className={styles.navHighlightLabel}>
-                  👈 Тут начинается игра
+                  {highlightLabel}
                 </span>
               )}
             </button>

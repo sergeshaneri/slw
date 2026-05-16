@@ -15,7 +15,7 @@ import SettingsView from './components/SettingsView/SettingsView'
 import AdminView from './components/AdminView/AdminView'
 import AchievementToast from './components/Toast/AchievementToast'
 import IntroTour from './components/Onboarding/IntroTour'
-import { fetchMyProfile, markOnboardingDone } from './api/client'
+import { fetchMyProfile, markOnboardingDone, markHintSeen } from './api/client'
 import LoadingScreen from './components/LoadingScreen/LoadingScreen'
 import AuthModal from './components/Auth/AuthModal'
 import WelcomeScreen from './components/Welcome/WelcomeScreen'
@@ -636,6 +636,17 @@ export default function App() {
       setShowAuth(true)
       return
     }
+    // Гасим подсветку Аспектов при первом клике. Best-effort: пишем
+    // на бэк (hints_seen) и в localStorage, чтобы условие подсветки
+    // в App.jsx больше не срабатывало.
+    if (newView === 'aspects' && user && !user?.hints_seen?.['nav-aspects-cta']) {
+      try { localStorage.setItem('hint_nav-aspects-cta', '1') } catch { /* ignore */ }
+      markHintSeen('nav-aspects-cta').catch(() => {})
+      onAuthSuccess({
+        ...user,
+        hints_seen: { ...(user.hints_seen ?? {}), 'nav-aspects-cta': true },
+      })
+    }
     setView(newView)
     setSelectedAspect(null)
     setViewingProfileId(null)
@@ -809,6 +820,18 @@ export default function App() {
         // ни разу не начинал путешествие. Условие выключается само,
         // как только totalCompleted > 0 (юзер прошёл хотя бы один шаг).
         journeyHighlight={!!user && view === 'dashboard' && (journey?.totalCompleted ?? 0) === 0}
+        // Подсветка «Аспекты» — для юзера который УЖЕ начал проходить
+        // путешествие (3+ шагов), но ещё не открывал страницу Аспектов.
+        // Цель: напомнить про теорию/контент сфер, когда у юзера накопился
+        // интерес к деталям. Отключается через hints_seen['nav-aspects-cta']
+        // при первом клике на кнопку.
+        aspectsHighlight={
+          !!user
+          && view === 'dashboard'
+          && (journey?.totalCompleted ?? 0) >= 3
+          && !user?.hints_seen?.['nav-aspects-cta']
+          && localStorage.getItem('hint_nav-aspects-cta') !== '1'
+        }
         user={user}
         userAvatar={myAvatar}
         onLogin={() => setShowAuth(true)}
