@@ -765,18 +765,31 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   }, [scripts, setState])
 
   // ─── Онбординг ───────────────────────────────────────────────
-  // Шаги 0–3: общее интро, не привязанное к аспекту.
-  // Упрощённый онбординг (2026-05): один вводный экран → Карта Планет.
-  // Старые 4 шага в чате + IntroTour 5 страниц были переусложнены.
-  // Теперь юзер видит один текст «Привет. Это твой компас.», жмёт
-  // «Открыть карту» — попадает в PlanetMap. Подсказки на ключевых
-  // местах появляются по мере навигации через <Hint/> компоненты.
-  // Полный обзор тура — отдельная кнопка «🎓 Пройти обучение» в дашборде.
+  // Шаги 0–3: общее интро, не привязанное к аспекту (см. onboarding.md
+  // — авторский текст, не переписывать без явной просьбы).
+  // После шага 3 → бот рассказывает про карту планет.
+  // Юзер сам жмёт «Открыть Карту Планет» (шаг 4), чтобы перейти.
+  // Дальше handleSwitchAspect инжектит aspectIntro и первый скрипт
+  // L0 выбранного аспекта.
+  // IntroTour (полноэкранный 5-страничный) больше не вызывается
+  // автоматически — открывается опционально кнопкой «🎓 Пройти обучение»
+  // в дашборде.
   const handleOnboardingNext = useCallback(async () => {
-    // Любое нажатие кнопки в intro-state ведёт сразу на Карту Планет.
-    addUserMessage(ONBOARDING[0]?.button || 'Открыть карту')
-    setState(s => ({ ...s, onboardingStep: 4, screen: 'planets' }))
-  }, [addUserMessage, setState])
+    const step = state.onboardingStep
+    addUserMessage(ONBOARDING[Math.min(step, 3)]?.button || 'Далее')
+    if (step < 3) {
+      await addBotMessage(ONBOARDING[step + 1].text, 700)
+      setState(s => ({ ...s, onboardingStep: step + 1 }))
+    } else if (step === 3) {
+      await addBotMessage(
+        'Готово. Сейчас покажу Карту Планет — выбери, с какого аспекта хочешь начать.',
+        900
+      )
+      setState(s => ({ ...s, onboardingStep: 4 }))
+    } else if (step === 4) {
+      setState(s => ({ ...s, screen: 'planets' }))
+    }
+  }, [state.onboardingStep, addBotMessage, addUserMessage, setState])
 
   // Помещаем задание в очередь активных (без дублей по scriptId).
   const enqueueTask = useCallback((script, status) => {

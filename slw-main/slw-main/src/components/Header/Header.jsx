@@ -5,6 +5,7 @@ export default function Header({
   view,
   onViewChange,
   journeyPendingCount = 0,
+  journeyHighlight = false,
   user,
   userAvatar,
   onLogin,
@@ -39,17 +40,25 @@ export default function Header({
       </div>
 
       <nav className={styles.nav}>
-        {navItems.map(item => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => onViewChange(item.id)}
-            className={`${styles.navButton} ${view === item.id ? styles.active : ''}`}
-          >
-            <span>{item.label}</span>
-            {item.badge > 0 && <span className={styles.navBadge}>{item.badge}</span>}
-          </button>
-        ))}
+        {navItems.map(item => {
+          const isHighlight = item.id === 'journey' && journeyHighlight
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onViewChange(item.id)}
+              className={`${styles.navButton} ${view === item.id ? styles.active : ''} ${isHighlight ? styles.navHighlight : ''}`}
+            >
+              <span>{item.label}</span>
+              {item.badge > 0 && <span className={styles.navBadge}>{item.badge}</span>}
+              {isHighlight && (
+                <span className={styles.navHighlightLabel}>
+                  👈 Тут начинается игра
+                </span>
+              )}
+            </button>
+          )
+        })}
       </nav>
 
       <div className={styles.authBlock}>

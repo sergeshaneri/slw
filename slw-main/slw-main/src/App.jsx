@@ -805,6 +805,10 @@ export default function App() {
         view={view}
         onViewChange={handleViewChange}
         journeyPendingCount={journey?.aspects?.[journey?.currentAspect]?.pendingTasks?.length ?? 0}
+        // Подсвечиваем «Путешествие» если юзер залогинен, на дашборде и
+        // ни разу не начинал путешествие. Условие выключается само,
+        // как только totalCompleted > 0 (юзер прошёл хотя бы один шаг).
+        journeyHighlight={!!user && view === 'dashboard' && (journey?.totalCompleted ?? 0) === 0}
         user={user}
         userAvatar={myAvatar}
         onLogin={() => setShowAuth(true)}

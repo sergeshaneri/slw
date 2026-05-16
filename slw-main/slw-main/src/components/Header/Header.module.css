@@ -140,6 +140,59 @@
   box-shadow: 0 0 12px rgba(255, 255, 255, 0.55);
 }
 
+/* Подсветка кнопки «Путешествие» — для юзера, который ещё не начал
+   проходить ни одного шага. Пульсирующее свечение + tooltip-стрелка
+   «Тут начинается игра» снизу. Когда totalCompleted > 0 — выключается. */
+.navHighlight {
+  position: relative;
+  background: linear-gradient(180deg, rgba(179,157,219,0.22), rgba(179,157,219,0.10));
+  border-color: rgba(179,157,219,0.55);
+  color: #fff;
+  animation: ctaPulse 2.2s infinite ease-in-out;
+}
+
+.navHighlight:hover {
+  background: linear-gradient(180deg, rgba(179,157,219,0.32), rgba(179,157,219,0.16));
+}
+
+.navHighlightLabel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 6px 12px;
+  background: #b39ddb;
+  color: #1a1622;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px -4px rgba(179,157,219,0.6);
+  pointer-events: none;
+  /* Стрелка-указатель вверх к кнопке */
+  z-index: 10;
+}
+.navHighlightLabel::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 10px;
+  height: 10px;
+  background: #b39ddb;
+}
+
+@keyframes ctaPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(179,157,219,0.45), 0 0 14px rgba(179,157,219,0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(179,157,219,0), 0 0 22px rgba(179,157,219,0.55);
+  }
+}
+
 @keyframes badgePulse {
   0%, 100% { transform: scale(1); opacity: 1; }
   50%      { transform: scale(1.07); opacity: .92; }
