@@ -99,9 +99,22 @@ export default function Chat({
           записать инсайт минимум 10 символов — это попадает в дневник.
           На вопросах со шкалой — двигай ползунок и жми «Ответить».
         </Hint>
-        <Hint id="journey-planets-btn" user={user} position="top-left">
-          ↑ Здесь можно сменить планету — прогресс сохранится в каждой.
-        </Hint>
+        {/* journey-planets-btn — показываем только когда первая
+            подсказка уже закрыта (juniey-chat-intro в hints_seen) И
+            юзер прошёл хотя бы один шаг в текущем аспекте. Иначе
+            обе подсказки сыпались одновременно — было перегружено. */}
+        {(() => {
+          const chatIntroSeen = !!(user?.hints_seen?.['journey-chat-intro'])
+            || (typeof window !== 'undefined' && localStorage.getItem('hint_journey-chat-intro') === '1')
+          const folder = state.aspects?.[state.currentAspect]
+          const completedCount = (folder?.completedScripts ?? []).length
+          if (!chatIntroSeen || completedCount < 1) return null
+          return (
+            <Hint id="journey-planets-btn" user={user} position="top-left">
+              ↑ Здесь можно сменить планету — прогресс сохранится в каждой.
+            </Hint>
+          )
+        })()}
         {state.messages.map(m => {
           if (m.kind === 'script') {
             const sc = lookup(m)
