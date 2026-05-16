@@ -5,8 +5,6 @@ import {
   summonCoach,
   fetchCoachHistory,
 } from '../../api/client'
-import { isTMA } from '../../tma'
-import { useMainButton } from '../../tma/hooks'
 import styles from './CoachView.module.css'
 
 const PROMPT_TEMPLATE =
@@ -119,23 +117,6 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
     onDiaryChange([entry, ...(diary ?? [])])
     setSavedToDiary(true)
   }
-
-  // Telegram MainButton: внутри TMA берёт на себя роль кнопки «Позвать».
-  // Текст и disabled-логика — те же что у веб-кнопки. В вебе хук — no-op.
-  const mainBtnText = busy
-    ? 'Зову…'
-    : canCallFree
-      ? 'Позвать'
-      : canBuyWithStardust
-        ? `⚡ Использовать ${stardustCost}`
-        : 'Позвать'
-  const mainBtnDisabled = busy || !prompt.trim() || (!canCallFree && !canBuyWithStardust)
-  useMainButton({
-    text: mainBtnText,
-    onClick: () => handleSubmit(!canCallFree),
-    loading: busy,
-    disabled: mainBtnDisabled,
-  })
 
   return (
     <div className={styles.container}>

@@ -1,6 +1,4 @@
 import { useEffect, useState } from 'react'
-import { isTMA } from '../../tma'
-import { useMainButton } from '../../tma/hooks'
 import styles from './JourneyView.module.css'
 
 /**
@@ -33,19 +31,13 @@ export default function StepInsightPrompt({ kind, onSubmit, minLength = 10, onFo
 
   // При появлении prompt'а сразу триггерим onFocus (как-будто фокус на textarea).
   // autoFocus на textarea не всегда генерит focus-event синхронно — поэтому
-  // делаем явный вызов через useEffect.
+  // делаем явный вызов через useEffect. Используется в Chat.jsx чтобы
+  // свернуть топбар на время ввода инсайта.
   useEffect(() => {
     if (onFocus) onFocus()
     return () => { if (onBlur) onBlur() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  // Telegram MainButton: заменяет «Сохранить и дальше →» в TMA.
-  useMainButton({
-    text: 'Сохранить и дальше →',
-    onClick: () => canSubmit && onSubmit(text.trim()),
-    disabled: !canSubmit,
-  })
 
   return (
     <div className={styles.stepInsightArea}>

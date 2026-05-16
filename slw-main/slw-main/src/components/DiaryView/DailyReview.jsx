@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { fetchHabitsToday, tickHabit, untickHabit } from '../../api/client'
-import { isTMA } from '../../tma'
-import { useMainButton, tmaNotify } from '../../tma/hooks'
+import { tmaNotify } from '../../tma/hooks'
 import styles from './DiaryView.module.css'
 
 // Подсказки-«вопросы дня» по каждому аспекту. Список — это лишь гайд,
@@ -242,20 +241,6 @@ export default function DailyReview({ diary, onDiaryChange }) {
   const habitsChangedCount = habits.filter(
     h => !!h.ticked_today !== !!habitTicks[h.aspect]
   ).length
-
-  // Telegram MainButton: подменяет sticky save-bar в TMA.
-  const mainBtnDisabled = saving || (filledCount === 0 && habitsChangedCount === 0)
-  const mainBtnText = saving
-    ? 'Сохраняю…'
-    : saved
-      ? '✓ Сохранено'
-      : 'Сохранить день'
-  useMainButton({
-    text: mainBtnText,
-    onClick: handleSave,
-    loading: saving,
-    disabled: mainBtnDisabled,
-  })
 
   return (
     <div className={styles.dailyReview}>

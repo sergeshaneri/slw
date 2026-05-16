@@ -16,8 +16,7 @@ import {
 } from '../../api/client'
 import ReactorsList from '../PublicProfileView/ReactorsList'
 import Heatmap from '../Heatmap/Heatmap'
-import { isTMA } from '../../tma'
-import { useMainButton, tmaNotify } from '../../tma/hooks'
+import { tmaNotify } from '../../tma/hooks'
 import styles from './ProfileView.module.css'
 
 const AVATAR_OPTIONS = [
@@ -216,16 +215,6 @@ export default function ProfileView({
       setError(e.message ?? 'Не удалось удалить')
     }
   }
-
-  // Telegram MainButton: «Сохранить профиль» внизу экрана.
-  // Хук вызывается ВСЕГДА (порядок хуков), но условно — только если профиль
-  // загружен. Когда нет данных — text='' и кнопка скрыта.
-  useMainButton({
-    text: profile ? (saving ? 'Сохраняю…' : 'Сохранить профиль') : '',
-    onClick: handleSave,
-    loading: saving,
-    disabled: saving,
-  })
 
   if (busy) return <div className={styles.container}><div className={styles.muted}>Загрузка профиля…</div></div>
   if (!profile) return null
