@@ -4,6 +4,7 @@ import ScriptButtons from './ScriptButtons'
 import Slider from './Slider'
 import StepInsightPrompt from './StepInsightPrompt'
 import Hint from '../Onboarding/Hint'
+import { tma, isTMA } from '../../tma'
 import styles from './JourneyView.module.css'
 
 export default function Chat({
@@ -41,25 +42,55 @@ export default function Chat({
   const isText = state.awaitingInput === 'text' || state.awaitingInput === 'exercise_note'
   const isStepInsight = state.awaitingInput === 'step-insight'
 
-  // Сворачиваем шапку когда юзер начинает писать в textarea — иначе на
-  // мобильном (особенно в Telegram WebView с открытой клавиатурой) топбар
-  // съедает ~74px и оставляет крошечный кусок для чата. При фокусе скрываем
-  // топбар и доскролливаем чат к последнему сообщению (вопрос становится виден).
+  // Сворачиваем шапку когда юзер открывает клавиатуру — иначе на мобильном
+  // (особенно в Telegram WebView) топбар съедает ~74px и оставляет крошечный
+  // кусок для чата. Определяем «клавиатура открыта» двумя способами:
+  //   1. TG-событие viewportChanged (надёжно на мобильном TG)
+  //   2. focus/blur на textarea (fallback для веба + старых TG-клиентов)
   const [inputFocused, setInputFocused] = useState(false)
+
+  // 1. TG WebApp viewportChanged event.
+  // Когда клавиатура поднимается, tma.viewportHeight уменьшается, а
+  // viewportStableHeight остаётся прежним. Сравниваем — если viewport
+  // меньше stable хотя бы на 100px, считаем что клавиатура открыта.
+  useEffect(() => {
+    if (!isTMA || !tma?.onEvent) return
+    const handler = () => {
+      const vh = tma.viewportHeight || 0
+      const vsh = tma.viewportStableHeight || vh
+      const keyboardOpen = vsh - vh > 100
+      setInputFocused(keyboardOpen)
+    }
+    tma.onEvent('viewportChanged', handler)
+    return () => { tma.offEvent?.('viewportChanged', handler) }
+  }, [])
+
+  // 2. focus/blur на textarea — fallback и для случая когда юзер тапает на
+  // поле но клавиатура ещё не успела открыться (даёт быстрый отклик UI).
   const handleInputFocus = () => {
     setInputFocused(true)
-    // Задержка чтобы клавиатура успела открыться и viewport стабилизировался,
-    // потом скроллим чат вниз — пользователь видит вопрос на который отвечает.
-    setTimeout(() => {
+  }
+  const handleInputBlur = () => {
+    // Не сбрасываем сразу — viewportChanged сам поймает закрытие клавиатуры.
+    // Это избегает мерцания на мобильном: blur может срабатывать раньше чем
+    // клавиатура реально закроется.
+    if (!isTMA) setInputFocused(false)
+  }
+
+  // Когда inputFocused становится true — скроллим чат вниз чтобы последнее
+  // сообщение (вопрос на который отвечаешь) было видно над клавиатурой.
+  useEffect(() => {
+    if (!inputFocused) return
+    const id = setTimeout(() => {
       if (chatRef?.current) {
         chatRef.current.scrollTo({
           top: chatRef.current.scrollHeight,
           behavior: 'smooth',
         })
       }
-    }, 300)
-  }
-  const handleInputBlur = () => setInputFocused(false)
+    }, 250)
+    return () => clearTimeout(id)
+  }, [inputFocused, chatRef])
 
   return (
     <>
