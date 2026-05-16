@@ -20,6 +20,7 @@ import LoadingScreen from './components/LoadingScreen/LoadingScreen'
 import AuthModal from './components/Auth/AuthModal'
 import WelcomeScreen from './components/Welcome/WelcomeScreen'
 import Footer from './components/Footer/Footer'
+import { isTMA } from './tma'
 import { ASPECT_KEYS } from './data/aspects'
 import { getJourney } from './data/journey/registry'
 import { ru } from './locales/ru'
@@ -757,10 +758,12 @@ export default function App() {
 
   // Пока useAuth проверяет токен — короткий лоадер, чтобы не моргало.
   if (authLoading) return <LoadingScreen text="Загрузка..." />
-  // Гость, который ещё не нажал «Начать бесплатно» — экран приветствия.
+  // Внутри Telegram Mini App: bootstrapTMA уже положил токен, useAuth его
+  // подобрал. WelcomeScreen не показываем — юзер всегда авторизован через TG.
+  // Гость (вне TG), который ещё не нажал «Начать бесплатно» — экран приветствия.
   // После клика на «Начать бесплатно» — выпадает в общее приложение
   // (данные пишутся в localStorage, путешествие гейтится).
-  if (!user && !welcomeDismissed) {
+  if (!user && !welcomeDismissed && !isTMA) {
     return (
       <WelcomeScreen
         onAuthSuccess={onAuthSuccess}

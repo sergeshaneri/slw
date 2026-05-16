@@ -3,6 +3,7 @@ Auth routes:
   POST /api/auth/register         — email + password
   POST /api/auth/login            — email + password
   POST /api/auth/telegram         — Telegram Login Widget (creates or logs in)
+  POST /api/auth/telegram-webapp  — Telegram Mini App (initData → JWT)
   POST /api/auth/link             — link Telegram to existing email account
   POST /api/auth/add-email        — add email+password to TG-only account
   GET  /api/auth/me               — current user info
@@ -13,6 +14,7 @@ Auth routes:
   POST /api/auth/delete-account   — delete user + cascade everything
   GET  /api/auth/export           — JSON export of all user data
 """
+import json
 import urllib.parse
 from datetime import datetime
 
@@ -38,6 +40,7 @@ from app.web.auth import (
     hash_password,
     verify_password,
     verify_telegram_auth,
+    verify_webapp_init_data,
 )
 from app.web.deps import get_current_user
 
@@ -89,6 +92,11 @@ class TelegramAuthIn(BaseModel):
     photo_url: str | None = None
     auth_date: int
     hash: str
+
+
+class TelegramWebAppIn(BaseModel):
+    # initData как есть, из window.Telegram.WebApp.initData (query-string).
+    init_data: str
 
 
 def _user_out(user: WebUser, token: str | None = None) -> dict:
@@ -169,6 +177,57 @@ async def telegram_auth(body: TelegramAuthIn, session: AsyncSession = Depends(ge
         # Update display name in case it changed
         user.telegram_username = body.username
         user.telegram_first_name = body.first_name
+        await session.commit()
+
+    return _user_out(user, create_token(user.id))
+
+
+# ── Telegram Mini App (WebApp initData → JWT) ────────────────────────────────
+# Юзер запускает Mini App из бота → window.Telegram.WebApp.initData
+# содержит подписанные данные о юзере. Фронт шлёт сюда, мы валидируем
+# подпись HMAC-SHA256 (см. verify_webapp_init_data) и выдаём JWT.
+
+@router.post("/telegram-webapp")
+async def telegram_webapp(body: TelegramWebAppIn, session: AsyncSession = Depends(get_session)) -> dict:
+    parsed = verify_webapp_init_data(body.init_data)
+    if not parsed:
+        raise HTTPException(401, "Invalid Telegram WebApp init data")
+
+    # 'user' приходит как JSON-строка с {id, first_name, last_name?, username?, photo_url?, ...}
+    user_raw = parsed.get("user")
+    if not user_raw:
+        raise HTTPException(400, "Missing user in init data")
+    try:
+        tg = json.loads(user_raw)
+    except (ValueError, TypeError):
+        raise HTTPException(400, "Bad user payload")
+
+    tg_id = int(tg.get("id", 0))
+    if tg_id <= 0:
+        raise HTTPException(400, "Bad telegram id")
+
+    first_name = (tg.get("first_name") or "").strip()
+    username = tg.get("username")
+
+    user = (
+        await session.execute(select(WebUser).where(WebUser.telegram_id == tg_id))
+    ).scalar_one_or_none()
+
+    if not user:
+        user = WebUser(
+            telegram_id=tg_id,
+            telegram_username=username,
+            telegram_first_name=first_name or None,
+            created_at=datetime.utcnow(),
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+    else:
+        # Подтягиваем актуальные данные при каждом входе.
+        user.telegram_username = username
+        if first_name:
+            user.telegram_first_name = first_name
         await session.commit()
 
     return _user_out(user, create_token(user.id))

@@ -12,6 +12,7 @@ from telegram.ext import (
 
 from app.bot.fsm import IN_SCRIPT, WAITING_OPEN_ANSWER, WAITING_SCORE, WAITING_THEORY_NOTE
 from app.bot.handlers.admin import cmd_reload, cmd_reset
+from app.bot.handlers.app_button import cmd_app
 from app.bot.handlers.aspect import cmd_aspect, on_aspect_pick
 from app.bot.handlers.note import cmd_note
 from app.bot.handlers.profile import cmd_profile, on_profile_resume, on_profile_switch_aspect
@@ -63,6 +64,9 @@ def build() -> "Application":
     app.add_handler(CommandHandler("profile", cmd_profile))
     app.add_handler(CommandHandler("note", cmd_note))
     app.add_handler(CommandHandler("progress", cmd_progress))
+    # /app — открыть Mini App. Регистрируется на верхнем уровне (не в conv),
+    # чтобы работать из любого FSM-состояния.
+    app.add_handler(CommandHandler("app", cmd_app))
     app.add_handler(CallbackQueryHandler(on_profile_resume, pattern=r"^profile:resume$"))
     app.add_handler(CallbackQueryHandler(on_profile_switch_aspect, pattern=r"^profile:switch_aspect$"))
     app.add_handler(MessageHandler(BTN_PROFILE & ~filters.COMMAND, cmd_profile))

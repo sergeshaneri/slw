@@ -33,6 +33,12 @@ async def apply_ddl() -> None:
             "ALTER TABLE web_users "
             "ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false"
         ))
+        # TMA-юзеры регистрируются по telegram_id без email/пароля. Снимаем
+        # NOT NULL чтобы INSERT в /api/auth/telegram-webapp проходил.
+        # ALTER ... DROP NOT NULL идемпотентен: повторный запуск ОК.
+        await conn.execute(text(
+            "ALTER TABLE web_users ALTER COLUMN email DROP NOT NULL"
+        ))
         await conn.commit()
 
     # journey_events — НОВАЯ таблица. Изолируем от ALTER-ов выше: отдельная

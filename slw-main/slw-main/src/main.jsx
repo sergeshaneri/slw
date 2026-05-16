@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
+import { bootstrapTMA, isTMA } from './tma'
 import './index.css'
 
 // Initialize localStorage wrapper
@@ -23,8 +24,21 @@ window.storage = {
   }
 }
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+function mount() {
+  createRoot(document.getElementById('root')).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+}
+
+// Внутри Telegram Mini App: сначала обмениваем initData на JWT, потом мaунтим.
+// useAuth дальше увидит токен в localStorage и пройдёт fetchMe() при mount.
+// Вне Telegram bootstrapTMA() — no-op (вернёт null сразу), маунтим как обычно.
+if (isTMA) {
+  // Помечаем body для возможных CSS-стилей (например, скрыть header-меню).
+  document.body.classList.add('tma')
+  bootstrapTMA().finally(mount)
+} else {
+  mount()
+}

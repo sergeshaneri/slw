@@ -8,6 +8,7 @@ import EmotionsTab from './EmotionsTab'
 import TrainingsTab from './TrainingsTab'
 import AnalyticsTab from './AnalyticsTab'
 import VaultSyncTab from './VaultSyncTab'
+import { isTMA } from '../../tma'
 import styles from './DiaryView.module.css'
 
 const SOURCE_LABEL = {
@@ -96,13 +97,15 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
             >
               📊 Отчёты
             </button>
-            <button
-              type="button"
-              className={`${styles.tabBtn} ${mode === 'sync' ? styles.tabBtnActive : ''}`}
-              onClick={() => setMode('sync')}
-            >
-              🔗 Sync
-            </button>
+            {!isTMA && (
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${mode === 'sync' ? styles.tabBtnActive : ''}`}
+                onClick={() => setMode('sync')}
+              >
+                🔗 Sync
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -110,7 +113,7 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
       {mode === 'emotions' && user && <EmotionsTab />}
       {mode === 'trainings' && user && <TrainingsTab />}
       {mode === 'analytics' && user && <AnalyticsTab />}
-      {mode === 'sync' && user && <VaultSyncTab />}
+      {mode === 'sync' && user && !isTMA && <VaultSyncTab />}
 
       {mode === 'today' && user && (
         <>
