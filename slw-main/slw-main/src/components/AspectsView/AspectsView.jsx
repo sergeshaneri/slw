@@ -24,7 +24,7 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, di
   }, [selectedAspect])
 
   if (!selectedAspect) {
-    return <AspectsGrid scores={scores} onAspectSelect={onAspectSelect} journey={journey} />
+    return <AspectsGrid scores={scores} onAspectSelect={onAspectSelect} journey={journey} user={user} />
   }
 
   const data = ASPECT_DATA[selectedAspect]
@@ -70,9 +70,13 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, di
 
 // ─── Сетка 8 аспектов ──────────────────────────────────────────────────────
 
-function AspectsGrid({ scores, onAspectSelect, journey }) {
+function AspectsGrid({ scores, onAspectSelect, journey, user }) {
   return (
-    <div className={`${styles.aspectsGrid} ${styles.fadeIn}`}>
+    <div className={`${styles.aspectsGrid} ${styles.fadeIn}`} style={{ position: 'relative' }}>
+      <Hint id="aspects-grid-intro" user={user} position="top-right">
+        Тыкай в любую сферу — внутри теория, цели, дневник.
+        Прогресс-бар внизу карточки показывает, сколько шагов уровня уже пройдено.
+      </Hint>
       {ASPECT_KEYS.map((key, i) => {
         const d = ASPECT_DATA[key]
         const color = ASPECT_COLORS[key]

@@ -78,6 +78,7 @@ export default function DashboardView({
   onOpenDM,
   onOpenDMList,
   onOpenLeaderboard,
+  onOpenTour,
 }) {
   const [data, setData] = useState(null)
   const [busy, setBusy] = useState(true)
@@ -270,11 +271,18 @@ export default function DashboardView({
 
         {/* ── Колесо мини + актуальный аспект ───── */}
         <Section label={<><WheelFlowerGlyph />Колесо баланса</>}>
-          <MiniWheel
-            scores={data.scores}
-            size={220}
-            onAspectClick={(a) => onOpenAspect?.(a)}
-          />
+          <div style={{ position: 'relative' }}>
+            <Hint id="dashboard-wheel" user={user} position="top-right">
+              8 сфер жизни. Колесо растёт по мере того, как ты проходишь
+              шаги в путешествии и отвечаешь на вопросы навыков.
+              Тыкни в любой сектор — откроется страница аспекта.
+            </Hint>
+            <MiniWheel
+              scores={data.scores}
+              size={220}
+              onAspectClick={(a) => onOpenAspect?.(a)}
+            />
+          </div>
           <div className={styles.scoresLine}>
             {ASPECT_KEYS.map(k => (
               <span key={k} style={{ color: ASPECT_COLORS[k] }} className={styles.scoreChip}>
@@ -461,6 +469,27 @@ export default function DashboardView({
             onReload={reload}
           />
         </div>
+
+        {/* ── «Пройти обучение» — открывает IntroTour-как-«Обучение» ── */}
+        {onOpenTour && (
+          <div className={styles.spanFull}>
+            <button
+              type="button"
+              className={styles.tourCta}
+              onClick={onOpenTour}
+            >
+              <span className={styles.tourCtaIcon}>🎓</span>
+              <span className={styles.tourCtaBody}>
+                <span className={styles.tourCtaTitle}>Пройти обучение</span>
+                <span className={styles.tourCtaSub}>
+                  Краткий тур по приложению — 5 экранов с разъяснениями.
+                  Открыть в любой момент.
+                </span>
+              </span>
+              <span className={styles.tourCtaArrow}>→</span>
+            </button>
+          </div>
+        )}
 
         {/* ── Heatmap 30 дней ────────────────── */}
         <Section label="📅 Активность за 30 дней" className={styles.spanFull}>

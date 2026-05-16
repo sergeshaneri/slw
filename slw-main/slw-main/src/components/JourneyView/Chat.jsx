@@ -95,7 +95,12 @@ export default function Chat({
 
       <div className={styles.chatScroll} ref={chatRef}>
         <Hint id="journey-chat-intro" user={user}>
-          Каждый ответ — XP. Под утверждениями анкет можно писать инсайты — попадут в дневник.
+          Каждый ответ — XP. После теории, слова дня и итогов нужно
+          записать инсайт минимум 10 символов — это попадает в дневник.
+          На вопросах со шкалой — двигай ползунок и жми «Ответить».
+        </Hint>
+        <Hint id="journey-planets-btn" user={user} position="top-left">
+          ↑ Здесь можно сменить планету — прогресс сохранится в каждой.
         </Hint>
         {state.messages.map(m => {
           if (m.kind === 'script') {

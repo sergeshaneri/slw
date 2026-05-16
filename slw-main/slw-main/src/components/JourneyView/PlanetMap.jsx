@@ -1,5 +1,6 @@
 import { getAllPlanets } from '../../data/journey/registry'
 import { ASPECT_DISPLAY_KEY } from '../../data/aspects'
+import Hint from '../Onboarding/Hint'
 import styles from './PlanetMap.module.css'
 
 // PlanetMap — экран выбора планеты (аспекта).
@@ -10,10 +11,11 @@ import styles from './PlanetMap.module.css'
 //
 // Props:
 //   state         — журнал (нужен для статуса прогресса по каждой планете)
+//   user          — для Hint hints_seen-проверки (опционально, может быть null)
 //   onSwitch      — (aspectKey) => void
 //   onClose       — закрыть карту, остаться в текущем аспекте
 //   onLockedTap   — () => void — что показать при тапе на «скоро»-карточку
-export default function PlanetMap({ state, onSwitch, onClose, onLockedTap }) {
+export default function PlanetMap({ state, user, onSwitch, onClose, onLockedTap }) {
   const planets = getAllPlanets()
   const activeAspect = state.currentAspect
 
@@ -40,6 +42,10 @@ export default function PlanetMap({ state, onSwitch, onClose, onLockedTap }) {
           Каждый аспект — это отдельный мир со своим путём.
           Переключайся между ними свободно: твой прогресс сохраняется в каждом.
         </p>
+        <Hint id="planetmap-intro" user={user} position="top-right">
+          Тыкни любую планету. Порядок неважен — начинай с самой интересной.
+          Зелёный кружок на карточке = есть прогресс. Серый = ещё не начато.
+        </Hint>
       </div>
 
       <div className={styles.grid}>

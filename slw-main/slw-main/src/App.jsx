@@ -706,18 +706,13 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
-  // IntroTour: показать при первом контакте.
-  // Залогиненным — read user.onboarding_done с бэка (грузится в useAuth).
-  // Гостям — localStorage флаг 'slw_intro_seen' (после welcomeDismissed).
-  // user === null означает «ещё проверяем токен» — ничего не делаем.
-  useEffect(() => {
-    if (user === null) return
-    if (user && user.onboarding_done === false) {
-      setShowIntroTour(true)
-    } else if (user === false && welcomeDismissed && localStorage.getItem('slw_intro_seen') !== '1') {
-      setShowIntroTour(true)
-    }
-  }, [user, welcomeDismissed])
+  // IntroTour: 2026-05 — автоматический показ отключён. Раньше открывался
+  // при первом контакте (5 полноэкранных шагов после короткого онбординга
+  // в чате — итого пользователь видел ~9 экранов знакомства). Теперь:
+  // вводный экран в чате (1 шаг) → Карта Планет → контекстные подсказки
+  // в интерфейсе. IntroTour превращён в опциональное «Обучение» — открыть
+  // можно через кнопку «🎓 Пройти обучение» в дашборде или «📖 Гид» в
+  // ProfileView. Сразу-после-логина авто-показ больше НЕ инициируется.
 
   const handleTourClose = async () => {
     setShowIntroTour(false)
@@ -834,6 +829,7 @@ export default function App() {
             onOpenDM={openDM}
             onOpenDMList={() => openDM(null)}
             onOpenLeaderboard={() => handleViewChange('leaderboard')}
+            onOpenTour={() => setShowIntroTour(true)}
           />
         )}
 
