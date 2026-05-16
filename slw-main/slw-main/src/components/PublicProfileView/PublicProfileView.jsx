@@ -10,6 +10,7 @@ import {
 } from '../../api/client'
 import ReactorsList from './ReactorsList'
 import Heatmap from '../Heatmap/Heatmap'
+import { tmaHaptic } from '../../tma/hooks'
 import styles from './PublicProfileView.module.css'
 
 const KIND_LABEL = {
@@ -55,6 +56,7 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
   }, [userId])
 
   const handleReact = async (insightId, reaction, comment) => {
+    tmaHaptic('light')   // вибро в TG на тапе по реакции
     try {
       const { my_reaction, my_comment, reactions, total } =
         await reactToInsightWithComment(insightId, reaction, comment)

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { postStepCompleted, chooseHabit } from '../../api/client'
+import { tmaHaptic } from '../../tma/hooks'
 import { ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
 import { ONBOARDING } from '../../data/journey/onboarding'
 import { getJourney } from '../../data/journey/registry'
@@ -697,6 +698,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
   const awardXP = useCallback((xp, stardust = 0, scriptId = null) => {
     if (xp <= 0 && stardust <= 0) return
+    tmaHaptic('medium')  // вибро в TG при завершении шага (вне TMA — no-op)
 
     // Захватываем текущий state ДО setState — чтобы знать какой шаг
     // только что завершён (для append-only журнала событий).
@@ -2171,6 +2173,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           skills={state.skills ?? {}}
           onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
           onStartSkill={handleStartSkillSurvey}
+          onOpenSkillDetail={handleOpenSkillDetail}
           onOpenPlanetMap={handleOpenPlanetMap}
         />
       )}

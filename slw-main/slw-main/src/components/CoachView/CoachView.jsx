@@ -5,6 +5,8 @@ import {
   summonCoach,
   fetchCoachHistory,
 } from '../../api/client'
+import { isTMA } from '../../tma'
+import { useMainButton } from '../../tma/hooks'
 import styles from './CoachView.module.css'
 
 const PROMPT_TEMPLATE =
@@ -118,6 +120,23 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
     setSavedToDiary(true)
   }
 
+  // Telegram MainButton: внутри TMA берёт на себя роль кнопки «Позвать».
+  // Текст и disabled-логика — те же что у веб-кнопки. В вебе хук — no-op.
+  const mainBtnText = busy
+    ? 'Зову…'
+    : canCallFree
+      ? 'Позвать'
+      : canBuyWithStardust
+        ? `⚡ Использовать ${stardustCost}`
+        : 'Позвать'
+  const mainBtnDisabled = busy || !prompt.trim() || (!canCallFree && !canBuyWithStardust)
+  useMainButton({
+    text: mainBtnText,
+    onClick: () => handleSubmit(!canCallFree),
+    loading: busy,
+    disabled: mainBtnDisabled,
+  })
+
   return (
     <div className={styles.container}>
       <div className={styles.titleBlock}>
@@ -161,27 +180,29 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
           maxLength={4000}
         />
 
-        <div className={styles.actions}>
-          <button
-            type="button"
-            onClick={() => handleSubmit(false)}
-            disabled={busy || !prompt.trim() || !canCallFree}
-            className={styles.callButton}
-          >
-            {busy ? 'Зову…' : 'Позвать'}
-          </button>
-          {!canCallFree && (
+        {!isTMA && (
+          <div className={styles.actions}>
             <button
               type="button"
-              onClick={() => handleSubmit(true)}
-              disabled={busy || !prompt.trim() || !canBuyWithStardust}
-              className={styles.stardustButton}
-              title={canBuyWithStardust ? '' : `Нужно ${stardustCost} стардаста`}
+              onClick={() => handleSubmit(false)}
+              disabled={busy || !prompt.trim() || !canCallFree}
+              className={styles.callButton}
             >
-              ⚡ Использовать {stardustCost}
+              {busy ? 'Зову…' : 'Позвать'}
             </button>
-          )}
-        </div>
+            {!canCallFree && (
+              <button
+                type="button"
+                onClick={() => handleSubmit(true)}
+                disabled={busy || !prompt.trim() || !canBuyWithStardust}
+                className={styles.stardustButton}
+                title={canBuyWithStardust ? '' : `Нужно ${stardustCost} стардаста`}
+              >
+                ⚡ Использовать {stardustCost}
+              </button>
+            )}
+          </div>
+        )}
 
         {error && <div className={styles.error}>{error}</div>}
       </div>

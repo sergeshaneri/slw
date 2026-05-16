@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { isTMA } from '../../tma'
+import { useMainButton } from '../../tma/hooks'
 import styles from './JourneyView.module.css'
 
 /**
@@ -29,6 +31,13 @@ export default function StepInsightPrompt({ kind, onSubmit, minLength = 10 }) {
   const [text, setText] = useState('')
   const canSubmit = text.trim().length >= minLength
 
+  // Telegram MainButton: заменяет «Сохранить и дальше →» в TMA.
+  useMainButton({
+    text: 'Сохранить и дальше →',
+    onClick: () => canSubmit && onSubmit(text.trim()),
+    disabled: !canSubmit,
+  })
+
   return (
     <div className={styles.stepInsightArea}>
       <div className={styles.stepInsightLabel}>
@@ -45,14 +54,16 @@ export default function StepInsightPrompt({ kind, onSubmit, minLength = 10 }) {
       <div className={styles.stepInsightHint}>
         Минимум {minLength} символов · сейчас {text.trim().length}
       </div>
-      <button
-        type="button"
-        className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`}
-        disabled={!canSubmit}
-        onClick={() => onSubmit(text.trim())}
-      >
-        Сохранить и дальше →
-      </button>
+      {!isTMA && (
+        <button
+          type="button"
+          className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`}
+          disabled={!canSubmit}
+          onClick={() => onSubmit(text.trim())}
+        >
+          Сохранить и дальше →
+        </button>
+      )}
     </div>
   )
 }

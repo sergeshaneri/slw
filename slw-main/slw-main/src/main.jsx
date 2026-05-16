@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
 import { bootstrapTMA, isTMA } from './tma'
+import { applyTmaTheme, listenTmaTheme } from './tma/hooks'
 import './index.css'
 
 // Initialize localStorage wrapper
@@ -38,6 +39,9 @@ function mount() {
 if (isTMA) {
   // Помечаем body для возможных CSS-стилей (например, скрыть header-меню).
   document.body.classList.add('tma')
+  // Синхронизируем тему TG → CSS vars (--tg-bg, --tg-text, --tg-button, ...).
+  applyTmaTheme()
+  listenTmaTheme()
   bootstrapTMA().finally(mount)
 } else {
   mount()

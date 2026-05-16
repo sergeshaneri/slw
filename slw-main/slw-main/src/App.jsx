@@ -21,6 +21,7 @@ import AuthModal from './components/Auth/AuthModal'
 import WelcomeScreen from './components/Welcome/WelcomeScreen'
 import Footer from './components/Footer/Footer'
 import { isTMA } from './tma'
+import { useBackButton } from './tma/hooks'
 import { ASPECT_KEYS } from './data/aspects'
 import { getJourney } from './data/journey/registry'
 import { ru } from './locales/ru'
@@ -665,6 +666,24 @@ export default function App() {
   const dismissToast = (id) => {
     setToasts(prev => prev.filter(t => t.id !== id))
   }
+
+  // BackButton от Telegram: показываем стрелку «назад» в шапке TG на всех
+  // экранах кроме «домашних» (dashboard, aspects). Клик возвращает на
+  // дашборд для залогиненных или aspects для гостей.
+  // Если открыт чужой профиль или холл — сначала закрываем их (возврат на
+  // дашборд), иначе двойной back не нужен.
+  const HOME_VIEWS = ['dashboard', 'aspects']
+  const tmaBackHandler = isTMA && !HOME_VIEWS.includes(view)
+    ? () => {
+        // Чужой профиль/холл/DM-тред: закрываем их и идём на «домашний» view.
+        setViewingProfileId(null)
+        setHallAspect(null)
+        setDmPartnerId(null)
+        setSelectedAspect(null)
+        setView(user ? 'dashboard' : 'aspects')
+      }
+    : null
+  useBackButton(tmaBackHandler)
 
   // При логине проверяем разблокированные ачивки. /api/profile/me грантит
   // и возвращает newly_unlocked — ставим тосты и +1 стардаст за каждую.

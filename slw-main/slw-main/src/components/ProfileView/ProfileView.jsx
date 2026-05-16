@@ -16,6 +16,8 @@ import {
 } from '../../api/client'
 import ReactorsList from '../PublicProfileView/ReactorsList'
 import Heatmap from '../Heatmap/Heatmap'
+import { isTMA } from '../../tma'
+import { useMainButton, tmaNotify } from '../../tma/hooks'
 import styles from './ProfileView.module.css'
 
 const AVATAR_OPTIONS = [
@@ -171,11 +173,13 @@ export default function ProfileView({
       })
       setProfile(updated)
       setSavedAt(Date.now())
+      tmaNotify('success')
       // Обновляем аватарку в шапке App-уровня — иначе там остаётся старая
       // (Header читает из App.myAvatar, а не из локального ProfileView state).
       if (onAvatarChange) onAvatarChange(updated.avatar ?? '')
     } catch (e) {
       setError(e.message ?? 'Не удалось сохранить')
+      tmaNotify('error')
     } finally {
       setSaving(false)
     }
@@ -212,6 +216,16 @@ export default function ProfileView({
       setError(e.message ?? 'Не удалось удалить')
     }
   }
+
+  // Telegram MainButton: «Сохранить профиль» внизу экрана.
+  // Хук вызывается ВСЕГДА (порядок хуков), но условно — только если профиль
+  // загружен. Когда нет данных — text='' и кнопка скрыта.
+  useMainButton({
+    text: profile ? (saving ? 'Сохраняю…' : 'Сохранить профиль') : '',
+    onClick: handleSave,
+    loading: saving,
+    disabled: saving,
+  })
 
   if (busy) return <div className={styles.container}><div className={styles.muted}>Загрузка профиля…</div></div>
   if (!profile) return null
@@ -490,7 +504,8 @@ export default function ProfileView({
         ))}
       </Section>
 
-      <div className={styles.saveBar}>
+      {/* В TMA save-bar заменён нативной MainButton от Telegram. */}
+      <div className={styles.saveBar} style={isTMA ? { display: 'none' } : undefined}>
         <button
           type="button"
           className={styles.btnPrimary}
