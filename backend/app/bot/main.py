@@ -15,7 +15,12 @@ from app.bot.handlers.admin import cmd_reload, cmd_reset
 from app.bot.handlers.app_button import cmd_app
 from app.bot.handlers.aspect import cmd_aspect, on_aspect_pick
 from app.bot.handlers.note import cmd_note
-from app.bot.handlers.profile import cmd_profile, on_profile_resume, on_profile_switch_aspect
+from app.bot.handlers.profile import (
+    cmd_profile,
+    cmd_profile_in_conv,
+    on_profile_resume,
+    on_profile_switch_aspect,
+)
 from app.bot.handlers.progress import cmd_progress
 from app.bot.handlers.script import (
     cmd_go,
@@ -48,6 +53,26 @@ BTN_INSIGHT  = filters.Regex(r"^Записать инсайт$")
 # все кнопки нижней клавиатуры — исключаем из text-хендлеров
 BTN_ANY = BTN_PROFILE | BTN_CONTINUE | BTN_NEXT | BTN_ACK | BTN_INSIGHT | \
           filters.Regex(r"^(Ввести оценку|Написать ответ)$")
+
+
+# Глобальная ссылка на Application — нужна для отправки сообщений из
+# scheduler'а нотификаций и других мест бэка. Заполняется в `serve.py`
+# сразу после `build()`, до запуска polling'а.
+_app: "Application | None" = None
+
+
+def get_app() -> "Application | None":
+    """Текущий запущенный Application бота. None если бот ещё не поднят
+    (например, при импорте до старта). Используй для асинхронной отправки
+    сообщений: `bot = get_app(); await bot.bot.send_message(chat_id, ...)`.
+    """
+    return _app
+
+
+def set_app(app: "Application") -> None:
+    """Запоминает построенный Application в модульной переменной."""
+    global _app
+    _app = app
 
 
 def build() -> "Application":
@@ -106,9 +131,12 @@ def build() -> "Application":
             CommandHandler("start", cmd_start),
             CommandHandler("reset", cmd_reset),
             CommandHandler("note", cmd_note),
-            CommandHandler("profile", cmd_profile),
+            # cmd_profile_in_conv возвращает IN_SCRIPT — иначе нажатие
+            # «Профиль» внутри conv выходит из него и «Далее ▶» перестаёт
+            # работать (его handler живёт только в state IN_SCRIPT).
+            CommandHandler("profile", cmd_profile_in_conv),
             CommandHandler("aspect", cmd_aspect),
-            MessageHandler(BTN_PROFILE & ~filters.COMMAND, cmd_profile),
+            MessageHandler(BTN_PROFILE & ~filters.COMMAND, cmd_profile_in_conv),
             MessageHandler(BTN_CONTINUE & ~filters.COMMAND, cmd_resume),
             CallbackQueryHandler(on_aspect_pick, pattern=r"^aspect:"),
         ],
@@ -117,6 +145,7 @@ def build() -> "Application":
         per_message=False,
     )
     app.add_handler(script_conv)
+    set_app(app)
     return app
 
 

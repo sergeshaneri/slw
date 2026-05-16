@@ -2,6 +2,7 @@ from sqlalchemy import select
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
+from app.bot.fsm import IN_SCRIPT
 from app.bot.handlers.start import ASPECT_TAGLINES, show_aspect_picker
 from app.content.loader import load_steps
 from app.db.models import Answer, DiaryEntry, UserState
@@ -70,6 +71,20 @@ async def cmd_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     ])
 
     await update.message.reply_text("\n".join(lines), reply_markup=markup)
+
+
+async def cmd_profile_in_conv(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """То же что cmd_profile, но возвращает IN_SCRIPT — чтобы юзер не выпадал
+    из ConversationHandler при тапе кнопки «Профиль» в нижней клавиатуре.
+
+    Контекст: в fallbacks ConversationHandler возврат None означает END
+    (выход из разговора). После END кнопка «Далее ▶» перестаёт работать,
+    потому что её handler зарегистрирован только в state IN_SCRIPT.
+    Юзер фактически застревает — должен писать /resume вручную.
+    Этот wrapper фиксит проблему.
+    """
+    await cmd_profile(update, context)
+    return IN_SCRIPT
 
 
 async def on_profile_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
