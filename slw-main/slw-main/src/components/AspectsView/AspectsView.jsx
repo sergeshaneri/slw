@@ -115,7 +115,7 @@ function AspectsGrid({ scores, onAspectSelect, journey }) {
             </div>
             <div className={styles.aspectProgress}>
               <span className={styles.aspectLevelPill} style={{ borderColor: `${color}88`, color }}>
-                L{currentLevel}
+                уровень {currentLevel}
               </span>
               <span className={styles.aspectStepsCount}>
                 {notStarted
