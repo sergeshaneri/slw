@@ -41,9 +41,29 @@ export default function Chat({
   const isText = state.awaitingInput === 'text' || state.awaitingInput === 'exercise_note'
   const isStepInsight = state.awaitingInput === 'step-insight'
 
+  // Сворачиваем шапку когда юзер начинает писать в textarea — иначе на
+  // мобильном (особенно в Telegram WebView с открытой клавиатурой) топбар
+  // съедает ~74px и оставляет крошечный кусок для чата. При фокусе скрываем
+  // топбар и доскролливаем чат к последнему сообщению (вопрос становится виден).
+  const [inputFocused, setInputFocused] = useState(false)
+  const handleInputFocus = () => {
+    setInputFocused(true)
+    // Задержка чтобы клавиатура успела открыться и viewport стабилизировался,
+    // потом скроллим чат вниз — пользователь видит вопрос на который отвечает.
+    setTimeout(() => {
+      if (chatRef?.current) {
+        chatRef.current.scrollTo({
+          top: chatRef.current.scrollHeight,
+          behavior: 'smooth',
+        })
+      }
+    }, 300)
+  }
+  const handleInputBlur = () => setInputFocused(false)
+
   return (
     <>
-      <div className={styles.topbar}>
+      <div className={`${styles.topbar} ${inputFocused ? styles.topbarHidden : ''}`}>
         <button type="button" className={styles.avatar} onClick={onOpenProfile} aria-label="Профиль">
           <span className={styles.avatarGlyph}>◐</span>
         </button>
@@ -184,6 +204,8 @@ export default function Chat({
             }
             value={inputVal}
             onChange={e => setInputVal(e.target.value)}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
