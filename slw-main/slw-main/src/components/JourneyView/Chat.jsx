@@ -4,7 +4,6 @@ import ScriptButtons from './ScriptButtons'
 import Slider from './Slider'
 import StepInsightPrompt from './StepInsightPrompt'
 import Hint from '../Onboarding/Hint'
-import { tma, isTMA } from '../../tma'
 import styles from './JourneyView.module.css'
 
 export default function Chat({
@@ -43,38 +42,42 @@ export default function Chat({
   const isStepInsight = state.awaitingInput === 'step-insight'
 
   // Сворачиваем шапку когда юзер открывает клавиатуру — иначе на мобильном
-  // (особенно в Telegram WebView) топбар съедает ~74px и оставляет крошечный
-  // кусок для чата. Определяем «клавиатура открыта» двумя способами:
-  //   1. TG-событие viewportChanged (надёжно на мобильном TG)
-  //   2. focus/blur на textarea (fallback для веба + старых TG-клиентов)
+  // топбар съедает ~74px и оставляет крошечный кусок для чата. Используем
+  // window.visualViewport — стандартный браузерный API, работает везде:
+  //   • Telegram WebView (Android/iOS/Desktop)
+  //   • Обычный мобильный браузер
+  //   • Когда клавиатура поднимается, visualViewport.height сжимается
+  // Плюс onFocus/onBlur как мгновенный fallback (пока visualViewport ещё не
+  // обновился — даёт быстрый отклик UI на тап).
   const [inputFocused, setInputFocused] = useState(false)
 
-  // 1. TG WebApp viewportChanged event.
-  // Когда клавиатура поднимается, tma.viewportHeight уменьшается, а
-  // viewportStableHeight остаётся прежним. Сравниваем — если viewport
-  // меньше stable хотя бы на 100px, считаем что клавиатура открыта.
+  // visualViewport detection — основной механизм
   useEffect(() => {
-    if (!isTMA || !tma?.onEvent) return
+    if (typeof window === 'undefined' || !window.visualViewport) return
+    const vv = window.visualViewport
+    // Базовая высота окна (без клавиатуры) — фиксируем при mount.
+    const baseHeight = window.innerHeight
     const handler = () => {
-      const vh = tma.viewportHeight || 0
-      const vsh = tma.viewportStableHeight || vh
-      const keyboardOpen = vsh - vh > 100
+      // Если visual viewport сжался на > 100px относительно базовой —
+      // считаем клавиатуру открытой. Порог 100px защищает от мелких
+      // изменений (адресная строка браузера и т.п.).
+      const keyboardOpen = baseHeight - vv.height > 100
       setInputFocused(keyboardOpen)
     }
-    tma.onEvent('viewportChanged', handler)
-    return () => { tma.offEvent?.('viewportChanged', handler) }
+    vv.addEventListener('resize', handler)
+    return () => vv.removeEventListener('resize', handler)
   }, [])
 
-  // 2. focus/blur на textarea — fallback и для случая когда юзер тапает на
-  // поле но клавиатура ещё не успела открыться (даёт быстрый отклик UI).
-  const handleInputFocus = () => {
-    setInputFocused(true)
-  }
+  // onFocus/onBlur — мгновенный fallback. Срабатывает быстрее чем
+  // visualViewport resize, и работает даже когда visualViewport API
+  // отсутствует (старые browsers).
+  const handleInputFocus = () => setInputFocused(true)
   const handleInputBlur = () => {
-    // Не сбрасываем сразу — viewportChanged сам поймает закрытие клавиатуры.
-    // Это избегает мерцания на мобильном: blur может срабатывать раньше чем
-    // клавиатура реально закроется.
-    if (!isTMA) setInputFocused(false)
+    // Если visualViewport есть — не сбрасываем сразу, он сам поймает
+    // закрытие клавиатуры. Иначе сбрасываем по blur.
+    if (typeof window === 'undefined' || !window.visualViewport) {
+      setInputFocused(false)
+    }
   }
 
   // Когда inputFocused становится true — скроллим чат вниз чтобы последнее

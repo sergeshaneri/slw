@@ -802,6 +802,12 @@ export default function App() {
   // Залогиненный юзер ждёт данные с бэка — лоадер.
   if (user && dataLoading) return <LoadingScreen text={t.loading} />
 
+  // В Telegram Mini App на странице путешествия скрываем Header —
+  // там и так есть свой топбар внутри Chat (с avatar/планетой/XP),
+  // плюс BackButton TG для возврата. Иначе на мобильном суммарно 4 шапки
+  // съедают половину экрана, чат и клавиатура не помещаются.
+  const hideHeader = isTMA && view === 'journey'
+
   return (
     <div className={styles.app}>
       <AchievementToast items={toasts} onDismiss={dismissToast} />
@@ -812,7 +818,7 @@ export default function App() {
           onGoToPlanets={handleTourComplete}
         />
       )}
-      <Header
+      {!hideHeader && <Header
         view={view}
         onViewChange={handleViewChange}
         journeyPendingCount={journey?.aspects?.[journey?.currentAspect]?.pendingTasks?.length ?? 0}
@@ -842,7 +848,7 @@ export default function App() {
         onOpenHall={enterHall}
         onOpenAdmin={() => setView('admin')}
         t={t}
-      />
+      />}
 
       {showAuth && (
         <AuthModal
