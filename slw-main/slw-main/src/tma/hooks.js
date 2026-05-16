@@ -9,6 +9,17 @@
 import { useEffect, useRef } from 'react'
 import { tma, isTMA } from './index'
 
+// ── Диагностика для отладки: пишем в window.__slwTma что происходит ────────
+// Юзер открывает DevTools в TG Desktop и смотрит `window.__slwTma`.
+// Это временная штука для дебага — после починки можно удалить.
+const dbg = (event, data) => {
+  if (typeof window === 'undefined') return
+  if (!window.__slwTma) window.__slwTma = { log: [], counters: {} }
+  window.__slwTma.log.push({ t: Date.now(), event, ...data })
+  window.__slwTma.counters[event] = (window.__slwTma.counters[event] || 0) + 1
+  if (window.__slwTma.log.length > 200) window.__slwTma.log.shift()
+}
+
 // ── Координация владения MainButton/BackButton между компонентами ──────────
 // Проблема: в React при смене view один компонент unmount-ится, другой mount-
 // ится почти одновременно. Если в cleanup делаем btn.hide(), а в setup нового
@@ -80,6 +91,7 @@ export function useMainButton({ text, onClick, loading = false, disabled = false
   // (если был запланирован при unmount предыдущего владельца) и показываем
   // с обновлёнными параметрами.
   useEffect(() => {
+    dbg('main:effect', { text, loading, disabled, isTMA, hasBtn: !!tma?.MainButton })
     if (!isTMA) return
     const btn = tma.MainButton
     if (!btn) return
@@ -87,6 +99,7 @@ export function useMainButton({ text, onClick, loading = false, disabled = false
     if (!text) {
       cancelMainHide()
       btn.hide()
+      dbg('main:hide(empty-text)', {})
       return
     }
 
@@ -100,13 +113,17 @@ export function useMainButton({ text, onClick, loading = false, disabled = false
     if (disabled) btn.disable()
     else btn.enable()
     btn.show()
+    dbg('main:show', { text, disabled, loading })
   }, [text, loading, disabled, color])
 
   // ── Hide on unmount: с задержкой 50мс ───────────────────────────────────
   // Если за эти 50мс смонтируется следующий useMainButton — он отменит hide.
   useEffect(() => {
     if (!isTMA) return
-    return () => { scheduleMainHide() }
+    return () => {
+      dbg('main:scheduleHide', {})
+      scheduleMainHide()
+    }
   }, [])
 }
 

@@ -369,8 +369,9 @@ export default function DailyReview({ diary, onDiaryChange }) {
 
       {/* ── Сохранить ───────────────────────────────── */}
       {error && <div className={styles.dayError}>{error}</div>}
-      {/* В TMA save-bar заменён нативной MainButton от Telegram (внизу экрана). */}
-      <div className={styles.daySaveBar} style={isTMA ? { display: 'none' } : undefined}>
+      {/* Web save-bar показывается всегда (даже в TMA как fallback) —
+          MainButton параллельно тоже подключается через useMainButton выше. */}
+      <div className={styles.daySaveBar}>
         <div className={styles.daySaveSummary}>
           {filledCount > 0 && <span>{filledCount} {pluralize(filledCount, ['блок', 'блока', 'блоков'])}</span>}
           {filledCount > 0 && habitsChangedCount > 0 && <span> · </span>}

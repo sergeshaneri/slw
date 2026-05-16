@@ -504,8 +504,8 @@ export default function ProfileView({
         ))}
       </Section>
 
-      {/* В TMA save-bar заменён нативной MainButton от Telegram. */}
-      <div className={styles.saveBar} style={isTMA ? { display: 'none' } : undefined}>
+      {/* Web save-bar показывается всегда (TMA MainButton подключается параллельно). */}
+      <div className={styles.saveBar}>
         <button
           type="button"
           className={styles.btnPrimary}

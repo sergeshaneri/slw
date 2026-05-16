@@ -227,6 +227,8 @@ export default function Chat({
         <StepInsightPrompt
           kind={currentScript.type}
           onSubmit={text => onSend(text)}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
         />
       )}
     </>

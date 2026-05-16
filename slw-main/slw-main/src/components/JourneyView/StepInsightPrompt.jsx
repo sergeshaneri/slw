@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { isTMA } from '../../tma'
 import { useMainButton } from '../../tma/hooks'
 import styles from './JourneyView.module.css'
@@ -27,9 +27,18 @@ const KIND_LABEL = {
   exercise:   '✎ Запиши результат упражнения',
 }
 
-export default function StepInsightPrompt({ kind, onSubmit, minLength = 10 }) {
+export default function StepInsightPrompt({ kind, onSubmit, minLength = 10, onFocus, onBlur }) {
   const [text, setText] = useState('')
   const canSubmit = text.trim().length >= minLength
+
+  // При появлении prompt'а сразу триггерим onFocus (как-будто фокус на textarea).
+  // autoFocus на textarea не всегда генерит focus-event синхронно — поэтому
+  // делаем явный вызов через useEffect.
+  useEffect(() => {
+    if (onFocus) onFocus()
+    return () => { if (onBlur) onBlur() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Telegram MainButton: заменяет «Сохранить и дальше →» в TMA.
   useMainButton({
@@ -47,6 +56,8 @@ export default function StepInsightPrompt({ kind, onSubmit, minLength = 10 }) {
         className={styles.stepInsightInput}
         value={text}
         onChange={e => setText(e.target.value)}
+        onFocus={onFocus}
+        onBlur={onBlur}
         placeholder={KIND_HINT[kind] || 'Твоя мысль…'}
         rows={3}
         autoFocus
@@ -54,16 +65,14 @@ export default function StepInsightPrompt({ kind, onSubmit, minLength = 10 }) {
       <div className={styles.stepInsightHint}>
         Минимум {minLength} символов · сейчас {text.trim().length}
       </div>
-      {!isTMA && (
-        <button
-          type="button"
-          className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`}
-          disabled={!canSubmit}
-          onClick={() => onSubmit(text.trim())}
-        >
-          Сохранить и дальше →
-        </button>
-      )}
+      <button
+        type="button"
+        className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`}
+        disabled={!canSubmit}
+        onClick={() => onSubmit(text.trim())}
+      >
+        Сохранить и дальше →
+      </button>
     </div>
   )
 }

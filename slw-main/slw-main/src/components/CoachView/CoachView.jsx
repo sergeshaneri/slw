@@ -180,29 +180,27 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
           maxLength={4000}
         />
 
-        {!isTMA && (
-          <div className={styles.actions}>
+        <div className={styles.actions}>
+          <button
+            type="button"
+            onClick={() => handleSubmit(false)}
+            disabled={busy || !prompt.trim() || !canCallFree}
+            className={styles.callButton}
+          >
+            {busy ? 'Зову…' : 'Позвать'}
+          </button>
+          {!canCallFree && (
             <button
               type="button"
-              onClick={() => handleSubmit(false)}
-              disabled={busy || !prompt.trim() || !canCallFree}
-              className={styles.callButton}
+              onClick={() => handleSubmit(true)}
+              disabled={busy || !prompt.trim() || !canBuyWithStardust}
+              className={styles.stardustButton}
+              title={canBuyWithStardust ? '' : `Нужно ${stardustCost} стардаста`}
             >
-              {busy ? 'Зову…' : 'Позвать'}
+              ⚡ Использовать {stardustCost}
             </button>
-            {!canCallFree && (
-              <button
-                type="button"
-                onClick={() => handleSubmit(true)}
-                disabled={busy || !prompt.trim() || !canBuyWithStardust}
-                className={styles.stardustButton}
-                title={canBuyWithStardust ? '' : `Нужно ${stardustCost} стардаста`}
-              >
-                ⚡ Использовать {stardustCost}
-              </button>
-            )}
-          </div>
-        )}
+          )}
+        </div>
 
         {error && <div className={styles.error}>{error}</div>}
       </div>
