@@ -19,7 +19,29 @@ const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
 export const tma = typeof window !== 'undefined' ? window.Telegram?.WebApp : null
 
-export const isTMA = !!(tma && tma.initData && tma.initData.length > 0)
+// Детект «мы внутри Telegram Mini App» через platform, а не initData.
+//
+// initData может быть пуст в нескольких сценариях:
+//   • После Inspect → Reload в Telegram Desktop (теряется при пересоздании
+//     WebView, баг TG-клиента).
+//   • При открытии Mini App через старые версии TG.
+//   • Когда сессия protected, и TG ждёт user-action перед передачей initData.
+//
+// platform же всегда указывает конкретного клиента ('tdesktop' / 'ios' /
+// 'android' / 'web' / 'macos' / 'weba' / 'webk'). Только вне Telegram он
+// 'unknown' или пуст. Это надёжный способ понять «мы в TG WebView».
+//
+// Для bootstrapTMA (где НУЖЕН initData чтобы получить JWT) отдельная
+// проверка initData.length > 0 — см. ниже.
+export const isTMA = !!(
+  tma &&
+  tma.platform &&
+  tma.platform !== 'unknown'
+)
+
+// Есть ли валидный initData для бэкенд-авторизации. Отдельно от isTMA, потому
+// что хуки MainButton/BackButton не зависят от initData, а bootstrap зависит.
+export const hasInitData = !!(tma && tma.initData && tma.initData.length > 0)
 
 /**
  * Стартовый параметр из t.me/<bot>/<app>?startapp=XYZ.
@@ -52,6 +74,14 @@ export async function bootstrapTMA() {
   // Если токен уже сохранён — useAuth подхватит его сам. Не дёргаем бэк зря.
   const existing = localStorage.getItem('slw_token')
   if (existing) return existing
+
+  // Auth требует initData. Если он пуст (бывает после Inspect→Reload в TG
+  // Desktop, или на некоторых старых клиентах) — пропускаем auth, юзер
+  // увидит fallback на обычный auth-flow.
+  if (!hasInitData) {
+    console.warn('TMA: initData is empty, skipping auto-auth')
+    return null
+  }
 
   try {
     const res = await fetch(`${API_BASE}/api/auth/telegram-webapp`, {
