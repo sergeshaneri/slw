@@ -138,6 +138,15 @@ class WebUser(Base):
     hints_seen: Mapped[dict] = mapped_column(
         JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
     )
+    # TG-нотификации (2026-05). Глобальный toggle + cool-down per type.
+    # notification_cooldowns хранит { 'continue_journey': 'YYYY-MM-DD', ... }
+    # чтобы не отправлять один тип чаще раза в сутки.
+    notifications_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    notification_cooldowns: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
+    )
     created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
 
 

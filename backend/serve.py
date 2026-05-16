@@ -474,6 +474,26 @@ async def apply_ddl() -> None:
     except Exception as e:
         log.warning("onboarding flags DDL failed: %s", e)
 
+    # TG-нотификации (2026-05): notifications_enabled — глобальный toggle,
+    # notification_cooldowns — JSONB { type: 'YYYY-MM-DD' } чтобы не спамить
+    # один тип чаще раза в сутки. Поля идемпотентны.
+    try:
+        async with asyncio.timeout(15):
+            async with engine.connect() as conn:
+                await conn.execute(text(
+                    "ALTER TABLE web_users "
+                    "ADD COLUMN IF NOT EXISTS notifications_enabled "
+                    "BOOLEAN DEFAULT TRUE NOT NULL"
+                ))
+                await conn.execute(text(
+                    "ALTER TABLE web_users "
+                    "ADD COLUMN IF NOT EXISTS notification_cooldowns "
+                    "JSONB DEFAULT '{}'::jsonb NOT NULL"
+                ))
+                await conn.commit()
+    except Exception as e:
+        log.warning("notifications DDL failed: %s", e)
+
     # user_aspect_state — мульти-аспектный прогресс бота. Одна строка на
     # пару (юзер, аспект). Source of truth для current_step_id внутри
     # аспекта; user_state.current_step_id остаётся как денормализованная
@@ -523,8 +543,17 @@ async def main() -> None:
         await bot.start()
         log.info("Bot started")
 
+        # Запускаем фоновый scheduler TG-нотификаций. Loop ждёт нужный
+        # час дня (NOTIFY_HOUR_UTC, по умолчанию 15:00 UTC = 18:00 МСК)
+        # и шлёт уведомления подходящим юзерам. Cool-down защищает от
+        # повторов при перезапуске. Никогда не валит main — ошибки внутри
+        # ловятся, loop продолжается.
+        from app.bot.notifications import notifications_loop
+        notify_task = asyncio.create_task(notifications_loop())
+
         await server.serve()   # blocks until uvicorn exits
 
+        notify_task.cancel()
         await bot.updater.stop()
         await bot.stop()
 

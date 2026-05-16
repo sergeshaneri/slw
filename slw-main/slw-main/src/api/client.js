@@ -177,6 +177,10 @@ export async function removeEmail() {
   return request('POST', '/api/auth/remove-email')
 }
 
+export async function updateNotifications(enabled) {
+  return request('PATCH', '/api/auth/notifications', { enabled })
+}
+
 export async function unlinkTelegram() {
   return request('POST', '/api/auth/unlink-telegram')
 }

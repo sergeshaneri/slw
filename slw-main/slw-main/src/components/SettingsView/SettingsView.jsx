@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   updateProfile,
+  updateNotifications,
   changePassword,
   removeEmail,
   unlinkTelegram,
@@ -38,6 +39,9 @@ export default function SettingsView({ user, onUserUpdate, onAccountDeleted, onL
 
       <ProfileSection user={user} onUserUpdate={onUserUpdate} />
       <PrivacySection />
+      {user.telegram_id && (
+        <NotificationsSection user={user} onUserUpdate={onUserUpdate} />
+      )}
       <SecuritySection user={user} onUserUpdate={onUserUpdate} />
       <DataSection user={user} />
       <DangerSection
@@ -176,6 +180,54 @@ function PrivacySection() {
           {err && <div className={styles.errorMsg}>{err}</div>}
         </>
       )}
+    </section>
+  )
+}
+
+// ─── TG-нотификации ────────────────────────────────────────────────────────
+
+function NotificationsSection({ user, onUserUpdate }) {
+  const [enabled, setEnabled] = useState(user.notifications_enabled !== false)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  const handleToggle = async (e) => {
+    const next = e.target.checked
+    setEnabled(next)
+    setSaving(true)
+    setErr('')
+    try {
+      const updated = await updateNotifications(next)
+      onUserUpdate?.(updated)
+    } catch (e) {
+      setEnabled(!next)
+      setErr(e.message ?? 'Не удалось сохранить')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>Уведомления в Telegram</h2>
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={handleToggle}
+            disabled={saving}
+            style={{ marginRight: 8 }}
+          />
+          Получать ежедневные напоминания в Telegram
+        </span>
+        <span className={styles.hint}>
+          Один раз в день вечером, если есть что-то конкретное:
+          взятое упражнение, забытая практика или давно не заходил.
+          Можно выключить — не будем беспокоить.
+        </span>
+        {err && <span className={styles.err}>{err}</span>}
+      </label>
     </section>
   )
 }

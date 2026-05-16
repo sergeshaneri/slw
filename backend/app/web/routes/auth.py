@@ -110,6 +110,11 @@ def _user_out(user: WebUser, token: str | None = None) -> dict:
         "is_admin": user.is_admin,
         "onboarding_done": bool(getattr(user, "onboarding_done", False)),
         "hints_seen": dict(getattr(user, "hints_seen", None) or {}),
+        # TG-нотификации. notifications_enabled — toggle, юзер может
+        # выключить через PATCH /api/auth/notifications.
+        "notifications_enabled": bool(
+            getattr(user, "notifications_enabled", True)
+        ),
     }
     if token:
         out["token"] = token
@@ -321,6 +326,28 @@ async def update_profile(
     на дефолт: telegram_first_name или часть email до @)."""
     name = (body.display_name or "").strip()
     current_user.display_name = name or None
+    await session.commit()
+    await session.refresh(current_user)
+    return _user_out(current_user)
+
+
+# ── TG notifications toggle ──────────────────────────────────────────────────
+
+class NotificationsIn(BaseModel):
+    enabled: bool
+
+
+@router.patch("/notifications")
+async def update_notifications(
+    body: NotificationsIn,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Toggle ежедневных TG-нотификаций. При False — scheduler не шлёт.
+    При True — sheduler снова включает юзера в рассылку (если есть
+    подходящий тип уведомления по логике в `app.bot.notifications`).
+    """
+    current_user.notifications_enabled = bool(body.enabled)
     await session.commit()
     await session.refresh(current_user)
     return _user_out(current_user)
