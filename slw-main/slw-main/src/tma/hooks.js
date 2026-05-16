@@ -9,6 +9,40 @@
 import { useEffect, useRef } from 'react'
 import { tma, isTMA } from './index'
 
+// ── Координация владения MainButton/BackButton между компонентами ──────────
+// Проблема: в React при смене view один компонент unmount-ится, другой mount-
+// ится почти одновременно. Если в cleanup делаем btn.hide(), а в setup нового
+// компонента btn.show() — на iOS Telegram быстрая последовательность hide()+
+// show() в одном фрейме оставляет кнопку скрытой (race с анимацией TG-client'а).
+//
+// Решение: при unmount шедулим btn.hide() через 50мс. Если за это время другой
+// useMainButton монтируется и вызывает show() — отменяем pending hide. В итоге
+// при переключении между экранами с MainButton кнопка остаётся видимой
+// (с обновлёнными параметрами), а исчезает только когда уходим на экран без
+// MainButton.
+let pendingMainHide = null
+let pendingBackHide = null
+function scheduleMainHide() {
+  if (pendingMainHide) return
+  pendingMainHide = setTimeout(() => {
+    pendingMainHide = null
+    try { tma?.MainButton?.hide(); tma?.MainButton?.hideProgress() } catch { /* */ }
+  }, 50)
+}
+function cancelMainHide() {
+  if (pendingMainHide) { clearTimeout(pendingMainHide); pendingMainHide = null }
+}
+function scheduleBackHide() {
+  if (pendingBackHide) return
+  pendingBackHide = setTimeout(() => {
+    pendingBackHide = null
+    try { tma?.BackButton?.hide() } catch { /* */ }
+  }, 50)
+}
+function cancelBackHide() {
+  if (pendingBackHide) { clearTimeout(pendingBackHide); pendingBackHide = null }
+}
+
 /**
  * Telegram MainButton — большая синяя кнопка снизу экрана от TG.
  * Подменяет собой sticky submit-кнопки (Сохранить день, Спросить коуча, и т.п.)
@@ -42,19 +76,21 @@ export function useMainButton({ text, onClick, loading = false, disabled = false
   }, [])
 
   // ── Visual state: обновляем параметры без hide()-в-cleanup ──────────────
-  // На каждый ре-рендер просто перенастраиваем кнопку. Если text='' —
-  // прячем (одиночный hide, не в паре с show). Иначе — show() с актуальными
-  // params. Никакого мерцания.
+  // На каждый ре-рендер просто перенастраиваем кнопку. Отменяем pending hide
+  // (если был запланирован при unmount предыдущего владельца) и показываем
+  // с обновлёнными параметрами.
   useEffect(() => {
     if (!isTMA) return
     const btn = tma.MainButton
     if (!btn) return
 
     if (!text) {
+      cancelMainHide()
       btn.hide()
       return
     }
 
+    cancelMainHide()  // отмена pending hide от предыдущего владельца
     btn.setText(text)
     if (color) {
       try { btn.setParams({ color }) } catch { /* старые клиенты */ }
@@ -66,16 +102,11 @@ export function useMainButton({ text, onClick, loading = false, disabled = false
     btn.show()
   }, [text, loading, disabled, color])
 
-  // ── Hide on unmount: единственное место где скрываем при уходе ──────────
+  // ── Hide on unmount: с задержкой 50мс ───────────────────────────────────
+  // Если за эти 50мс смонтируется следующий useMainButton — он отменит hide.
   useEffect(() => {
     if (!isTMA) return
-    return () => {
-      const btn = tma.MainButton
-      if (btn) {
-        btn.hide()
-        btn.hideProgress()
-      }
-    }
+    return () => { scheduleMainHide() }
   }, [])
 }
 
@@ -105,17 +136,19 @@ export function useBackButton(onClick) {
     if (!isTMA) return
     const btn = tma.BackButton
     if (!btn) return
-    if (onClick) btn.show()
-    else btn.hide()
+    if (onClick) {
+      cancelBackHide()
+      btn.show()
+    } else {
+      cancelBackHide()
+      btn.hide()
+    }
   }, [!!onClick])
 
-  // Hide on unmount.
+  // Hide on unmount — с задержкой.
   useEffect(() => {
     if (!isTMA) return
-    return () => {
-      const btn = tma.BackButton
-      if (btn) btn.hide()
-    }
+    return () => { scheduleBackHide() }
   }, [])
 }
 
