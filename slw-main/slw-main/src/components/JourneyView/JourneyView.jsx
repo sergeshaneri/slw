@@ -270,7 +270,14 @@ function SkillTreeIntroHint({ user }) {
 //     Теперь messages, pendingTasks, currentScriptId — всё сохраняется.
 //     Если потребуется реально сбросить чат при несовместимых правках
 //     контента — это будет отдельный механизм (per-user флаг).
-export const CONTENT_VERSION = 26
+// v27 — БЭ Фаза 3.5: восстановление полного контента в aspects-fi-extension.js,
+//     ранее в Фазе 3 контент был сжат. Восстановлены до источника:
+//     professions (107 — каждая 3-5 предложений + 4 ключевых навыка с
+//     описанием), facts (90), childRaising (100). Также убраны блоки
+//     historicalFigures / art / quotes из blocks.js — оставлены только
+//     hallStub блоки (hallFigures / hallArts / hallQuotes), которые
+//     отсылают в Холл. Чат не сбрасывается (data-preserving).
+export const CONTENT_VERSION = 27
 
 // Миграция id навыков после ревизии дерева (v9). Старый id → новый.
 // Если у юзера уже есть запись по новому id, старая отбрасывается

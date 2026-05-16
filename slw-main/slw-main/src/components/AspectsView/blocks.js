@@ -414,15 +414,6 @@ export const BLOCKS = [
     has: d => d.selfAssessment?.length > 0
   },
   {
-    id: 'historicalFigures',
-    level: 1,
-    title: 'Известные личности',
-    lead: 'Двадцать фигур из истории — десять зрелых проявлений и десять теневых.',
-    kind: 'titledList',
-    field: 'historicalFigures',
-    has: d => d.historicalFigures?.length > 0
-  },
-  {
     id: 'hallFigures',
     level: 1,
     title: 'Известные личности — в Холле',
@@ -430,15 +421,6 @@ export const BLOCKS = [
     kind: 'hallStub',
     hallSection: 'figures',
     has: (d, aspect) => (HALL_CONTENT?.[aspect]?.figures?.length ?? 0) > 0
-  },
-  {
-    id: 'art',
-    level: 1,
-    title: 'Искусство',
-    lead: 'Книги, фильмы, картины и музыка, в которых живёт сенсорная природа аспекта.',
-    kind: 'titledList',
-    field: 'art',
-    has: d => d.art?.length > 0
   },
   {
     id: 'hallArts',
@@ -535,15 +517,6 @@ export const BLOCKS = [
     kind: 'titledList',
     field: 'myths',
     has: d => d.myths?.length > 0
-  },
-  {
-    id: 'quotes',
-    level: 2,
-    title: 'Цитаты',
-    lead: 'Подборка цитат — каждая с короткой привязкой к теме аспекта.',
-    kind: 'titledList',
-    field: 'quotes',
-    has: d => d.quotes?.length > 0
   },
   {
     id: 'hallQuotes',
