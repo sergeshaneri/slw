@@ -27,6 +27,24 @@ export function useMainButton({ text, onClick, loading = false, disabled = false
   const handlerRef = useRef(onClick)
   useEffect(() => { handlerRef.current = onClick }, [onClick])
 
+  // ── Click handler: регистрируется ОДИН раз за жизнь компонента ──────────
+  // Это важно: если регистрировать в том же useEffect что и .show(), и звать
+  // .hide() в cleanup на каждое изменение text/disabled — на iOS Telegram
+  // быстрая последовательность hide()+show() оставляет кнопку скрытой
+  // (race с TG-анимацией). Раздельные эффекты решают эту проблему.
+  useEffect(() => {
+    if (!isTMA) return
+    const btn = tma.MainButton
+    if (!btn) return
+    const trampoline = () => handlerRef.current?.()
+    btn.onClick(trampoline)
+    return () => { btn.offClick(trampoline) }
+  }, [])
+
+  // ── Visual state: обновляем параметры без hide()-в-cleanup ──────────────
+  // На каждый ре-рендер просто перенастраиваем кнопку. Если text='' —
+  // прячем (одиночный hide, не в паре с show). Иначе — show() с актуальными
+  // params. Никакого мерцания.
   useEffect(() => {
     if (!isTMA) return
     const btn = tma.MainButton
@@ -37,8 +55,6 @@ export function useMainButton({ text, onClick, loading = false, disabled = false
       return
     }
 
-    const trampoline = () => handlerRef.current?.()
-
     btn.setText(text)
     if (color) {
       try { btn.setParams({ color }) } catch { /* старые клиенты */ }
@@ -47,18 +63,20 @@ export function useMainButton({ text, onClick, loading = false, disabled = false
     else btn.hideProgress()
     if (disabled) btn.disable()
     else btn.enable()
-
-    btn.onClick(trampoline)
     btn.show()
-
-    return () => {
-      btn.offClick(trampoline)
-      // Скрываем при анмаунте — иначе кнопка «зависнет» при смене view
-      // и продолжит вызывать старый callback на новом экране.
-      btn.hide()
-      btn.hideProgress()
-    }
   }, [text, loading, disabled, color])
+
+  // ── Hide on unmount: единственное место где скрываем при уходе ──────────
+  useEffect(() => {
+    if (!isTMA) return
+    return () => {
+      const btn = tma.MainButton
+      if (btn) {
+        btn.hide()
+        btn.hideProgress()
+      }
+    }
+  }, [])
 }
 
 /**
@@ -69,25 +87,36 @@ export function useBackButton(onClick) {
   const handlerRef = useRef(onClick)
   useEffect(() => { handlerRef.current = onClick }, [onClick])
 
+  // Аналогично useMainButton — раздельные эффекты во избежание race-condition
+  // hide+show на одних и тех же кадрах рендеринга.
+
+  // Регистрация click handler — один раз.
   useEffect(() => {
     if (!isTMA) return
     const btn = tma.BackButton
     if (!btn) return
-
-    if (!onClick) {
-      btn.hide()
-      return
-    }
-
     const trampoline = () => handlerRef.current?.()
     btn.onClick(trampoline)
-    btn.show()
+    return () => { btn.offClick(trampoline) }
+  }, [])
 
-    return () => {
-      btn.offClick(trampoline)
-      btn.hide()
-    }
+  // Управление видимостью — на смену onClick (null/функция).
+  useEffect(() => {
+    if (!isTMA) return
+    const btn = tma.BackButton
+    if (!btn) return
+    if (onClick) btn.show()
+    else btn.hide()
   }, [!!onClick])
+
+  // Hide on unmount.
+  useEffect(() => {
+    if (!isTMA) return
+    return () => {
+      const btn = tma.BackButton
+      if (btn) btn.hide()
+    }
+  }, [])
 }
 
 /**
