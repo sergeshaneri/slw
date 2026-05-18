@@ -38,7 +38,7 @@ from app.db.models import (
     WebUser,
 )
 from app.db.session import get_session
-from app.web.deps import get_current_user
+from app.web.deps import get_current_user, get_current_user_optional
 from app.web.notify import notify
 from app.web.streak import bump_streak
 
@@ -717,20 +717,26 @@ async def update_my_profile(
 @router.get("/profile/{user_id}")
 async def get_public_profile(
     user_id: int,
+    viewer: WebUser | None = Depends(get_current_user_optional),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
+    """Публичный профиль. Опциональная auth: если viewer передал валидный
+    JWT — `_profile_payload` посчитает is_followed_by_me относительно него
+    (это нужно чтобы кнопка «Подписаться/Подписан» сохраняла состояние
+    после reload). Гости без auth получают is_followed_by_me=False.
+    """
     target = await session.get(WebUser, user_id)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
 
     profile = await session.get(PublicProfile, user_id)
-    # Скрытый профиль — 404 для всех кроме самого юзера. Этот эндпоинт
-    # без auth, так что просто 404.
+    # Скрытый профиль — 404 для всех кроме самого юзера.
     if profile is not None and profile.is_public is False:
-        raise HTTPException(status_code=404, detail="Profile is private")
+        if viewer is None or viewer.id != target.id:
+            raise HTTPException(status_code=404, detail="Profile is private")
 
     return await _profile_payload(
-        session, target, profile, viewer_user=None, include_private=False
+        session, target, profile, viewer_user=viewer, include_private=False
     )
 
 
