@@ -1,10 +1,14 @@
 import { useState } from 'react'
+import type { CSSProperties } from 'react'
 import {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE,
   COMMON_BASE_SKILL_IDS, getSkillsForArchetype,
   calcArchetypeAvg, calcSiScoreFromSkills, getSkillProgress,
   getCompletedPasses
 } from '../../data/journey/skills'
+import type { SkillStateEntry } from '../../data/journey/skills'
+import type { ArchetypeKey, SkillTreeNode } from '../../data/journey/skills/tree'
+import type { SkillState } from '@/types/journey'
 import styles from './JourneyView.module.css'
 
 // Меню веток талантов: 4 архетипа, под каждым — список навыков.
@@ -18,10 +22,24 @@ import styles from './JourneyView.module.css'
 //
 // Клик по навыку запускает следующий проход (или продолжает draft).
 
-function statusFor(skillState) {
+type SkillStatus =
+  | { kind: 'idle' }
+  | { kind: 'draft'; mode: string; startPass: number; stepIndex: number }
+  | { kind: 'light'; avg: number | undefined }
+  | { kind: 'medium'; avg: number | undefined }
+  | { kind: 'full'; avg: number | undefined }
+
+function statusFor(skillState: SkillState | undefined): SkillStatus {
   if (!skillState) return { kind: 'idle' }
   if (skillState.draft) {
-    const d = skillState.draft
+    // TODO(ts): widen SkillState.draft from unknown to a structured type.
+    const d = skillState.draft as {
+      mode?: string
+      startPass?: number
+      pass?: number
+      stepIndex?: number
+      blockIndex?: number
+    }
     return {
       kind: 'draft',
       mode: d.mode ?? 'short',
@@ -29,22 +47,31 @@ function statusFor(skillState) {
       stepIndex: d.stepIndex ?? d.blockIndex ?? 0,
     }
   }
-  const passes = getCompletedPasses(skillState)
+  const passes = getCompletedPasses(skillState as SkillStateEntry)
   if (passes === 0) return { kind: 'idle' }
   if (passes >= 3) return { kind: 'full', avg: skillState.result }
   if (passes === 2) return { kind: 'medium', avg: skillState.result }
   return { kind: 'light', avg: skillState.result }
 }
 
-export default function SkillTree({ accent, skills, onClose, onStartSkill, onOpenSkillDetail, onOpenPlanetMap }) {
-  const siScore = calcSiScoreFromSkills(skills)
-  const progress = getSkillProgress(skills)
+type Props = {
+  accent: string
+  skills: Record<string, SkillState>
+  onClose: () => void
+  onStartSkill: (skillId: string) => void
+  onOpenSkillDetail?: (skillId: string) => void
+  onOpenPlanetMap?: () => void
+}
+
+export default function SkillTree({ accent, skills, onClose, onStartSkill, onOpenSkillDetail, onOpenPlanetMap }: Props) {
+  const siScore = calcSiScoreFromSkills(skills as Record<string, SkillStateEntry>)
+  const progress = getSkillProgress(skills as Record<string, SkillStateEntry>)
 
   // Multi-accordion: набор раскрытых архетипов. По умолчанию все свёрнуты —
   // 33 навыка сразу пугают, юзер видит только 4 шапки веток и сам решает,
   // куда копать. Toggle через клик на шапке.
-  const [expanded, setExpanded] = useState(() => new Set())
-  const toggleBranch = (key) => {
+  const [expanded, setExpanded] = useState<Set<ArchetypeKey>>(() => new Set())
+  const toggleBranch = (key: ArchetypeKey) => {
     setExpanded(prev => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
@@ -54,7 +81,7 @@ export default function SkillTree({ accent, skills, onClose, onStartSkill, onOpe
   }
 
   return (
-    <div className={styles.treeShell} style={{ '--accent': accent }}>
+    <div className={styles.treeShell} style={{ '--accent': accent } as CSSProperties}>
       <div className={styles.treeHeader}>
         <button
           type="button"
@@ -69,7 +96,7 @@ export default function SkillTree({ accent, skills, onClose, onStartSkill, onOpe
           <div className={styles.treeHeaderTitle}>Навыки БС</div>
           <div className={styles.treeHeaderSub}>
             {progress.completed} / {progress.total} оценено
-            {Number.isFinite(siScore) && ` · ср. ${siScore.toFixed(1)}/10`}
+            {siScore != null && Number.isFinite(siScore) && ` · ср. ${siScore.toFixed(1)}/10`}
           </div>
         </div>
         {onOpenPlanetMap && (
@@ -94,12 +121,12 @@ export default function SkillTree({ accent, skills, onClose, onStartSkill, onOpe
       </div>
 
       <div className={styles.treeBody}>
-        {ARCHETYPE_KEYS.map(key => {
+        {ARCHETYPE_KEYS.map((key: ArchetypeKey) => {
           const arche = ARCHETYPES[key]
           // 3 общих базовых сверху + специфичные навыки архетипа.
           const skillsInBranch = getSkillsForArchetype(key)
-          const branchAvg = calcArchetypeAvg(skills, key)
-          const completed = skillsInBranch.filter(s => Number.isFinite(skills?.[s.id]?.result)).length
+          const branchAvg = calcArchetypeAvg(skills as Record<string, SkillStateEntry>, key)
+          const completed = skillsInBranch.filter((s: SkillTreeNode) => Number.isFinite(skills?.[s.id]?.result)).length
           const isOpen = expanded.has(key)
           return (
             <section key={key} className={styles.treeBranch}>
@@ -119,7 +146,7 @@ export default function SkillTree({ accent, skills, onClose, onStartSkill, onOpe
                 </div>
                 <div className={styles.treeBranchSubRow}>
                   <span className={styles.treeBranchSub}>{arche.subtitle}</span>
-                  {Number.isFinite(branchAvg) && (
+                  {branchAvg != null && Number.isFinite(branchAvg) && (
                     <span className={styles.treeBranchAvg}>ср. {branchAvg.toFixed(1)}</span>
                   )}
                 </div>
@@ -127,7 +154,7 @@ export default function SkillTree({ accent, skills, onClose, onStartSkill, onOpe
 
               {isOpen && (
                 <ul className={styles.treeSkillList}>
-                  {skillsInBranch.map(skill => {
+                  {skillsInBranch.map((skill: SkillTreeNode) => {
                     const st = statusFor(skills?.[skill.id])
                     const cls =
                       st.kind === 'full'   ? styles.treeSkillDone :
@@ -150,9 +177,9 @@ export default function SkillTree({ accent, skills, onClose, onStartSkill, onOpe
                           </span>
                           <span className={styles.treeSkillStatus}>
                             {st.kind === 'idle'   && 'оценить'}
-                            {st.kind === 'light'  && `${st.avg.toFixed(1)}/10 · 1/3 · углубить`}
-                            {st.kind === 'medium' && `${st.avg.toFixed(1)}/10 · 2/3 · углубить`}
-                            {st.kind === 'full'   && `${st.avg.toFixed(1)}/10 · полная`}
+                            {st.kind === 'light'  && `${(st.avg ?? 0).toFixed(1)}/10 · 1/3 · углубить`}
+                            {st.kind === 'medium' && `${(st.avg ?? 0).toFixed(1)}/10 · 2/3 · углубить`}
+                            {st.kind === 'full'   && `${(st.avg ?? 0).toFixed(1)}/10 · полная`}
                             {st.kind === 'draft'  && `${st.mode === 'full' ? 'полный' : 'короткий'} · продолжить`}
                           </span>
                         </button>

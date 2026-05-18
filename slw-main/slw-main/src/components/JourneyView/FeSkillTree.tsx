@@ -1,31 +1,41 @@
 import { useState } from 'react'
+import type { CSSProperties } from 'react'
 import {
-  ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE, COMMON_BASE_SKILLS,
-  getSkillsForArchetype,
-  calcSeArchetypeAvg, getSeSkillProgress
-} from '../../data/journey/skills/se-skills'
+  ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE,
+  COMMON_BASE_SKILL_IDS, getSkillsForArchetype,
+  calcArchetypeAvg, calcFeScoreFromSkills, getSkillProgress
+} from '../../data/journey/fe-skills'
 import { getCompletedPasses } from '../../data/journey/skills'
+import type { SkillStateEntry } from '../../data/journey/skills'
+import type { FeArchetypeKey, FeSkillTreeNode } from '../../data/journey/fe-skills/tree'
+import type { SkillState } from '@/types/journey'
 import styles from './JourneyView.module.css'
 
-// Колесо ЧС — интерактивное дерево 47 навыков по 4 архетипам
-// (Защитник, Правитель, Строитель, Герой).
+// Колесо ЧЭ — 4 архетипа, под каждым — список навыков с 3 ядерными сверху.
+// Прогрессивная анкета: каждый навык можно пройти за 1, 2 или 3 прохода
+// по 5 утверждений. Состояние и UX совпадают с SkillTree.jsx (БС).
 //
-// 4 общих базовых навыка (Физическая Заземлённость, Реалистичная Оценка
-// Сил, Принятие Решения, Сила Воли) не вынесены в отдельную ветку —
-// они отображаются в каждом архетипе сверху, помеченные «общий», и
-// входят в средний подсчёт каждого архетипа.
-//
-// Радикальное Принятие — синергическая вершина зрелой ЧС, помещена в
-// архетип Hero как 12-й навык.
-//
-// Анкеты: 47 анкет (4 общих + 43 специфичных) — те же 5 блоков × 3
-// утверждения, что у БС/ЧИ/ЧЛ. Прогрессивная: 5 / 10 / 15 утверждений.
-// Источник — `se-surveys.md`.
+// Архетипы ЧЭ: Заводила (zavodila), Оратор (orator), Артист (artist),
+// Мастер Атмосферы (master_atmo).
 
-function statusFor(skillState) {
+type SkillStatus =
+  | { kind: 'idle' }
+  | { kind: 'draft'; mode: string; startPass: number; stepIndex: number }
+  | { kind: 'light'; avg: number | undefined }
+  | { kind: 'medium'; avg: number | undefined }
+  | { kind: 'full'; avg: number | undefined }
+
+function statusFor(skillState: SkillState | undefined): SkillStatus {
   if (!skillState) return { kind: 'idle' }
   if (skillState.draft) {
-    const d = skillState.draft
+    // TODO(ts): widen SkillState.draft from unknown to a structured type.
+    const d = skillState.draft as {
+      mode?: string
+      startPass?: number
+      pass?: number
+      stepIndex?: number
+      blockIndex?: number
+    }
     return {
       kind: 'draft',
       mode: d.mode ?? 'short',
@@ -33,19 +43,28 @@ function statusFor(skillState) {
       stepIndex: d.stepIndex ?? d.blockIndex ?? 0,
     }
   }
-  const passes = getCompletedPasses(skillState)
+  const passes = getCompletedPasses(skillState as SkillStateEntry)
   if (passes === 0) return { kind: 'idle' }
   if (passes >= 3) return { kind: 'full', avg: skillState.result }
   if (passes === 2) return { kind: 'medium', avg: skillState.result }
   return { kind: 'light', avg: skillState.result }
 }
 
-export default function SeSkillTree({ accent, skills, onClose, onStartSkill, onOpenSkillDetail, onOpenPlanetMap }) {
-  const progress = getSeSkillProgress(skills ?? {})
+type Props = {
+  accent: string
+  skills: Record<string, SkillState>
+  onClose: () => void
+  onStartSkill: (skillId: string) => void
+  onOpenSkillDetail?: (skillId: string) => void
+  onOpenPlanetMap?: () => void
+}
 
-  // По умолчанию все ветки свёрнуты — 47 навыков сразу пугают.
-  const [expanded, setExpanded] = useState(() => new Set())
-  const toggleBranch = (key) => {
+export default function FeSkillTree({ accent, skills, onClose, onStartSkill, onOpenSkillDetail, onOpenPlanetMap }: Props) {
+  const feScore = calcFeScoreFromSkills(skills as Record<string, SkillStateEntry>)
+  const progress = getSkillProgress(skills as Record<string, SkillStateEntry>)
+
+  const [expanded, setExpanded] = useState<Set<FeArchetypeKey>>(() => new Set())
+  const toggleBranch = (key: FeArchetypeKey) => {
     setExpanded(prev => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
@@ -55,7 +74,7 @@ export default function SeSkillTree({ accent, skills, onClose, onStartSkill, onO
   }
 
   return (
-    <div className={styles.treeShell} style={{ '--accent': accent }}>
+    <div className={styles.treeShell} style={{ '--accent': accent } as CSSProperties}>
       <div className={styles.treeHeader}>
         <button
           type="button"
@@ -67,9 +86,10 @@ export default function SeSkillTree({ accent, skills, onClose, onStartSkill, onO
           <span>Путешествие</span>
         </button>
         <div className={styles.treeHeaderTitleBlock}>
-          <div className={styles.treeHeaderTitle}>Навыки ЧС</div>
+          <div className={styles.treeHeaderTitle}>Навыки ЧЭ</div>
           <div className={styles.treeHeaderSub}>
-            {progress.completed} / {progress.total} оценено · 4 архетипа
+            {progress.completed} / {progress.total} оценено
+            {feScore != null && Number.isFinite(feScore) && ` · ср. ${feScore.toFixed(1)}/10`}
           </div>
         </div>
         {onOpenPlanetMap && (
@@ -94,20 +114,18 @@ export default function SeSkillTree({ accent, skills, onClose, onStartSkill, onO
       </div>
 
       <div className={styles.treeNote}>
-        В каждом архетипе четыре общих базовых сверху —{' '}
-        {COMMON_BASE_SKILLS.map(s => s.name.replace(/\s*\(.*\)/, '')).join(', ')}.
+        В каждом архетипе три ядерных навыка сверху —
+        Эмоциональная осознанность, Выразительность, Конгруэнтность.
         Они входят в средний подсчёт каждого архетипа.
       </div>
 
       <div className={styles.treeBody}>
-        {ARCHETYPE_KEYS.map(key => {
+        {ARCHETYPE_KEYS.map((key: FeArchetypeKey) => {
           const arche = ARCHETYPES[key]
-          const allSkillsInBranch = getSkillsForArchetype(key)
-          const specificCount = (SKILL_TREE[key] ?? []).length
-          const branchAvg = calcSeArchetypeAvg(skills ?? {}, key)
-          const completedInBranch = allSkillsInBranch.filter(
-            s => Number.isFinite(skills?.[s.id]?.result)
-          ).length
+          // 3 ядерных сверху + специфичные навыки архетипа.
+          const skillsInBranch = getSkillsForArchetype(key)
+          const branchAvg = calcArchetypeAvg(skills as Record<string, SkillStateEntry>, key)
+          const completed = skillsInBranch.filter((s: FeSkillTreeNode) => Number.isFinite(skills?.[s.id]?.result)).length
           const isOpen = expanded.has(key)
           return (
             <section key={key} className={styles.treeBranch}>
@@ -120,21 +138,15 @@ export default function SeSkillTree({ accent, skills, onClose, onStartSkill, onO
                 <div className={styles.treeBranchTitleRow}>
                   <span className={styles.treeBranchGlyph}>{arche.glyph}</span>
                   <span className={styles.treeBranchName}>{arche.name}</span>
-                  <span className={styles.treeBranchCount}>
-                    {completedInBranch} / {allSkillsInBranch.length}
-                  </span>
+                  <span className={styles.treeBranchCount}>{completed} / {skillsInBranch.length}</span>
                   <span className={styles.treeBranchChevron} aria-hidden="true">
                     {isOpen ? '▴' : '▾'}
                   </span>
                 </div>
                 <div className={styles.treeBranchSubRow}>
                   <span className={styles.treeBranchSub}>{arche.subtitle}</span>
-                  {Number.isFinite(branchAvg) ? (
+                  {branchAvg != null && Number.isFinite(branchAvg) && (
                     <span className={styles.treeBranchAvg}>ср. {branchAvg.toFixed(1)}</span>
-                  ) : (
-                    <span className={styles.treeBranchAvg}>
-                      4 общих + {specificCount} специфичных
-                    </span>
                   )}
                 </div>
               </button>
@@ -143,7 +155,7 @@ export default function SeSkillTree({ accent, skills, onClose, onStartSkill, onO
                 <>
                   <div className={styles.treeBranchBlurb}>{arche.blurb}</div>
                   <ul className={styles.treeSkillList}>
-                    {allSkillsInBranch.map(skill => {
+                    {skillsInBranch.map((skill: FeSkillTreeNode) => {
                       const st = statusFor(skills?.[skill.id])
                       const cls =
                         st.kind === 'full'   ? styles.treeSkillDone :
@@ -152,25 +164,23 @@ export default function SeSkillTree({ accent, skills, onClose, onStartSkill, onO
                         st.kind === 'draft'  ? styles.treeSkillDraft :
                         ''
                       const hasPasses = st.kind === 'light' || st.kind === 'medium' || st.kind === 'full'
+                      const isCommon = skill.isCommon || COMMON_BASE_SKILL_IDS.has(skill.id)
                       return (
                         <li key={`${key}-${skill.id}`} className={styles.treeSkillRow}>
                           <button
                             type="button"
                             className={`${styles.treeSkill} ${cls}`}
-                            onClick={() => onStartSkill?.(skill.id)}
-                            disabled={!onStartSkill}
+                            onClick={() => onStartSkill(skill.id)}
                           >
                             <span className={styles.treeSkillName}>
                               {skill.name}
-                              {skill.isCommon && (
-                                <span className={styles.treeSkillTag}> · общий</span>
-                              )}
+                              {isCommon && <span className={styles.treeSkillCommonTag}>ядерный</span>}
                             </span>
                             <span className={styles.treeSkillStatus}>
                               {st.kind === 'idle'   && 'оценить'}
-                              {st.kind === 'light'  && `${st.avg.toFixed(1)}/10 · 1/3 · углубить`}
-                              {st.kind === 'medium' && `${st.avg.toFixed(1)}/10 · 2/3 · углубить`}
-                              {st.kind === 'full'   && `${st.avg.toFixed(1)}/10 · полная`}
+                              {st.kind === 'light'  && `${(st.avg ?? 0).toFixed(1)}/10 · 1/3 · углубить`}
+                              {st.kind === 'medium' && `${(st.avg ?? 0).toFixed(1)}/10 · 2/3 · углубить`}
+                              {st.kind === 'full'   && `${(st.avg ?? 0).toFixed(1)}/10 · полная`}
                               {st.kind === 'draft'  && `${st.mode === 'full' ? 'полный' : 'короткий'} · продолжить`}
                             </span>
                           </button>
