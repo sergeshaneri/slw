@@ -10,20 +10,21 @@
  */
 import { useEffect, useRef } from 'react'
 import { tma, isTMA } from './index'
+import type { TelegramHapticImpact, TelegramHapticNotify } from '@/types/telegram'
 
 // ── Координация владения BackButton между компонентами ─────────────────────
 // Аналогично MainButton (теперь удалён): при unmount шедулим hide через 50мс,
 // при mount cancel. Это избегает race-condition на iOS Telegram между
 // последовательными hide() + show() в одном кадре.
-let pendingBackHide = null
-function scheduleBackHide() {
+let pendingBackHide: ReturnType<typeof setTimeout> | null = null
+function scheduleBackHide(): void {
   if (pendingBackHide) return
   pendingBackHide = setTimeout(() => {
     pendingBackHide = null
     try { tma?.BackButton?.hide() } catch { /* */ }
   }, 50)
 }
-function cancelBackHide() {
+function cancelBackHide(): void {
   if (pendingBackHide) { clearTimeout(pendingBackHide); pendingBackHide = null }
 }
 
@@ -31,13 +32,13 @@ function cancelBackHide() {
  * Telegram BackButton — стрелка ← в шапке TG.
  * Если onClick null/undefined — кнопка скрыта.
  */
-export function useBackButton(onClick) {
-  const handlerRef = useRef(onClick)
+export function useBackButton(onClick: (() => void) | null | undefined): void {
+  const handlerRef = useRef<(() => void) | null | undefined>(onClick)
   useEffect(() => { handlerRef.current = onClick }, [onClick])
 
   // Регистрация click handler — один раз.
   useEffect(() => {
-    if (!isTMA) return
+    if (!isTMA || !tma) return
     const btn = tma.BackButton
     if (!btn) return
     const trampoline = () => handlerRef.current?.()
@@ -47,7 +48,7 @@ export function useBackButton(onClick) {
 
   // Управление видимостью — на смену onClick (null/функция).
   useEffect(() => {
-    if (!isTMA) return
+    if (!isTMA || !tma) return
     const btn = tma.BackButton
     if (!btn) return
     if (onClick) {
@@ -71,7 +72,7 @@ export function useBackButton(onClick) {
  *
  * @param {('light'|'medium'|'heavy'|'rigid'|'soft')} [kind='light'] — для impactOccurred
  */
-export function tmaHaptic(kind = 'light') {
+export function tmaHaptic(kind: TelegramHapticImpact = 'light'): void {
   try {
     tma?.HapticFeedback?.impactOccurred?.(kind)
   } catch { /* старый клиент без HapticFeedback */ }
@@ -82,7 +83,7 @@ export function tmaHaptic(kind = 'light') {
  *
  * @param {('success'|'error'|'warning')} kind
  */
-export function tmaNotify(kind) {
+export function tmaNotify(kind: TelegramHapticNotify): void {
   try {
     tma?.HapticFeedback?.notificationOccurred?.(kind)
   } catch { /* старый клиент */ }
@@ -95,12 +96,12 @@ export function tmaNotify(kind) {
  * Использовать в CSS как `var(--tg-bg)`, `var(--tg-text)`, `var(--tg-button)`.
  * Аспект-цвета (ASPECT_COLORS) не трогаем — у них своя семантика.
  */
-export function applyTmaTheme() {
-  if (!isTMA) return
-  const t = tma?.themeParams
+export function applyTmaTheme(): void {
+  if (!isTMA || !tma) return
+  const t = tma.themeParams
   if (!t) return
   const root = document.documentElement
-  const set = (name, value, fallback) => {
+  const set = (name: string, value: string | undefined, fallback: string): void => {
     root.style.setProperty(name, value || fallback)
   }
   set('--tg-bg', t.bg_color, '#0a0a1a')
@@ -118,9 +119,10 @@ export function applyTmaTheme() {
  * Подписаться на themeChanged. Вызвать один раз при старте.
  * Возвращает unsubscribe (если потребуется).
  */
-export function listenTmaTheme() {
-  if (!isTMA) return () => {}
+export function listenTmaTheme(): () => void {
+  if (!isTMA || !tma) return () => {}
+  const tg = tma // capture narrowed reference for closure
   const handler = () => applyTmaTheme()
-  tma.onEvent?.('themeChanged', handler)
-  return () => tma.offEvent?.('themeChanged', handler)
+  tg.onEvent?.('themeChanged', handler)
+  return () => tg.offEvent?.('themeChanged', handler)
 }
