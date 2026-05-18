@@ -1,3 +1,4 @@
+import type { JourneyState, AspectState } from '@/types/journey'
 import { ONBOARDING } from '../../data/journey/onboarding'
 import styles from './JourneyView.module.css'
 
@@ -7,7 +8,22 @@ import styles from './JourneyView.module.css'
  * Полноэкранный IntroTour отдельно — открывается кнопкой «🎓 Пройти
  * обучение» в дашборде, но автоматически не вызывается.
  */
-export default function Onboarding({ state, isTyping, chatRef, onNext }) {
+
+// JourneyView передаёт детям «плоский» state: глобальные поля + поля
+// активной папки аспекта (см. stateForChildren в JourneyView.jsx).
+// Этот тип отражает оба источника одновременно.
+type FlatJourneyState = JourneyState & Partial<AspectState>
+
+type Props = {
+  state: FlatJourneyState
+  accent?: string
+  isTyping: boolean
+  chatRef: React.RefObject<HTMLDivElement>
+  onNext: () => void
+  aspectIntro?: unknown
+}
+
+export default function Onboarding({ state, isTyping, chatRef, onNext }: Props) {
   const buttonLabel = (() => {
     if (state.onboardingStep === 4) return 'Открыть Карту Планет →'
     if (state.onboardingStep === 3) return 'Доставай сферы жизни'
@@ -15,6 +31,8 @@ export default function Onboarding({ state, isTyping, chatRef, onNext }) {
   })()
 
   const buttonModifier = state.onboardingStep === 4 ? styles.btnAccent : styles.btnPrimary
+
+  const messages = state.messages ?? []
 
   return (
     <>
@@ -33,7 +51,7 @@ export default function Onboarding({ state, isTyping, chatRef, onNext }) {
           <div className={styles.msgAvatar}>◐</div>
           <div className={`${styles.msgBubble} ${styles.msgBot}`}>{ONBOARDING[0].text}</div>
         </div>
-        {state.messages.map(m => (
+        {messages.map(m => (
           <div key={m.id} className={`${styles.msg} ${m.role === 'user' ? styles.msgUser : ''}`}>
             {m.role === 'bot' && <div className={styles.msgAvatar}>◐</div>}
             <div className={`${styles.msgBubble} ${m.role === 'user' ? styles.msgBubbleUser : styles.msgBot}`}>{m.text}</div>

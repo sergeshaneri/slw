@@ -1,7 +1,13 @@
+import type { Script } from '@/types/script'
 import styles from './JourneyView.module.css'
 
-export default function ScriptButtons({ script, onAction }) {
-  const act = (a) => onAction(a, script.id)
+type Props = {
+  script: Script
+  onAction: (action: string, scriptId: string) => void
+}
+
+export default function ScriptButtons({ script, onAction }: Props) {
+  const act = (a: string) => onAction(a, script.id)
   switch (script.type) {
     case 'theory':
       return (

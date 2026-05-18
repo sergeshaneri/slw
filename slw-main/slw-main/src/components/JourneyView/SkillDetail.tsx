@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { CSSProperties } from 'react'
 import {
   getSkillContent,
   getUnlockedSkillLevel,
@@ -21,20 +22,50 @@ import styles from './JourneyView.module.css'
 //   - InsightInput («✎ Записать инсайт»)
 //
 // Внизу — кнопка «Какие психологические черты это развивает →» (ведёт в SkillTraits).
-//
-// Props:
-//   skillId       — id навыка из tree.js
-//   currentLevel  — уровень путешествия по аспекту (0..3)
-//   passes        — getCompletedPasses(state.skills[skillId]) (0..3)
-//   accent        — цвет аспекта
-//   onClose       — назад в дерево навыков
-//   onOpenTraits?: (skillId) => void  — открыть SkillTraits
-//   onSaveInsight?: (skillId, level, source, text) => void
+
+// Source of skill content (data/skills/index.js) is .js for now —
+// getSkillContent returns an unknown structural object. Описываем здесь
+// минимальные поля, которые рендерим. После P1B/P3 поднимет реальный Skill-тип.
+// NOTE(ts): tightened in P3 after data/skills/ TS conversion.
+type SkillTraitData = { title: string; desc: string }
+type PracticeData = { name: string; desc: string }
+type SkillLevelData = {
+  typage?: string
+  essence?: string
+  gift?: SkillTraitData
+  shadow?: SkillTraitData
+  actions?: string[]
+  practices?: PracticeData[]
+  criteria?: string[]
+  pitfalls?: string[]
+  precaution?: string
+  dilemma?: { name: string; desc: string }
+}
+type SkillContent = {
+  name?: string
+  intro?: string
+  domain?: string
+  levels?: Partial<Record<1 | 2 | 3, SkillLevelData>>
+}
+
+// CSS custom var `--accent` set inline.
+type AccentStyle = CSSProperties & { '--accent'?: string }
+
+type Props = {
+  skillId: string
+  currentLevel?: number | null
+  passes?: number | null
+  accent?: string
+  onClose: () => void
+  onOpenTraits?: (skillId: string) => void
+  onSaveInsight?: (skillId: string, level: number, source: string, text: string) => void
+}
+
 export default function SkillDetail({
   skillId, currentLevel, passes, accent, onClose,
   onOpenTraits, onSaveInsight
-}) {
-  const content = getSkillContent(skillId)
+}: Props) {
+  const content = getSkillContent(skillId) as SkillContent | null | undefined
   const cl = currentLevel ?? 0
   const p  = passes ?? 0
   const unlockedLevel = getUnlockedSkillLevel(cl, p)
@@ -42,8 +73,10 @@ export default function SkillDetail({
   const skillName = getSkillName(skillId)
   const archeName = getArchetypeNameForSkill(skillId)
 
+  const shellStyle: AccentStyle = { '--accent': accent }
+
   return (
-    <div className={styles.treeShell} style={{ '--accent': accent }}>
+    <div className={styles.treeShell} style={shellStyle}>
       <div className={styles.treeHeader}>
         <button
           type="button"
@@ -82,7 +115,7 @@ export default function SkillDetail({
               <p className={styles.skillDetailIntro}>{content.intro}</p>
             )}
 
-            {[1, 2, 3].map(lvl => {
+            {([1, 2, 3] as const).map(lvl => {
               const lvlData = content.levels?.[lvl]
               const isUnlocked = lvl <= unlockedLevel
               return (
@@ -125,7 +158,7 @@ export default function SkillDetail({
 }
 
 // Условия открытия уровня в человекочитаемом виде.
-function lockMessage(level, currentLevel, passes) {
+function lockMessage(level: number, currentLevel?: number | null, passes?: number | null): string {
   const cl = currentLevel ?? 0
   const p  = passes ?? 0
   const journeyOk = cl >= level
@@ -148,9 +181,20 @@ function lockMessage(level, currentLevel, passes) {
   return `Откроется, когда сдашь ${passNeed}. Уровень путешествия — готово ✓`
 }
 
+type CardProps = {
+  level: number
+  data: SkillLevelData | undefined
+  unlocked: boolean
+  skillId: string
+  currentLevel: number
+  passes: number
+  accent?: string
+  onSaveInsight?: (skillId: string, level: number, source: string, text: string) => void
+}
+
 // Карточка одного уровня с гейтингом.
-function SkillLevelCard({ level, data, unlocked, skillId, currentLevel, passes, accent, onSaveInsight }) {
-  const [showHow, setShowHow] = useState(false)
+function SkillLevelCard({ level, data, unlocked, skillId, currentLevel, passes, accent, onSaveInsight }: CardProps) {
+  const [showHow, setShowHow] = useState<boolean>(false)
 
   if (!unlocked) {
     return (
@@ -221,7 +265,7 @@ function SkillLevelCard({ level, data, unlocked, skillId, currentLevel, passes, 
 
       {showHow && (
         <div className={styles.skillHow}>
-          {data.actions?.length > 0 && (
+          {data.actions && data.actions.length > 0 && (
             <div className={styles.skillHowSection}>
               <div className={styles.skillHowSectionTitle}>Что делает ученик</div>
               <ul className={styles.skillHowList}>
@@ -232,7 +276,7 @@ function SkillLevelCard({ level, data, unlocked, skillId, currentLevel, passes, 
             </div>
           )}
 
-          {data.practices?.length > 0 && (
+          {data.practices && data.practices.length > 0 && (
             <div className={styles.skillHowSection}>
               <div className={styles.skillHowSectionTitle}>Практики</div>
               <ol className={styles.skillHowPractices}>
@@ -246,7 +290,7 @@ function SkillLevelCard({ level, data, unlocked, skillId, currentLevel, passes, 
             </div>
           )}
 
-          {data.criteria?.length > 0 && (
+          {data.criteria && data.criteria.length > 0 && (
             <div className={styles.skillHowSection}>
               <div className={styles.skillHowSectionTitle}>Критерии освоения</div>
               <ul className={styles.skillHowList}>
@@ -257,7 +301,7 @@ function SkillLevelCard({ level, data, unlocked, skillId, currentLevel, passes, 
             </div>
           )}
 
-          {data.pitfalls?.length > 0 && (
+          {data.pitfalls && data.pitfalls.length > 0 && (
             <div className={styles.skillHowSection}>
               <div className={styles.skillHowSectionTitle}>Типичные ошибки</div>
               <ul className={styles.skillHowList}>

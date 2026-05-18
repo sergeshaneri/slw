@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { CSSProperties } from 'react'
 import { calcSurveyResult, SURVEY_BLOCKS } from '../../data/journey/skills'
 import { resolveSurvey } from '../../data/journey/skills/resolve'
 import { getSkillContent, getUnlockedSkillLevel } from '../../data/skills'
@@ -16,20 +17,48 @@ import styles from './JourneyView.module.css'
  * Если контент есть, навык ядерный (archetype: 'common') и L1 ещё не
  * откроется (cl<1), показывается плашка-анонс: «✓ Сохранено. На следующем
  * уровне здесь откроется...».
- *
- * Props:
- *   activeSurvey: { skillId, pass, answers, ... }
- *   accent: цвет
- *   currentLevel: уровень путешествия по аспекту (0..3)
- *   onSave: (text) => void
- *   onCancel: () => void  — закроет, ответы сохранятся как draft
  */
-export default function SurveyInsight({ activeSurvey, accent, currentLevel, onSave, onCancel }) {
-  const [text, setText] = useState('')
+
+// Activator shape passed in via state.activeSurvey. Реальный shape в
+// JourneyView шире, чем ActiveSurvey из types/journey — содержит pass,
+// answers, scriptId, ещё. NOTE(ts): tightened in P3 after JourneyView lands.
+type ActiveSurveyLike = {
+  skillId: string
+  pass?: number
+  answers?: Record<string, Array<number | null | undefined>>
+}
+
+// NOTE(ts): tightened in P3 after data/skills/ TS conversion.
+type SkillContentLike = {
+  name?: string
+  archetype?: string
+  role?: string
+}
+
+type AccentStyle = CSSProperties & { '--accent'?: string }
+
+type Props = {
+  activeSurvey: ActiveSurveyLike
+  accent?: string
+  currentLevel?: number | null
+  onSave: (text: string) => void
+  onCancel: () => void
+}
+
+export default function SurveyInsight({ activeSurvey, accent, currentLevel, onSave, onCancel }: Props) {
+  const [text, setText] = useState<string>('')
   const survey = resolveSurvey(activeSurvey.skillId)
   const pass = activeSurvey.pass ?? 1
 
-  const result = calcSurveyResult(activeSurvey.answers ?? {})
+  // calcSurveyResult expects Record<string, number[]>, наш активный буфер
+  // может содержать undefined-ячейки в массиве — отфильтровываем.
+  const cleanedAnswers: Record<string, number[]> = {}
+  if (activeSurvey.answers) {
+    for (const [k, v] of Object.entries(activeSurvey.answers)) {
+      cleanedAnswers[k] = (v ?? []).filter((n): n is number => typeof n === 'number' && Number.isFinite(n))
+    }
+  }
+  const result = calcSurveyResult(cleanedAnswers)
   const skillAvg = result.skill
 
   if (!survey) {
@@ -49,13 +78,13 @@ export default function SurveyInsight({ activeSurvey, accent, currentLevel, onSa
   let actualPasses = 0
   for (const k of blockKeys) {
     const arr = activeSurvey.answers?.[k] ?? []
-    const len = arr.filter(n => Number.isFinite(n)).length
+    const len = arr.filter(n => typeof n === 'number' && Number.isFinite(n)).length
     if (len > actualPasses) actualPasses = len
   }
   actualPasses = Math.min(3, actualPasses)
 
   const cl = currentLevel ?? 0
-  const skillContent = getSkillContent(activeSurvey.skillId)
+  const skillContent = getSkillContent(activeSurvey.skillId) as SkillContentLike | null | undefined
   const willOpenDetail = !!skillContent && getUnlockedSkillLevel(cl, actualPasses) >= 1
   const isCore = skillContent?.archetype === 'common' || skillContent?.role === 'core'
   const showCoreAnnounce = !!skillContent && isCore && !willOpenDetail
@@ -63,8 +92,10 @@ export default function SurveyInsight({ activeSurvey, accent, currentLevel, onSa
   const canSave = text.trim().length > 0
   const passLabel = pass === 1 ? '1/3' : pass === 2 ? '2/3' : '3/3'
 
+  const shellStyle: AccentStyle = { '--accent': accent }
+
   return (
-    <div className={styles.surveyShell} style={{ '--accent': accent }}>
+    <div className={styles.surveyShell} style={shellStyle}>
       <div className={styles.surveyHeader}>
         <button type="button" className={styles.surveyClose} onClick={onCancel} aria-label="Прервать">✕</button>
         <div className={styles.surveyTitleBlock}>
@@ -77,7 +108,7 @@ export default function SurveyInsight({ activeSurvey, accent, currentLevel, onSa
         <div className={styles.insightAvgRow}>
           <div className={styles.insightAvgLabel}>Средняя по навыку</div>
           <div className={styles.insightAvgVal}>
-            {Number.isFinite(skillAvg) ? skillAvg.toFixed(1) : '—'}<span className={styles.insightAvgTotal}>/10</span>
+            {skillAvg != null && Number.isFinite(skillAvg) ? skillAvg.toFixed(1) : '—'}<span className={styles.insightAvgTotal}>/10</span>
           </div>
         </div>
 
@@ -88,7 +119,7 @@ export default function SurveyInsight({ activeSurvey, accent, currentLevel, onSa
               <div key={b.id} className={styles.insightBlockRow}>
                 <span className={styles.insightBlockName}>{b.name}</span>
                 <span className={styles.insightBlockVal}>
-                  {Number.isFinite(v) ? v.toFixed(1) : '—'}
+                  {v != null && Number.isFinite(v) ? v.toFixed(1) : '—'}
                 </span>
               </div>
             )

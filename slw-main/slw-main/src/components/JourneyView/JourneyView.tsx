@@ -1,4 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import type { CSSProperties } from 'react'
+import type { AspectKey } from '@/types/aspect'
+import type {
+  JourneyState, AspectState, AwaitingInput, ChatMessage, PendingTask,
+  SkillState, ActiveSurvey
+} from '@/types/journey'
+import type { Script } from '@/types/script'
 import { postStepCompleted, chooseHabit } from '../../api/client'
 import { tmaHaptic } from '../../tma/hooks'
 import { ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
@@ -65,12 +72,33 @@ import { getSkillContent, getUnlockedSkillLevel } from '../../data/skills'
 import PlanetMap from './PlanetMap'
 import AdminPanel from './AdminPanel'
 import AdminSkillsEditor from './AdminSkillsEditor'
+import type { SkillEdits } from './AdminSkillsEditor'
 import Hint from '../Onboarding/Hint'
 import styles from './JourneyView.module.css'
 
+// suppress unused-import warnings without changing call surface: эти
+// идентификаторы используются для будущих хоков, но в рантайме они
+// не нужны напрямую в JourneyView. Оставлены чтобы не ломать импорт-API
+// (legacy imports видны из соседних веток миграции). Они подтянулись из
+// .jsx — оставляем как есть.
+void findFirstUnansweredSurveyIndex
+void getStatementsForPass
+void getStatementsForFullRange
+void SURVEYS
+void SURVEYS_FE
+
+// TODO(ts): types/journey.ts:ScreenName needs to include 'tasks' and
+// 'fe-core-overview'. Runtime code uses them, but the union as shipped
+// from Phase 1 doesn't list them. Coordinator/P3 widens the type; here
+// we cast through JourneyState['screen'] at every usage to avoid lying.
+
 // Маленькая обёртка-хинт для skill-tree экранов (8 типов деревьев — не хочется
 // внедряться в каждый отдельно). Хинт показывается ОДИН раз на любом дереве.
-function SkillTreeIntroHint({ user }) {
+type SkillTreeIntroHintProps = {
+  user?: unknown
+}
+
+function SkillTreeIntroHint({ user }: SkillTreeIntroHintProps) {
   return (
     <div style={{ padding: '12px 16px 0' }}>
       <Hint id="skill-tree-intro" user={user}>
@@ -83,208 +111,14 @@ function SkillTreeIntroHint({ user }) {
 // Версия контента уровня. При несовпадении с сохранённой в state
 // чат-история сбрасывается, чтобы юзер увидел новые тексты с начала
 // (статистика — XP/streak/totalCompleted — сохраняется).
-//
-// 3 — добавлен level в script-sообщения (для разрешения коллизий
-//     ID между уровнями: T-1 в L0 ≠ T-1 в L1).
-// 4 — переписан L1 «Карта и намерение» (25 шагов, 5×5, вопросы
-//     формата B). Параллельно введён mode (core/pool), но он
-//     совместим со старым state через спред DEFAULT_JOURNEY и
-//     сам по себе бампа не требовал.
-// 5 — прогрессивная анкета (5 вопросов × 3 прохода вместо 15 за
-//     раз). state.skills[id] получил поля passes, insights[].
-//     activeSurvey получил pass. Старые записи мигрируем в
-//     migrateState (passes вычисляется по answers).
-// 6 — анкеты вынесены из L0-чата (33 SURV-шага → отдельный
-//     bs-l0-surveys.md, видны только через дерево навыков). B-1/2/3
-//     перешли на open-text без слайдера, исчезли followUp-блоки.
-//     Концепция `pool`/`mode` удалена. Старый state с mode='pool'
-//     или индексом в pool — мигрируется со сбросом messages/
-//     completedScripts/pendingTasks. state.skills сохраняется.
-// 7 — добавлен L2 БС «Системы заботы»: 40 шагов core (8×5),
-//     вопросы формата B (open-text). Также прошлись по L0/L1
-//     и переименовали несколько шагов (Аудит комфорта → Что меня
-//     окружает, и т.п.), убрали ID-метки из тела скриптов,
-//     перевели «или проговорить» в обязательное «Запиши ответы».
-// 8 — per-aspect рефакторинг state. Раньше currentLevel/messages/
-//     currentScriptIndex/currentScriptId/awaitingInput/completedScripts/
-//     pendingTasks были глобальными — теперь живут в state.aspects[aspect].
-//     Это позволяет одному юзеру параллельно идти по БС и БЛ (и далее)
-//     без коллизий. XP/streak/skills/stardust остаются глобальными.
-//     При миграции с v<8 старые «плоские» поля помещаются в активный
-//     аспект; чат сбрасывается (как при любом бампе CONTENT_VERSION).
-// 9 — ревизия дерева навыков БС: 33 → 47 (7 слияний + 21 новый
-//     навык). Слияния: scan→interoception, relax→balance,
-//     aging→pain, env-quality→quality, env-design→ergonomics,
-//     load→pause, library→pleasure. Старые id в state.skills
-//     мигрируем через SKILL_ID_MIGRATION в migrateSkills (если
-//     у юзера уже есть результат для нового id — старый
-//     отбрасывается; иначе старый копируется под новым id).
-//     Удалено 7 SURV-* шагов из bs-l0-surveys.md, добавлен 21 новый
-//     SURV-34..54. Нумерация старых SURV-* оставлена с пропусками,
-//     чтобы completedScripts существующих юзеров не сломались.
-// 10 — добавлен аспект ЧЭ (Чёрная Этика, планета Passio Ignis):
-//     L0 (15 шагов), L1 (25), L2 (40), L3 (стартовый — 20).
-//     Регистрация в registry.js, новый файл aspects/che.js.
-//     Контент в `che-l*.md`. Дерево навыков ЧЭ и анкеты пока не
-//     интегрированы — будут добавлены отдельно. Существующие юзеры
-//     получат сброс чат-истории по другим аспектам, но прогресс
-//     XP/streak/skills сохранится.
-// 11 — в L0 БС добавлены 3 универсальные анкеты (signals,
-//     interoception, honesty) с подготовительным сообщением.
-//     Эти 3 навыка вынесены в COMMON_BASE_SKILLS — они входят в
-//     средний по каждому из 4 архетипов БС-колеса доп.слагаемыми.
-//     Survey-карточки снова рендерятся в чат-ленте (Chat.jsx).
-//     Старые архивные SURV из v6 не показываются благодаря бампу
-//     (messages сбрасываются).
-// 12 — добавлено колесо ЧЭ (CheSkillTree): 34 навыка по 4 архетипам
-//     (Заводила, Оратор, Артист, Мастер Атмосферы) + 3 ядерных
-//     общих (Эмо-осознанность, Выразительность, Конгруэнтность).
-//     Новые файлы: che-skills/{tree,parseSurveys,index}.js, surveys.md
-//     (510 утверждений, по 15 на навык). CSURV-1..3 для трёх ядерных
-//     встроены инлайн в che-l0.md как часть L0-чата. getSurvey()
-//     в skills/index.js теперь fallback-ит в ЧЭ-анкеты. JourneyView
-//     dispatch-ит CheSkillTree для currentAspect === 'ЧЭ'. Skill ID
-//     у ЧЭ имеют префикс `che-` для глобальной уникальности.
-// 13 — UX-исправления для смены аспектов: handleStartSkillSurvey теперь
-//     aspect-aware (определяет БС/ЧЭ по префиксу skill id + ищет
-//     survey-шаг и в core, и в surveys). Кнопка «🪐 Планеты» добавлена
-//     в шапку SkillTree/CheSkillTree/NeSkillTree — выход на PlanetMap
-//     из колеса любого аспекта. AdminPanel получил блок «Планета» с
-//     кнопками быстрого переключения между доступными аспектами.
-// 14 — переименование внутренних ключей аспектов с кириллицы на латиницу
-//     (БС→Si, ЧС→Se, БЛ→Ti, ЧЛ→Te, БЭ→Fi, ЧЭ→Fe, БИ→Ni, ЧИ→Ne). UI-лейблы
-//     остались русскими (ASPECT_DATA[k].name). Миграция данных-сохраняющая:
-//     `migrateCyrAspectKeys` ниже переименовывает stored.currentAspect и
-//     все ключи в stored.aspects до проверки contentVersion, чтобы v13
-//     юзеры получили латинские ключи без сброса чата. Бэкенд продолжает
-//     использовать кириллицу — трансляция на границе api/client.js.
-// 15 — добавлен аспект БИ (Белая Интуиция, планета Tempum Spiralis):
-//     L0 (30 шагов), L1 (26), L2 (41), L3 (стартовый — 21).
-//     Регистрация в registry.js, новый модуль aspects/Ni/index.js.
-//     Контент в `aspects/Ni/l*.md`. Архетипы БИ: Мифотворец (на L0) →
-//     Провидец → Разоблачитель → Шаман (на L1). 3 общих базовых навыка:
-//     attunement / subconscious-listening / inner-silence — встроены инлайн
-//     в l0.md (B-1..B-15 со scale: 1-10). Полное дерево навыков БИ
-//     (43 навыка по 4 архетипам) и анкеты для архетипных навыков пока
-//     не интегрированы — будут добавлены отдельно через модуль
-//     skills/ni-skills.js + NiSkillTree-компонент.
-// 16 — пересборка общих базовых навыков БС: signals / interoception /
-//     honesty возвращены в SKILL_TREE.healer как обычные навыки архетипа
-//     (id остался прежним → state.skills.* по этим id сохраняется).
-//     На их место в COMMON_BASE_SKILLS введены 4 новых сквозных навыка:
-//     body-listening, needs-awareness, timely-care, details. Это цепочка
-//     «вход → понимание → выход + базовое качество тонкости», работающая
-//     через все 4 архетипа БС. В L0-чате БС старые SURV-100/101/102
-//     заменены на SURV-100..103 для четырёх новых навыков. Полные анкеты
-//     SURV-55..58 добавлены в l0-surveys.md. Содержательное описание
-//     навыков — `Si/Навыки БС — Универсальные.md`. Из-за бампа
-//     L0/L1/L2-чаты у БС перезапустятся, XP/skills/streak/stardust
-//     сохраняются.
-// 17 — добавлен аспект БЭ (Белая Этика, планета Anima Humanitatis):
-//     L0 (15 шагов), L1 (25), L2 (40), L3 (стартовый — 20). Регистрация
-//     в registry.js, новый модуль aspects/Fi/index.js. Контент в
-//     `aspects/Fi/l*.md`. Полное колесо БЭ: 58 навыков (2 корневых +
-//     17 Дипломат + 14 Духовник + 9 Хранитель Рода + 16 Друг) по 4
-//     архетипам, новые файлы skills/{fi-tree,fi-skills}.js + fi-surveys.md
-//     (870 утверждений, по 15 на навык). Новый компонент FiSkillTree.jsx
-//     дисптачится для currentAspect === 'Fi'. Skill ID у БЭ имеют
-//     префикс `fi-` для глобальной уникальности. resolveSurvey() и
-//     handleStartSkillSurvey обновлены для поддержки Fi. Существующие
-//     юзеры получат сброс чат-истории по другим аспектам, прогресс
-//     XP/streak/skills сохранится.
-// 18 — добавлен аспект ЧС (Чёрная Сенсорика, планета Imperium Magnum):
-//     L0 (15 шагов), L1 (25), L2 (40), L3 (60). Регистрация в registry.js,
-//     новый модуль aspects/Se/index.js. Контент в `aspects/Se/l*.md`.
-//     Полное колесо ЧС: 47 навыков (4 общих сквозных квартета
-//     тело-восприятие-выбор-исполнение + 12 Защитник + 9 Правитель +
-//     10 Строитель + 12 Герой включая синергический навык Радикальное
-//     Принятие), новый файл skills/se-tree.js + l0-surveys.md (47 анкет
-//     по 15 утверждений). SeSkillTree-компонент пока не реализован —
-//     дерево навыков ЧС видно только через `JOURNEYS.Se` для чата
-//     уровней. Survey-анкеты по навыкам ЧС будут добавлены отдельно.
-//     Все 8 аспектов теперь имеют контент уровней. Существующие
-//     юзеры получат сброс чат-истории по другим аспектам, прогресс
-//     XP/streak/skills сохранится.
-// 19 — унификация формата L0-оценки на B-вопросы со scale (по образцу
-//     Ni/Ne). Новый механизм: `parseScripts.js` читает metadata
-//     `skill:`/`block:` для type='question'; `handleSend` (number)
-//     пишет ответ в `state.skills[skill].answers[block][0]`,
-//     пересчитывает `result`/`passes`/`blocks` через `calcSurveyResult`
-//     и общий score аспекта через `calc*ScoreFromSkills`. Это
-//     синхронизирует L0-чат с деревом талантов: SURV-анкета сразу
-//     знает «pass 1 пройден». Стартовый rollout: Se переписан, Ne/Ni
-//     получили `block:`.
-// 20 — финальная унификация L0 для всех 6 аспектов с skill-tree:
-//     Si (4 раунда — body-listening, needs-awareness, timely-care,
-//     details), Te (4 — work-vs-busyness, goal-holding,
-//     cost-benefit-vision, technological-thinking), Fe (3 —
-//     fe-awareness, fe-expressiveness, fe-congruence), Fi (2 —
-//     fi-trust, fi-values-check + narrative-раунд об архетипах),
-//     Ti (3 — structural-thinking, modality-distinction,
-//     mental-discipline; pool B-4..B-6/U-4..U-5/S-4..S-6 удалён —
-//     B-нумерация переехала на core).
-//     Все B-вопросы со skill+block — тексты взяты как первое
-//     утверждение каждого блока из соответствующего {aspect}-surveys.md.
-//     Существующие SURV-карточки в дереве талантов автоматически
-//     синхронизируются: после L0 navык получает passes=1, дерево
-//     предложит «продолжить с pass 2» через getNextPass.
-// 21 — экраны «Как развить» (SkillDetail) и «Какие черты» (SkillTraits)
-//     для Fe-навыков. data/skills/Fe/{core,zavodila,orator,artist,master-atmo}.js
-//     с полным контентом 34 навыков по 3 уровням (typage / essence / gift / shadow /
-//     actions / practices / criteria / pitfalls; на L3 — precaution + dilemma).
-//     Aspect-aware lookup в data/skills/index.js. Кнопка «Сохранить и узнать,
-//     как развить →» в SurveyInsight + auto-redirect в SkillDetail при
-//     открытом L1. Плашка-анонс для ядерных навыков, когда L1 ещё закрыт.
-//     InsightInput на каждой unlocked-карточке SkillDetail и SkillTraits.
-//     CTA «Узнать, как развить →» в FeSkillTree. Третья кнопка
-//     «Изучить универсальные навыки» в LevelComplete для Fe на L0 →
-//     FeCoreOverview с 3 карточками ядерных навыков.
-//     state.skills[id].insights[] получили опциональные поля
-//     source ('survey'|'detail'|'traits') и level (1|2|3).
-//     Migration data-preserving: старые записи получают source='survey'.
-//     Чат НЕ сбрасывается (только структурное расширение).
-// v22 — БЭ-контент: расширение ASPECT_DATA.Fi 12 полями (skills, archetypePath,
-//     historicalFigures, art, professions, myths, quotes, culturalDifferences,
-//     childRaising, childhoodQuestions, fiSkillBlocksCore, fiSkillBlocks).
-//     Источник — 11 .md-файлов в Fi/. data/skills/Fi/skill-blocks.js с 58
-//     навыками × 4 блока психодинамики. Чат НЕ сбрасывается.
-// v23 — БЭ Фаза 2: data/skills/Fi/ — 5 файлов (core, diplomat, confessor,
-//     ancestor, friend) с детальным контентом всех 58 навыков по 3 уровням
-//     (gift/shadow/actions/practices/criteria/pitfalls + precaution/dilemma на L3).
-//     Подключение в data/skills/index.js (getSkillContent / getSkillName /
-//     getArchetypeNameForSkill). Расширение HALL_CONTENT.Fi: 15 цитат, 18
-//     личностей, 36 произведений, 4 архетипа. Чат НЕ сбрасывается.
-// v24 — БЭ Фаза 3: допереносы контента в aspects-fi-extension.js до полного
-//     покрытия исходных .md. Расширения: professions 17→107, art 18→102,
-//     childRaising 20→100, quotes 14→80, myths 20→50, culturalDifferences
-//     17→50, childhoodQuestions 20→50. Новое поле facts (90) + новый блок
-//     'facts' в blocks.js (L2). Источник — 8 .md-файлов в Fi/. Чат НЕ
-//     сбрасывается (только наполнение блоков теории аспекта).
-// v25 — Поведенческое изменение migrateState: при бампе CONTENT_VERSION
-//     теперь СОХРАНЯЕМ completedScripts и currentLevel каждого аспекта.
-//     Раньше сбрасывали полностью — это привело к кейсу, когда у юзера
-//     totalCompleted=114 а sum(completedScripts) свелся к 9 после бампа.
-// v26 — Доразработка v25: миграция полностью data-preserving (как
-//     match-version ветка). Стирание messages в v25 приводило к тому,
-//     что UI активного аспекта видел messages=[] и инициализировал чат
-//     заново, перетирая восстановленный currentLevel и completedScripts.
-//     Теперь messages, pendingTasks, currentScriptId — всё сохраняется.
-//     Если потребуется реально сбросить чат при несовместимых правках
-//     контента — это будет отдельный механизм (per-user флаг).
-// v27 — БЭ Фаза 3.5: восстановление полного контента в aspects-fi-extension.js,
-//     ранее в Фазе 3 контент был сжат. Восстановлены до источника:
-//     professions (107 — каждая 3-5 предложений + 4 ключевых навыка с
-//     описанием), facts (90), childRaising (100). Также убраны блоки
-//     historicalFigures / art / quotes из blocks.js — оставлены только
-//     hallStub блоки (hallFigures / hallArts / hallQuotes), которые
-//     отсылают в Холл. Чат не сбрасывается (data-preserving).
+// История версий — см. оригинал в JourneyView.jsx до v27.
 export const CONTENT_VERSION = 27
 
 // Миграция id навыков после ревизии дерева (v9). Старый id → новый.
 // Если у юзера уже есть запись по новому id, старая отбрасывается
 // (приоритет — у новой записи). Если только старая — копируем под
 // новым id.
-const SKILL_ID_MIGRATION = {
+const SKILL_ID_MIGRATION: Record<string, string> = {
   'scan': 'interoception',
   'relax': 'balance',
   'aging': 'pain',
@@ -295,7 +129,7 @@ const SKILL_ID_MIGRATION = {
 }
 
 // Дефолтные значения per-aspect папки.
-export const DEFAULT_ASPECT_STATE = {
+export const DEFAULT_ASPECT_STATE: AspectState = {
   currentLevel: 0,
   currentScriptIndex: 0,
   currentScriptId: null,
@@ -307,13 +141,15 @@ export const DEFAULT_ASPECT_STATE = {
 
 // Безопасное чтение активной папки. Если её нет — отдаёт дефолт
 // (чтобы старые места state.currentLevel и т.п. не падали).
-export function aspectOf(s) {
+export function aspectOf(s: JourneyState): AspectState {
   return s.aspects?.[s.currentAspect] ?? DEFAULT_ASPECT_STATE
 }
 
+type AspectPatch = Partial<AspectState> | ((cur: AspectState) => AspectState)
+
 // Иммутабельный апдейт активной папки. patch может быть объектом
 // (мерджится поверх) или функцией (cur) => next.
-export function updateAspect(s, patch) {
+export function updateAspect(s: JourneyState, patch: AspectPatch): JourneyState {
   const cur = s.aspects?.[s.currentAspect] ?? DEFAULT_ASPECT_STATE
   const next = typeof patch === 'function' ? patch(cur) : { ...cur, ...patch }
   return {
@@ -322,7 +158,7 @@ export function updateAspect(s, patch) {
   }
 }
 
-export const DEFAULT_JOURNEY = {
+export const DEFAULT_JOURNEY: JourneyState = {
   screen: 'onboarding',
   onboardingStep: 0,
   currentAspect: 'Si',
@@ -348,35 +184,46 @@ export const DEFAULT_JOURNEY = {
 
 // Префикс ID навыков ЧЭ переименован с `che-` (русский транслит) на `fe-`
 // (стандартная соционическая нотация). Применяется до общего SKILL_ID_MIGRATION.
-function renameChePrefix(id) {
+function renameChePrefix(id: string): string {
   return id.startsWith('che-') ? 'fe-' + id.slice(4) : id
 }
 
-// Миграция skills-записей со старого формата (без passes/insights) на новый.
-// Старые записи: { result, blocks, completedAt, answers? }.
-// Новые: + passes (вычисляется по answers), + insights: [].
-// v21: старые insights не имели поля source — добавляем 'survey'
-// (это все уже сохранённые до v21 инсайты, они приходили из SurveyInsight).
-function upgradeInsights(insights) {
-  if (!Array.isArray(insights) || insights.length === 0) return insights ?? []
-  return insights.map(ins => {
-    if (!ins) return ins
-    if (ins.source) return ins
-    return { source: 'survey', ...ins }
+// Старые insights в state.skills могут не иметь поля source — добавляем
+// 'survey' (это все уже сохранённые до v21 инсайты, они приходили из SurveyInsight).
+type InsightLike = { source?: string; [key: string]: unknown }
+
+function upgradeInsights(insights: unknown): InsightLike[] {
+  if (!Array.isArray(insights) || insights.length === 0) return (insights as InsightLike[] | undefined) ?? []
+  return insights.map((ins: unknown) => {
+    if (!ins || typeof ins !== 'object') return ins as InsightLike
+    const item = ins as InsightLike
+    if (item.source) return item
+    return { source: 'survey', ...item }
   })
 }
 
-function migrateSkills(skills) {
+// state.skills entry shape с учётом legacy-полей миграции.
+// Используем структурный тип ('any-shaped'-record) — миграция не знает
+// точного состава старых записей.
+type StoredSkillEntry = SkillState & {
+  passes?: number
+  answers?: Record<string, Array<number | null | undefined>>
+  result?: number
+  insights?: unknown
+}
+
+function migrateSkills(skills: unknown): Record<string, StoredSkillEntry> {
   if (!skills || typeof skills !== 'object') return {}
-  const out = {}
-  for (const [id, entry] of Object.entries(skills)) {
+  const src = skills as Record<string, StoredSkillEntry | null | undefined>
+  const out: Record<string, StoredSkillEntry> = {}
+  for (const [id, entry] of Object.entries(src)) {
     if (!entry) continue
     // Префикс che- → fe- для навыков ЧЭ + v9-переименования БС-навыков.
     const renamed = renameChePrefix(id)
     const targetId = SKILL_ID_MIGRATION[renamed] ?? renamed
-    if (targetId !== id && skills[targetId]) continue
+    if (targetId !== id && src[targetId]) continue
     // passes уже есть — оставляем как есть.
-    if (Number.isFinite(entry.passes)) {
+    if (typeof entry.passes === 'number' && Number.isFinite(entry.passes)) {
       out[targetId] = { ...entry, insights: upgradeInsights(entry.insights) }
       continue
     }
@@ -385,10 +232,10 @@ function migrateSkills(skills) {
     if (entry.answers) {
       for (const k of SURVEY_BLOCK_KEYS) {
         const arr = entry.answers[k] ?? []
-        const len = arr.filter(n => Number.isFinite(n)).length
+        const len = arr.filter((n): n is number => typeof n === 'number' && Number.isFinite(n)).length
         if (len > passes) passes = len
       }
-    } else if (Number.isFinite(entry.result)) {
+    } else if (typeof entry.result === 'number' && Number.isFinite(entry.result)) {
       // У старых записей нет answers, но есть result — считаем как полную (3).
       passes = 3
     }
@@ -400,7 +247,7 @@ function migrateSkills(skills) {
 // Нормализует одну per-aspect папку — заполняет недостающие ключи
 // дефолтами. Используется и для актуальной версии (внутри aspects),
 // и для старого «плоского» state при миграции.
-function normalizeAspect(folder) {
+function normalizeAspect(folder: Partial<AspectState> | null | undefined): AspectState {
   return {
     ...DEFAULT_ASPECT_STATE,
     ...(folder ?? {}),
@@ -412,7 +259,7 @@ function normalizeAspect(folder) {
 
 // Кириллица → латиница для ключей аспектов (v14). Применяется до проверки
 // contentVersion — поэтому v13 юзеры получают плавный rename без сброса чата.
-const CYR_TO_LAT_ASPECT = {
+const CYR_TO_LAT_ASPECT: Record<string, AspectKey> = {
   'БС': 'Si', 'ЧС': 'Se', 'БЛ': 'Ti', 'ЧЛ': 'Te',
   'БЭ': 'Fi', 'ЧЭ': 'Fe', 'БИ': 'Ni', 'ЧИ': 'Ne',
 }
@@ -420,10 +267,27 @@ const CYR_TO_LAT_ASPECT = {
 // Перепишем stored.currentAspect и ключи stored.aspects в латиницу.
 // Если у юзера каким-то образом уже есть и кир. и лат. ключ — латинская
 // версия имеет приоритет (кириллический ключ отбрасывается).
-function migrateCyrAspectKeys(stored) {
+type StoredJourneyShape = Partial<JourneyState> & {
+  currentAspect?: string
+  aspects?: Record<string, Partial<AspectState> | null | undefined>
+  // Плоские legacy-поля
+  currentLevel?: AspectState['currentLevel']
+  currentScriptIndex?: number
+  currentScriptId?: string | null
+  awaitingInput?: AwaitingInput
+  messages?: ChatMessage[]
+  completedScripts?: string[]
+  pendingTasks?: PendingTask[]
+  mode?: unknown
+  contentVersion?: number
+  skills?: unknown
+  activeSurvey?: unknown
+}
+
+function migrateCyrAspectKeys(stored: StoredJourneyShape | null | undefined): StoredJourneyShape | null | undefined {
   if (!stored || typeof stored !== 'object') return stored
   let changed = false
-  let next = stored
+  let next: StoredJourneyShape = stored
 
   if (typeof stored.currentAspect === 'string' && CYR_TO_LAT_ASPECT[stored.currentAspect]) {
     next = { ...next, currentAspect: CYR_TO_LAT_ASPECT[stored.currentAspect] }
@@ -431,7 +295,7 @@ function migrateCyrAspectKeys(stored) {
   }
 
   if (stored.aspects && typeof stored.aspects === 'object') {
-    const newAspects = {}
+    const newAspects: Record<string, Partial<AspectState> | null | undefined> = {}
     let aspectsChanged = false
     for (const [k, v] of Object.entries(stored.aspects)) {
       const target = CYR_TO_LAT_ASPECT[k] ?? k
@@ -455,32 +319,23 @@ function migrateCyrAspectKeys(stored) {
 //   • контент-версия не совпала → сбрасываем чат / completedScripts /
 //     pendingTasks (и заодно currentLevel — как и до v8), сохраняем
 //     XP/streak/stardust/totalCompleted/lastActiveDate/skills/activeSurvey.
-//
-// Тут же поддерживаем входной «плоский» state (v<8 либо bot-sync override
-// из App.jsx, который в legacy-формате может прислать flat currentLevel
-// и т.п.) — флэты складываем в aspects[currentAspect].
-//
-// Старое поле `mode` ('core'|'pool') v5 удаляется при чтении.
-function migrateState(stored) {
+function migrateState(stored: StoredJourneyShape | null | undefined): JourneyState {
   if (!stored) return DEFAULT_JOURNEY
 
   // v14: переименуем кириллические ключи в латиницу ДО проверки версии.
-  // Для v13-юзеров это означает плавный rename без сброса чата (контент
-  // не менялся, поэтому contentVersion после миграции бампнем до 14
-  // в обеих ветках ниже).
   stored = migrateCyrAspectKeys(stored)
+  if (!stored) return DEFAULT_JOURNEY
   const isV13Rename = stored.contentVersion === 13
   // v20 → v21: только структурное расширение (добавлены опциональные поля
-  // source/level в insights[]). Чат не сбрасываем — лечим как match-version,
-  // с миграцией insights через migrateSkills/upgradeInsights ниже.
+  // source/level в insights[]).
   const isV20Insights = stored.contentVersion === 20
 
-  const currentAspect = stored.currentAspect ?? 'Si'
+  const currentAspect: AspectKey = (stored.currentAspect as AspectKey | undefined) ?? 'Si'
 
   // Собираем aspects: если уже есть — нормализуем каждую папку; плоские
   // legacy-поля (currentLevel/messages/...) поглощаются в активный аспект.
   const incomingAspects = stored.aspects ?? {}
-  const flatLegacy = {
+  const flatLegacy: Partial<AspectState> = {
     currentLevel: stored.currentLevel,
     currentScriptIndex: stored.currentScriptIndex,
     currentScriptId: stored.currentScriptId,
@@ -491,44 +346,42 @@ function migrateState(stored) {
   }
   const hasFlatLegacy = Object.values(flatLegacy).some(v => v !== undefined)
 
-  // v13 → v14: миграция была чисто переименованием ключей (см.
-  // migrateCyrAspectKeys выше), контент не менялся. Лечим как match-version,
-  // чтобы чат не сбросился.
   if (stored.contentVersion === CONTENT_VERSION || isV13Rename || isV20Insights) {
-    const aspects = {}
+    const aspects: Partial<Record<AspectKey, AspectState>> = {}
     for (const [k, v] of Object.entries(incomingAspects)) {
-      aspects[k] = normalizeAspect(v)
+      // NOTE(ts): stored aspect keys могут быть любым string в legacy-state;
+      // мы доверяем источнику (migrateCyrAspectKeys уже отнормировал).
+      aspects[k as AspectKey] = normalizeAspect(v)
     }
     if (hasFlatLegacy) {
       // Bot-sync override может прийти с плоскими полями — поглощаем их
       // в активный аспект, не затирая то, что уже есть.
       const cur = aspects[currentAspect] ?? { ...DEFAULT_ASPECT_STATE }
-      aspects[currentAspect] = normalizeAspect({
-        ...cur,
-        ...Object.fromEntries(
-          Object.entries(flatLegacy).filter(([, v]) => v !== undefined)
-        ),
-      })
+      const legacyOverride = Object.fromEntries(
+        Object.entries(flatLegacy).filter(([, v]) => v !== undefined)
+      ) as Partial<AspectState>
+      aspects[currentAspect] = normalizeAspect({ ...cur, ...legacyOverride })
     }
     if (!aspects[currentAspect]) {
       aspects[currentAspect] = { ...DEFAULT_ASPECT_STATE }
     }
     // Сбрасываем legacy-плоские поля наверх, чтобы не плодить мусор в
     // сохранённом state (теперь они живут только в aspects).
-    // eslint-disable-next-line no-unused-vars
     const {
       currentLevel: _l, currentScriptIndex: _i, currentScriptId: _id,
       awaitingInput: _ai, messages: _m, completedScripts: _cs, pendingTasks: _pt,
       mode: _mode,
       ...rest
     } = stored
+    // Глушим неиспользованные deconstructed-поля для линтера.
+    void _l; void _i; void _id; void _ai; void _m; void _cs; void _pt; void _mode
     return {
       ...DEFAULT_JOURNEY,
       ...rest,
       aspects,
       currentAspect,
       skills: migrateSkills(stored.skills),
-      activeSurvey: stored.activeSurvey ?? null,
+      activeSurvey: (stored.activeSurvey as ActiveSurvey | null | undefined) ?? null,
       // Бампим версию (важно для ветки isV13Rename — иначе при следующей
       // загрузке снова попадём в эту же ветку).
       contentVersion: CONTENT_VERSION,
@@ -536,71 +389,88 @@ function migrateState(stored) {
   }
 
   // Контент-версия не совпала. С v26 миграция полностью data-preserving:
-  // сохраняем ВСЕ поля каждого аспекта (messages, completedScripts,
-  // currentLevel, currentScriptId, pendingTasks, etc.). Раньше стирали
-  // messages — это приводило к UI-логике «начать L0 заново» при открытии
-  // активного аспекта и перетирало восстановленный прогресс.
-  // Если в будущем потребуется реально сбросить чат (например, при
-  // несовместимых правках контента) — это будет отдельный механизм
-  // (per-user флаг или whitelist аспектов).
-  const aspects = {}
+  // сохраняем ВСЕ поля каждого аспекта.
+  const aspects: Partial<Record<AspectKey, AspectState>> = {}
   for (const [k, v] of Object.entries(incomingAspects)) {
-    aspects[k] = normalizeAspect(v)
+    aspects[k as AspectKey] = normalizeAspect(v)
   }
   if (hasFlatLegacy) {
     const cur = aspects[currentAspect] ?? { ...DEFAULT_ASPECT_STATE }
-    aspects[currentAspect] = normalizeAspect({
-      ...cur,
-      ...Object.fromEntries(
-        Object.entries(flatLegacy).filter(([, v]) => v !== undefined)
-      ),
-    })
+    const legacyOverride = Object.fromEntries(
+      Object.entries(flatLegacy).filter(([, v]) => v !== undefined)
+    ) as Partial<AspectState>
+    aspects[currentAspect] = normalizeAspect({ ...cur, ...legacyOverride })
   }
   if (!aspects[currentAspect]) {
     aspects[currentAspect] = { ...DEFAULT_ASPECT_STATE }
   }
-  // eslint-disable-next-line no-unused-vars
   const {
     currentLevel: _l, currentScriptIndex: _i, currentScriptId: _id,
     awaitingInput: _ai, messages: _m, completedScripts: _cs, pendingTasks: _pt,
     mode: _mode,
     ...rest
   } = stored
+  void _l; void _i; void _id; void _ai; void _m; void _cs; void _pt; void _mode
   return {
     ...DEFAULT_JOURNEY,
     ...rest,
     aspects,
     currentAspect,
     skills: migrateSkills(stored.skills),
-    activeSurvey: stored.activeSurvey ?? null,
+    activeSurvey: (stored.activeSurvey as ActiveSurvey | null | undefined) ?? null,
     contentVersion: CONTENT_VERSION,
   }
 }
 
-const todayStr = () => new Date().toISOString().slice(0, 10)
+const todayStr = (): string => new Date().toISOString().slice(0, 10)
 
-function calcStreak(s) {
+function calcStreak(s: JourneyState): number {
   const t = todayStr()
   if (!s.lastActiveDate) return 1
   if (s.lastActiveDate === t) return s.streak
-  const diff = Math.round((new Date(t) - new Date(s.lastActiveDate)) / 86400000)
+  const diff = Math.round((new Date(t).getTime() - new Date(s.lastActiveDate).getTime()) / 86400000)
   return diff === 1 ? s.streak + 1 : 1
 }
 
-export default function JourneyView({ journey: extJourney, onJourneyChange, scores, onScoresChange, diary, onDiaryChange, t, isAdmin = false, user }) {
+// Диарийная запись (App.jsx это знает шире — у нас здесь минимальный shape
+// для входа/выхода). NOTE(ts): tightened in P3 after App.jsx conversion.
+type DiaryEntry = Record<string, unknown>
+
+// Шкала -accent через CSS custom property.
+type AccentVarStyle = CSSProperties & { '--accent'?: string }
+
+type Props = {
+  journey: StoredJourneyShape | null | undefined
+  onJourneyChange: (next: JourneyState) => void
+  scores: Record<string, number>
+  onScoresChange: (next: Record<string, number>) => void
+  diary: DiaryEntry[] | null | undefined
+  onDiaryChange: (next: DiaryEntry[]) => void
+  // NOTE(ts): tightened in P3 — locale fn signature живёт в locales/ru.ts.
+  t?: (key: string) => string
+  isAdmin?: boolean
+  user?: unknown
+}
+
+export default function JourneyView({
+  journey: extJourney, onJourneyChange, scores, onScoresChange, diary, onDiaryChange,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  t: _t,
+  isAdmin = false, user
+}: Props) {
   // Локальный стейт — единственный source of truth.
   // Наружу синхронизируется через useEffect (ниже), чтобы persist-callback
   // не ломал серийные setState в одном хэндлере.
   // migrateState учитывает разные версии контента и пропавшие поля.
-  const [state, setState] = useState(() => migrateState(extJourney))
+  const [state, setState] = useState<JourneyState>(() => migrateState(extJourney))
 
   // Стабильная ссылка на текущий persist-callback (он пересоздаётся
   // каждый рендер родителя — через ref эффект-зависимость остаётся чистой).
-  const persistRef = useRef(onJourneyChange)
+  const persistRef = useRef<Props['onJourneyChange']>(onJourneyChange)
   useEffect(() => { persistRef.current = onJourneyChange }, [onJourneyChange])
 
   // Сохраняем стейт наружу при каждом изменении, кроме первого рендера.
-  const isFirstRender = useRef(true)
+  const isFirstRender = useRef<boolean>(true)
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false
@@ -609,21 +479,24 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     persistRef.current?.(state)
   }, [state])
 
-  const [inputVal, setInputVal] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
-  const [toast, setToast] = useState(null)
-  const chatRef = useRef(null)
-  const inputRef = useRef(null)
+  const [inputVal, setInputVal] = useState<string>('')
+  const [isTyping, setIsTyping] = useState<boolean>(false)
+  const [toast, setToast] = useState<string | null>(null)
+  const chatRef = useRef<HTMLDivElement | null>(null)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
 
   // Активная per-aspect папка. Все per-aspect чтения идут через `a`,
   // все per-aspect записи — через updateAspect(s, ...).
   const a = aspectOf(state)
 
   const currentJourney = getJourney(state.currentAspect)
-  const currentLevel = currentJourney?.levels?.[a.currentLevel]
+  // levels индексируются числовыми ключами (0..3). Сохраняем структуру
+  // от registry.Journey, но допускаем lookup с произвольным числом.
+  const levelsMap = currentJourney?.levels as Record<number, { core?: Script[]; scripts?: Script[]; surveys?: Script[]; title?: string; complete?: { text?: string } } | undefined> | undefined
+  const currentLevel = levelsMap?.[a.currentLevel]
   // Linear core-маршрут уровня. Анкеты (currentLevel.surveys) живут
   // отдельно, доступны только через дерево навыков, не из chat-ленты.
-  const scripts = currentLevel?.core ?? currentLevel?.scripts ?? []
+  const scripts: Script[] = currentLevel?.core ?? currentLevel?.scripts ?? []
   const aspectIntro = currentJourney?.intro ?? []
   const accent = ASPECT_COLORS[state.currentAspect] ?? '#4cc9f0'
 
@@ -631,25 +504,25 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   // сообщений: T-1 в L0 ≠ T-1 в L1, ID может повторяться между
   // уровнями. Дополнительный fallback в surveys целевого уровня —
   // на случай чтения старых state с архивными SURV-сообщениями (v5).
-  const resolveScript = useCallback((scriptId, level) => {
+  const resolveScript = useCallback((scriptId: string, level?: number): Script | null => {
     const lvl = level ?? a.currentLevel
-    const lvlData = currentJourney?.levels?.[lvl]
+    const lvlData = levelsMap?.[lvl]
     const inCore = lvlData?.core?.find(s => s.id === scriptId)
     if (inCore) return inCore
     const inSurveys = lvlData?.surveys?.find(s => s.id === scriptId)
     if (inSurveys) return inSurveys
     return scripts.find(s => s.id === scriptId) ?? null
-  }, [currentJourney, scripts, a.currentLevel])
+  }, [levelsMap, scripts, a.currentLevel])
 
-  const nextLevel = currentJourney?.levels?.[a.currentLevel + 1] ?? null
+  const nextLevel = levelsMap?.[a.currentLevel + 1] ?? null
 
   // Первый скрол после mount/смены экрана — мгновенный, чтобы юзер
   // сразу видел последние сообщения. Дальше — плавный.
-  const isFirstScroll = useRef(true)
+  const isFirstScroll = useRef<boolean>(true)
   useEffect(() => {
     if (chatRef.current) {
       const el = chatRef.current
-      const behavior = isFirstScroll.current ? 'auto' : 'smooth'
+      const behavior: ScrollBehavior = isFirstScroll.current ? 'auto' : 'smooth'
       const id = setTimeout(() => {
         el.scrollTo({ top: el.scrollHeight, behavior })
         isFirstScroll.current = false
@@ -672,12 +545,12 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: 'number' })))
   }, [state.screen, a.currentScriptIndex, a.awaitingInput, scripts, setState])
 
-  const showToast = useCallback((msg) => {
+  const showToast = useCallback((msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 2800)
   }, [])
 
-  const addBotMessage = useCallback((text, delay = 400) => new Promise((resolve) => {
+  const addBotMessage = useCallback((text: string, delay: number = 400): Promise<void> => new Promise<void>((resolve) => {
     setIsTyping(true)
     setTimeout(() => {
       setIsTyping(false)
@@ -689,20 +562,20 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     }, delay)
   }), [setState])
 
-  const addUserMessage = useCallback((text) => {
+  const addUserMessage = useCallback((text: string) => {
     setState(s => updateAspect(s, cur => ({
       ...cur,
       messages: [...cur.messages, { id: Date.now() + Math.random(), role: 'user', text }]
     })))
   }, [setState])
 
-  const awardXP = useCallback((xp, stardust = 0, scriptId = null) => {
+  const awardXP = useCallback((xp: number, stardust: number = 0, scriptId: string | null = null) => {
     if (xp <= 0 && stardust <= 0) return
     tmaHaptic('medium')  // вибро в TG при завершении шага (вне TMA — no-op)
 
     // Захватываем текущий state ДО setState — чтобы знать какой шаг
     // только что завершён (для append-only журнала событий).
-    let completedSnapshot = null
+    let completedSnapshot: { aspect: AspectKey; level: number; short_id: string | null } | null = null
     setState(s => {
       // Запоминаем что закрылось — отправим в журнал после setState.
       const folder = aspectOf(s)
@@ -713,7 +586,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       }
 
       // Глобальные счётчики (XP/streak/...).
-      const globals = {
+      const globals: JourneyState = {
         ...s,
         xp: s.xp + xp,
         stardust: s.stardust + stardust,
@@ -733,18 +606,22 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     // Append-only журнал: страховка от потери completedScripts при сбросах
     // state. Best-effort, ошибки игнорируем — идемпотентно на бэке.
     // ВНЕ setState чтобы не вызывать side-effect в React 18 strict mode.
-    if (completedSnapshot?.short_id && completedSnapshot?.aspect) {
-      postStepCompleted(completedSnapshot)
-        .catch(err => console.warn('event log failed:', err?.message))
+    if (completedSnapshot && (completedSnapshot as { short_id: string | null }).short_id && (completedSnapshot as { aspect: AspectKey }).aspect) {
+      const snap = completedSnapshot as { aspect: AspectKey; level: number; short_id: string }
+      postStepCompleted(snap)
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err)
+          console.warn('event log failed:', msg)
+        })
     }
 
-    const parts = []
+    const parts: string[] = []
     if (xp > 0) parts.push(`+${xp} XP`)
     if (stardust > 0) parts.push(`+${stardust} ✦`)
     showToast(parts.join('   '))
   }, [setState, showToast])
 
-  const deliverScript = useCallback((index) => {
+  const deliverScript = useCallback((index: number) => {
     const script = scripts[index]
     if (!script) {
       setState(s => updateAspect({ ...s, screen: 'levelcomplete' }, cur => ({ ...cur, awaitingInput: null })))
@@ -765,15 +642,6 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   }, [scripts, setState])
 
   // ─── Онбординг ───────────────────────────────────────────────
-  // Шаги 0–3: общее интро, не привязанное к аспекту (см. onboarding.md
-  // — авторский текст, не переписывать без явной просьбы).
-  // После шага 3 → бот рассказывает про карту планет.
-  // Юзер сам жмёт «Открыть Карту Планет» (шаг 4), чтобы перейти.
-  // Дальше handleSwitchAspect инжектит aspectIntro и первый скрипт
-  // L0 выбранного аспекта.
-  // IntroTour (полноэкранный 5-страничный) больше не вызывается
-  // автоматически — открывается опционально кнопкой «🎓 Пройти обучение»
-  // в дашборде.
   const handleOnboardingNext = useCallback(async () => {
     const step = state.onboardingStep
     addUserMessage(ONBOARDING[Math.min(step, 3)]?.button || 'Далее')
@@ -792,7 +660,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   }, [state.onboardingStep, addBotMessage, addUserMessage, setState])
 
   // Помещаем задание в очередь активных (без дублей по scriptId).
-  const enqueueTask = useCallback((script, status) => {
+  const enqueueTask = useCallback((script: Script, status: PendingTask['status']) => {
     setState(s => updateAspect(s, cur => ({
       ...cur,
       pendingTasks: [
@@ -808,7 +676,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     })))
   }, [])
 
-  const removePending = useCallback((scriptId) => {
+  const removePending = useCallback((scriptId: string) => {
     setState(s => updateAspect(s, cur => ({
       ...cur,
       pendingTasks: (cur.pendingTasks ?? []).filter(t => t.scriptId !== scriptId)
@@ -816,7 +684,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   }, [])
 
   // ─── Действия в чате ─────────────────────────────────────────
-  const handleScriptAction = useCallback(async (action, scriptId) => {
+  const handleScriptAction = useCallback(async (action: string, scriptId: string) => {
     const script = scripts.find(s => s.id === scriptId)
     if (!script) return
 
@@ -841,7 +709,10 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
             aspect: state.currentAspect,
             title: script.title,
             exerciseId: script.id,
-          }).catch(err => console.warn('chooseHabit failed:', err?.message))
+          }).catch((err: unknown) => {
+            const msg = err instanceof Error ? err.message : String(err)
+            console.warn('chooseHabit failed:', msg)
+          })
         } else {
           addUserMessage('Взял задание')
           await addBotMessage('Задание добавлено в активные. Открой раздел «Активные задания», когда выполнишь.', 500)
@@ -859,8 +730,6 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       ) {
         // Обязательный insight: открываем поле для записи в дневник.
         // XP/diary/advance произойдёт в handleSend для awaitingInput='step-insight'.
-        // Сохраняем «прошлое сообщение от юзера» = «Дальше», как и раньше,
-        // но не двигаем чат — ждём ввод инсайта.
         setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: 'step-insight' })))
         setTimeout(() => inputRef.current?.focus(), 50)
       } else {
@@ -883,21 +752,23 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       // Запуск анкеты. Переходим на отдельный экран с поэтапным UI.
       // Если по этому навыку уже был сохранён черновик (юзер прервал
       // анкету раньше) — восстанавливаем прогресс. Иначе старт с нуля.
-      const draft = state.skills?.[script.skill]?.draft
+      const skillKey = script.skill ?? ''
+      const draftEntry = state.skills?.[skillKey] as (StoredSkillEntry & { draft?: Record<string, unknown> }) | undefined
+      const draft = draftEntry?.draft
       setState(s => ({
         ...s,
         screen: 'survey',
-        activeSurvey: draft
-          ? { scriptId: script.id, skillId: script.skill, ...draft }
-          : { scriptId: script.id, skillId: script.skill, blockIndex: 0, statementIndex: 0, answers: {} }
+        activeSurvey: (draft
+          ? { scriptId: script.id, skillId: skillKey, ...draft }
+          : { scriptId: script.id, skillId: skillKey, blockIndex: 0, statementIndex: 0, answers: {} }) as unknown as ActiveSurvey
       }))
     }
-  }, [scripts, a.currentScriptIndex, state.skills, addBotMessage, addUserMessage, awardXP, deliverScript, enqueueTask, removePending])
+  }, [scripts, a.currentScriptIndex, state.skills, state.currentAspect, addBotMessage, addUserMessage, deliverScript, enqueueTask, setState])
 
   // ─── Ввод текста / числа ─────────────────────────────────────
   // override — опциональный аргумент с уже известным значением (используется
   // в Chat для слайдера, чтобы обойти race condition с setInputVal).
-  const handleSend = useCallback(async (override) => {
+  const handleSend = useCallback(async (override?: string) => {
     const raw = typeof override === 'string' ? override : inputVal
     const val = raw.trim()
     if (!val) return
@@ -916,16 +787,15 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
       // Если у скрипта есть skill+block — пишем ответ в state.skills как
       // statementIndex=0 (соответствует pass=1) и пересчитываем score
-      // аспекта через calc*ScoreFromSkills. Иначе — старое поведение:
-      // прямая запись в scores[aspect] (последний ответ перетирает).
+      // аспекта через calc*ScoreFromSkills.
       if (script?.skill && script?.block) {
         const aspect = state.currentAspect
         const prevSkills = state.skills ?? {}
-        const prevEntry = prevSkills[script.skill] ?? { answers: {}, blocks: {}, insights: [], passes: 0 }
-        const prevAnswers = prevEntry.answers ?? {}
+        const prevEntry = (prevSkills[script.skill] as StoredSkillEntry | undefined) ?? { id: script.skill, answers: {}, blocks: {}, insights: [], passes: 0 }
+        const prevAnswers = (prevEntry.answers as Record<string, number[]> | undefined) ?? {}
         const blockArr = [...(prevAnswers[script.block] ?? [])]
         blockArr[0] = num
-        const newAnswers = { ...prevAnswers, [script.block]: blockArr }
+        const newAnswers: Record<string, number[]> = { ...prevAnswers, [script.block]: blockArr }
         const result = calcSurveyResult(newAnswers)
         let passes = 0
         for (const k of SURVEY_BLOCK_KEYS) {
@@ -933,18 +803,18 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           const len = arr.filter(n => Number.isFinite(n)).length
           if (len > passes) passes = len
         }
-        const newEntry = {
+        const newEntry: StoredSkillEntry = {
           ...prevEntry,
           answers: newAnswers,
-          blocks: result.blocks,
-          result: Number.isFinite(result.skill) ? result.skill : prevEntry.result,
+          blocks: result.blocks as Record<string, number>,
+          result: (typeof result.skill === 'number' && Number.isFinite(result.skill)) ? result.skill : prevEntry.result,
           passes: Math.min(3, passes),
           completedAt: Date.now(),
         }
-        const newSkills = { ...prevSkills, [script.skill]: newEntry }
+        const newSkills: Record<string, SkillState> = { ...prevSkills, [script.skill]: newEntry }
         setState(s => ({ ...s, skills: newSkills }))
 
-        const calcByAspect = {
+        const calcByAspect: Record<AspectKey, (sk: Record<string, SkillState>) => number | null> = {
           Si: calcSiScoreFromSkills, Se: calcSeScoreFromSkills,
           Ti: calcTiScoreFromSkills, Te: calcTeScoreFromSkills,
           Fi: calcFiScoreFromSkills, Fe: calcFeScoreFromSkills,
@@ -952,7 +822,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         }
         const calcFn = calcByAspect[aspect]
         const aspScore = calcFn?.(newSkills)
-        if (Number.isFinite(aspScore)) {
+        if (typeof aspScore === 'number' && Number.isFinite(aspScore)) {
           onScoresChange({ ...scores, [aspect]: Math.round(aspScore) })
         }
       } else {
@@ -968,7 +838,6 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       setInputVal('')
       setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: null })))
       // Нейтральная реплика без похвалы за факт ответа (см. §3.6).
-      // Для open-ended вопросов целей и для рефлексий используем одну формулировку.
       const ack = script?.type === 'question' ? 'Записано в карту.' : 'Записано в дневник.'
       await addBotMessage(ack, 500)
       // Сайд-эффект: рефлексия → запись в дневник с подписью «на какой вопрос ответ».
@@ -987,16 +856,11 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         ...(diary ?? [])
       ])
       if (script?.id) removePending(script.id)
-      // Word-скрипты («Слово дня: X») имеют stardust: 1 — начисляем его и
-      // через answer_text, чтобы запись ответа не «съедала» стардаст
-      // относительно ветки `next`. Для других типов (reflection, question)
-      // stardust не задаётся, и он естественно равен 0.
       const stardust = script?.type === 'word' ? (script?.stardust ?? 0) : 0
       awardXP(script?.xp ?? 10, stardust, script?.id ?? null)
       setTimeout(() => deliverScript(a.currentScriptIndex + 1), 700)
     } else if (a.awaitingInput === 'exercise_note') {
       // Завершение упражнения с обязательным комментарием.
-      // Пустая строка отсекается общим guard'ом в начале handleSend.
       addUserMessage(val)
       setInputVal('')
       setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: null })))
@@ -1019,10 +883,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       awardXP(script?.xp ?? 15, script?.stardust ?? 0, script?.id ?? null)
       setTimeout(() => deliverScript(a.currentScriptIndex + 1), 700)
     } else if (a.awaitingInput === 'step-insight') {
-      // Обязательный инсайт после T/S/R — раньше эти типы давали XP сразу
-      // на «Дальше». Теперь юзер обязан записать рефлексию, она уходит в
-      // дневник со scriptId, и только потом chat двигается дальше.
-      // Это гарантирует, что каждый пройденный шаг оставляет видимый след.
+      // Обязательный инсайт после T/S/R.
       addUserMessage(val)
       setInputVal('')
       setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: null })))
@@ -1046,7 +907,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       awardXP(script?.xp ?? 10, stardust, script?.id ?? null)
       setTimeout(() => deliverScript(a.currentScriptIndex + 1), 600)
     }
-  }, [inputVal, a.awaitingInput, a.currentScriptIndex, state.currentAspect, scripts, scores, diary, addBotMessage, addUserMessage, awardXP, deliverScript, onDiaryChange, onScoresChange, removePending])
+  }, [inputVal, a.awaitingInput, a.currentScriptIndex, state.currentAspect, state.skills, scripts, scores, diary, addBotMessage, addUserMessage, awardXP, deliverScript, onDiaryChange, onScoresChange, removePending])
 
   const handleReset = useCallback(() => {
     setState(DEFAULT_JOURNEY)
@@ -1055,44 +916,37 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   // Переход на следующий уровень. Сохраняет всю историю сообщений
   // (с level=прошлый), добавляет первый скрипт нового уровня.
   const handleNextLevel = useCallback(() => {
-    const next = currentJourney?.levels?.[a.currentLevel + 1]
+    const next = levelsMap?.[a.currentLevel + 1]
     if (!next) return
     const firstScript = (next.core ?? next.scripts ?? [])[0]
     setState(s => updateAspect(
       { ...s, screen: 'chat' },
-      cur => ({
-        ...cur,
-        currentLevel: cur.currentLevel + 1,
-        currentScriptIndex: 0,
-        currentScriptId: firstScript?.id ?? null,
-        awaitingInput: null,
-        messages: firstScript
-          ? [...cur.messages, { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: firstScript.id, level: cur.currentLevel + 1 }]
-          : cur.messages
-      })
+      cur => {
+        const newLevel = (cur.currentLevel + 1) as AspectState['currentLevel']
+        return {
+          ...cur,
+          currentLevel: newLevel,
+          currentScriptIndex: 0,
+          currentScriptId: firstScript?.id ?? null,
+          awaitingInput: null,
+          messages: firstScript
+            ? [...cur.messages, { id: Date.now() + Math.random(), role: 'bot', kind: 'script', scriptId: firstScript.id, level: newLevel }]
+            : cur.messages
+        }
+      }
     ))
-  }, [currentJourney, a.currentLevel])
+  }, [levelsMap, a.currentLevel])
 
   // ─── Анкета навыков (survey) ─────────────────────────────────
-  // Режимы:
-  //   mode='short' — 5 утверждений (один pass)
-  //   mode='full'  — все оставшиеся утверждения (от startPass до 3)
-  //
-  // activeSurvey:
-  //   { skillId, scriptId, mode, startPass, stepIndex, answers }
-  //
-  // Список утверждений вычисляется через buildSurveyStatements(survey, mode, startPass).
-  // stepIndex итерирует по этому списку. Когда stepIndex >= statements.length —
-  // конец сессии, переход на survey-insight.
-  const handleSurveyAnswer = useCallback((value, insightText) => {
+  const handleSurveyAnswer = useCallback((value: number, insightText: string) => {
     // Если юзер записал инсайт по конкретному утверждению — кладём в дневник
     // отдельной записью с привязкой к навыку и тексту утверждения.
     const trimmedInsight = (insightText ?? '').trim()
     if (trimmedInsight) {
-      const active = state.activeSurvey
+      const active = state.activeSurvey as (ActiveSurvey & { scriptId?: string; mode?: 'short' | 'full'; startPass?: number; stepIndex?: number }) | null
       const survey = active ? resolveSurvey(active.skillId) : null
       const stmts = survey
-        ? buildSurveyStatements(survey, active.mode ?? 'short', active.startPass ?? 1)
+        ? buildSurveyStatements(survey, active?.mode ?? 'short', active?.startPass ?? 1)
         : []
       const current = stmts[active?.stepIndex ?? 0]
       const statementText = current?.statement ?? ''
@@ -1109,12 +963,12 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           promptTitle: skillName,
           skillId: active?.skillId,
         },
-        ...diary,
+        ...(diary ?? []),
       ])
     }
 
     setState(s => {
-      const active = s.activeSurvey
+      const active = s.activeSurvey as (ActiveSurvey & { mode?: 'short' | 'full'; startPass?: number; stepIndex?: number }) | null
       if (!active) return s
       const survey = resolveSurvey(active.skillId)
       if (!survey) return s
@@ -1122,7 +976,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       const current = stmts[active.stepIndex ?? 0]
       if (!current) return s
 
-      const prevAnswers = active.answers?.[current.blockKey] ?? []
+      const prevAnswers = (active.answers as Record<string, number[]>)[current.blockKey] ?? []
       const nextBlockAnswers = [...prevAnswers]
       nextBlockAnswers[current.statementIndex] = value
       const nextAnswers = { ...active.answers, [current.blockKey]: nextBlockAnswers }
@@ -1133,7 +987,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           ...active,
           answers: nextAnswers,
           stepIndex: (active.stepIndex ?? 0) + 1
-        }
+        } as unknown as ActiveSurvey
       }
     })
   }, [setState, state.activeSurvey, state.currentAspect, diary, onDiaryChange])
@@ -1141,77 +995,76 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   // Назад на одно утверждение (внутри текущей сессии).
   const handleSurveyBack = useCallback(() => {
     setState(s => {
-      const active = s.activeSurvey
+      const active = s.activeSurvey as (ActiveSurvey & { stepIndex?: number }) | null
       if (!active) return s
       return {
         ...s,
         activeSurvey: {
           ...active,
           stepIndex: Math.max(0, (active.stepIndex ?? 0) - 1)
-        }
+        } as unknown as ActiveSurvey
       }
     })
   }, [setState])
 
   // Конец прохода (5 утверждений отвечены): переключаемся на экран
-  // обязательного инсайта. Здесь НЕ пишем в state.skills и не выдаём XP —
-  // это делает handleSurveyInsight после ввода рефлексии.
+  // обязательного инсайта.
   const handleSurveyComplete = useCallback(() => {
     setState(s => ({ ...s, screen: 'survey-insight' }))
   }, [setState])
 
-  // Открыть детальный разбор навыка (черты + практики + действия).
-  // Доступен из дерева навыков для пройденных навыков и автоматически —
-  // сразу после прохождения анкеты (см. handleSurveyInsight).
-  const handleOpenSkillDetail = useCallback((skillId) => {
+  // Открыть детальный разбор навыка.
+  const handleOpenSkillDetail = useCallback((skillId: string) => {
     setState(s => ({ ...s, skillDetailId: skillId, screen: 'skill-detail' }))
   }, [setState])
 
   // Юзер написал инсайт и нажал «Сохранить».
-  // Считаем средние по всем накопленным ответам, пишем skill, апдейтим
-  // passes по фактической длине массивов в answers.
-  const handleSurveyInsight = useCallback((insightText) => {
-    const active = state.activeSurvey
+  const handleSurveyInsight = useCallback((insightText: string) => {
+    const active = state.activeSurvey as (ActiveSurvey & {
+      scriptId?: string; mode?: 'short' | 'full'; startPass?: number
+    }) | null
     if (!active) return
     const survey = resolveSurvey(active.skillId)
     if (!survey) return
 
-    const result = calcSurveyResult(active.answers)
+    const cleanedAnswers: Record<string, number[]> = {}
+    for (const [k, v] of Object.entries(active.answers ?? {})) {
+      cleanedAnswers[k] = (v as Array<number | null | undefined>).filter((n): n is number => typeof n === 'number' && Number.isFinite(n))
+    }
+    const result = calcSurveyResult(cleanedAnswers)
     const completedAt = Date.now()
 
     // Фактическое число проходов = max длина массивов ответов по блокам.
     let actualPasses = 0
     for (const k of SURVEY_BLOCK_KEYS) {
-      const arr = active.answers?.[k] ?? []
-      const len = arr.filter(n => Number.isFinite(n)).length
+      const arr = (active.answers as Record<string, Array<number | null | undefined>>)[k] ?? []
+      const len = arr.filter(n => typeof n === 'number' && Number.isFinite(n)).length
       if (len > actualPasses) actualPasses = len
     }
     actualPasses = Math.min(3, actualPasses)
 
-    const prev = state.skills?.[active.skillId] ?? {}
+    const prev = (state.skills?.[active.skillId] as StoredSkillEntry | undefined) ?? { id: active.skillId }
     const wasPasses = prev.passes ?? 0
-    const newSkillEntry = {
+    const newSkillEntry: StoredSkillEntry = {
       ...prev,
-      result: result.skill,
-      blocks: result.blocks,
-      answers: active.answers,
+      result: result.skill ?? undefined,
+      blocks: result.blocks as Record<string, number>,
+      answers: active.answers as Record<string, number[]>,
       passes: actualPasses,
       completedAt,
       insights: [
-        ...(prev.insights ?? []),
+        ...(((prev.insights as InsightLike[] | undefined) ?? [])),
         { text: insightText, completedAt, mode: active.mode, pass: actualPasses }
       ],
-      draft: undefined
     }
-    delete newSkillEntry.draft
+    // draft удаляем — анкета закрыта.
+    delete (newSkillEntry as { draft?: unknown }).draft
 
-    const newSkills = { ...state.skills, [active.skillId]: newSkillEntry }
+    const newSkills: Record<string, SkillState> = { ...state.skills, [active.skillId]: newSkillEntry }
 
-    // Если анкета была запущена из чат-скрипта (например, SURV-* в L0)
-    // — возвращаем юзера в чат и продвигаем на следующий шаг.
+    // Если анкета была запущена из чат-скрипта — возвращаем в чат и продвигаем.
     // Если из дерева навыков — открываем экран деталей навыка, но только
-    // если для него есть развёрнутый контент И L1 уже открыт (cl≥1 ∧ passes≥1).
-    // Иначе возвращаем в дерево навыков (плашка-анонс уже была показана в SurveyInsight).
+    // если для него есть развёрнутый контент И L1 уже открыт.
     const fromChatScript = scripts.some(sc => sc.id === active.scriptId)
     const cl = aspectOf(state).currentLevel ?? 0
     const skillContent = getSkillContent(active.skillId)
@@ -1230,25 +1083,24 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       setTimeout(() => deliverScript(nextIdx), 100)
     }
 
-    // Пересчёт средних: БС / ЧЭ / ЧИ / БИ / ЧЛ / БЛ / БЭ / ЧС. Каждый calc смотрит только в свои id,
-    // так что один newSkills корректно обновляет все score одновременно.
-    const siScore  = calcSiScoreFromSkills(newSkills)
+    // Пересчёт средних по всем 8 аспектам с tree.
+    const siScore = calcSiScoreFromSkills(newSkills)
     const feScore = calcFeScoreFromSkills(newSkills)
-    const neScore  = calcNeScoreFromSkills(newSkills)
-    const niScore  = calcNiScoreFromSkills(newSkills)
-    const teScore  = calcTeScoreFromSkills(newSkills)
-    const tiScore  = calcTiScoreFromSkills(newSkills)
-    const fiScore  = calcFiScoreFromSkills(newSkills)
-    const seScore  = calcSeScoreFromSkills(newSkills)
-    const nextScores = { ...scores }
-    if (Number.isFinite(siScore))  nextScores['Si'] = Math.round(siScore)
-    if (Number.isFinite(feScore)) nextScores['Fe'] = Math.round(feScore)
-    if (Number.isFinite(neScore))  nextScores['Ne'] = Math.round(neScore)
-    if (Number.isFinite(niScore))  nextScores['Ni'] = Math.round(niScore)
-    if (Number.isFinite(teScore))  nextScores['Te'] = Math.round(teScore)
-    if (Number.isFinite(tiScore))  nextScores['Ti'] = Math.round(tiScore)
-    if (Number.isFinite(fiScore))  nextScores['Fi'] = Math.round(fiScore)
-    if (Number.isFinite(seScore))  nextScores['Se'] = Math.round(seScore)
+    const neScore = calcNeScoreFromSkills(newSkills)
+    const niScore = calcNiScoreFromSkills(newSkills)
+    const teScore = calcTeScoreFromSkills(newSkills)
+    const tiScore = calcTiScoreFromSkills(newSkills)
+    const fiScore = calcFiScoreFromSkills(newSkills)
+    const seScore = calcSeScoreFromSkills(newSkills)
+    const nextScores: Record<string, number> = { ...scores }
+    if (typeof siScore === 'number' && Number.isFinite(siScore))  nextScores['Si'] = Math.round(siScore)
+    if (typeof feScore === 'number' && Number.isFinite(feScore))  nextScores['Fe'] = Math.round(feScore)
+    if (typeof neScore === 'number' && Number.isFinite(neScore))  nextScores['Ne'] = Math.round(neScore)
+    if (typeof niScore === 'number' && Number.isFinite(niScore))  nextScores['Ni'] = Math.round(niScore)
+    if (typeof teScore === 'number' && Number.isFinite(teScore))  nextScores['Te'] = Math.round(teScore)
+    if (typeof tiScore === 'number' && Number.isFinite(tiScore))  nextScores['Ti'] = Math.round(tiScore)
+    if (typeof fiScore === 'number' && Number.isFinite(fiScore))  nextScores['Fi'] = Math.round(fiScore)
+    if (typeof seScore === 'number' && Number.isFinite(seScore))  nextScores['Se'] = Math.round(seScore)
     onScoresChange(nextScores)
 
     // Запись в дневник.
@@ -1284,9 +1136,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       ...(diary ?? [])
     ])
 
-    // XP: 10 за каждый закрытый проход. Большой опрос = 3 прохода = 30,
-    // три мини-прохода по очереди = 10+10+10 = те же 30.
-    // Stardust по-прежнему только на финальном проходе (passes=3).
+    // XP: 10 за каждый закрытый проход.
     const wentToFinal = wasPasses < 3 && actualPasses === 3
     const xp = (actualPasses - wasPasses) * 10
     if (script) removePending(script.id)
@@ -1294,16 +1144,14 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   }, [state, scripts, scores, diary, onDiaryChange, onScoresChange, awardXP, removePending, setState, deliverScript])
 
   // Сохранить inline-инсайт с карточки уровня (SkillDetail / SkillTraits).
-  // Пишем в state.skills[id].insights[] с полями source ('detail'|'traits') и level,
-  // а также в дневник (как обычный journey-skill-insight).
-  const handleSaveSkillInsight = useCallback((skillId, level, source, text) => {
+  const handleSaveSkillInsight = useCallback((skillId: string, level: number, source: string, text: string) => {
     if (!skillId || !text) return
     const completedAt = Date.now()
 
     setState(s => {
-      const skillEntry = s.skills?.[skillId] ?? {}
+      const skillEntry = (s.skills?.[skillId] as StoredSkillEntry | undefined) ?? { id: skillId }
       const insights = [
-        ...(skillEntry.insights ?? []),
+        ...(((skillEntry.insights as InsightLike[] | undefined) ?? [])),
         { text, completedAt, source, level }
       ]
       return {
@@ -1317,7 +1165,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     const survey = resolveSurvey(skillId)
     if (survey?.name) skillName = survey.name
     else {
-      const c = getSkillContent(skillId)
+      const c = getSkillContent(skillId) as { name?: string } | null | undefined
       if (c?.name) skillName = c.name
     }
 
@@ -1341,15 +1189,15 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   // Отмена анкеты или инсайта — сохраняем текущий прогресс как draft.
   const handleSurveyCancel = useCallback(() => {
     setState(s => {
-      const active = s.activeSurvey
+      const active = s.activeSurvey as (ActiveSurvey & { mode?: 'short' | 'full'; startPass?: number; stepIndex?: number }) | null
       if (!active) return { ...s, screen: 'skill-tree' }
-      const hasAnyAnswer = Object.values(active.answers ?? {}).some(arr =>
-        Array.isArray(arr) && arr.some(n => Number.isFinite(n))
+      const hasAnyAnswer = Object.values(active.answers ?? {}).some((arr: unknown) =>
+        Array.isArray(arr) && arr.some(n => typeof n === 'number' && Number.isFinite(n))
       )
       if (!hasAnyAnswer) {
         return { ...s, activeSurvey: null, screen: 'skill-tree' }
       }
-      const prevSkill = s.skills?.[active.skillId] ?? {}
+      const prevSkill = (s.skills?.[active.skillId] as StoredSkillEntry | undefined) ?? { id: active.skillId }
       return {
         ...s,
         activeSurvey: null,
@@ -1370,12 +1218,8 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     })
   }, [setState])
 
-  // Открыть меню «Дерево навыков» — выбор любого навыка для оценки
-  // вручную, с видимым прогрессом по веткам. Доступно с момента, когда
-  // юзер дошёл до экрана LevelComplete L0 («Открыть Колесо БС») —
-  // gate здесь лояльный, фактическая блокировка на UI-уровне.
-  // Дерево есть у Si/Fe/Ne/Ni/Te/Ti/Fi/Se; для остальных аспектов — toast.
-  const ASPECTS_WITH_SKILL_TREE = ['Si', 'Fe', 'Ne', 'Ni', 'Te', 'Ti', 'Fi', 'Se']
+  // Открыть меню «Дерево навыков». Дерево есть у Si/Fe/Ne/Ni/Te/Ti/Fi/Se.
+  const ASPECTS_WITH_SKILL_TREE: AspectKey[] = ['Si', 'Fe', 'Ne', 'Ni', 'Te', 'Ti', 'Fi', 'Se']
   const handleOpenSkillTree = useCallback(() => {
     if (!ASPECTS_WITH_SKILL_TREE.includes(state.currentAspect)) {
       showToast('У этой планеты пока нет колеса навыков')
@@ -1384,18 +1228,12 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setState(s => ({ ...s, screen: 'skill-tree' }))
   }, [state.currentAspect, setState, showToast])
 
-  // Тык на навык в дереве:
-  //   - Если passes=3 → ничего не делаем.
-  //   - Если есть draft (юзер прерывал) → сразу продолжаем с того же места.
-  //   - Иначе → открываем экран выбора режима (short / full).
-  // Анкета лежит в currentLevel.surveys (отдельный массив, не в core-чате).
-  const handleStartSkillSurvey = useCallback((skillId) => {
-    const skillEntry = state.skills?.[skillId]
+  // Тык на навык в дереве.
+  const handleStartSkillSurvey = useCallback((skillId: string) => {
+    const skillEntry = state.skills?.[skillId] as (StoredSkillEntry & { draft?: { mode?: 'short' | 'full'; startPass?: number; stepIndex?: number; answers?: Record<string, unknown> } }) | undefined
     const draft = skillEntry?.draft
 
-    // ЧИ (Ne) — анкеты живут отдельно (NE_SURVEYS из ne-skills.js), не как
-    // journey-скрипты. Используем синтетический scriptId. Аспект в
-    // state остаётся 'Ne' (юзер пришёл из Колеса Ne).
+    // ЧИ (Ne)
     if (isNeSkill(skillId)) {
       if (draft) {
         setState(s => ({
@@ -1409,7 +1247,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
             startPass: draft.startPass ?? 1,
             stepIndex: draft.stepIndex ?? 0,
             answers: draft.answers ?? {},
-          },
+          } as unknown as ActiveSurvey,
         }))
         return
       }
@@ -1418,14 +1256,12 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         ...s,
         currentAspect: 'Ne',
         screen: 'survey-choice',
-        activeSurvey: { scriptId: `ne-survey-${skillId}`, skillId },
+        activeSurvey: { scriptId: `ne-survey-${skillId}`, skillId } as unknown as ActiveSurvey,
       }))
       return
     }
 
-    // БИ (Ni) — анкеты живут отдельно (NI_SURVEYS из ni-skills.js), не как
-    // journey-скрипты. Аналогично Ne. Аспект в state остаётся 'Ni'
-    // (юзер пришёл из Колеса Ni).
+    // БИ (Ni)
     if (isNiSkill(skillId)) {
       if (draft) {
         setState(s => ({
@@ -1439,7 +1275,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
             startPass: draft.startPass ?? 1,
             stepIndex: draft.stepIndex ?? 0,
             answers: draft.answers ?? {},
-          },
+          } as unknown as ActiveSurvey,
         }))
         return
       }
@@ -1448,14 +1284,12 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         ...s,
         currentAspect: 'Ni',
         screen: 'survey-choice',
-        activeSurvey: { scriptId: `ni-survey-${skillId}`, skillId },
+        activeSurvey: { scriptId: `ni-survey-${skillId}`, skillId } as unknown as ActiveSurvey,
       }))
       return
     }
 
-    // ЧЛ (Te) — анкеты живут отдельно (TE_SURVEYS из te-skills.js), не как
-    // journey-скрипты. Аналогично Ne/Ni. Аспект в state остаётся 'Te'
-    // (юзер пришёл из Колеса Te).
+    // ЧЛ (Te)
     if (isTeSkill(skillId)) {
       if (draft) {
         setState(s => ({
@@ -1469,7 +1303,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
             startPass: draft.startPass ?? 1,
             stepIndex: draft.stepIndex ?? 0,
             answers: draft.answers ?? {},
-          },
+          } as unknown as ActiveSurvey,
         }))
         return
       }
@@ -1478,14 +1312,12 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         ...s,
         currentAspect: 'Te',
         screen: 'survey-choice',
-        activeSurvey: { scriptId: `te-survey-${skillId}`, skillId },
+        activeSurvey: { scriptId: `te-survey-${skillId}`, skillId } as unknown as ActiveSurvey,
       }))
       return
     }
 
-    // БЛ (Ti) — анкеты живут отдельно (TI_SURVEYS из ti-skills.js), не как
-    // journey-скрипты. Аналогично Ne/Ni/Te. Аспект в state остаётся 'Ti'
-    // (юзер пришёл из Колеса Ti).
+    // БЛ (Ti)
     if (isTiSkill(skillId)) {
       if (draft) {
         setState(s => ({
@@ -1499,7 +1331,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
             startPass: draft.startPass ?? 1,
             stepIndex: draft.stepIndex ?? 0,
             answers: draft.answers ?? {},
-          },
+          } as unknown as ActiveSurvey,
         }))
         return
       }
@@ -1508,14 +1340,12 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         ...s,
         currentAspect: 'Ti',
         screen: 'survey-choice',
-        activeSurvey: { scriptId: `ti-survey-${skillId}`, skillId },
+        activeSurvey: { scriptId: `ti-survey-${skillId}`, skillId } as unknown as ActiveSurvey,
       }))
       return
     }
 
-    // БЭ (Fi) — анкеты живут отдельно (FI_SURVEYS из fi-skills.js), не как
-    // journey-скрипты. Аналогично Ne/Ni/Te. Аспект в state остаётся 'Fi'
-    // (юзер пришёл из Колеса Fi).
+    // БЭ (Fi)
     if (isFiSkill(skillId)) {
       if (draft) {
         setState(s => ({
@@ -1529,7 +1359,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
             startPass: draft.startPass ?? 1,
             stepIndex: draft.stepIndex ?? 0,
             answers: draft.answers ?? {},
-          },
+          } as unknown as ActiveSurvey,
         }))
         return
       }
@@ -1538,14 +1368,12 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         ...s,
         currentAspect: 'Fi',
         screen: 'survey-choice',
-        activeSurvey: { scriptId: `fi-survey-${skillId}`, skillId },
+        activeSurvey: { scriptId: `fi-survey-${skillId}`, skillId } as unknown as ActiveSurvey,
       }))
       return
     }
 
-    // ЧС (Se) — анкеты живут отдельно (SE_SURVEYS из se-skills.js), не как
-    // journey-скрипты. Аналогично Ne/Ni/Te/Fi. Аспект в state остаётся 'Se'
-    // (юзер пришёл из Колеса Se).
+    // ЧС (Se)
     if (isSeSkill(skillId)) {
       if (draft) {
         setState(s => ({
@@ -1559,7 +1387,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
             startPass: draft.startPass ?? 1,
             stepIndex: draft.stepIndex ?? 0,
             answers: draft.answers ?? {},
-          },
+          } as unknown as ActiveSurvey,
         }))
         return
       }
@@ -1568,20 +1396,16 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         ...s,
         currentAspect: 'Se',
         screen: 'survey-choice',
-        activeSurvey: { scriptId: `se-survey-${skillId}`, skillId },
+        activeSurvey: { scriptId: `se-survey-${skillId}`, skillId } as unknown as ActiveSurvey,
       }))
       return
     }
 
-    // Определяем аспект по skill ID. У Fe-навыков id с префиксом `fe-`,
-    // их анкеты живут инлайн в core (CSURV-1..3 в Fe/l0.md), у Si —
-    // в отдельном пуле levels[0].surveys.
-    const aspect = skillId.startsWith('fe-') ? 'Fe' : 'Si'
-    const journeyData = getJourney(aspect)
+    // По умолчанию: БС или ЧЭ.
+    const aspect: AspectKey = skillId.startsWith('fe-') ? 'Fe' : 'Si'
+    const journeyData = getJourney(aspect) as { levels?: Record<number, { core?: Script[]; surveys?: Script[] } | undefined> } | null | undefined
 
-    // Ищем survey-шаг и в core, и в surveys-pool — для ЧЭ они лежат в core,
-    // для БС — в surveys.
-    const allSteps = [
+    const allSteps: Script[] = [
       ...(journeyData?.levels?.[0]?.surveys ?? []),
       ...(journeyData?.levels?.[0]?.core ?? [])
     ]
@@ -1589,10 +1413,6 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     if (!target) return
 
     if (draft) {
-      // Продолжаем как было — без выбора. currentScriptId не трогаем:
-      // он нужен для chat-flow (core-шагов), а survey-id в нём только
-      // путает resolveScript при возврате в чат.
-      // Аспект переключаем на нужный (БС или ЧЭ), сбрасываем awaitingInput.
       setState(s => updateAspect(
         {
           ...s,
@@ -1605,34 +1425,32 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
             startPass: draft.startPass ?? 1,
             stepIndex: draft.stepIndex ?? 0,
             answers: draft.answers ?? {},
-          },
+          } as unknown as ActiveSurvey,
         },
         cur => ({ ...cur, awaitingInput: null })
       ))
       return
     }
 
-    if (getNextPass(skillEntry) === 0) return  // всё пройдено
+    if (getNextPass(skillEntry) === 0) return
 
-    // Открываем экран выбора. activeSurvey временно хранит skillId/scriptId,
-    // mode выберется на следующем шаге.
     setState(s => updateAspect(
       {
         ...s,
         currentAspect: aspect,
         screen: 'survey-choice',
-        activeSurvey: { scriptId: target.id, skillId },  // mode появится после choose
+        activeSurvey: { scriptId: target.id, skillId } as unknown as ActiveSurvey,
       },
       cur => ({ ...cur, awaitingInput: null })
     ))
   }, [state.skills, setState])
 
   // Юзер выбрал режим в SurveyChoice. Стартуем активную анкету.
-  const handleChooseSurveyMode = useCallback((mode) => {
+  const handleChooseSurveyMode = useCallback((mode: 'short' | 'full') => {
     setState(s => {
-      const active = s.activeSurvey
+      const active = s.activeSurvey as (ActiveSurvey & { mode?: 'short' | 'full'; startPass?: number; stepIndex?: number }) | null
       if (!active) return s
-      const skillEntry = s.skills?.[active.skillId]
+      const skillEntry = s.skills?.[active.skillId] as StoredSkillEntry | undefined
       const startPass = getNextPass(skillEntry) || 1
       return {
         ...s,
@@ -1642,26 +1460,24 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           mode,
           startPass,
           stepIndex: 0,
-          // Накопленные ответы предыдущих проходов сохраняем, чтобы в новых
-          // слотах писать дальше.
-          answers: skillEntry?.answers ?? {},
-        },
+          // Накопленные ответы предыдущих проходов сохраняем.
+          answers: ((skillEntry as { answers?: Record<string, unknown> } | undefined)?.answers) ?? {},
+        } as unknown as ActiveSurvey,
       }
     })
   }, [setState])
 
-  const goToScreen = useCallback((screen) => {
+  const goToScreen = useCallback((screen: JourneyState['screen']) => {
     setState(s => ({ ...s, screen }))
   }, [setState])
 
   // Вспомогательное: если открыта анкета — сохраняем её черновик в
-  // state.skills[id].draft и закрываем модалку. Возвращает state с
-  // обнулёнными activeSurvey/skillDetailId. Используется при свободном
-  // переключении планеты, чтобы не терять заполненную часть.
-  const dismissActiveSurveyToDraft = useCallback((s) => {
-    if (!s.activeSurvey) return { ...s, skillDetailId: null }
-    const { skillId, mode, startPass, stepIndex, answers } = s.activeSurvey
-    const skillEntry = s.skills?.[skillId] ?? {}
+  // state.skills[id].draft и закрываем модалку.
+  const dismissActiveSurveyToDraft = useCallback((s: JourneyState): JourneyState => {
+    const active = s.activeSurvey as (ActiveSurvey & { mode?: 'short' | 'full'; startPass?: number; stepIndex?: number }) | null
+    if (!active) return { ...s, skillDetailId: null }
+    const { skillId, mode, startPass, stepIndex, answers } = active
+    const skillEntry = (s.skills?.[skillId] as StoredSkillEntry | undefined) ?? { id: skillId }
     return {
       ...s,
       activeSurvey: null,
@@ -1681,12 +1497,8 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setState(s => ({ ...dismissActiveSurveyToDraft(s), screen: 'planets' }))
   }, [setState, dismissActiveSurveyToDraft])
 
-  // Переключение на другой аспект. Сохраняет анкету (если открыта) в
-  // draft, ставит currentAspect, переводит экран в 'chat'.
-  // Если у нового аспекта папки ещё нет (первый заход) — инжектим intro
-  // нового аспекта + первый скрипт L0, чтобы юзер сразу попал в чат.
-  // Иначе — возвращаемся к сохранённому состоянию.
-  const handleSwitchAspect = useCallback((aspectKey) => {
+  // Переключение на другой аспект.
+  const handleSwitchAspect = useCallback((aspectKey: AspectKey) => {
     if (!aspectKey) return
     setState(s => {
       const cleaned = dismissActiveSurveyToDraft(s)
@@ -1695,17 +1507,15 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         !existing.messages?.length && !existing.currentScriptId
       )
 
-      let folder = existing ?? { ...DEFAULT_ASPECT_STATE }
+      let folder: AspectState = existing ?? { ...DEFAULT_ASPECT_STATE }
       if (isFresh) {
         const j = getJourney(aspectKey)
         const intro = j?.intro ?? []
-        const firstScript = (j?.levels?.[0]?.core ?? j?.levels?.[0]?.scripts ?? [])[0]
-        const msgs = []
+        const firstScript = ((j?.levels?.[0] as { core?: Script[]; scripts?: Script[] } | undefined)?.core ?? (j?.levels?.[0] as { scripts?: Script[] } | undefined)?.scripts ?? [])[0]
+        const msgs: ChatMessage[] = []
         let idCounter = Date.now()
         for (let i = 0; i < intro.length; i++) {
           const e = intro[i]
-          // intro[i>0] обычно содержит button — рисуем «псевдо-клик» юзера
-          // перед ответным текстом бота, чтобы интро читалось как диалог.
           if (i > 0 && e.button) {
             msgs.push({ id: idCounter++, role: 'user', text: e.button })
           }
@@ -1742,27 +1552,24 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   }, [setState, dismissActiveSurveyToDraft])
 
   // ─── Админ-действия (видимы только при isAdmin) ──────────────
-  // Все хендлеры обходят геймификацию: XP не выдаём, в дневник
-  // не пишем, через addBotMessage не отвечаем.
 
-  // 1. Пропустить текущий шаг в чате — просто двигаем currentScriptIndex.
+  // 1. Пропустить текущий шаг в чате.
   const handleAdminSkipStep = useCallback(() => {
     setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: null })))
     setTimeout(() => deliverScript(a.currentScriptIndex + 1), 50)
   }, [deliverScript, a.currentScriptIndex])
 
   // 2. Заполнить активную анкету. Все утверждения текущей сессии = 7.
-  //    Сдвигаем stepIndex за конец → SurveyScreen.useEffect → survey-insight.
-  //    resolveSurvey работает для всех аспектов (Si/Fe/Ne/Ni/Te/Fi).
   const handleAdminFillSurvey = useCallback(() => {
     setState(s => {
-      if (!s.activeSurvey) return s
-      const survey = resolveSurvey(s.activeSurvey.skillId)
+      const active = s.activeSurvey as (ActiveSurvey & { mode?: 'short' | 'full'; startPass?: number; stepIndex?: number }) | null
+      if (!active) return s
+      const survey = resolveSurvey(active.skillId)
       if (!survey) return s
-      const mode = s.activeSurvey.mode ?? 'short'
-      const startPass = s.activeSurvey.startPass ?? 1
+      const mode = active.mode ?? 'short'
+      const startPass = active.startPass ?? 1
       const stmts = buildSurveyStatements(survey, mode, startPass)
-      const answers = { ...(s.activeSurvey.answers ?? {}) }
+      const answers: Record<string, number[]> = { ...((active.answers as Record<string, number[]>) ?? {}) }
       for (const stm of stmts) {
         const arr = answers[stm.blockKey] ? [...answers[stm.blockKey]] : []
         arr[stm.statementIndex] = 7
@@ -1771,27 +1578,23 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       return {
         ...s,
         activeSurvey: {
-          ...s.activeSurvey,
+          ...active,
           answers,
           stepIndex: stmts.length,
-        },
+        } as unknown as ActiveSurvey,
       }
     })
   }, [setState])
 
   // 3. Заполнить все навыки 7/10 (полностью все 3 прохода).
-  //    Охватывает все аспекты, у которых есть skill-tree:
-  //    Si / Fe / Ne / Ni / Te / Fi. Анкета по skillId резолвится через
-  //    resolveSurvey() — он сам выбирает нужный *_SURVEYS-словарь.
-  //    Сразу пересчитываем средние по всем 6.
   const handleAdminFillAllSkills = useCallback(() => {
     const completedAt = Date.now()
-    const newSkills = {}
-    const fillFromIds = (skillIds) => {
+    const newSkills: Record<string, SkillState> = {}
+    const fillFromIds = (skillIds: string[]) => {
       for (const skillId of skillIds) {
         const survey = resolveSurvey(skillId)
-        const blocks = {}
-        const answers = {}
+        const blocks: Record<string, number> = {}
+        const answers: Record<string, number[]> = {}
         if (survey) {
           for (const key of SURVEY_BLOCK_KEYS) {
             const arr = survey.blocks[key] ?? []
@@ -1804,14 +1607,16 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           for (const key of SURVEY_BLOCK_KEYS) blocks[key] = 7
         }
         newSkills[skillId] = {
+          id: skillId,
           result: 7,
           blocks,
           completedAt,
           answers,
           passes: 3,
           insights: [],
-          _admin: true
-        }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as unknown as SkillState & { _admin: boolean }
+        ;(newSkills[skillId] as unknown as { _admin: boolean })._admin = true
       }
     }
     fillFromIds(ALL_SKILL_IDS)     // Si
@@ -1825,7 +1630,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
     setState(s => ({ ...s, skills: newSkills }))
 
-    const next = { ...scores }
+    const next: Record<string, number> = { ...scores }
     const si = calcSiScoreFromSkills(newSkills)
     const fe = calcFeScoreFromSkills(newSkills)
     const ne = calcNeScoreFromSkills(newSkills)
@@ -1834,28 +1639,27 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     const ti = calcTiScoreFromSkills(newSkills)
     const fi = calcFiScoreFromSkills(newSkills)
     const se = calcSeScoreFromSkills(newSkills)
-    if (Number.isFinite(si)) next['Si'] = Math.round(si)
-    if (Number.isFinite(fe)) next['Fe'] = Math.round(fe)
-    if (Number.isFinite(ne)) next['Ne'] = Math.round(ne)
-    if (Number.isFinite(ni)) next['Ni'] = Math.round(ni)
-    if (Number.isFinite(te)) next['Te'] = Math.round(te)
-    if (Number.isFinite(ti)) next['Ti'] = Math.round(ti)
-    if (Number.isFinite(fi)) next['Fi'] = Math.round(fi)
-    if (Number.isFinite(se)) next['Se'] = Math.round(se)
+    if (typeof si === 'number' && Number.isFinite(si)) next['Si'] = Math.round(si)
+    if (typeof fe === 'number' && Number.isFinite(fe)) next['Fe'] = Math.round(fe)
+    if (typeof ne === 'number' && Number.isFinite(ne)) next['Ne'] = Math.round(ne)
+    if (typeof ni === 'number' && Number.isFinite(ni)) next['Ni'] = Math.round(ni)
+    if (typeof te === 'number' && Number.isFinite(te)) next['Te'] = Math.round(te)
+    if (typeof ti === 'number' && Number.isFinite(ti)) next['Ti'] = Math.round(ti)
+    if (typeof fi === 'number' && Number.isFinite(fi)) next['Fi'] = Math.round(fi)
+    if (typeof se === 'number' && Number.isFinite(se)) next['Se'] = Math.round(se)
     onScoresChange(next)
   }, [scores, onScoresChange, setState])
 
-  // 4. Прыжок на конкретный уровень. Сбрасываем core-индекс, подаём
-  //    первый скрипт в чат. Если уровня нет — no-op.
-  const handleAdminJumpLevel = useCallback((targetLevel) => {
-    const lvlData = currentJourney?.levels?.[targetLevel]
+  // 4. Прыжок на конкретный уровень.
+  const handleAdminJumpLevel = useCallback((targetLevel: number) => {
+    const lvlData = levelsMap?.[targetLevel]
     if (!lvlData) return
     const first = (lvlData.core ?? lvlData.scripts ?? [])[0]
     setState(s => updateAspect(
       { ...s, screen: 'chat', activeSurvey: null },
       cur => ({
         ...cur,
-        currentLevel: targetLevel,
+        currentLevel: targetLevel as AspectState['currentLevel'],
         currentScriptIndex: 0,
         currentScriptId: first?.id ?? null,
         awaitingInput: null,
@@ -1864,7 +1668,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           : cur.messages
       })
     ))
-  }, [currentJourney, setState])
+  }, [levelsMap, setState])
 
   // 5. Полный сброс journey-state. Без подтверждения.
   const handleAdminReset = useCallback(() => {
@@ -1876,22 +1680,19 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
     setState(s => ({ ...s, screen: 'admin-skills' }))
   }, [setState])
 
-  // 7. Применить правки из редактора. edits = { [skillId]: { enabled, value, passes } }
-  //    enabled=true  → перезаписываем skillId на новые значения
-  //    enabled=false → удаляем skillId из state.skills (если есть)
-  const handleAdminApplyEdits = useCallback((edits) => {
+  // 7. Применить правки из редактора.
+  const handleAdminApplyEdits = useCallback((edits: SkillEdits) => {
     const completedAt = Date.now()
-    const newSkills = { ...(state.skills ?? {}) }
+    const newSkills: Record<string, SkillState> = { ...(state.skills ?? {}) }
     for (const [id, e] of Object.entries(edits ?? {})) {
       if (!e?.enabled) {
         // Disabled — удаляем navыk если был.
         if (newSkills[id]) delete newSkills[id]
         continue
       }
-      // resolveSurvey покрывает все аспекты, не только БС.
       const survey = resolveSurvey(id)
-      const blocks = {}
-      const answers = {}
+      const blocks: Record<string, number> = {}
+      const answers: Record<string, number[]> = {}
       if (survey) {
         for (const k of SURVEY_BLOCK_KEYS) {
           const arr = survey.blocks[k] ?? []
@@ -1903,7 +1704,8 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
       } else {
         for (const k of SURVEY_BLOCK_KEYS) blocks[k] = e.value
       }
-      newSkills[id] = {
+      const entry: SkillState & { _admin?: boolean } = {
+        id,
         result: e.value,
         blocks,
         answers,
@@ -1912,25 +1714,26 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         completedAt,
         _admin: true,
       }
+      newSkills[id] = entry
     }
     setState(s => ({ ...s, skills: newSkills, screen: 'skill-tree' }))
-    const bs  = calcSiScoreFromSkills(newSkills)
+    const bs = calcSiScoreFromSkills(newSkills)
     const che = calcFeScoreFromSkills(newSkills)
-    const ne  = calcNeScoreFromSkills(newSkills)
-    const ni  = calcNiScoreFromSkills(newSkills)
-    const te  = calcTeScoreFromSkills(newSkills)
-    const ti  = calcTiScoreFromSkills(newSkills)
-    const fi  = calcFiScoreFromSkills(newSkills)
-    const se  = calcSeScoreFromSkills(newSkills)
-    const next = { ...scores }
-    if (Number.isFinite(bs))  next['Si'] = Math.round(bs)
-    if (Number.isFinite(che)) next['Fe'] = Math.round(che)
-    if (Number.isFinite(ne))  next['Ne'] = Math.round(ne)
-    if (Number.isFinite(ni))  next['Ni'] = Math.round(ni)
-    if (Number.isFinite(te))  next['Te'] = Math.round(te)
-    if (Number.isFinite(ti))  next['Ti'] = Math.round(ti)
-    if (Number.isFinite(fi))  next['Fi'] = Math.round(fi)
-    if (Number.isFinite(se))  next['Se'] = Math.round(se)
+    const ne = calcNeScoreFromSkills(newSkills)
+    const ni = calcNiScoreFromSkills(newSkills)
+    const te = calcTeScoreFromSkills(newSkills)
+    const ti = calcTiScoreFromSkills(newSkills)
+    const fi = calcFiScoreFromSkills(newSkills)
+    const se = calcSeScoreFromSkills(newSkills)
+    const next: Record<string, number> = { ...scores }
+    if (typeof bs === 'number' && Number.isFinite(bs))   next['Si'] = Math.round(bs)
+    if (typeof che === 'number' && Number.isFinite(che)) next['Fe'] = Math.round(che)
+    if (typeof ne === 'number' && Number.isFinite(ne))   next['Ne'] = Math.round(ne)
+    if (typeof ni === 'number' && Number.isFinite(ni))   next['Ni'] = Math.round(ni)
+    if (typeof te === 'number' && Number.isFinite(te))   next['Te'] = Math.round(te)
+    if (typeof ti === 'number' && Number.isFinite(ti))   next['Ti'] = Math.round(ti)
+    if (typeof fi === 'number' && Number.isFinite(fi))   next['Fi'] = Math.round(fi)
+    if (typeof se === 'number' && Number.isFinite(se))   next['Se'] = Math.round(se)
     onScoresChange(next)
   }, [state.skills, scores, onScoresChange, setState])
 
@@ -1943,10 +1746,16 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
   // state.currentLevel / state.messages / state.awaitingInput / ... напрямую.
   // После рефакторинга эти поля живут в state.aspects[currentAspect],
   // но мерджим их сверху, чтобы не править все child-компоненты.
-  const stateForChildren = { ...state, ...a }
+  const stateForChildren = { ...state, ...a } as JourneyState & AspectState
+
+  const shellStyle: AccentVarStyle = { '--accent': accent }
+
+  // aspectIntro здесь не используется — но передаётся в Onboarding для
+  // обратной совместимости с .jsx-сигнатурой.
+  void aspectIntro
 
   return (
-    <div className={styles.shell} style={{ '--accent': accent }}>
+    <div className={styles.shell} style={shellStyle}>
       <div className={styles.stars} />
 
       {state.screen === 'onboarding' && (
@@ -1975,7 +1784,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           onAction={handleScriptAction}
           onSend={handleSend}
           onOpenProfile={() => goToScreen('profile')}
-          onOpenTasks={() => goToScreen('tasks')}
+          onOpenTasks={() => goToScreen('tasks' as JourneyState['screen'])}
           onGoToSurveys={handleOpenSkillTree}
           onOpenPlanetMap={handleOpenPlanetMap}
           // Пилюля «Оценить навыки» появляется только после L0 (или для админа).
@@ -1997,7 +1806,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           })()}
           pendingCount={a.pendingTasks?.length ?? 0}
           aspectName={currentJourney
-            ? `Уровень ${a.currentLevel} · ${currentLevel?.title}`
+            ? `Уровень ${a.currentLevel} · ${currentLevel?.title ?? ''}`
             : 'Путешествие'}
           planet={currentJourney?.planet}
           user={user}
@@ -2006,8 +1815,6 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
 
       {state.screen === 'levelcomplete' && (() => {
         // На L0 после прохождения core — primary CTA «Открыть Колесо аспекта»
-        // (skill-tree). Для БС — если у уровня есть анкеты (surveys).
-        // Для ЧИ/БИ/ЧЛ/БЭ/ЧЭ — всегда (анкеты живут отдельно).
         const isNe = state.currentAspect === 'Ne'
         const isNi = state.currentAspect === 'Ni'
         const isTe = state.currentAspect === 'Te'
@@ -2026,8 +1833,6 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
                 : isFe
                   ? 'Открыть Колесо ЧЭ'
                   : 'Открыть Колесо БС'
-        // Для Fe на L0 показываем третью кнопку — «Изучить универсальные навыки».
-        // Открывает FeCoreOverview с 3 ядерными карточками (fe-awareness/expressiveness/congruence).
         const showCoreOverview = isFe && a.currentLevel === 0
         return (
           <LevelComplete
@@ -2039,9 +1844,9 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
             wheelLabel={wheelLabel}
             onProfile={() => goToScreen('profile')}
             nextLevelTitle={nextLevel?.title}
-            onNextLevel={nextLevel ? handleNextLevel : null}
-            onOpenWheel={showWheel ? handleOpenSkillTree : null}
-            onOpenCoreOverview={showCoreOverview ? () => goToScreen('fe-core-overview') : null}
+            onNextLevel={nextLevel ? handleNextLevel : undefined}
+            onOpenWheel={showWheel ? handleOpenSkillTree : undefined}
+            onOpenCoreOverview={showCoreOverview ? () => goToScreen('fe-core-overview' as JourneyState['screen']) : undefined}
             coreOverviewLabel="Изучить универсальные навыки"
           />
         )
@@ -2056,22 +1861,16 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
           levelTitle={currentLevel?.title}
           planet={currentJourney?.planet}
           aspectName={ASPECT_DATA[state.currentAspect]?.name ?? 'Путешествие'}
-          // Возврат в чат должен очистить активную анкету: иначе её
-          // SURV-script-карточка всплывает в chat-ленте через resolveScript
-          // (который теперь fallback-ит в currentLevel.surveys), и юзер
-          // вместо чата видит заглушку «Анкета по навыку БС…».
-          // Прогресс анкеты сохраняем как draft в state.skills, чтобы юзер
-          // мог продолжить с того же места из дерева навыков.
           onContinue={() => {
             setState(s => {
               let nextSkills = s.skills
-              const active = s.activeSurvey
+              const active = s.activeSurvey as (ActiveSurvey & { mode?: 'short' | 'full'; startPass?: number; stepIndex?: number }) | null
               if (active) {
-                const hasAnyAnswer = Object.values(active.answers ?? {}).some(arr =>
-                  Array.isArray(arr) && arr.some(n => Number.isFinite(n))
+                const hasAnyAnswer = Object.values(active.answers ?? {}).some((arr: unknown) =>
+                  Array.isArray(arr) && arr.some(n => typeof n === 'number' && Number.isFinite(n))
                 )
                 if (hasAnyAnswer) {
-                  const prevSkill = s.skills?.[active.skillId] ?? {}
+                  const prevSkill = (s.skills?.[active.skillId] as StoredSkillEntry | undefined) ?? { id: active.skillId }
                   nextSkills = {
                     ...s.skills,
                     [active.skillId]: {
@@ -2195,10 +1994,10 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         <SkillDetail
           skillId={state.skillDetailId}
           currentLevel={a.currentLevel ?? 0}
-          passes={getCompletedPasses(state.skills?.[state.skillDetailId])}
+          passes={getCompletedPasses(state.skills?.[state.skillDetailId] as StoredSkillEntry | undefined)}
           accent={accent}
           onClose={() => goToScreen('skill-tree')}
-          onOpenTraits={(id) => setState(s => ({ ...s, skillDetailId: id, screen: 'skill-traits' }))}
+          onOpenTraits={(id: string) => setState(s => ({ ...s, skillDetailId: id, screen: 'skill-traits' }))}
           onSaveInsight={handleSaveSkillInsight}
         />
       )}
@@ -2207,31 +2006,29 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         <SkillTraits
           skillId={state.skillDetailId}
           currentLevel={a.currentLevel ?? 0}
-          passes={getCompletedPasses(state.skills?.[state.skillDetailId])}
+          passes={getCompletedPasses(state.skills?.[state.skillDetailId] as StoredSkillEntry | undefined)}
           accent={accent}
           onSaveInsight={handleSaveSkillInsight}
           onClose={() => goToScreen('skill-detail')}
         />
       )}
 
-      {state.screen === 'fe-core-overview' && (
+      {state.screen === ('fe-core-overview' as JourneyState['screen']) && (
         <FeCoreOverview
           accent={accent}
-          onOpenSkill={(id) => setState(s => ({ ...s, skillDetailId: id, screen: 'skill-detail' }))}
+          onOpenSkill={(id: string) => setState(s => ({ ...s, skillDetailId: id, screen: 'skill-detail' }))}
           onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'levelcomplete')}
         />
       )}
 
       {state.screen === 'survey-choice' && state.activeSurvey && (() => {
-        // Найдём имя навыка для заголовка — сначала через resolveSurvey (универсально для всех аспектов),
-        // потом через БС-дерево как фолбэк для случая, когда анкета ещё не загружена.
-        let name = state.activeSurvey.skillId
+        let name: string = state.activeSurvey.skillId
         const survey = resolveSurvey(state.activeSurvey.skillId)
         if (survey?.name) {
           name = survey.name
         } else {
           for (const arche of ARCHETYPE_KEYS) {
-            const found = (SKILL_TREE[arche] ?? []).find(s => s.id === state.activeSurvey.skillId)
+            const found = (SKILL_TREE[arche] ?? []).find(s => s.id === state.activeSurvey?.skillId)
             if (found) { name = found.name; break }
           }
         }
@@ -2286,7 +2083,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
         />
       )}
 
-      {state.screen === 'tasks' && (
+      {state.screen === ('tasks' as JourneyState['screen']) && (
         <TasksScreen
           tasks={a.pendingTasks ?? []}
           // Лукап тасок ищет по scriptId — в задачах могут быть core-скрипты
@@ -2312,7 +2109,7 @@ export default function JourneyView({ journey: extJourney, onJourneyChange, scor
               ...(diary ?? [])
             ])
           }}
-          onDelete={(scriptId) => removePending(scriptId)}
+          onDelete={(scriptId: string) => removePending(scriptId)}
         />
       )}
 

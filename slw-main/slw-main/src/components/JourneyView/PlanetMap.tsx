@@ -1,3 +1,6 @@
+import type { CSSProperties } from 'react'
+import type { AspectKey } from '@/types/aspect'
+import type { JourneyState, AspectState } from '@/types/journey'
 import { getAllPlanets } from '../../data/journey/registry'
 import { ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import Hint from '../Onboarding/Hint'
@@ -8,15 +11,33 @@ import styles from './PlanetMap.module.css'
 // Показывает 8 карточек со всеми аспектами. По клику на доступную —
 // onSwitch(key) переключает state.currentAspect и переводит в чат.
 // Locked-карточки кликабельны, но показывают тост вместо переключения.
-//
-// Props:
-//   state         — журнал (нужен для статуса прогресса по каждой планете)
-//   user          — для Hint hints_seen-проверки (опционально, может быть null)
-//   onSwitch      — (aspectKey) => void
-//   onClose       — закрыть карту, остаться в текущем аспекте
-//   onLockedTap   — () => void — что показать при тапе на «скоро»-карточку
-export default function PlanetMap({ state, user, onSwitch, onClose, onLockedTap }) {
-  const planets = getAllPlanets()
+
+// Структурный shape планеты, как возвращает registry.getAllPlanets().
+// NOTE(ts): tightened in P3 — registry.ts экспортирует Planet тип.
+type Planet = {
+  aspect: AspectKey
+  name: string
+  realm?: string
+  planet?: string
+  color: string
+  available: boolean
+}
+
+type CardStatus =
+  | { kind: 'locked'; label: string; level?: number }
+  | { kind: 'progress'; label: string; level: number }
+  | { kind: 'idle'; label: string; level?: number }
+
+type Props = {
+  state: JourneyState
+  user?: unknown
+  onSwitch: (aspectKey: AspectKey) => void
+  onClose?: () => void
+  onLockedTap?: () => void
+}
+
+export default function PlanetMap({ state, user, onSwitch, onClose, onLockedTap }: Props) {
+  const planets = getAllPlanets() as Planet[]
   const activeAspect = state.currentAspect
 
   return (
@@ -79,7 +100,7 @@ export default function PlanetMap({ state, user, onSwitch, onClose, onLockedTap 
 // или перешёл на >L0). Просто заход на планету (есть intro в messages,
 // но completedScripts пустой) не считается прогрессом — иначе карта
 // врёт после случайного клика.
-function computeStatus(planet, folder) {
+function computeStatus(planet: Planet, folder: AspectState | undefined): CardStatus {
   if (!planet.available) return { kind: 'locked', label: 'Скоро' }
   const level = folder?.currentLevel ?? 0
   const completed = folder?.completedScripts?.length ?? 0
@@ -89,7 +110,16 @@ function computeStatus(planet, folder) {
   return { kind: 'idle', label: 'Не начато' }
 }
 
-function PlanetCard({ planet, status, isActive, onClick }) {
+type PlanetColorStyle = CSSProperties & { '--planet-color'?: string }
+
+type CardProps = {
+  planet: Planet
+  status: CardStatus
+  isActive: boolean
+  onClick: () => void
+}
+
+function PlanetCard({ planet, status, isActive, onClick }: CardProps) {
   const { aspect, name, realm, color, planet: latin, available } = planet
   const cls = [
     styles.card,
@@ -98,12 +128,15 @@ function PlanetCard({ planet, status, isActive, onClick }) {
     status.kind === 'progress' && styles.hasProgress,
   ].filter(Boolean).join(' ')
 
+  const cardStyle: PlanetColorStyle = { '--planet-color': color }
+  const statusClass = (styles as Record<string, string>)[`status_${status.kind}`] ?? ''
+
   return (
     <button
       type="button"
       className={cls}
       onClick={onClick}
-      style={{ '--planet-color': color }}
+      style={cardStyle}
     >
       <div className={styles.cardHead}>
         <span className={styles.glyph} aria-hidden="true">◍</span>
@@ -121,7 +154,7 @@ function PlanetCard({ planet, status, isActive, onClick }) {
           <span className={styles.activeTag}>Сейчас здесь</span>
         )}
         {!isActive && (
-          <span className={`${styles.statusTag} ${styles[`status_${status.kind}`]}`}>
+          <span className={`${styles.statusTag} ${statusClass}`}>
             {status.kind === 'progress' && <span aria-hidden="true">✓ </span>}
             {status.label}
           </span>

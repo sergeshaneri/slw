@@ -1,8 +1,11 @@
 import { useState } from 'react'
+import type { CSSProperties } from 'react'
+import type { Script, ScriptType } from '@/types/script'
+import type { PendingTask } from '@/types/journey'
 import styles from './JourneyView.module.css'
 import MarkdownLite from './MarkdownLite'
 
-const TYPE_LABEL = {
+const TYPE_LABEL: Partial<Record<ScriptType, string>> = {
   exercise: 'Упражнение',
   question: 'Вопрос',
   theory: 'Теория',
@@ -10,10 +13,21 @@ const TYPE_LABEL = {
   reflection: 'Рефлексия'
 }
 
-export default function TasksScreen({ tasks, scripts, accent, onCompleteWithNote, onDelete, onBack }) {
-  const items = tasks
+type Props = {
+  tasks: PendingTask[]
+  scripts: Script[]
+  accent?: string
+  onCompleteWithNote: (script: Script, note: string) => void
+  onDelete: (scriptId: string) => void
+  onBack: () => void
+}
+
+type Pair = { task: PendingTask; script: Script }
+
+export default function TasksScreen({ tasks, scripts, accent, onCompleteWithNote, onDelete, onBack }: Props) {
+  const items: Pair[] = tasks
     .map(t => ({ task: t, script: scripts.find(s => s.id === t.scriptId) }))
-    .filter(x => x.script)
+    .filter((x): x is Pair => !!x.script)
 
   return (
     <>
@@ -52,9 +66,19 @@ export default function TasksScreen({ tasks, scripts, accent, onCompleteWithNote
   )
 }
 
-function TaskItem({ task, script, accent, onCompleteWithNote, onDelete }) {
-  const [noteOpen, setNoteOpen] = useState(false)
-  const [noteText, setNoteText] = useState('')
+type AccentStyle = CSSProperties & { '--accent'?: string }
+
+type ItemProps = {
+  task: PendingTask
+  script: Script
+  accent?: string
+  onCompleteWithNote: (script: Script, note: string) => void
+  onDelete: (scriptId: string) => void
+}
+
+function TaskItem({ task, script, accent, onCompleteWithNote, onDelete }: ItemProps) {
+  const [noteOpen, setNoteOpen] = useState<boolean>(false)
+  const [noteText, setNoteText] = useState<string>('')
 
   const handleSaveWithNote = () => {
     if (!noteText.trim()) return
@@ -62,6 +86,8 @@ function TaskItem({ task, script, accent, onCompleteWithNote, onDelete }) {
     setNoteText('')
     setNoteOpen(false)
   }
+
+  const accentStyle: AccentStyle | undefined = accent ? { '--accent': accent } : undefined
 
   return (
     <li className={styles.taskItem}>
@@ -82,7 +108,7 @@ function TaskItem({ task, script, accent, onCompleteWithNote, onDelete }) {
             type="button"
             className={`${styles.btn} ${styles.btnAccent}`}
             onClick={() => setNoteOpen(true)}
-            style={{ '--accent': accent }}
+            style={accentStyle}
           >
             Выполнить + записать
           </button>
@@ -109,7 +135,7 @@ function TaskItem({ task, script, accent, onCompleteWithNote, onDelete }) {
               className={`${styles.btn} ${styles.btnPrimary}`}
               onClick={handleSaveWithNote}
               disabled={!noteText.trim()}
-              style={{ '--accent': accent }}
+              style={accentStyle}
             >
               Сохранить и закрыть
             </button>

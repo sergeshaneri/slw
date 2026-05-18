@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { COMMON_BASE_SKILLS } from '../../data/journey/fe-skills'
 import { getSkillContent } from '../../data/skills'
 import styles from './JourneyView.module.css'
@@ -10,15 +11,27 @@ import styles from './JourneyView.module.css'
  * соответствующего навыка; ← возвращается в этот же overview.
  *
  * Открывается из вилки после завершения уровня Fe-путешествия.
- *
- * Props:
- *   accent
- *   onOpenSkill: (skillId) => void
- *   onClose: () => void
  */
-export default function FeCoreOverview({ accent, onOpenSkill, onClose }) {
+
+// NOTE(ts): tightened in P3 after data/skills/ TS conversion.
+type SkillContentLike = {
+  name?: string
+  intro?: string
+}
+
+type AccentStyle = CSSProperties & { '--accent'?: string }
+
+type Props = {
+  accent?: string
+  onOpenSkill: (skillId: string) => void
+  onClose: () => void
+}
+
+export default function FeCoreOverview({ accent, onOpenSkill, onClose }: Props) {
+  const shellStyle: AccentStyle = { '--accent': accent }
+
   return (
-    <div className={styles.coreOverviewShell} style={{ '--accent': accent }}>
+    <div className={styles.coreOverviewShell} style={shellStyle}>
       <div className={styles.treeHeader}>
         <button
           type="button"
@@ -42,7 +55,7 @@ export default function FeCoreOverview({ accent, onOpenSkill, onClose }) {
         </p>
 
         {COMMON_BASE_SKILLS.map(skill => {
-          const content = getSkillContent(skill.id)
+          const content = getSkillContent(skill.id) as SkillContentLike | null | undefined
           return (
             <button
               key={skill.id}

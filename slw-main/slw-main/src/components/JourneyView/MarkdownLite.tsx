@@ -12,20 +12,23 @@ const BOLD_RE = /\*\*([^*\n]+?)\*\*/g
 const ITALIC_RE = /(^|[\s(\[«"'])([_*])([^_*\n]+?)\2(?=[\s.,!?:;)\]»"']|$)/g
 const CODE_RE = /`([^`\n]+?)`/g
 
+type SegmentKind = 'text' | 'code' | 'bold' | 'em'
+type Segment = { kind: SegmentKind; value: string }
+
 // Превращает строку в массив React-элементов с inline-форматированием.
-function renderInline(text, keyPrefix = '') {
+function renderInline(text: string, keyPrefix: string = ''): Array<React.ReactNode> {
   // Применяем последовательно: code → bold → italic. Каждое — токенизация
   // на сегменты [{ kind: 'text'|'code'|'bold'|'em', value }] и replace.
-  let segments = [{ kind: 'text', value: text }]
+  let segments: Segment[] = [{ kind: 'text', value: text }]
 
-  const splitBy = (regex, kind, group = 1) => {
-    const next = []
+  const splitBy = (regex: RegExp, kind: SegmentKind, group: number = 1) => {
+    const next: Segment[] = []
     for (const seg of segments) {
       if (seg.kind !== 'text') { next.push(seg); continue }
       let lastIdx = 0
       const str = seg.value
       regex.lastIndex = 0
-      let m
+      let m: RegExpExecArray | null
       while ((m = regex.exec(str)) !== null) {
         if (m.index > lastIdx) {
           next.push({ kind: 'text', value: str.slice(lastIdx, m.index) })
@@ -46,13 +49,13 @@ function renderInline(text, keyPrefix = '') {
 
   // Italic: regex ловит ведущий пробел/скобку — нужно его сохранить.
   {
-    const next = []
+    const next: Segment[] = []
     for (const seg of segments) {
       if (seg.kind !== 'text') { next.push(seg); continue }
       let lastIdx = 0
       const str = seg.value
       ITALIC_RE.lastIndex = 0
-      let m
+      let m: RegExpExecArray | null
       while ((m = ITALIC_RE.exec(str)) !== null) {
         const lead = m[1] ?? ''
         const inner = m[3]
@@ -82,8 +85,8 @@ function renderInline(text, keyPrefix = '') {
 
 // Превращает массив строк (lines одного «параграфа») в React-children
 // с переносами через <br/>.
-function renderLinesWithBreaks(lines, keyPrefix) {
-  const out = []
+function renderLinesWithBreaks(lines: string[], keyPrefix: string): React.ReactNode[] {
+  const out: React.ReactNode[] = []
   lines.forEach((line, i) => {
     if (i > 0) out.push(<br key={`${keyPrefix}-br-${i}`} />)
     out.push(...renderInline(line, `${keyPrefix}-l${i}`))
@@ -91,12 +94,16 @@ function renderLinesWithBreaks(lines, keyPrefix) {
   return out
 }
 
-export default function MarkdownLite({ text }) {
+type Props = {
+  text?: string | null
+}
+
+export default function MarkdownLite({ text }: Props) {
   if (!text) return null
 
   // Разбиваем на блоки по пустым строкам.
   const blocks = String(text).split(/\n\s*\n/)
-  const elements = []
+  const elements: React.ReactNode[] = []
 
   // Внутри блока разделяем строки на под-сегменты:
   //   text-сегмент   → одна или несколько строк обычного текста
@@ -107,21 +114,24 @@ export default function MarkdownLite({ text }) {
   const ORDERED = /^\s*\d+\.\s+/
   const BULLET = /^\s*[-*•—]\s+/
 
+  type BlockSegmentKind = 'text' | 'ol' | 'ul'
+  type BlockSegment = { kind: BlockSegmentKind; lines: string[] }
+
   blocks.forEach((block, bi) => {
     const trimmed = block.trim()
     if (!trimmed) return
     const lines = trimmed.split('\n')
 
-    const segments = []
-    let buffer = []
-    let bufferKind = 'text'
+    const segments: BlockSegment[] = []
+    let buffer: string[] = []
+    let bufferKind: BlockSegmentKind = 'text'
     const flush = () => {
       if (buffer.length === 0) return
       segments.push({ kind: bufferKind, lines: buffer })
       buffer = []
     }
     for (const line of lines) {
-      let kind = 'text'
+      let kind: BlockSegmentKind = 'text'
       if (ORDERED.test(line)) kind = 'ol'
       else if (BULLET.test(line)) kind = 'ul'
       if (kind !== bufferKind) flush()

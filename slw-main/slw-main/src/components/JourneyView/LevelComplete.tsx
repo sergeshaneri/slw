@@ -1,7 +1,33 @@
 import styles from './JourneyView.module.css'
 
+// Принимаемая `state` — это композит per-aspect полей (currentLevel) и
+// глобальных счётчиков (xp/totalCompleted/stardust). JourneyView собирает
+// её на лету при вызове; поэтому тип здесь — структурный shape, а не
+// JourneyState.
+type LevelCompleteState = {
+  currentLevel?: number | null
+  xp: number
+  totalCompleted: number
+  stardust: number
+}
+
+type Props = {
+  state: LevelCompleteState
+  accent?: string
+  completeText: string
+  levelTitle?: string
+  planetName?: string
+  wheelLabel?: string
+  onProfile: () => void
+  nextLevelTitle?: string
+  onNextLevel?: () => void
+  onOpenWheel?: () => void
+  onOpenCoreOverview?: () => void
+  coreOverviewLabel?: string
+}
+
 export default function LevelComplete({
-  state, accent,
+  state,
   completeText,
   levelTitle,
   planetName,
@@ -11,7 +37,7 @@ export default function LevelComplete({
   onOpenWheel,
   onOpenCoreOverview,
   coreOverviewLabel
-}) {
+}: Props) {
   const levelNum = state.currentLevel ?? 0
   const planet = planetName ?? 'Terra Harmonia'
   const wheelBtnLabel = wheelLabel ?? 'Открыть Колесо БС'

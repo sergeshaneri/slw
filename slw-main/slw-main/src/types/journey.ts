@@ -16,6 +16,8 @@ export type ScreenName =
   | 'onboarding'
   | 'levelcomplete'
   | 'admin-skills'
+  | 'tasks'
+  | 'fe-core-overview'
 
 // Awaiting-input values produced by JourneyView/Chat handlers.
 export type AwaitingInput = null | 'number' | 'text' | 'choice' | 'step-insight' | 'exercise_note'
@@ -71,7 +73,9 @@ export type SkillAnswer = {
 // in callers as needed. TODO(ts): tighten after Phase 1/2 covers skill UI.
 export type SkillState = {
   id: string
-  answers?: Record<string, SkillAnswer[]>
+  // Survey answers are stored as plain number arrays keyed by block name.
+  // The richer SkillAnswer object shape was a P0 guess but runtime uses number[].
+  answers?: Record<string, number[]>
   blocks?: Record<string, number>
   passes?: number
   result?: number

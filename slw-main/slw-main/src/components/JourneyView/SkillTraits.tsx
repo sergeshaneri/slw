@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import {
   getSkillContent,
   getUnlockedSkillLevel,
@@ -18,14 +19,36 @@ import styles from './JourneyView.module.css'
  *   - InsightInput (для unlocked-уровней)
  *
  * Гейтинг открытия уровней совпадает с SkillDetail (cl≥N ∧ passes≥N).
- *
- * Props:
- *   skillId, currentLevel, passes, accent
- *   onSaveInsight: (skillId, level, source, text) => void
- *   onClose: () => void  — назад в SkillDetail
  */
-export default function SkillTraits({ skillId, currentLevel, passes, accent, onSaveInsight, onClose }) {
-  const content = getSkillContent(skillId)
+
+// NOTE(ts): tightened in P3 after data/skills/ TS conversion.
+type SkillTraitData = { title: string; desc: string }
+type SkillLevelData = {
+  typage?: string
+  gift?: SkillTraitData
+  shadow?: SkillTraitData
+  precaution?: string
+  dilemma?: { name: string; desc: string }
+}
+type SkillContent = {
+  name?: string
+  intro?: string
+  levels?: Partial<Record<1 | 2 | 3, SkillLevelData>>
+}
+
+type AccentStyle = CSSProperties & { '--accent'?: string }
+
+type Props = {
+  skillId: string
+  currentLevel?: number | null
+  passes?: number | null
+  accent?: string
+  onSaveInsight?: (skillId: string, level: number, source: string, text: string) => void
+  onClose: () => void
+}
+
+export default function SkillTraits({ skillId, currentLevel, passes, accent, onSaveInsight, onClose }: Props) {
+  const content = getSkillContent(skillId) as SkillContent | null | undefined
   const cl = currentLevel ?? 0
   const p = passes ?? 0
   const unlockedLevel = getUnlockedSkillLevel(cl, p)
@@ -33,8 +56,10 @@ export default function SkillTraits({ skillId, currentLevel, passes, accent, onS
   const skillName = getSkillName(skillId)
   const archeName = getArchetypeNameForSkill(skillId)
 
+  const shellStyle: AccentStyle = { '--accent': accent }
+
   return (
-    <div className={styles.treeShell} style={{ '--accent': accent }}>
+    <div className={styles.treeShell} style={shellStyle}>
       <div className={styles.treeHeader}>
         <button
           type="button"
@@ -63,7 +88,7 @@ export default function SkillTraits({ skillId, currentLevel, passes, accent, onS
 
         {content && (
           <>
-            {[1, 2, 3].map(lvl => {
+            {([1, 2, 3] as const).map(lvl => {
               const lvlData = content.levels?.[lvl]
               const isUnlocked = lvl <= unlockedLevel
               return (
@@ -94,7 +119,7 @@ export default function SkillTraits({ skillId, currentLevel, passes, accent, onS
   )
 }
 
-function lockMessage(level, currentLevel, passes) {
+function lockMessage(level: number, currentLevel?: number | null, passes?: number | null): string {
   const cl = currentLevel ?? 0
   const p = passes ?? 0
   const journeyOk = cl >= level
@@ -116,7 +141,18 @@ function lockMessage(level, currentLevel, passes) {
   return `Откроется, когда сдашь ${passNeed}. Уровень путешествия — готово ✓`
 }
 
-function SkillTraitsCard({ level, data, unlocked, skillId, currentLevel, passes, accent, onSaveInsight }) {
+type CardProps = {
+  level: number
+  data: SkillLevelData | undefined
+  unlocked: boolean
+  skillId: string
+  currentLevel: number
+  passes: number
+  accent?: string
+  onSaveInsight?: (skillId: string, level: number, source: string, text: string) => void
+}
+
+function SkillTraitsCard({ level, data, unlocked, skillId, currentLevel, passes, accent, onSaveInsight }: CardProps) {
   if (!unlocked) {
     return (
       <section className={`${styles.skillLevelCard} ${styles.skillLevelLocked}`}>
