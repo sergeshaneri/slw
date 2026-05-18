@@ -82,7 +82,7 @@ export type SkillLevel = {
   actions: string[]
   practices: SkillPractice[]
   criteria: string[]
-  pitfalls: string[]
+  pitfalls?: string[]  // optional: Fe archetypes (artist/master-atmo/orator/zavodila) and Fe/core omit this field
   // L3-only:
   precaution?: string
   dilemma?: SkillDilemma
