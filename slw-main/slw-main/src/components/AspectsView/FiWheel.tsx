@@ -1,14 +1,21 @@
+import type { CSSProperties, ReactNode } from 'react'
 import {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE,
-  calcNiArchetypeAvg, calcNiScoreFromSkills, getNiSkillProgress
-} from '../../data/journey/skills/ni-skills'
+  calcFiArchetypeAvg, calcFiScoreFromSkills, getFiSkillProgress
+} from '../../data/journey/skills/fi-skills'
+import type { SkillState } from '@/types/journey'
 import styles from './SiWheel.module.css'
 
-// Колесо БИ — реальное колесо баланса по 4 архетипам (Мифотворец, Провидец,
-// Разоблачитель, Шаман) + 3 общих базовых навыка, входящих в каждый архетип.
+// `ARCHETYPE_KEYS` re-exported for parity with the JS source; not consumed here.
+void ARCHETYPE_KEYS
+
+// Колесо БЭ — реальное колесо баланса по 4 архетипам (Дипломат, Духовник,
+// Хранитель Рода, Друг) + 2 общих базовых навыка (Установление Доверия,
+// Внутренняя Сверка с Ценностями), входящих в каждый архетип сквозным слоем.
 //
-// Структура и стадии — те же, что и в SiWheel/FeWheel: лепестки по avg,
-// звёзды по пройденным анкетам, эволюция украшений per-архетип и глобально.
+// Структура и стадии — те же, что и в SiWheel/FeWheel/NeWheel/NiWheel:
+// лепестки по avg, звёзды по пройденным анкетам, эволюция украшений
+// per-архетип и глобально.
 //
 // Стадии per-архетип:
 //   pre       — 0 анкет в архетипе
@@ -23,21 +30,22 @@ const R_INNER = 32
 const R_OUTER = 130
 const R_AVAILABLE = R_OUTER - R_INNER
 
-const QUADRANT_ORDER = ['mythmaker', 'seer', 'debunker', 'shaman']
+type QuadrantKey = 'diplomat' | 'confessor' | 'ancestor' | 'friend'
 
-// Цвета архетипов БИ. Подобраны в гамме потока, времени и глубины:
-// янтарь — нить памяти (Мифотворец), индиго — взгляд в будущее (Провидец),
-// серебро-сталь — острота различения (Разоблачитель), аметист — глубина (Шаман).
-const ARCHETYPE_COLORS = {
-  mythmaker: '#d4a854', // янтарь — память, сюжет
-  seer:      '#4a8df0', // индиго — окно в будущее
-  debunker:  '#a3b1c9', // сталь — острота различения
-  shaman:    '#8a5fe0', // аметист — глубина, резонанс
+const QUADRANT_ORDER: QuadrantKey[] = ['diplomat', 'confessor', 'ancestor', 'friend']
+
+const ARCHETYPE_COLORS: Record<QuadrantKey, string> = {
+  diplomat:  '#f4a6c0', // розово-коралловый — Дипломат, мост между сторонами
+  confessor: '#b794f4', // мягкий фиолетовый — Духовник, голубь, слушание
+  ancestor:  '#d4a574', // тёплое золото — Хранитель Рода, история и корни
+  friend:    '#7dd3a8', // зелёный — Друг, преданность
 }
 
-const STAGE_ORDER = ['pre', 'light', 'medium', 'strong', 'masterful']
+type ArcheStage = 'pre' | 'light' | 'medium' | 'strong' | 'masterful'
 
-function getArcheStage(completed, total) {
+const STAGE_ORDER: ArcheStage[] = ['pre', 'light', 'medium', 'strong', 'masterful']
+
+function getArcheStage(completed: number, total: number): ArcheStage {
   if (completed >= total && total > 0) return 'masterful'
   if (completed >= 6) return 'strong'
   if (completed >= 3) return 'medium'
@@ -45,12 +53,12 @@ function getArcheStage(completed, total) {
   return 'pre'
 }
 
-function polar(angleDeg, radius) {
+function polar(angleDeg: number, radius: number): { x: number; y: number } {
   const a = (angleDeg - 90) * (Math.PI / 180)
   return { x: CX + radius * Math.cos(a), y: CY + radius * Math.sin(a) }
 }
 
-function wedgePath(angleStart, angleEnd, rInner, rOuter) {
+function wedgePath(angleStart: number, angleEnd: number, rInner: number, rOuter: number): string {
   const p1 = polar(angleStart, rInner)
   const p2 = polar(angleStart, rOuter)
   const p3 = polar(angleEnd, rOuter)
@@ -66,14 +74,14 @@ function wedgePath(angleStart, angleEnd, rInner, rOuter) {
   ].join(' ')
 }
 
-function arcPath(angleStart, angleEnd, radius) {
+function arcPath(angleStart: number, angleEnd: number, radius: number): string {
   const p1 = polar(angleStart, radius)
   const p2 = polar(angleEnd, radius)
   const largeArc = (angleEnd - angleStart) > 180 ? 1 : 0
   return `M ${p1.x} ${p1.y} A ${radius} ${radius} 0 ${largeArc} 1 ${p2.x} ${p2.y}`
 }
 
-function seedFromString(s) {
+function seedFromString(s: string): number {
   let h = 2166136261
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i)
@@ -81,7 +89,7 @@ function seedFromString(s) {
   }
   return h >>> 0
 }
-function makeRng(seed) {
+function makeRng(seed: number): () => number {
   let s = seed
   return () => {
     s = Math.imul(s ^ (s >>> 16), 2246822507)
@@ -91,7 +99,9 @@ function makeRng(seed) {
   }
 }
 
-function Star({ x, y, size = 2.6, opacity = 0.9 }) {
+type StarProps = { x: number; y: number; size?: number; opacity?: number }
+
+function Star({ x, y, size = 2.6, opacity = 0.9 }: StarProps) {
   const s = size
   const t = s * 0.22
   return (
@@ -105,9 +115,19 @@ function Star({ x, y, size = 2.6, opacity = 0.9 }) {
   )
 }
 
-function TallyMarks({ qi, count, total, radius, length = 4, opacity = 0.55, color = 'currentColor' }) {
+type TallyMarksProps = {
+  qi: number
+  count: number
+  total: number
+  radius: number
+  length?: number
+  opacity?: number
+  color?: string
+}
+
+function TallyMarks({ qi, count, total, radius, length = 4, opacity = 0.55, color = 'currentColor' }: TallyMarksProps) {
   if (count === 0) return null
-  const lines = []
+  const lines: ReactNode[] = []
   const pad = 6
   for (let i = 0; i < count; i++) {
     const angleFrac = total === 1 ? 0.5 : pad / 90 + (i / (total - 1)) * ((90 - 2 * pad) / 90)
@@ -127,10 +147,19 @@ function TallyMarks({ qi, count, total, radius, length = 4, opacity = 0.55, colo
   return <g>{lines}</g>
 }
 
-function QuadrantCorona({ qi, color, dots = 5, radius, size = 1.6, opacity = 0.65 }) {
+type QuadrantCoronaProps = {
+  qi: number
+  color: string
+  dots?: number
+  radius: number
+  size?: number
+  opacity?: number
+}
+
+function QuadrantCorona({ qi, color, dots = 5, radius, size = 1.6, opacity = 0.65 }: QuadrantCoronaProps) {
   const startA = qi * 90 + 8
   const endA = qi * 90 + 82
-  const elements = []
+  const elements: ReactNode[] = []
   for (let i = 0; i < dots; i++) {
     const t = dots === 1 ? 0.5 : i / (dots - 1)
     const angle = startA + t * (endA - startA)
@@ -147,7 +176,13 @@ function QuadrantCorona({ qi, color, dots = 5, radius, size = 1.6, opacity = 0.6
   return <g>{elements}</g>
 }
 
-function CompassMarks({ globalStage, radius, color = 'currentColor' }) {
+type CompassMarksProps = {
+  globalStage: ArcheStage
+  radius: number
+  color?: string
+}
+
+function CompassMarks({ globalStage, radius, color = 'currentColor' }: CompassMarksProps) {
   if (globalStage === 'pre') return null
   const size =
     globalStage === 'masterful' ? 3.2 :
@@ -158,7 +193,7 @@ function CompassMarks({ globalStage, radius, color = 'currentColor' }) {
     globalStage === 'strong'    ? 0.7 :
     globalStage === 'medium'    ? 0.55 : 0.4
 
-  const elements = []
+  const elements: ReactNode[] = []
   for (let i = 0; i < 4; i++) {
     const angle = i * 90
     const p = polar(angle, radius)
@@ -177,8 +212,10 @@ function CompassMarks({ globalStage, radius, color = 'currentColor' }) {
   return <g>{elements}</g>
 }
 
-function MasterfulArcs({ radius, color = 'currentColor' }) {
-  const elements = []
+type MasterfulArcsProps = { radius: number; color?: string }
+
+function MasterfulArcs({ radius, color = 'currentColor' }: MasterfulArcsProps) {
+  const elements: ReactNode[] = []
   for (let i = 0; i < 4; i++) {
     const startA = i * 90 + 6
     const endA = i * 90 + 84
@@ -197,17 +234,29 @@ function MasterfulArcs({ radius, color = 'currentColor' }) {
   return <g>{elements}</g>
 }
 
-export default function NiWheel({ skills, color, onContinueSurveys, isLocked = false }) {
-  const niScore = calcNiScoreFromSkills(skills)
-  const progress = getNiSkillProgress(skills)
+type Props = {
+  skills: Record<string, SkillState>
+  color: string
+  onContinueSurveys?: () => void
+  isLocked?: boolean
+}
 
-  // Per-архетип состояние — для БИ ветки включают 3 общих базовых навыка сверху.
+export default function FiWheel({ skills, color, onContinueSurveys, isLocked = false }: Props) {
+  // TODO(ts): см. SiWheel — SkillState vs SkillStateEntry (answers shape).
+  const skillsArg = skills as unknown as Parameters<typeof calcFiScoreFromSkills>[0]
+  const fiScore = calcFiScoreFromSkills(skillsArg)
+  const progress = getFiSkillProgress(skillsArg)
+
+  // Per-архетип состояние — у БЭ ветки включают 2 общих базовых сверху
+  // (Установление Доверия, Внутренняя Сверка с Ценностями), которые входят
+  // в средний подсчёт каждого архетипа. branch здесь — только специфичные
+  // навыки; calcFiArchetypeAvg учитывает общие.
   const archeStates = QUADRANT_ORDER.map((key, qi) => {
     const branch = SKILL_TREE[key] ?? []
     const total = branch.length
     const completedSkills = branch.filter(s => Number.isFinite(skills?.[s.id]?.result))
     const completed = completedSkills.length
-    const avg = calcNiArchetypeAvg(skills, key)
+    const avg = calcFiArchetypeAvg(skillsArg, key)
     const stage = getArcheStage(completed, total)
     return { key, qi, branch, total, completed, completedSkills, avg, stage }
   })
@@ -225,21 +274,21 @@ export default function NiWheel({ skills, color, onContinueSurveys, isLocked = f
 
   const stageLabel = isLocked
     ? 'Пройди уровень 0, чтобы открыть колесо навыков'
-    : 'Изучай свои навыки чутья для эволюции колеса'
+    : 'Изучай свои навыки внутреннего хранителя связей для эволюции колеса'
 
   return (
-    <section className={styles.wheel} style={{ '--accent': color }}>
+    <section className={styles.wheel} style={{ '--accent': color } as unknown as CSSProperties}>
       <header className={styles.wheelHeader}>
         <div className={styles.wheelTitleBlock}>
-          <span className={styles.wheelEyebrow}>Колесо БИ</span>
+          <span className={styles.wheelEyebrow}>Колесо БЭ</span>
           <h2 className={styles.wheelTitle}>Самооценка по архетипам</h2>
         </div>
         <div className={styles.wheelStat}>
           <div className={styles.wheelStatVal}>
-            {Number.isFinite(niScore) ? niScore.toFixed(1) : '—'}
+            {Number.isFinite(fiScore) ? (fiScore as number).toFixed(1) : '—'}
             <span className={styles.wheelStatTotal}>/10</span>
           </div>
-          <div className={styles.wheelStatLbl}>общее БИ</div>
+          <div className={styles.wheelStatLbl}>общее БЭ</div>
         </div>
       </header>
 
@@ -270,7 +319,7 @@ export default function NiWheel({ skills, color, onContinueSurveys, isLocked = f
           {archeStates.map(({ key, qi, avg, stage }) => {
             if (!Number.isFinite(avg)) return null
             if (stage !== 'strong' && stage !== 'masterful') return null
-            const length = R_INNER + (avg / 10) * R_AVAILABLE
+            const length = R_INNER + ((avg as number) / 10) * R_AVAILABLE
             return (
               <path
                 key={`glow-${key}`}
@@ -284,7 +333,7 @@ export default function NiWheel({ skills, color, onContinueSurveys, isLocked = f
 
           {archeStates.map(({ key, qi, avg }) => {
             if (!Number.isFinite(avg)) return null
-            const length = R_INNER + (avg / 10) * R_AVAILABLE
+            const length = R_INNER + ((avg as number) / 10) * R_AVAILABLE
             return (
               <path
                 key={`sector-${key}`}
@@ -297,7 +346,7 @@ export default function NiWheel({ skills, color, onContinueSurveys, isLocked = f
 
           {archeStates.map(({ key, qi, avg, completedSkills, stage }) => {
             if (completedSkills.length === 0 || !Number.isFinite(avg)) return null
-            const filledOuter = R_INNER + (avg / 10) * R_AVAILABLE
+            const filledOuter = R_INNER + ((avg as number) / 10) * R_AVAILABLE
             const innerR = R_INNER + 4
             const outerR = Math.max(innerR + 2, filledOuter - 4)
             return (
@@ -351,7 +400,7 @@ export default function NiWheel({ skills, color, onContinueSurveys, isLocked = f
           {archeStates.map(({ key, qi, avg, stage }) => {
             if (stage !== 'strong' && stage !== 'masterful') return null
             if (!Number.isFinite(avg)) return null
-            const length = R_INNER + (avg / 10) * R_AVAILABLE
+            const length = R_INNER + ((avg as number) / 10) * R_AVAILABLE
             const arcR = R_INNER + (length - R_INNER) * 0.55
             return (
               <path
@@ -478,7 +527,7 @@ export default function NiWheel({ skills, color, onContinueSurveys, isLocked = f
             fontSize={showBigBadge ? 17 : 14}
             fontWeight="700"
           >
-            {Number.isFinite(niScore) ? niScore.toFixed(1) : '—'}
+            {Number.isFinite(fiScore) ? (fiScore as number).toFixed(1) : '—'}
           </text>
           <text
             x={CX} y={showBigBadge ? CY + 12 : CY + 11}
@@ -489,7 +538,7 @@ export default function NiWheel({ skills, color, onContinueSurveys, isLocked = f
             opacity={0.65}
             letterSpacing="0.1em"
           >
-            БИ
+            БЭ
           </text>
 
           {archeStates.map(({ key, qi, stage }) => {
@@ -561,7 +610,7 @@ export default function NiWheel({ skills, color, onContinueSurveys, isLocked = f
               </span>
               <span className={styles.archetypeName}>{arche.name}</span>
               <span className={styles.archetypeMeta}>
-                {Number.isFinite(avg) ? `${avg.toFixed(1)}` : '—'} · {stageGlyph} {completed}/{total}
+                {Number.isFinite(avg) ? `${(avg as number).toFixed(1)}` : '—'} · {stageGlyph} {completed}/{total}
               </span>
             </div>
           )

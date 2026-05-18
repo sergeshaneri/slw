@@ -1,8 +1,10 @@
 import { useState, useMemo, useEffect } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { getJourney } from '../../data/journey/registry'
 import { HALL_CONTENT } from '../../data/hallContent'
 import { BLOCKS, LEVEL_LABELS, getBlockItems, teaseBlockData } from './blocks'
+import type { Block, BlockItem, BlockLevel, HallSection } from './blocks'
 import SiWheel from './SiWheel'
 import FeWheel from './FeWheel'
 import NeWheel from './NeWheel'
@@ -11,13 +13,55 @@ import FiWheel from './FiWheel'
 import TeWheel from './TeWheel'
 import TiWheel from './TiWheel'
 import SeWheel from './SeWheel'
-import PlaceholderWheel from './PlaceholderWheel'
 import HabitSection from './HabitSection'
+// @ts-expect-error Onboarding/Hint is still .jsx (P2A scope); resolves after P2A merges.
 import Hint from '../Onboarding/Hint'
+import type { AspectKey } from '@/types/aspect'
+import type { JourneyState, SkillState } from '@/types/journey'
 import styles from './AspectsView.module.css'
 
-export default function AspectsView({ selectedAspect, onAspectSelect, scores, diary, onDiaryChange, journey, onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys, onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys, onEnterHall, isAdmin = false, t, user }) {
-  const [blockId, setBlockId] = useState(null)
+// Запись дневника, передаваемая в `diary` / `onDiaryChange`. AspectsView
+// добавляет в неё «aspect-note» через handleSaveNote — расширенный shape
+// зависит от App.jsx (Phase 3). Минимум, который трогает этот файл —
+// массив записей с произвольным shape; TODO(ts) перейти на DiaryEntry
+// из @/types/api когда P2D его пробросит.
+type DiaryEntry = Record<string, unknown>
+
+// Объект юзера. AspectsView читает только `hints_seen` через Hint —
+// прокидывает пропс дальше. Полный shape — в @/types/api (web_users).
+type User = unknown
+
+type AspectsViewProps = {
+  selectedAspect: AspectKey | null
+  onAspectSelect: (aspect: AspectKey | null) => void
+  scores: Partial<Record<AspectKey, number>>
+  diary?: DiaryEntry[]
+  onDiaryChange?: (next: DiaryEntry[]) => void
+  journey?: JourneyState
+  onGoToSiSurveys?: () => void
+  onGoToFeSurveys?: () => void
+  onGoToNeSurveys?: () => void
+  onGoToNiSurveys?: () => void
+  onGoToFiSurveys?: () => void
+  onGoToTeSurveys?: () => void
+  onGoToTiSurveys?: () => void
+  onGoToSeSurveys?: () => void
+  onEnterHall?: (aspect: AspectKey, section?: HallSection) => void
+  isAdmin?: boolean
+  t?: unknown
+  user?: User
+}
+
+export default function AspectsView({
+  selectedAspect, onAspectSelect, scores, diary, onDiaryChange, journey,
+  onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys,
+  onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys,
+  onEnterHall, isAdmin = false, t, user,
+}: AspectsViewProps) {
+  // `t` (локаль) пока не используется в этом view, прокидывается родителем
+  // для будущей i18n — оставляем в props для парности с App.jsx.
+  void t
+  const [blockId, setBlockId] = useState<string | null>(null)
 
   useEffect(() => {
     setBlockId(null)
@@ -70,7 +114,14 @@ export default function AspectsView({ selectedAspect, onAspectSelect, scores, di
 
 // ─── Сетка 8 аспектов ──────────────────────────────────────────────────────
 
-function AspectsGrid({ scores, onAspectSelect, journey, user }) {
+type AspectsGridProps = {
+  scores: Partial<Record<AspectKey, number>>
+  onAspectSelect: (aspect: AspectKey | null) => void
+  journey?: JourneyState
+  user?: User
+}
+
+function AspectsGrid({ scores, onAspectSelect, journey, user }: AspectsGridProps) {
   return (
     <div className={`${styles.aspectsGrid} ${styles.fadeIn}`} style={{ position: 'relative' }}>
       <Hint id="aspects-grid-intro" user={user} position="top-right">
@@ -87,10 +138,12 @@ function AspectsGrid({ scores, onAspectSelect, journey, user }) {
         // Прогресс по текущему уровню = сколько скриптов уровня пройдено.
         // Берём из getJourney — для аспектов без контента (Se/Fi) вернётся 0.
         const levelData = getJourney(key)?.levels?.[currentLevel]
+        // TODO(ts): levelData.scripts — алиас на levelData.core; в registry
+        // оба определены, читаем core с фолбэком.
         const levelScripts = levelData?.core ?? levelData?.scripts ?? []
         const levelTotal = levelScripts.length
         // Сколько ID из уровня уже в completedScripts.
-        const completedSet = new Set(folder?.completedScripts ?? [])
+        const completedSet = new Set<string>(folder?.completedScripts ?? [])
         const inLevel = levelScripts.filter(s => completedSet.has(s.id)).length
         const levelPct = levelTotal > 0 ? Math.min(100, Math.round((inLevel / levelTotal) * 100)) : 0
         const notStarted = completed === 0
@@ -101,7 +154,7 @@ function AspectsGrid({ scores, onAspectSelect, journey, user }) {
             type="button"
             onClick={() => onAspectSelect(key)}
             className={`${styles.aspectCard} ${styles.stagger}`}
-            style={{ '--accent': color, '--i': i }}
+            style={{ '--accent': color, '--i': i } as unknown as CSSProperties}
           >
             <div className={styles.aspectGlow} style={{ background: `radial-gradient(circle at 30% 20%, ${color}22, transparent 60%)` }} />
             <div className={styles.aspectTop}>
@@ -136,7 +189,7 @@ function AspectsGrid({ scores, onAspectSelect, journey, user }) {
   )
 }
 
-function pluralSteps(n) {
+function pluralSteps(n: number): string {
   const mod10 = n % 10
   const mod100 = n % 100
   if (mod10 === 1 && mod100 !== 11) return 'шаг'
@@ -146,9 +199,33 @@ function pluralSteps(n) {
 
 // ─── Оглавление аспекта ────────────────────────────────────────────────────
 
-function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys, onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys, onOpenBlock, onEnterHall, isAdmin = false }) {
+type TocProps = {
+  aspect: AspectKey
+  data: typeof ASPECT_DATA[AspectKey]
+  color: string
+  available: Block[]
+  scores: Partial<Record<AspectKey, number>>
+  onAspectSelect: (aspect: AspectKey | null) => void
+  journey?: JourneyState
+  onGoToSiSurveys?: () => void
+  onGoToFeSurveys?: () => void
+  onGoToNeSurveys?: () => void
+  onGoToNiSurveys?: () => void
+  onGoToFiSurveys?: () => void
+  onGoToTeSurveys?: () => void
+  onGoToTiSurveys?: () => void
+  onGoToSeSurveys?: () => void
+  onOpenBlock: (id: string) => void
+  onEnterHall?: (aspect: AspectKey, section?: HallSection) => void
+  isAdmin?: boolean
+}
+
+function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys, onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys, onOpenBlock, onEnterHall, isAdmin = false }: TocProps) {
+  // `scores` сейчас не используется в Toc — слайдер оценки удалён 2026-05.
+  // Оставляем в props для совместимости с App.jsx (Phase 3 уберёт если что).
+  void scores
   const byLevel = useMemo(() => {
-    const m = { 0: [], 1: [], 2: [], 3: [] }
+    const m: Record<BlockLevel, Block[]> = { 0: [], 1: [], 2: [], 3: [] }
     available.forEach(b => m[b.level].push(b))
     return m
   }, [available])
@@ -161,6 +238,8 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
     ? 99
     : (journey?.aspects?.[aspect]?.currentLevel ?? 0)
 
+  const skillsForWheels: Record<string, SkillState> = journey?.skills ?? {}
+
   return (
     <div className={`${styles.tocPage} ${styles.fadeIn}`}>
       <AspectHeader
@@ -168,14 +247,14 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
         data={data}
         color={color}
         onBack={() => onAspectSelect(null)}
-        onEnterHall={onEnterHall ? () => onEnterHall(aspect) : null}
+        onEnterHall={onEnterHall ? () => onEnterHall(aspect) : undefined}
       />
 
       {/* Колесо БС с разбивкой по 4 архетипам — только на странице БС.
           Заблокировано до прохождения L0 (currentLevel >= 1). */}
       {aspect === 'Si' && (
         <SiWheel
-          skills={journey?.skills ?? {}}
+          skills={skillsForWheels}
           color={color}
           onContinueSurveys={onGoToSiSurveys}
           isLocked={!isAdmin && (journey?.aspects?.['Si']?.currentLevel ?? 0) < 1}
@@ -186,7 +265,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
           Заблокировано до прохождения L0 ЧЭ (currentLevel >= 1). */}
       {aspect === 'Fe' && (
         <FeWheel
-          skills={journey?.skills ?? {}}
+          skills={skillsForWheels}
           color={color}
           onContinueSurveys={onGoToFeSurveys}
           isLocked={!isAdmin && (journey?.aspects?.['Fe']?.currentLevel ?? 0) < 1}
@@ -198,7 +277,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
           Заблокировано до прохождения L0 ЧИ (currentLevel >= 1). */}
       {aspect === 'Ne' && (
         <NeWheel
-          skills={journey?.skills ?? {}}
+          skills={skillsForWheels}
           color={color}
           onContinueSurveys={onGoToNeSurveys}
           isLocked={!isAdmin && (journey?.aspects?.['Ne']?.currentLevel ?? 0) < 1}
@@ -210,7 +289,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
           Заблокировано до прохождения L0 БИ (currentLevel >= 1). */}
       {aspect === 'Ni' && (
         <NiWheel
-          skills={journey?.skills ?? {}}
+          skills={skillsForWheels}
           color={color}
           onContinueSurveys={onGoToNiSurveys}
           isLocked={!isAdmin && (journey?.aspects?.['Ni']?.currentLevel ?? 0) < 1}
@@ -222,7 +301,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
           Заблокировано до прохождения L0 БЭ (currentLevel >= 1). */}
       {aspect === 'Fi' && (
         <FiWheel
-          skills={journey?.skills ?? {}}
+          skills={skillsForWheels}
           color={color}
           onContinueSurveys={onGoToFiSurveys}
           isLocked={!isAdmin && (journey?.aspects?.['Fi']?.currentLevel ?? 0) < 1}
@@ -234,7 +313,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
           Заблокировано до прохождения L0 ЧЛ (currentLevel >= 1). */}
       {aspect === 'Te' && (
         <TeWheel
-          skills={journey?.skills ?? {}}
+          skills={skillsForWheels}
           color={color}
           onContinueSurveys={onGoToTeSurveys}
           isLocked={!isAdmin && (journey?.aspects?.['Te']?.currentLevel ?? 0) < 1}
@@ -246,7 +325,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
           Заблокировано до прохождения L0 ЧС (currentLevel >= 1). */}
       {aspect === 'Se' && (
         <SeWheel
-          skills={journey?.skills ?? {}}
+          skills={skillsForWheels}
           color={color}
           onContinueSurveys={onGoToSeSurveys}
           isLocked={!isAdmin && (journey?.aspects?.['Se']?.currentLevel ?? 0) < 1}
@@ -258,7 +337,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
           Заблокировано до прохождения L0 БЛ (currentLevel >= 1). */}
       {aspect === 'Ti' && (
         <TiWheel
-          skills={journey?.skills ?? {}}
+          skills={skillsForWheels}
           color={color}
           onContinueSurveys={onGoToTiSurveys}
           isLocked={!isAdmin && (journey?.aspects?.['Ti']?.currentLevel ?? 0) < 1}
@@ -270,10 +349,10 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
       {onEnterHall && (() => {
         const hall = HALL_CONTENT?.[aspect]
         const counts = [
-          hall?.figures?.length > 0 && `${hall.figures.length} личностей`,
-          hall?.arts?.length > 0 && `${hall.arts.length} произведений искусства`,
-          hall?.quotes?.length > 0 && `${hall.quotes.length} цитат`,
-          hall?.interestingFacts?.length > 0 && `${hall.interestingFacts.length} интересных фактов`
+          (hall?.figures?.length ?? 0) > 0 && `${hall!.figures!.length} личностей`,
+          (hall?.arts?.length ?? 0) > 0 && `${hall!.arts!.length} произведений искусства`,
+          (hall?.quotes?.length ?? 0) > 0 && `${hall!.quotes!.length} цитат`,
+          (hall?.interestingFacts?.length ?? 0) > 0 && `${hall!.interestingFacts!.length} интересных фактов`
         ].filter(Boolean)
         if (counts.length === 0) return null
         return (
@@ -281,7 +360,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
             type="button"
             className={styles.tocHallCta}
             onClick={() => onEnterHall(aspect)}
-            style={{ '--accent': color }}
+            style={{ '--accent': color } as unknown as CSSProperties}
           >
             <span className={styles.tocHallCtaIcon}>🏛</span>
             <span className={styles.tocHallCtaBody}>
@@ -297,10 +376,10 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
         <p className={styles.tocIntroText}>{data.essence}</p>
       </div>
 
-      {[0, 1, 2, 3].map(lvl => (
+      {([0, 1, 2, 3] as BlockLevel[]).map(lvl => (
         byLevel[lvl].length > 0 && (
           <section key={lvl} className={styles.tocLevel}>
-            <header className={styles.tocLevelHeader} style={{ '--accent': color }}>
+            <header className={styles.tocLevelHeader} style={{ '--accent': color } as unknown as CSSProperties}>
               <span className={styles.tocLevelCode} style={{ color }}>{LEVEL_LABELS[lvl].code}</span>
               <div className={styles.tocLevelTitles}>
                 <h2 className={styles.tocLevelName}>{LEVEL_LABELS[lvl].name}</h2>
@@ -312,11 +391,11 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
               {byLevel[lvl].map((b, i) => {
                 const isUnlocked = b.level <= accessLevel
                 return (
-                  <li key={b.id} className={styles.stagger} style={{ '--i': i }}>
+                  <li key={b.id} className={styles.stagger} style={{ '--i': i } as unknown as CSSProperties}>
                     <button
                       type="button"
                       className={`${styles.tocItem} ${isUnlocked ? '' : styles.tocItemLocked}`}
-                      style={{ '--accent': color }}
+                      style={{ '--accent': color } as unknown as CSSProperties}
                       onClick={() => onOpenBlock(b.id)}
                     >
                       <span className={styles.tocItemIdx}>{String(i + 1).padStart(2, '0')}</span>
@@ -344,9 +423,18 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
 
 // ─── Шапка аспекта (одинаковая в оглавлении и чтении) ──────────────────────
 
-function AspectHeader({ aspect, data, color, onBack, compact, onEnterHall }) {
+type AspectHeaderProps = {
+  aspect: AspectKey
+  data: typeof ASPECT_DATA[AspectKey]
+  color: string
+  onBack: () => void
+  compact?: boolean
+  onEnterHall?: (() => void) | undefined
+}
+
+function AspectHeader({ aspect, data, color, onBack, compact, onEnterHall }: AspectHeaderProps) {
   return (
-    <header className={`${styles.aspectHeader} ${compact ? styles.aspectHeaderCompact : ''}`} style={{ '--accent': color }}>
+    <header className={`${styles.aspectHeader} ${compact ? styles.aspectHeaderCompact : ''}`} style={{ '--accent': color } as unknown as CSSProperties}>
       <div
         className={styles.aspectHeaderBackdrop}
         style={{ background: `radial-gradient(ellipse at 10% 0%, ${color}33, transparent 55%)` }}
@@ -373,7 +461,7 @@ function AspectHeader({ aspect, data, color, onBack, compact, onEnterHall }) {
                 style={{
                   '--btn-bg': color,
                   '--btn-glow': `${color}aa`,
-                }}
+                } as unknown as CSSProperties}
               >
                 🏛 Войти в холл
               </button>
@@ -387,9 +475,27 @@ function AspectHeader({ aspect, data, color, onBack, compact, onEnterHall }) {
 
 // ─── Чтение одного блока (с sidebar) ───────────────────────────────────────
 
-function BlockReader({ aspect, data, color, block, available, prev, next, diary, onDiaryChange, onBack, onGoto, journey, isAdmin = false, user, onEnterHall }) {
+type BlockReaderProps = {
+  aspect: AspectKey
+  data: typeof ASPECT_DATA[AspectKey]
+  color: string
+  block: Block
+  available: Block[]
+  prev?: Block
+  next?: Block
+  diary?: DiaryEntry[]
+  onDiaryChange?: (next: DiaryEntry[]) => void
+  onBack: () => void
+  onGoto: (id: string) => void
+  journey?: JourneyState
+  isAdmin?: boolean
+  user?: User
+  onEnterHall?: (aspect: AspectKey, section?: HallSection) => void
+}
+
+function BlockReader({ aspect, data, color, block, available, prev, next, diary, onDiaryChange, onBack, onGoto, journey, isAdmin = false, user, onEnterHall }: BlockReaderProps) {
   const byLevel = useMemo(() => {
-    const m = { 0: [], 1: [], 2: [], 3: [] }
+    const m: Record<BlockLevel, Block[]> = { 0: [], 1: [], 2: [], 3: [] }
     available.forEach(b => m[b.level].push(b))
     return m
   }, [available])
@@ -409,8 +515,8 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
   const [noteSaved, setNoteSaved] = useState(false)
   const [pickedItemId, setPickedItemId] = useState('')
 
-  const blockItems = useMemo(() => getBlockItems(block, data), [block, data])
-  const pickedItem = useMemo(
+  const blockItems = useMemo<BlockItem[]>(() => getBlockItems(block, data), [block, data])
+  const pickedItem = useMemo<BlockItem | null>(
     () => blockItems.find(it => it.id === pickedItemId) ?? null,
     [blockItems, pickedItemId]
   )
@@ -426,7 +532,7 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
   const handleSaveNote = () => {
     const text = noteText.trim()
     if (!text || !onDiaryChange) return
-    const entry = {
+    const entry: DiaryEntry = {
       id: Date.now(),
       date: new Date().toLocaleDateString('ru-RU'),
       ts: Date.now(),
@@ -448,7 +554,7 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
   }
 
   return (
-    <div className={`${styles.readerLayout} ${styles.fadeIn}`} style={{ '--accent': color }}>
+    <div className={`${styles.readerLayout} ${styles.fadeIn}`} style={{ '--accent': color } as unknown as CSSProperties}>
       {/* Левая колонка: sidebar */}
       <aside className={styles.sidebar}>
         <button type="button" className={styles.sidebarBack} onClick={onBack}>
@@ -460,7 +566,7 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
           <span className={styles.sidebarAspectName}>{data.name}</span>
         </div>
         <nav className={styles.sidebarNav}>
-          {[0, 1, 2, 3].map(lvl => (
+          {([0, 1, 2, 3] as BlockLevel[]).map(lvl => (
             byLevel[lvl].length > 0 && (
               <div key={lvl} className={styles.sidebarLevel}>
                 <div className={styles.sidebarLevelHeader}>
@@ -523,7 +629,7 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
                 <div className={styles.silhouetteLine} style={{ width: '64%' }} />
                 <div className={styles.silhouetteLine} style={{ width: '80%' }} />
               </div>
-              <div className={styles.blockLockOverlay} style={{ '--accent': color }}>
+              <div className={styles.blockLockOverlay} style={{ '--accent': color } as unknown as CSSProperties}>
                 <div className={styles.blockLockIcon} aria-hidden="true">🔒</div>
                 <div className={styles.blockLockHead}>
                   Откроется на{' '}
@@ -582,7 +688,7 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
                   </div>
                 )}
 
-                <div className={styles.notePreview} style={{ '--accent': color }}>
+                <div className={styles.notePreview} style={{ '--accent': color } as unknown as CSSProperties}>
                   <div className={styles.notePreviewTitle}>
                     {pickedItem ? pickedItem.label : block.title}
                   </div>
@@ -605,7 +711,7 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
                     className={styles.noteSaveBtn}
                     onClick={handleSaveNote}
                     disabled={!noteText.trim()}
-                    style={{ '--accent': color }}
+                    style={{ '--accent': color } as unknown as CSSProperties}
                   >
                     В дневник
                   </button>
@@ -636,21 +742,36 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
 
 // ─── Рендереры для каждого вида блока ──────────────────────────────────────
 
-function BlockBody({ block, data, color, aspect, onEnterHall }) {
+type BlockBodyProps = {
+  block: Block
+  // `data` — это либо ASPECT_DATA[aspect] (когда блок разблокирован), либо
+  // результат teaseBlockData (когда залочен). teaseBlockData возвращает
+  // объект с подмножеством полей, поэтому подбираем тип на уровне
+  // конкретных полевых обращений ниже. TODO(ts): сузить до union AspectInfo
+  // | TeaserCopy после Phase 3.
+  data: typeof ASPECT_DATA[AspectKey] | Record<string, unknown>
+  color: string
+  aspect: AspectKey
+  onEnterHall?: (aspect: AspectKey, section?: HallSection) => void
+}
+
+function BlockBody({ block, data, color, aspect, onEnterHall }: BlockBodyProps) {
   const { kind, field } = block
+  // Локальный helper: безопасный доступ к произвольному полю data.
+  const d = data as Record<string, unknown>
   switch (kind) {
     case 'hallStub':
       return <HallStubBlock block={block} color={color} aspect={aspect} onEnterHall={onEnterHall} />
 
 
     case 'text':
-      return <Prose>{data.essence}</Prose>
+      return <Prose>{d.essence as string | undefined}</Prose>
 
     case 'textItalic':
-      return <Prose italic>{data.superpower}</Prose>
+      return <Prose italic>{d.superpower as string | undefined}</Prose>
 
     case 'list': {
-      const items = data[field] || []
+      const items = (field ? (d[field] as string[] | undefined) : undefined) || []
       return (
         <ul className={styles.bulletList}>
           {items.map((it, i) => (
@@ -664,7 +785,7 @@ function BlockBody({ block, data, color, aspect, onEnterHall }) {
     }
 
     case 'numberedList': {
-      const items = data[field] || []
+      const items = (field ? (d[field] as string[] | undefined) : undefined) || []
       return (
         <ol className={styles.numberList}>
           {items.map((it, i) => (
@@ -677,52 +798,64 @@ function BlockBody({ block, data, color, aspect, onEnterHall }) {
       )
     }
 
-    case 'archetypes':
+    case 'archetypes': {
+      const archetypes = d.archetypes as { shadow: string[]; gift: string[] } | undefined
       return (
         <div className={styles.twoCols}>
-          <PolarBlock label="Тень" tone="shadow" items={data.archetypes.shadow} />
-          <PolarBlock label="Дар" tone="gift" items={data.archetypes.gift} />
+          <PolarBlock label="Тень" tone="shadow" items={archetypes?.shadow ?? []} />
+          <PolarBlock label="Дар" tone="gift" items={archetypes?.gift ?? []} />
         </div>
       )
+    }
 
-    case 'dilemmas':
+    case 'dilemmas': {
+      const dilemmas = (d.dilemmas as Array<{ t: string; s: string; g: string }> | undefined) ?? []
       return (
         <div className={styles.dilemmaList}>
-          {data.dilemmas.map((d, i) => (
+          {dilemmas.map((dl, i) => (
             <div key={i} className={styles.dilemmaBlock}>
-              <h3 className={styles.dilemmaTitle}>{d.t}</h3>
+              <h3 className={styles.dilemmaTitle}>{dl.t}</h3>
               <div className={styles.twoCols}>
                 <div className={styles.polar}>
                   <div className={`${styles.polarLabel} ${styles.polarShadow}`}>Тень</div>
-                  <p className={styles.polarText}>{d.s}</p>
+                  <p className={styles.polarText}>{dl.s}</p>
                 </div>
                 <div className={styles.polar}>
                   <div className={`${styles.polarLabel} ${styles.polarGift}`}>Дар</div>
-                  <p className={styles.polarText}>{d.g}</p>
+                  <p className={styles.polarText}>{dl.g}</p>
                 </div>
               </div>
             </div>
           ))}
         </div>
       )
+    }
 
-    case 'integration':
+    case 'integration': {
+      const integration = d.integration as {
+        opposite: string
+        desc: string
+        practices?: Array<{ name: string; desc: string }>
+      } | undefined
+      if (!integration) return null
       return (
         <>
           <p className={styles.integrationIntro}>
-            Противоположный аспект — <b style={{ color }}>{data.integration.opposite}</b>.
-            {' '}{data.integration.desc}
+            Противоположный аспект — <b style={{ color }}>{integration.opposite}</b>.
+            {' '}{integration.desc}
           </p>
-          {data.integration.practices?.map((p, i) => (
+          {integration.practices?.map((p, i) => (
             <PracticeItem key={i} name={p.name} desc={p.desc} color={color} />
           ))}
         </>
       )
+    }
 
-    case 'synergy':
+    case 'synergy': {
+      const synergy = (d.synergy as Array<{ aspects: string; name: string; desc: string }> | undefined) ?? []
       return (
         <div className={styles.synergyList}>
-          {data.synergy.map((s, i) => (
+          {synergy.map((s, i) => (
             <div key={i} className={styles.synergyBlock}>
               <div className={styles.synergyHead} style={{ color }}>
                 <span className={styles.synergyPair}>{s.aspects}</span>
@@ -734,11 +867,13 @@ function BlockBody({ block, data, color, aspect, onEnterHall }) {
           ))}
         </div>
       )
+    }
 
-    case 'polysemy':
+    case 'polysemy': {
+      const polysemy = (d.polysemy as Array<{ word: string; variants: string }> | undefined) ?? []
       return (
         <div className={styles.polysemyList}>
-          {data.polysemy.map((p, i) => (
+          {polysemy.map((p, i) => (
             <div key={i} className={styles.polysemyBlock}>
               <div className={styles.polysemyWord} style={{ color }}>{p.word}</div>
               <div className={styles.polysemyVariants}>{p.variants}</div>
@@ -746,23 +881,36 @@ function BlockBody({ block, data, color, aspect, onEnterHall }) {
           ))}
         </div>
       )
-
-    case 'practices':
-      return data.practices.map((p, i) => (
-        <PracticeItem key={i} name={p.name} desc={p.desc} color={color} index={i + 1} />
-      ))
-
-    case 'titledList': {
-      const items = data[field] || []
-      return items.map((p, i) => (
-        <PracticeItem key={i} name={p.name} desc={p.desc} color={color} index={i + 1} keySkills={p.keySkills} />
-      ))
     }
 
-    case 'archetypePath':
+    case 'practices': {
+      const practices = (d.practices as Array<{ name: string; desc: string }> | undefined) ?? []
+      return (
+        <>
+          {practices.map((p, i) => (
+            <PracticeItem key={i} name={p.name} desc={p.desc} color={color} index={i + 1} />
+          ))}
+        </>
+      )
+    }
+
+    case 'titledList': {
+      type TitledItem = { name: string; desc: string; keySkills?: Array<{ skill: string; note?: string }> }
+      const items = (field ? (d[field] as TitledItem[] | undefined) : undefined) || []
+      return (
+        <>
+          {items.map((p, i) => (
+            <PracticeItem key={i} name={p.name} desc={p.desc} color={color} index={i + 1} keySkills={p.keySkills} />
+          ))}
+        </>
+      )
+    }
+
+    case 'archetypePath': {
+      const path = (d.archetypePath as Array<{ name: string; prerequisite: string; lesson: string; transition: string }> | undefined) ?? []
       return (
         <div className={styles.pathList}>
-          {data.archetypePath.map((p, i) => (
+          {path.map((p, i) => (
             <div key={i} className={styles.pathBlock} style={{ borderColor: `${color}33` }}>
               <h3 className={styles.pathName} style={{ color }}>{p.name}</h3>
               <div className={styles.pathRow}>
@@ -780,33 +928,37 @@ function BlockBody({ block, data, color, aspect, onEnterHall }) {
           ))}
         </div>
       )
+    }
 
     case 'fears':
       return (
         <>
           <div className={styles.fearRow}>
             <div className={styles.fearLabel}>Страхи</div>
-            <p className={styles.fearText}>{data.fears}</p>
+            <p className={styles.fearText}>{d.fears as string | undefined}</p>
           </div>
           <div className={styles.fearRow}>
             <div className={styles.fearLabel}>Защиты</div>
-            <p className={styles.fearText}>{data.defenses}</p>
+            <p className={styles.fearText}>{d.defenses as string | undefined}</p>
           </div>
         </>
       )
 
-    case 'somatic':
+    case 'somatic': {
+      const somatic = d.somatic as { shadow: string[]; gift: string[] } | undefined
       return (
         <div className={styles.twoCols}>
-          <PolarBlock label="Тень" tone="shadow" items={data.somatic.shadow} />
-          <PolarBlock label="Дар" tone="gift" items={data.somatic.gift} />
+          <PolarBlock label="Тень" tone="shadow" items={somatic?.shadow ?? []} />
+          <PolarBlock label="Дар" tone="gift" items={somatic?.gift ?? []} />
         </div>
       )
+    }
 
-    case 'assessment':
+    case 'assessment': {
+      const sa = (d.selfAssessment as Array<{ pole: string; qs: string[] }> | undefined) ?? []
       return (
         <div className={styles.assessList}>
-          {data.selfAssessment.map((mp, mi) => (
+          {sa.map((mp, mi) => (
             <div key={mi} className={styles.assessBlock}>
               <h3 className={styles.assessPole} style={{ color }}>
                 <span className={styles.assessIdx}>{String(mi + 1).padStart(2, '0')}</span>
@@ -822,9 +974,18 @@ function BlockBody({ block, data, color, aspect, onEnterHall }) {
           <p className={styles.assessNote}>Ответы записывай в раздел «Дневник».</p>
         </div>
       )
+    }
 
     case 'skillBlocks': {
-      const items = data[field] || []
+      type SkillBlockItem = {
+        skillId?: string
+        name?: string
+        suppression?: string
+        defense?: string
+        beliefs?: string[]
+        family?: string[]
+      }
+      const items = (field ? (d[field] as SkillBlockItem[] | undefined) : undefined) || []
       return (
         <div className={styles.skillBlockList}>
           {items.map((sk, i) => (
@@ -835,15 +996,22 @@ function BlockBody({ block, data, color, aspect, onEnterHall }) {
     }
 
     case 'moneyPsychology': {
-      const mp = data[field]
+      type MoneyPsych = {
+        intro?: string
+        sections?: Array<{ title: string; desc: string }>
+        scenarios?: Array<{ title: string; desc: string }>
+        signs?: string[]
+        practices?: Array<{ title: string; desc: string }>
+      }
+      const mp = field ? (d[field] as MoneyPsych | undefined) : undefined
       if (!mp) return null
       return (
         <div className={styles.pathList}>
           {mp.intro && <Prose>{mp.intro}</Prose>}
-          {mp.sections?.length > 0 && (
+          {(mp.sections?.length ?? 0) > 0 && (
             <>
               <h3 className={styles.dilemmaTitle} style={{ color }}>Деньги как символ и язык обмена</h3>
-              {mp.sections.map((s, i) => (
+              {mp.sections!.map((s, i) => (
                 <div key={`s-${i}`} className={styles.pathBlock} style={{ borderColor: `${color}33` }}>
                   <h3 className={styles.pathName} style={{ color }}>{s.title}</h3>
                   <div className={styles.pathText}>{s.desc}</div>
@@ -851,10 +1019,10 @@ function BlockBody({ block, data, color, aspect, onEnterHall }) {
               ))}
             </>
           )}
-          {mp.scenarios?.length > 0 && (
+          {(mp.scenarios?.length ?? 0) > 0 && (
             <>
               <h3 className={styles.dilemmaTitle} style={{ color }}>Шесть глубинных сценариев денежных блоков</h3>
-              {mp.scenarios.map((s, i) => (
+              {mp.scenarios!.map((s, i) => (
                 <div key={`sc-${i}`} className={styles.pathBlock} style={{ borderColor: `${color}33` }}>
                   <h3 className={styles.pathName} style={{ color }}>{s.title}</h3>
                   <div className={styles.pathText}>{s.desc}</div>
@@ -862,11 +1030,11 @@ function BlockBody({ block, data, color, aspect, onEnterHall }) {
               ))}
             </>
           )}
-          {mp.signs?.length > 0 && (
+          {(mp.signs?.length ?? 0) > 0 && (
             <>
               <h3 className={styles.dilemmaTitle} style={{ color }}>Признаки денежных блокировок</h3>
               <ul className={styles.bulletList}>
-                {mp.signs.map((sign, i) => (
+                {mp.signs!.map((sign, i) => (
                   <li key={`sg-${i}`} className={styles.bulletItem}>
                     <span className={styles.bulletMark} style={{ background: color, boxShadow: `0 0 8px ${color}99` }} />
                     <span>{sign}</span>
@@ -875,10 +1043,10 @@ function BlockBody({ block, data, color, aspect, onEnterHall }) {
               </ul>
             </>
           )}
-          {mp.practices?.length > 0 && (
+          {(mp.practices?.length ?? 0) > 0 && (
             <>
               <h3 className={styles.dilemmaTitle} style={{ color }}>Практики проработки</h3>
-              {mp.practices.map((p, i) => (
+              {mp.practices!.map((p, i) => (
                 <PracticeItem key={`p-${i}`} name={p.title} desc={p.desc} color={color} index={i + 1} />
               ))}
             </>
@@ -894,11 +1062,15 @@ function BlockBody({ block, data, color, aspect, onEnterHall }) {
 
 // ─── Переиспользуемые кусочки ──────────────────────────────────────────────
 
-function Prose({ children, italic }) {
+type ProseProps = { children: ReactNode; italic?: boolean }
+
+function Prose({ children, italic }: ProseProps) {
   return <p className={`${styles.prose} ${italic ? styles.proseItalic : ''}`}>{children}</p>
 }
 
-function PolarBlock({ label, tone, items }) {
+type PolarBlockProps = { label: string; tone: 'shadow' | 'gift'; items: string[] }
+
+function PolarBlock({ label, tone, items }: PolarBlockProps) {
   return (
     <div className={styles.polar}>
       <div className={`${styles.polarLabel} ${tone === 'shadow' ? styles.polarShadow : styles.polarGift}`}>
@@ -912,7 +1084,7 @@ function PolarBlock({ label, tone, items }) {
 }
 
 // Утилита: взять N случайных индексов из массива длины `total`.
-function pickRandomIndexes(total, n) {
+function pickRandomIndexes(total: number, n: number): number[] {
   if (total <= n) return Array.from({ length: total }, (_, i) => i)
   const pool = Array.from({ length: total }, (_, i) => i)
   for (let i = pool.length - 1; i > 0; i--) {
@@ -925,10 +1097,20 @@ function pickRandomIndexes(total, n) {
 // Тизер-блок hallStub с рандомизацией. Показывает 3 случайных элемента
 // из секции холла (figures / arts / quotes / interestingFacts) с кнопкой
 // «🎲 Показать другие», которая перевыбирает случайную тройку.
-function HallStubBlock({ block, color, aspect, onEnterHall }) {
+type HallStubProps = {
+  block: Block
+  color: string
+  aspect: AspectKey
+  onEnterHall?: (aspect: AspectKey, section?: HallSection) => void
+}
+
+function HallStubBlock({ block, color, aspect, onEnterHall }: HallStubProps) {
   const section = block.hallSection
-  const hall = HALL_CONTENT?.[aspect] ?? {}
-  const items = hall[section] ?? []
+  // TODO(ts): HALL_CONTENT[aspect].{figures|arts|quotes|interestingFacts}
+  // имеют разные shape — здесь обращение по строковому ключу секции,
+  // поэтому работаем через узкий каст.
+  const hall = (HALL_CONTENT?.[aspect] ?? {}) as Record<string, Array<Record<string, unknown>> | undefined>
+  const items = (section ? hall[section] : []) ?? []
   const teaserSize = 3
   const [seed, setSeed] = useState(0)
   const indexes = useMemo(
@@ -938,12 +1120,12 @@ function HallStubBlock({ block, color, aspect, onEnterHall }) {
   )
   const teaser = indexes.map(i => items[i])
   const remaining = Math.max(0, items.length - teaser.length)
-  const sectionLabel = {
+  const sectionLabel = ({
     figures: 'личностей',
     arts: 'произведений',
     quotes: 'цитат',
     interestingFacts: 'фактов'
-  }[section] ?? 'элементов'
+  } as Record<string, string>)[section ?? ''] ?? 'элементов'
   return (
     <div className={styles.hallStubBlock}>
       <p className={styles.hallStubLead}>
@@ -952,8 +1134,8 @@ function HallStubBlock({ block, color, aspect, onEnterHall }) {
       <ul className={styles.hallStubList}>
         {teaser.map((item, i) => {
           if (!item) return null
-          const title = item.text ?? item.title ?? item.name ?? '—'
-          const sub = item.author ?? item.note ?? item.desc ?? ''
+          const title = (item.text ?? item.title ?? item.name ?? '—') as ReactNode
+          const sub = (item.author ?? item.note ?? item.desc ?? '') as ReactNode
           return (
             <li key={`${seed}-${i}`} className={styles.hallStubItem}>
               <span className={styles.hallStubItemTitle}>{title}</span>
@@ -967,7 +1149,7 @@ function HallStubBlock({ block, color, aspect, onEnterHall }) {
           type="button"
           className={styles.hallStubShuffle}
           onClick={() => setSeed(s => s + 1)}
-          style={{ '--accent': color }}
+          style={{ '--accent': color } as unknown as CSSProperties}
           aria-label="Показать другую случайную тройку"
         >
           <span>🎲 Показать другие</span>
@@ -983,7 +1165,7 @@ function HallStubBlock({ block, color, aspect, onEnterHall }) {
           type="button"
           className={styles.hallStubCta}
           onClick={() => onEnterHall(aspect, section)}
-          style={{ '--accent': color }}
+          style={{ '--accent': color } as unknown as CSSProperties}
         >
           <span>🏛 Открыть в Холле</span>
           <span aria-hidden="true">→</span>
@@ -997,7 +1179,18 @@ function HallStubBlock({ block, color, aspect, onEnterHall }) {
 // вытеснение / защита / убеждения / родовые программы.
 // Простая bold-разметка `**текст**` подсвечивается курсивом-жирным;
 // списки рендерятся как ul.
-function SkillBlockCard({ sk, color }) {
+type SkillBlockCardProps = {
+  sk: {
+    name?: string
+    suppression?: string
+    defense?: string
+    beliefs?: string[]
+    family?: string[]
+  } | null | undefined
+  color: string
+}
+
+function SkillBlockCard({ sk, color }: SkillBlockCardProps) {
   if (!sk) return null
   return (
     <div className={styles.skillBlockCard} style={{ borderColor: `${color}33` }}>
@@ -1017,22 +1210,22 @@ function SkillBlockCard({ sk, color }) {
         </div>
       )}
 
-      {sk.beliefs?.length > 0 && (
+      {(sk.beliefs?.length ?? 0) > 0 && (
         <div className={styles.skillBlockRow}>
           <div className={styles.skillBlockLabel}>3. Ограничивающие убеждения</div>
           <ul className={styles.skillBlockList2}>
-            {sk.beliefs.map((b, i) => (
+            {sk.beliefs!.map((b, i) => (
               <li key={i} className={styles.skillBlockItem}>{renderBoldRich(b)}</li>
             ))}
           </ul>
         </div>
       )}
 
-      {sk.family?.length > 0 && (
+      {(sk.family?.length ?? 0) > 0 && (
         <div className={styles.skillBlockRow}>
           <div className={styles.skillBlockLabel}>4. Родовые программы</div>
           <ul className={styles.skillBlockList2}>
-            {sk.family.map((f, i) => (
+            {sk.family!.map((f, i) => (
               <li key={i} className={styles.skillBlockItem}>{renderBoldRich(f)}</li>
             ))}
           </ul>
@@ -1044,7 +1237,7 @@ function SkillBlockCard({ sk, color }) {
 
 // Минимальный inline-парсер `**bold**` для выделений в текстах блоков.
 // Возвращает массив React-элементов / строк.
-function renderBoldRich(text) {
+function renderBoldRich(text: string | undefined | null): ReactNode {
   if (!text) return null
   const parts = String(text).split(/(\*\*[^*]+\*\*)/g)
   return parts.map((p, i) => {
@@ -1054,7 +1247,15 @@ function renderBoldRich(text) {
   })
 }
 
-function PracticeItem({ name, desc, color, index, keySkills }) {
+type PracticeItemProps = {
+  name: string
+  desc: string
+  color: string
+  index?: number
+  keySkills?: Array<{ skill: string; note?: string }>
+}
+
+function PracticeItem({ name, desc, color, index, keySkills }: PracticeItemProps) {
   return (
     <div className={styles.practiceItem}>
       <h3 className={styles.practiceName} style={{ color }}>
