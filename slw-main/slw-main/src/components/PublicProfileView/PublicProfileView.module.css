@@ -631,3 +631,24 @@
   border-radius: 10px;
   padding: 1px 6px;
 }
+
+/* Кнопка «↓ Показать все N карточек» / «↑ Свернуть». Появляется когда
+   список inspirations / insights больше дефолтного лимита (6 / 10).
+   Outline-pill в фиолетовом, как в Heatmap и AchievementsSection. */
+.expandBtn {
+  display: block;
+  margin: 14px auto 0;
+  background: transparent;
+  border: 1px solid rgba(179,157,219,0.30);
+  color: rgba(214,188,250,0.85);
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.expandBtn:hover {
+  background: rgba(179,157,219,0.10);
+  border-color: rgba(179,157,219,0.55);
+}

@@ -9,6 +9,13 @@
   --surface-2: #1c1d25;
   color: var(--text);
   max-width: 760px;
+  /* Защита от горизонтального скролла на мобиле — если внутри вкладок
+     (Эмоции/Тренировки) попадётся длинная строка без пробелов, она не
+     раздует весь Diary. */
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .titleBlock {
@@ -607,6 +614,26 @@
   background: var(--surface-2);
   border: 1px dashed var(--line);
   border-radius: 14px;
+}
+
+/* «↓ Показать все N записей» под списком, когда отфильтрованных
+   больше дефолтного лимита (20). Раскрывает весь хвост. */
+.expandBtn {
+  align-self: center;
+  margin-top: 10px;
+  background: transparent;
+  border: 1px solid rgba(179,157,219,0.30);
+  color: rgba(214,188,250,0.85);
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.expandBtn:hover {
+  background: rgba(179,157,219,0.10);
+  border-color: rgba(179,157,219,0.55);
 }
 
 /* ── survey details (раскрытие ответов на анкету) ── */

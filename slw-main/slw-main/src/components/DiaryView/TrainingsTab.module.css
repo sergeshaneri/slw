@@ -10,6 +10,19 @@
   --accent: #b39ddb;
   --danger: #e57373;
   color: var(--text);
+  /* Не раздуваем родителя — иначе страница скроллируется по горизонтали. */
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.day, .exercise, .sideList, .exerciseList {
+  min-width: 0;
+}
+
+.exerciseName, .exerciseNotes, .sideList li {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .muted { color: var(--text-muted); font-size: 13px; padding: 6px 0; }

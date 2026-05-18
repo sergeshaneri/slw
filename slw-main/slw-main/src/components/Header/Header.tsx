@@ -20,6 +20,8 @@ type Props = {
   aspectsHighlight?: boolean
   user: User | null
   userAvatar?: string
+  /** Сколько шагов путешествия юзер прошёл — для гейта ИИ-коуча (≥5). */
+  totalStepsCompleted?: number
   onLogin?: () => void
   onLogout: () => void
   onOpenMyProfile?: () => void
@@ -34,7 +36,12 @@ type NavItem = {
   id: ViewName
   label: string
   badge?: number
+  /** Кнопка визуально приглушена + дисэйблена + показывает tooltip. */
+  locked?: boolean
+  lockedTitle?: string
 }
+
+const COACH_UNLOCK_AT = 5
 
 export default function Header({
   view,
@@ -44,6 +51,7 @@ export default function Header({
   aspectsHighlight = false,
   user,
   userAvatar,
+  totalStepsCompleted = 0,
   onLogin,
   onLogout,
   onOpenMyProfile,
@@ -53,6 +61,13 @@ export default function Header({
   onOpenHall,
   onOpenAdmin,
 }: Props) {
+  // ИИ-коуч заблокирован пока юзер не прошёл хотя бы 5 шагов путешествия.
+  // На незалогиненных тоже показываем lock — чтобы было видно что фича
+  // существует, но не для гостей.
+  const coachLocked = !user || totalStepsCompleted < COACH_UNLOCK_AT
+  const coachLockedTitle =
+    'ИИ-коуч доступен тем, кто начал путешествие по планетам и прошёл хотя бы 5 шагов'
+
   const navItems: NavItem[] = [
     // Главная: для залогиненных — Дашборд, гостям — сразу Аспекты (read-only).
     ...(user ? [{ id: 'dashboard' as const, label: t.nav.dashboard }] : []),
@@ -61,8 +76,13 @@ export default function Header({
     { id: 'diary', label: t.nav.diary },
     // Топ публичный (без auth) — виден всем.
     { id: 'leaderboard', label: t.nav.leaderboard },
-    // Коуч гейтится в App.jsx:handleViewChange — без логина откроется AuthModal.
-    { id: 'coach', label: t.nav.coach },
+    // Коуч гейтится: до 5 пройденных шагов — затемнён и показывает tooltip.
+    {
+      id: 'coach',
+      label: t.nav.coach,
+      locked: coachLocked,
+      lockedTitle: coachLockedTitle,
+    },
     // Колесо и Прогресс убраны (2026-05). Функционал колеса — в MiniWheel
     // на дашборде; история оценок не использовалась — функционал удалён.
     // Сообщения и Профиль на дашборде + аватар справа.
@@ -81,14 +101,27 @@ export default function Header({
           if (item.id === 'journey' && journeyHighlight) highlightLabel = '👈 Тут начинается игра'
           else if (item.id === 'aspects' && aspectsHighlight) highlightLabel = '👆 Тут больше информации по сферам жизни'
           const isHighlight = !!highlightLabel
+          // Locked-кнопка остаётся кликабельной (alert через title) —
+          // визуально приглушена, не отключена hard (чтобы tooltip работал
+          // на мобиле через клик). Клик показывает alert с пояснением.
+          const handleClick = () => {
+            if (item.locked) {
+              window.alert(item.lockedTitle || 'Функция заблокирована')
+              return
+            }
+            onViewChange(item.id)
+          }
           return (
             <button
               key={item.id}
               type="button"
-              onClick={() => onViewChange(item.id)}
-              className={`${styles.navButton} ${view === item.id ? styles.active : ''} ${isHighlight ? styles.navHighlight : ''}`}
+              onClick={handleClick}
+              title={item.locked ? item.lockedTitle : undefined}
+              aria-disabled={item.locked || undefined}
+              className={`${styles.navButton} ${view === item.id ? styles.active : ''} ${isHighlight ? styles.navHighlight : ''} ${item.locked ? styles.navLocked : ''}`}
             >
               <span>{item.label}</span>
+              {item.locked && <span className={styles.navLockIcon}>🔒</span>}
               {item.badge !== undefined && item.badge > 0 && <span className={styles.navBadge}>{item.badge}</span>}
               {isHighlight && (
                 <span className={styles.navHighlightLabel}>

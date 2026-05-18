@@ -450,6 +450,40 @@ async def get_dashboard(
         if active_aspect else None
     )
 
+    # Общее число пройденных шагов — для empty-state «начни путешествие»
+    # и для гейта ИИ-коуча (нужно ≥5).
+    je_conds = [JourneyEvent.web_user_id == current_user.id]
+    if current_user.telegram_id:
+        je_conds.append(JourneyEvent.telegram_id == current_user.telegram_id)
+    server_steps = int((
+        await session.execute(
+            select(func.count(func.distinct(JourneyEvent.id)))
+            .where(
+                JourneyEvent.type == "step_completed",
+                or_(*je_conds),
+            )
+        )
+    ).scalar_one())
+    # Frontend journey.completedScripts тоже учитываем (фронт там мерджит
+    # web+bot). Берём max.
+    web_state = await session.get(WebState, current_user.id)
+    scripts_steps = 0
+    if web_state and isinstance(web_state.journey, dict):
+        cs_root = web_state.journey.get("completedScripts")
+        if isinstance(cs_root, list):
+            scripts_steps = max(scripts_steps, len(cs_root))
+        # Per-aspect: aspects[*].completedScripts.
+        aspects_map = web_state.journey.get("aspects")
+        if isinstance(aspects_map, dict):
+            total = 0
+            for v in aspects_map.values():
+                if isinstance(v, dict):
+                    cs = v.get("completedScripts")
+                    if isinstance(cs, list):
+                        total += len(cs)
+            scripts_steps = max(scripts_steps, total)
+    total_steps_completed = max(server_steps, scripts_steps)
+
     # Коуч-карточка.
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     coach_used = int((
@@ -602,6 +636,9 @@ async def get_dashboard(
         "scores": scores,
         "active_aspect": active_aspect,
         "level_progress": level_progress,
+        "total_steps_completed": total_steps_completed,
+        "is_newbie": total_steps_completed == 0,
+        "coach_unlocked": total_steps_completed >= 5,
         "coach": coach_payload,
         "notifications": notif_payload,
         "dm_unread_count": dm_unread,

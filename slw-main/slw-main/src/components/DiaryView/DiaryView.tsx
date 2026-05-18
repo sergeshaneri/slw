@@ -43,6 +43,10 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
   const [text, setText] = useState<string>('')
   const [aspect, setAspect] = useState<AspectKey | 'general'>('general')
   const [filter, setFilter] = useState<AspectKey | 'general' | 'all'>('all')
+  // Сколько последних записей рендерим. У активного юзера дневник
+  // может расти до сотен — без collapse страница тормозит.
+  // showAll=true → весь отфильтрованный список.
+  const [showAll, setShowAll] = useState<boolean>(false)
   // Вкладки внутри страницы: «entries» (записи) / «search» (поиск).
   // Поиск работает только для залогиненных юзеров (запрос идёт на бэк).
   const [mode, setMode] = useState<DiaryTab>('entries')
@@ -198,12 +202,24 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
       </div>
 
       <div className={styles.entries}>
-        {filteredDiary.map(entry => (
+        {(showAll ? filteredDiary : filteredDiary.slice(0, 20)).map(entry => (
           <DiaryEntry key={entry.id} entry={entry} onDelete={() => handleDelete(entry.id)} />
         ))}
 
         {filteredDiary.length === 0 && (
           <div className={styles.noEntries}>{t.diary.noEntries}</div>
+        )}
+
+        {filteredDiary.length > 20 && (
+          <button
+            type="button"
+            className={styles.expandBtn}
+            onClick={() => setShowAll(v => !v)}
+          >
+            {showAll
+              ? '↑ Свернуть'
+              : `↓ Показать все ${filteredDiary.length} записей`}
+          </button>
         )}
       </div>
       </>

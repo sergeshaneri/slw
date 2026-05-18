@@ -72,7 +72,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ### Stack
 
-**Frontend** — React 18 + Vite, CSS Modules  
+**Frontend** — React 18 + Vite, TypeScript strict, CSS Modules  
 Path: `slw-main/slw-main/src/`  
 Deploy: `npm run deploy` → gh-pages branch → `https://sergeshaneri.github.io/slw`  
 Env: `VITE_API_URL=https://slw-production.up.railway.app` (in `.env.production`)
@@ -119,36 +119,36 @@ Config: `backend/railway.toml`
 **Frontend**
 | File | What it does |
 |------|-------------|
-| `slw-main/slw-main/src/App.jsx` | Root: auth gate, data loading, view routing, тост-очередь, парсинг `?u=<id>` для deeplink на профиль |
-| `slw-main/slw-main/src/api/client.js` | Все API-вызовы, JWT в `localStorage['slw_token']` |
-| `slw-main/slw-main/src/hooks/useAuth.js` | Auth state, `?token=` в URL |
-| `slw-main/slw-main/src/components/Auth/AuthModal.jsx` | Login/register (3 mode) |
-| `slw-main/slw-main/src/components/Welcome/WelcomeScreen.jsx` | Гостевой стартовый экран |
-| `slw-main/slw-main/src/components/DashboardView/` | Главная для залогиненных. `MiniWheel.jsx` — компактное SVG-колесо. |
+| `slw-main/slw-main/src/App.tsx` | Root: auth gate, data loading, view routing, тост-очередь, парсинг `?u=<id>` для deeplink на профиль |
+| `slw-main/slw-main/src/api/client.ts` | Все API-вызовы, JWT в `localStorage['slw_token']` |
+| `slw-main/slw-main/src/hooks/useAuth.ts` | Auth state, `?token=` в URL |
+| `slw-main/slw-main/src/components/Auth/AuthModal.tsx` | Login/register (3 mode) |
+| `slw-main/slw-main/src/components/Welcome/WelcomeScreen.tsx` | Гостевой стартовый экран |
+| `slw-main/slw-main/src/components/DashboardView/` | Главная для залогиненных. `MiniWheel.tsx` — компактное SVG-колесо. |
 | `slw-main/slw-main/src/components/HallView/` | Холл аспекта (4 вкладки: Обзор / Чат / Вопросы / Инсайты / Сообщество) |
 | `slw-main/slw-main/src/components/ProfileView/` | Свой профиль, редактирование, секции стрика/практик/закладок |
-| `slw-main/slw-main/src/components/PublicProfileView/` | Чужой профиль (read-only). `ReactorsList.jsx` — общий компонент списка реагировавших с переходом на профиль. |
+| `slw-main/slw-main/src/components/PublicProfileView/` | Чужой профиль (read-only). `ReactorsList.tsx` — общий компонент списка реагировавших с переходом на профиль. |
 | `slw-main/slw-main/src/components/CoachView/` | ИИ-коуч: форма + лента истории |
 | `slw-main/slw-main/src/components/Heatmap/` | GitHub-style heatmap |
 | `slw-main/slw-main/src/components/Toast/` | Очередь тостов (achievements, etc) |
-| `slw-main/slw-main/src/data/aspects.js` | ASPECT_DATA + ASPECT_COLORS + ASPECT_KEYS (ключи на латинице: Si/Se/Ti/Te/Fi/Fe/Ni/Ne) |
-| `slw-main/slw-main/src/data/hallContent.js` | Курируемый контент холлов: цитаты, личности, искусство, архетипы (детально для ЧИ/Ne, для остальных затравки) |
-| `slw-main/slw-main/src/data/journey/aspects/<Latin>/` | Контент путешествия по аспекту: `index.js` + `l0.md..l3.md` + `l0-surveys.md`. Папки: `Si/`, `Ti/`, `Ne/`, `Fe/`, `Ni/` |
-| `slw-main/slw-main/src/data/journey/registry.js` | `JOURNEYS` map, `PLANETS` map (ключи латинские), `getAllPlanets()` для Карты Планет |
-| `slw-main/slw-main/src/data/journey/skills/tree.js` | Дерево навыков БС (Si): 4 общих + 4 архетипа (всего 47) |
-| `slw-main/slw-main/src/data/journey/skills/ne-tree.js` | Дерево навыков ЧИ (Ne): 3 общих + 4 архетипа (всего 36) |
-| `slw-main/slw-main/src/data/journey/skills/ni-tree.js` | Дерево навыков БИ (Ni): 3 общих + 4 архетипа (всего 43) |
-| `slw-main/slw-main/src/data/journey/skills/te-tree.js` | Дерево навыков ЧЛ (Te): 4 общих + 4 архетипа (62 навыка). Контент анкет в `te-surveys.md` |
-| `slw-main/slw-main/src/data/journey/skills/ti-tree.js` | Дерево навыков БЛ (Ti): 3 общих + 4 архетипа (41 навык: Аналитик 8, Архитектор 7, Хранитель Порядка 11, Энциклопедист 12). Контент анкет в `ti-surveys.md` |
+| `slw-main/slw-main/src/data/aspects.ts` | ASPECT_DATA + ASPECT_COLORS + ASPECT_KEYS (ключи на латинице: Si/Se/Ti/Te/Fi/Fe/Ni/Ne) |
+| `slw-main/slw-main/src/data/hallContent.ts` | Курируемый контент холлов: цитаты, личности, искусство, архетипы (детально для ЧИ/Ne, для остальных затравки) |
+| `slw-main/slw-main/src/data/journey/aspects/<Latin>/` | Контент путешествия по аспекту: `index.ts` + `l0.md..l3.md` + `l0-surveys.md`. Папки: `Si/`, `Ti/`, `Ne/`, `Fe/`, `Ni/` |
+| `slw-main/slw-main/src/data/journey/registry.ts` | `JOURNEYS` map, `PLANETS` map (ключи латинские), `getAllPlanets()` для Карты Планет |
+| `slw-main/slw-main/src/data/journey/skills/tree.ts` | Дерево навыков БС (Si): 4 общих + 4 архетипа (всего 47) |
+| `slw-main/slw-main/src/data/journey/skills/ne-tree.ts` | Дерево навыков ЧИ (Ne): 3 общих + 4 архетипа (всего 36) |
+| `slw-main/slw-main/src/data/journey/skills/ni-tree.ts` | Дерево навыков БИ (Ni): 3 общих + 4 архетипа (всего 43) |
+| `slw-main/slw-main/src/data/journey/skills/te-tree.ts` | Дерево навыков ЧЛ (Te): 4 общих + 4 архетипа (62 навыка). Контент анкет в `te-surveys.md` |
+| `slw-main/slw-main/src/data/journey/skills/ti-tree.ts` | Дерево навыков БЛ (Ti): 3 общих + 4 архетипа (41 навык: Аналитик 8, Архитектор 7, Хранитель Порядка 11, Энциклопедист 12). Контент анкет в `ti-surveys.md` |
 | `slw-main/slw-main/src/data/journey/fe-skills/` | Отдельная подпапка с навыками ЧЭ (Fe). До v16 называлась `che-skills/` (русский транслит) — переименована в правильную соционическую нотацию |
-| `slw-main/slw-main/src/components/AspectsView/{Si,Fe,Ne,Ni,Fi,Te,Ti,Se}Wheel.jsx` | Колесо аспекта с разбивкой по 4 архетипам. До рефактора 2026-05 называлось `BSWheel`/`CheWheel` (транслит). Все 8 аспектов теперь имеют свои реальные Wheel-компоненты. |
-| `slw-main/slw-main/src/components/AspectsView/PlaceholderWheel.jsx` | Заглушка-колесо для аспектов без skill-tree (на сейчас не используется — все 8 имеют свои *Wheel). Оставлен как утилита для будущих аспектов. |
-| `slw-main/slw-main/src/components/JourneyView/PlanetMap.jsx` | Экран выбора планеты-аспекта |
-| `slw-main/slw-main/src/components/DiaryView/DailyReview.jsx` | Вкладка «📅 Сегодня» — запись дня одним заходом по 8 аспектам |
-| `slw-main/slw-main/src/components/DiaryView/EmotionsTab.jsx` | Таблица эмоций (фильтр «пики ≥ 8», сортировка, топ-5 повторяющихся, раскрытие 7 полей) |
-| `slw-main/slw-main/src/components/DiaryView/TrainingsTab.jsx` | Тренировки группированы по дате + статистика + рекорды веса |
-| `slw-main/slw-main/src/components/DiaryView/AnalyticsTab.jsx` | Список аналитических отчётов (week/month) с просмотром markdown |
-| `slw-main/slw-main/src/components/DiaryView/VaultSyncTab.jsx` | Кнопка «Скачать ZIP» + инструкция настройки `tools/vault_sync.py` + блок с JWT (показать/копировать) |
+| `slw-main/slw-main/src/components/AspectsView/{Si,Fe,Ne,Ni,Fi,Te,Ti,Se}Wheel.tsx` | Колесо аспекта с разбивкой по 4 архетипам. До рефактора 2026-05 называлось `BSWheel`/`CheWheel` (транслит). Все 8 аспектов теперь имеют свои реальные Wheel-компоненты. |
+| `slw-main/slw-main/src/components/AspectsView/PlaceholderWheel.tsx` | Заглушка-колесо для аспектов без skill-tree (на сейчас не используется — все 8 имеют свои *Wheel). Оставлен как утилита для будущих аспектов. |
+| `slw-main/slw-main/src/components/JourneyView/PlanetMap.tsx` | Экран выбора планеты-аспекта |
+| `slw-main/slw-main/src/components/DiaryView/DailyReview.tsx` | Вкладка «📅 Сегодня» — запись дня одним заходом по 8 аспектам |
+| `slw-main/slw-main/src/components/DiaryView/EmotionsTab.tsx` | Таблица эмоций (фильтр «пики ≥ 8», сортировка, топ-5 повторяющихся, раскрытие 7 полей) |
+| `slw-main/slw-main/src/components/DiaryView/TrainingsTab.tsx` | Тренировки группированы по дате + статистика + рекорды веса |
+| `slw-main/slw-main/src/components/DiaryView/AnalyticsTab.tsx` | Список аналитических отчётов (week/month) с просмотром markdown |
+| `slw-main/slw-main/src/components/DiaryView/VaultSyncTab.tsx` | Кнопка «Скачать ZIP» + инструкция настройки `tools/vault_sync.py` + блок с JWT (показать/копировать) |
 
 ### Auth flow
 
@@ -258,7 +258,7 @@ await conn.execute(text(
 
 ### Дашборд = главная для залогиненных
 
-`view='dashboard'` — дефолт после логина (см. App.jsx useEffect on `user`). Гость видит колесо с баннером «Ознакомься со сферами жизни». Колесо `view='wheel'` остаётся отдельной страницей.
+`view='dashboard'` — дефолт после логина (см. App.tsx useEffect on `user`). Гость видит колесо с баннером «Ознакомься со сферами жизни». Колесо `view='wheel'` остаётся отдельной страницей.
 
 Дашборд тянет всё одним запросом `GET /api/dashboard` (round-trip-экономия). Если добавляешь новый блок — расширяй существующий endpoint, не создавай новый.
 
@@ -309,7 +309,7 @@ UPDATE web_users SET is_admin = true WHERE email = '...';
 
 ### Journey content versioning
 
-`slw-main/.../JourneyView/JourneyView.jsx → CONTENT_VERSION` (число). Бампать, когда меняешь L0/L1 markdown-контент так, что старая чат-история юзера ломается под новые тексты.
+`slw-main/.../JourneyView/JourneyView.tsx → CONTENT_VERSION` (число). Бампать, когда меняешь L0/L1 markdown-контент так, что старая чат-история юзера ломается под новые тексты.
 
 `migrateState()` сравнивает сохранённый `contentVersion` с текущим. При несовпадении — сбрасывает `messages`, `completedScripts`, `pendingTasks`, но сохраняет XP / streak / stardust / totalCompleted / lastActiveDate / skills.
 
@@ -357,7 +357,7 @@ UPDATE web_users SET is_admin = true WHERE email = '...';
 
 State пользователя тоже на латинице: `state.currentAspect = 'Si'`, `state.aspects = { 'Si': {...}, 'Ne': {...} }`.
 
-**Display-маппинг для UI** — `data/aspects.js:ASPECT_DISPLAY_KEY`:
+**Display-маппинг для UI** — `data/aspects.ts:ASPECT_DISPLAY_KEY`:
 ```js
 { Si: 'БС', Se: 'ЧС', Ti: 'БЛ', Te: 'ЧЛ', Fi: 'БЭ', Fe: 'ЧЭ', Ni: 'БИ', Ne: 'ЧИ' }
 ```
@@ -365,11 +365,11 @@ State пользователя тоже на латинице: `state.currentAsp
 
 **Текущее состояние рефактора (TODO):**
 - Frontend ✓ (полностью на латинице)
-- `client.js` — двусторонний маппинг на границе с бэком: `latToCyr()` для исходящих (paths/body), `translateAspectsInResponse()` для входящих
+- `client.ts` — двусторонний маппинг на границе с бэком: `latToCyr()` для исходящих (paths/body), `translateAspectsInResponse()` для входящих
 - Backend ✗ — пока на кириллице. DB колонки с `aspect` (`web_scores.aspect`, `web_diary_entries.aspect`, `aspect_messages.aspect`, `aspect_insights.aspect`, `bookmarks.target_id`, `user_habits.aspect`, `habit_ticks.aspect`, `inspirations[].aspect`) — кириллица.
 - TG-бот ✗ — `scripts.aspect`, `user_state.current_aspect` — кириллица
 
-**Когда мигрировать backend на латиницу:** убрать слой перевода в `client.js`, добавить `UPDATE` всех aspect-колонок в `serve.py:apply_ddl()` (идемпотентно, `WHERE aspect IN ('БС','ЧС',…)` → SET по маппингу), пройтись по бэк-коду и заменить литералы. Бэкенд должен принимать оба ключа в transition-период (compat shim) — иначе будет ~30s downtime между деплоем фронта и бэка.
+**Когда мигрировать backend на латиницу:** убрать слой перевода в `client.ts`, добавить `UPDATE` всех aspect-колонок в `serve.py:apply_ddl()` (идемпотентно, `WHERE aspect IN ('БС','ЧС',…)` → SET по маппингу), пройтись по бэк-коду и заменить литералы. Бэкенд должен принимать оба ключа в transition-период (compat shim) — иначе будет ~30s downtime между деплоем фронта и бэка.
 
 **Migration в JourneyView.migrateState** — `migrateCyrAspectKeys()` запускается ДО проверки версии: переименовывает `currentAspect` и ключи `aspects` с кириллицы на латиницу для уже-сохранённых юзеров. Чат не сбрасывается (это просто rename). См. `CONTENT_VERSION = 14`.
 
@@ -380,17 +380,17 @@ State пользователя тоже на латинице: `state.currentAsp
 ```
 aspects/
   Si/
-    index.js         # exports SI_ASPECT_INTRO, SI_LEVEL_0_CORE, …
+    index.ts         # exports SI_ASPECT_INTRO, SI_LEVEL_0_CORE, …
     l0.md, l1.md, l2.md, l3.md
     l0-surveys.md    # анкеты навыков для skill-tree
     drafts.md
-  Ti/  index.js + l0.md
-  Ne/  index.js + l0.md..l3.md
-  Fe/  index.js + l0.md..l3.md   # внутри файлы l0.md...l3.md (без транслит-префикса che-)
-  Ni/  index.js + l0.md..l3.md
+  Ti/  index.ts + l0.md
+  Ne/  index.ts + l0.md..l3.md
+  Fe/  index.ts + l0.md..l3.md   # внутри файлы l0.md...l3.md (без транслит-префикса che-)
+  Ni/  index.ts + l0.md..l3.md
 ```
 
-`registry.js` импортит `import { SI_LEVEL_0_CORE } from './aspects/Si'` и т.п. Для добавления нового аспекта — создать папку с латинским кодом, написать `index.js` по шаблону существующих, добавить ветку в `JOURNEYS` в `registry.js` и установить `available: true`.
+`registry.ts` импортит `import { SI_LEVEL_0_CORE } from './aspects/Si'` и т.п. Для добавления нового аспекта — создать папку с латинским кодом, написать `index.ts` по шаблону существующих, добавить ветку в `JOURNEYS` в `registry.ts` и установить `available: true`.
 
 ### Per-aspect journey state
 
@@ -413,7 +413,7 @@ state = {
 }
 ```
 
-Хелперы в `JourneyView.jsx`:
+Хелперы в `JourneyView.tsx`:
 - `aspectOf(s)` — безопасное чтение активной папки (с дефолтом `DEFAULT_ASPECT_STATE`).
 - `updateAspect(s, patch)` — иммутабельный апдейт активной папки (patch может быть объект или функцией).
 
@@ -421,7 +421,7 @@ state = {
 
 ### Planet Map / переключение аспектов
 
-Юзер переключается между планетами через **Карту Планет** (`screen='planets'`, компонент `PlanetMap.jsx`). Точки входа:
+Юзер переключается между планетами через **Карту Планет** (`screen='planets'`, компонент `PlanetMap.tsx`). Точки входа:
 - **Из чата** — клик по пилюле «текущая планета ▾» в шапке (с шевроном) → `onOpenPlanetMap`
 - **Из дерева навыков** — кнопка «🪐 Планеты» в шапке `SkillTree`/`FeSkillTree`/`NeSkillTree`/`NiSkillTree`/`TeSkillTree`
 - **Из JourneyProfile** (статистика юзера по планете, открывается кликом по аватару ◐ в шапке чата) — две точки: кликабельный заголовок с шевроном «{Полное имя} ▾» и отдельная кнопка «🪐 Сменить планету» рядом с «Продолжить путешествие» / «Начать заново»
@@ -439,7 +439,7 @@ state = {
 
 ### Common base skills (общие навыки БС)
 
-`tree.js` для аспекта Si выделяет **4 универсальных навыка** в `COMMON_BASE_SKILLS` (с v16):
+`tree.ts` для аспекта Si выделяет **4 универсальных навыка** в `COMMON_BASE_SKILLS` (с v16):
 - `body-listening` — Слушать тело (вход)
 - `needs-awareness` — Осознавать потребности (понимание)
 - `timely-care` — Своевременно заботиться (выход)
@@ -451,15 +451,15 @@ state = {
 
 В L0 чате БС эти 4 анкеты включены как первая оценка БС (`SURV-100/101/102/103` в `aspects/Si/l0.md`) с подготовительным сообщением. После прохождения user видит, что у каждого архетипа уже есть стартовое значение, и колесо начинает наполняться.
 
-**История.** До v16 в COMMON_BASE были `signals` / `interoception` / `honesty` (см. v11 в JourneyView.jsx). В v16 эти три навыка вернулись в SKILL_TREE.healer как обычные ядерные навыки Целителя (id остался прежним → state.skills сохраняется). На их место в COMMON_BASE введены 4 новых сквозных навыка верхнего уровня. Полные анкеты для них — SURV-55..58 в l0-surveys.md и `### Навык: <…>` в surveys.md.
+**История.** До v16 в COMMON_BASE были `signals` / `interoception` / `honesty` (см. v11 в JourneyView.tsx). В v16 эти три навыка вернулись в SKILL_TREE.healer как обычные ядерные навыки Целителя (id остался прежним → state.skills сохраняется). На их место в COMMON_BASE введены 4 новых сквозных навыка верхнего уровня. Полные анкеты для них — SURV-55..58 в l0-surveys.md и `### Навык: <…>` в surveys.md.
 
-Аспект Ne (ЧИ) использует похожий паттерн — `COMMON_BASE_SKILLS` в `ne-tree.js` (3 общих базовых: `attention-essence`, `metacognition`, `mindfulness`). Перевод ЧИ на четвёрку — TODO.
+Аспект Ne (ЧИ) использует похожий паттерн — `COMMON_BASE_SKILLS` в `ne-tree.ts` (3 общих базовых: `attention-essence`, `metacognition`, `mindfulness`). Перевод ЧИ на четвёрку — TODO.
 
 Аспект Ni (БИ) тоже имеет 3 общих базовых: `attunement`, `subconscious-listening`, `inner-silence` — встроены инлайн в L0-чат БИ как 15 B-вопросов (B-1..B-15) с `scale: 1-10`.
 
 ### Survey: per-question insight
 
-В `SurveyScreen.jsx` каждое утверждение анкеты имеет необязательную кнопку **«✎ Записать инсайт»** — раскрывает textarea. Текст сохраняется в дневник (`source: 'journey-survey-statement'`, `prompt = текст утверждения`, `promptTitle = название навыка`) при клике «Дальше →».
+В `SurveyScreen.tsx` каждое утверждение анкеты имеет необязательную кнопку **«✎ Записать инсайт»** — раскрывает textarea. Текст сохраняется в дневник (`source: 'journey-survey-statement'`, `prompt = текст утверждения`, `promptTitle = название навыка`) при клике «Дальше →».
 
 Подсказка-тултип показывается на стартовых вопросах, закрывается крестиком (запоминается в `localStorage['survey_insight_hint_dismissed']`), и поднимается на ховер через 3 секунды.
 
@@ -467,44 +467,44 @@ XP за анкету: 10 за каждый закрытый проход. 3 ми
 
 ### Survey: scale metadata
 
-Помимо followUp-блоков (формат A: 1-10 + бот-реакция за диапазон), вопрос можно пометить флагом `scale: 1-10` в metadata. Это включит ползунок (`awaitingInput='number'` → `Slider`) даже без followUp-секций. Логика в `parseScripts.js` (читает metadata.scale → `script.scale = true`) и `ScriptButtons.jsx` (`hasScale = !!followUp || !!scale`).
+Помимо followUp-блоков (формат A: 1-10 + бот-реакция за диапазон), вопрос можно пометить флагом `scale: 1-10` в metadata. Это включит ползунок (`awaitingInput='number'` → `Slider`) даже без followUp-секций. Логика в `parseScripts.ts` (читает metadata.scale → `script.scale = true`) и `ScriptButtons.tsx` (`hasScale = !!followUp || !!scale`).
 
 Используется когда нужна шкала самооценки, но bot-reaction за каждый диапазон писать не хочется.
 
 ### Per-aspect skill trees (Si / Ne / Ni / Fe / Te)
 
-Каждый аспект имеет свой `tree.js` (architecture, skill list, archetypes). Текущие реализации:
-- **Si** (БС) → `slw-main/.../data/journey/skills/tree.js` (4 общих + 4 архетипа × N навыков, всего 47)
-- **Ne** (ЧИ) → `data/journey/skills/ne-tree.js` (3 общих + 4 архетипа × N, всего 36)
-- **Ni** (БИ) → `data/journey/skills/ni-tree.js` (3 общих + 4 архетипа × N, всего 43)
-- **Fe** (ЧЭ) → `data/journey/fe-skills/tree.js` (отдельная подпапка `fe-skills/`, своя структура; 34 навыка с префиксом `fe-`)
-- **Te** (ЧЛ) → `data/journey/skills/te-tree.js` + `te-skills.js` + `te-surveys.md` (62 навыка)
-- **Ti** (БЛ) → `data/journey/skills/ti-tree.js` + `ti-skills.js` + `ti-surveys.md` (41 навык: 3 общих + Аналитик 8 + Архитектор 7 + Хранитель Порядка 11 + Энциклопедист 12)
+Каждый аспект имеет свой `tree.ts` (architecture, skill list, archetypes). Текущие реализации:
+- **Si** (БС) → `slw-main/.../data/journey/skills/tree.ts` (4 общих + 4 архетипа × N навыков, всего 47)
+- **Ne** (ЧИ) → `data/journey/skills/ne-tree.ts` (3 общих + 4 архетипа × N, всего 36)
+- **Ni** (БИ) → `data/journey/skills/ni-tree.ts` (3 общих + 4 архетипа × N, всего 43)
+- **Fe** (ЧЭ) → `data/journey/fe-skills/tree.ts` (отдельная подпапка `fe-skills/`, своя структура; 34 навыка с префиксом `fe-`)
+- **Te** (ЧЛ) → `data/journey/skills/te-tree.ts` + `te-skills.ts` + `te-surveys.md` (62 навыка)
+- **Ti** (БЛ) → `data/journey/skills/ti-tree.ts` + `ti-skills.ts` + `ti-surveys.md` (41 навык: 3 общих + Аналитик 8 + Архитектор 7 + Хранитель Порядка 11 + Энциклопедист 12)
 - **Fi / Se** — навыков пока нет
 
-В UI-компоненте `JourneyView.jsx` свитчер по `currentAspect` выбирает нужное дерево (`SkillTree` / `NeSkillTree` / `NiSkillTree` / `FeSkillTree` / `TeSkillTree` / `TiSkillTree` / `FiSkillTree` / `SeSkillTree`). Пилюля «Оценить навыки» в шапке чата (`surveyRemaining`) считает remaining через свич по `currentAspect` — для аспектов без дерева возвращает 0.
+В UI-компоненте `JourneyView.tsx` свитчер по `currentAspect` выбирает нужное дерево (`SkillTree` / `NeSkillTree` / `NiSkillTree` / `FeSkillTree` / `TeSkillTree` / `TiSkillTree` / `FiSkillTree` / `SeSkillTree`). Пилюля «Оценить навыки» в шапке чата (`surveyRemaining`) считает remaining через свич по `currentAspect` — для аспектов без дерева возвращает 0.
 
-`resolveSurvey(skillId)` (`data/journey/skills/resolve.js`) централизует резолюцию анкеты: знает, какие skill-id принадлежат каким аспектам (Ne/Ni/Te/Ti/Fi/Se живут отдельно от БС-tree). При добавлении нового аспекта — добавь импорт его `getXxxSurvey` + `ALL_SKILL_IDS` и Set-проверку.
+`resolveSurvey(skillId)` (`data/journey/skills/resolve.ts`) централизует резолюцию анкеты: знает, какие skill-id принадлежат каким аспектам (Ne/Ni/Te/Ti/Fi/Se живут отдельно от БС-tree). При добавлении нового аспекта — добавь импорт его `getXxxSurvey` + `ALL_SKILL_IDS` и Set-проверку.
 
 Скоринг общего балла аспекта (`scores[aspect]`) после прохождения анкеты обновляется в `handleSurveyInsight` для всех 4 аспектов с tree через `calcSiScoreFromSkills` / `calcFeScoreFromSkills` / `calcNeScoreFromSkills` / `calcNiScoreFromSkills`. Колесо на странице Аспекта читает `skills` напрямую (через свой `calc*ArchetypeAvg`) — там score актуален всегда.
 
-**Колесо аспекта на странице Аспекты:** для Si/Fe/Ne/Ni — реальное колесо с архетипами (`SiWheel`/`FeWheel`/`NeWheel`/`NiWheel`). Для Te/Ti/Se/Fi — заглушка `<PlaceholderWheel/>` (4 пунктирных сектора с подписью «скоро»). Когда напишешь реальное колесо для Te — убери `'Te'` из массива `['Te','Ti','Se','Fi']` в `AspectsView.jsx` и добавь `{aspect === 'Te' && <TeWheel … />}` рядом с остальными.
+**Колесо аспекта на странице Аспекты:** для Si/Fe/Ne/Ni — реальное колесо с архетипами (`SiWheel`/`FeWheel`/`NeWheel`/`NiWheel`). Для Te/Ti/Se/Fi — заглушка `<PlaceholderWheel/>` (4 пунктирных сектора с подписью «скоро»). Когда напишешь реальное колесо для Te — убери `'Te'` из массива `['Te','Ti','Se','Fi']` в `AspectsView.tsx` и добавь `{aspect === 'Te' && <TeWheel … />}` рядом с остальными.
 
 **Префикс `che-` → `fe-` (рефактор 2026-05):** до этого ID навыков ЧЭ имели префикс `che-` (русский транслит). Переименованы на правильную соционическую нотацию `fe-`. Миграция работает через `renameChePrefix(id)` внутри `migrateSkills` в JourneyView — при загрузке state любые ключи `che-X` переписываются на `fe-X`. CONTENT_VERSION для этого rename **не бампали** (data-preserving). Аналогично переименованы `BSWheel`→`SiWheel`, `calcBSScoreFromSkills`→`calcSiScoreFromSkills`, `goToBSSurveys`→`goToSiSurveys`, `BS_SKILL_BY_RUS_NAME`→`SI_SKILL_BY_RUS_NAME` и т.п. — везде где прежде был русский транслит.
 
 ### DiaryView вкладки
 
-В `DiaryView.jsx` теперь N вкладок (видны только залогиненным):
+В `DiaryView.tsx` теперь N вкладок (видны только залогиненным):
 - **Записи** — обычный список записей дневника + форма ручного добавления
-- **📅 Сегодня** (`DailyReview.jsx`) — запись дня одним заходом: общий блок «События» + 8 свёрнутых аккордеонов на каждый аспект с вопросами-чипами + чекбоксы привычек. Авто-скролл при раскрытии аккордеона выше sticky save-bar.
-- **🔍 Поиск** (`SearchView.jsx`) — раньше был отдельным view, перенесён внутрь дневника
-- **💗 Эмоции / 💪 Тренировки / 📊 Отчёты / 🔗 Sync** — отдельные вкладки (см. `EmotionsTab.jsx`, `TrainingsTab.jsx`, `AnalyticsTab.jsx`, `VaultSyncTab.jsx`)
+- **📅 Сегодня** (`DailyReview.tsx`) — запись дня одним заходом: общий блок «События» + 8 свёрнутых аккордеонов на каждый аспект с вопросами-чипами + чекбоксы привычек. Авто-скролл при раскрытии аккордеона выше sticky save-bar.
+- **🔍 Поиск** (`SearchView.tsx`) — раньше был отдельным view, перенесён внутрь дневника
+- **💗 Эмоции / 💪 Тренировки / 📊 Отчёты / 🔗 Sync** — отдельные вкладки (см. `EmotionsTab.tsx`, `TrainingsTab.tsx`, `AnalyticsTab.tsx`, `VaultSyncTab.tsx`)
 
 Все блоки опциональны в Daily Review — юзер заполняет только то, что хочется. На «Сохранить день»: создаются отдельные diary-записи (`source: 'daily-review'`) для каждого заполненного блока + sync галочек привычек через `tickHabit/untickHabit`.
 
 ### Premium aspect palette
 
-`ASPECT_COLORS` (data/aspects.js) подобраны как единая премиум-палитра для тёмного UI: все цвета сидят в полосе HSL L\* 56-67%, чтобы ни один не «выпадал» по яркости. Каждый цвет несёт психологическую семантику аспекта.
+`ASPECT_COLORS` (data/aspects.ts) подобраны как единая премиум-палитра для тёмного UI: все цвета сидят в полосе HSL L\* 56-67%, чтобы ни один не «выпадал» по яркости. Каждый цвет несёт психологическую семантику аспекта.
 
 ```
 Te → #5F7081 → slate steel        (cool blue-grey, металл, индустриал)
@@ -526,20 +526,20 @@ Ni → #B97FD2 → luminous amethyst  (мистика, время, подсоз�
 
 ### Aspect content gating (AspectsView)
 
-`blocks.js` определяет 24 секции теории аспекта с полем `level: 0|1|2|3` (отображаются группами под `LEVEL_LABELS`). Доступ к полному контенту блока зависит от прогресса юзера в путешествии **по этому конкретному аспекту**:
+`blocks.ts` определяет 24 секции теории аспекта с полем `level: 0|1|2|3` (отображаются группами под `LEVEL_LABELS`). Доступ к полному контенту блока зависит от прогресса юзера в путешествии **по этому конкретному аспекту**:
 
 ```js
 accessLevel = isAdmin ? 99 : (journey?.aspects?.[aspect]?.currentLevel ?? 0)
 isUnlocked = block.level <= accessLevel
 ```
 
-Расклад блоков по уровням (см. `BLOCKS` в blocks.js):
+Расклад блоков по уровням (см. `BLOCKS` в blocks.ts):
 - **L0 «Первый контакт»** — `essence`, `archetypes` (Тени и Дары)
 - **L1 «Эпоха племён»** — `archetypePath`, `skills`, `coachTips`, `goals`, `assessment`, `historicalFigures`, `art`
 - **L2 «Эпоха цивилизаций»** — `superpower`, `integration`, `synergy`, `polysemy`, `resources`, `practices`, `myths`, `quotes`
 - **L3 «Эпоха алхимии»** — `dilemmas`, `redFlags`, `fears`, `somatic`, `culturalDifferences`, `childRaising`
 
-**Tеaser-механика для locked-блоков:** даже если блок заблокирован, юзеру показывается **N первых элементов** + ниже размытый silhouette + lock-overlay с CTA. Это даёт пользу всем, включая тех кто не прошёл journey, но при этом видит что глубже есть ещё контент. Реализация — `teaseBlockData(block, data)` в `blocks.js` (возвращает обрезанную копию data, ниже которой рендерится silhouette).
+**Tеaser-механика для locked-блоков:** даже если блок заблокирован, юзеру показывается **N первых элементов** + ниже размытый silhouette + lock-overlay с CTA. Это даёт пользу всем, включая тех кто не прошёл journey, но при этом видит что глубже есть ещё контент. Реализация — `teaseBlockData(block, data)` в `blocks.ts` (возвращает обрезанную копию data, ниже которой рендерится silhouette).
 
 `TEASER_BY_KIND` defaults:
 - `list/numberedList/titledList` → 2 элемента
@@ -572,7 +572,7 @@ skill: body-listening
 block: knowledge
 ```
 
-Парсер (`parseScripts.js`): читает `metadata.skill` → `script.skill`, `metadata.block` → `script.block`.
+Парсер (`parseScripts.ts`): читает `metadata.skill` → `script.skill`, `metadata.block` → `script.block`.
 
 Эффект: после 5 таких ответов из 5 разных блоков (`knowledge`/`practice`/`awareness`/`priority`/`confidence`) навык получает `result` через `calcSurveyResult`, и колесо аспекта обновляется через `calc*ScoreFromSkills`. Это синхронизирует L0-чат с деревом навыков: SURV-карточка в дереве потом предложит «продолжить с pass 2», уже видя что pass 1 закрыт через L0-чат.
 
@@ -580,7 +580,7 @@ block: knowledge
 
 ### Wheel визуал в дашборде
 
-`MiniWheel.jsx` на дашборде:
+`MiniWheel.tsx` на дашборде:
 - Внешний обод (двойная окружность) + 8 спиц
 - Подписи аспектов снаружи обода (не внутри)
 - Контур каждого сектора **до 10** (не до текущей оценки) с неоновым свечением через SVG-фильтр `mwNeonGlow`
@@ -589,25 +589,25 @@ block: knowledge
 
 ### Settings → внутри Profile
 
-Раздел «Настройки» убран из nav-меню. Доступ через кнопку «⚙ Настройки» в шапке `ProfileView.jsx`. Маршрут `view='settings'` остался, чтобы `handleViewChange('settings')` работал. `SettingsView.jsx` не трогали.
+Раздел «Настройки» убран из nav-меню. Доступ через кнопку «⚙ Настройки» в шапке `ProfileView.tsx`. Маршрут `view='settings'` остался, чтобы `handleViewChange('settings')` работал. `SettingsView.tsx` не трогали.
 
 ### Frontend conventions
 
 - **CSS Modules** — каждый компонент рядом с `.module.css`. Глобальный CSS — только в `index.css` и `App.module.css`.
-- **`?raw` markdown imports** — journey-контент (`l0.md`, `l1.md`, `surveys.md`, `onboarding.md`, `SCRIPT_GUIDELINES.md` в подпапках `aspects/<Latin>/`) импортируется как сырой текст, парсится модулями `parseScripts.js` / `parseSurveys.js`. **Source of truth — `.md` файлы**, не JS-объекты.
-- **Aspect short-code на UI** — никогда не выводи `{key}` / `{aspect}` напрямую (там латиница). Используй `{ASPECT_DISPLAY_KEY[key]}` из `data/aspects.js`. Полное имя — `{ASPECT_DATA[key].name}`.
-- **Имена в стандартной соционической нотации** — никаких `che-*` / `bs_*` / `chi_*` префиксов в именах файлов, переменных, ID. Только `Si/Se/Ti/Te/Fi/Fe/Ni/Ne` (и lowercase для тех же кодов в файлах: `fe-skills/`, `ne-tree.js`, `fe-pause` skill id). Если видишь старый транслит — это либо строковые литералы для бэка (`'БС'` — оставь), либо забытое место (переименуй).
-- **Locale** — `src/locales/ru.js`, проп `t` в компонентах. Только русский, и большая часть текста всё равно захардкожена в JSX. Полноценная i18n далеко.
+- **`?raw` markdown imports** — journey-контент (`l0.md`, `l1.md`, `surveys.md`, `onboarding.md`, `SCRIPT_GUIDELINES.md` в подпапках `aspects/<Latin>/`) импортируется как сырой текст, парсится модулями `parseScripts.ts` / `parseSurveys.ts`. **Source of truth — `.md` файлы**, не TS-объекты.
+- **Aspect short-code на UI** — никогда не выводи `{key}` / `{aspect}` напрямую (там латиница). Используй `{ASPECT_DISPLAY_KEY[key]}` из `data/aspects.ts`. Полное имя — `{ASPECT_DATA[key].name}`.
+- **Имена в стандартной соционической нотации** — никаких `che-*` / `bs_*` / `chi_*` префиксов в именах файлов, переменных, ID. Только `Si/Se/Ti/Te/Fi/Fe/Ni/Ne` (и lowercase для тех же кодов в файлах: `fe-skills/`, `ne-tree.ts`, `fe-pause` skill id). Если видишь старый транслит — это либо строковые литералы для бэка (`'БС'` — оставь), либо забытое место (переименуй).
+- **Locale** — `src/locales/ru.ts`, проп `t` в компонентах. Только русский, и большая часть текста всё равно захардкожена в JSX. Полноценная i18n далеко.
 - **Storage** — JWT в `localStorage['slw_token']`. Префикс `whl_*` (whl_scores и т.п.) — наследие гостевого режима, сейчас не используется (WelcomeScreen требует логин).
 - **Reactions** — единый набор: `heart`/`thanks`/`aha`/`fire`. Один тип на (юзер, инсайт). Свои инсайты лайкать нельзя.
 - **Avatar** — эмодзи-набор в ProfileView (`AVATAR_OPTIONS`). Позже придёт upload, но интерфейс должен оставаться: одно поле `public_profiles.avatar` строкой.
-- **Deeplink на профиль** — URL `?u=<id>` парсится в App.jsx mount-эффекте, открывает PublicProfileView и удаляет параметр из URL.
+- **Deeplink на профиль** — URL `?u=<id>` парсится в App.tsx mount-эффекте, открывает PublicProfileView и удаляет параметр из URL.
 
 ### Hardcoded values worth knowing
 
 - `auth.py:FRONTEND_URL = "https://sergeshaneri.github.io/slw"` — куда редиректит `/telegram-redirect` после OAuth.
 - `auth.py:telegram_start` — `origin` и `return_to` URLs захардкожены.
-- `AuthModal.jsx` — `data-telegram-login="skb_coach_bot"` (username бота для Login Widget).
+- `AuthModal.tsx` — `data-telegram-login="skb_coach_bot"` (username бота для Login Widget).
 
 ### Где живёт что (быстрая шпаргалка)
 
@@ -618,18 +618,18 @@ block: knowledge
 | Каталог ачивок | `routes/profile.py:ACHIEVEMENT_CATALOG` |
 | Системный промпт ИИ-коуча | `routes/coach.py:SYSTEM_PROMPT` |
 | Слово дня (курируемые цитаты) | `routes/dashboard.py:_QUOTES_BY_ASPECT` |
-| Архетипы аспектов (статика) | `slw-main/.../data/hallContent.js` |
-| Маппинг латиница ↔ кириллица аспектов (внутри ↔ бэк) | `slw-main/.../api/client.js` (`latToCyr`/`cyrToLat` + `translateAspectsInResponse`) |
-| Маппинг латиница → кириллица для UI-отображения | `slw-main/.../data/aspects.js:ASPECT_DISPLAY_KEY` |
-| Миграция ID навыков `che-X` → `fe-X` + БС-rename | `JourneyView.jsx:renameChePrefix` + `SKILL_ID_MIGRATION` (вызываются в `migrateSkills`) |
+| Архетипы аспектов (статика) | `slw-main/.../data/hallContent.ts` |
+| Маппинг латиница ↔ кириллица аспектов (внутри ↔ бэк) | `slw-main/.../api/client.ts` (`latToCyr`/`cyrToLat` + `translateAspectsInResponse`) |
+| Маппинг латиница → кириллица для UI-отображения | `slw-main/.../data/aspects.ts:ASPECT_DISPLAY_KEY` |
+| Миграция ID навыков `che-X` → `fe-X` + БС-rename | `JourneyView.tsx:renameChePrefix` + `SKILL_ID_MIGRATION` (вызываются в `migrateSkills`) |
 | Сборка контента бота из markdown | `backend/app/content/build.py:_parse_aspect_md` (универсальный парсер; раньше назывался `_parse_bs_md`). Читает `aspects/Si/l0..l3.md`, пишет `compiled.json` |
 | Маппинг между ботом и web | `web_users.telegram_id` |
 | Парсер диария | `backend/app/sync/parser.py` (бэк-side) + `tools/vault_sync.py` (CLI) |
-| Заглушка-колесо для аспектов без skill-tree | `AspectsView/PlaceholderWheel.jsx` |
+| Заглушка-колесо для аспектов без skill-tree | `AspectsView/PlaceholderWheel.tsx` |
 | Admin Panel + endpoints | `backend/app/web/routes/admin.py` + `slw-main/.../components/AdminView/` |
 | Append-only журнал прогресса | `backend/app/web/routes/events.py` + `JourneyEvent` модель |
-| Step-insight prompt после T/S/R | `JourneyView/StepInsightPrompt.jsx` |
-| Optimistic locking PUT /api/state | `state.py` (expected_updated_at) + `App.jsx` (`stateVersionRef`, `saveStateGuarded` queue) |
+| Step-insight prompt после T/S/R | `JourneyView/StepInsightPrompt.tsx` |
+| Optimistic locking PUT /api/state | `state.py` (expected_updated_at) + `App.tsx` (`stateVersionRef`, `saveStateGuarded` queue) |
 
 Если меняешь домен фронта или username бота — все три места надо синхронить.
 
@@ -642,7 +642,7 @@ block: knowledge
   idempotently (dedupe по `web_user_id + source='web' + aspect + short_id + level`).
 
 При следующей загрузке `GET /api/events` отдаёт все события юзера, фронт
-в `App.jsx:loadFromApi` мёрджит **и web, и bot** события в
+в `App.tsx:loadFromApi` мёрджит **и web, и bot** события в
 `journey.aspects[X].completedScripts`. Это страховка от потери прогресса
 при сбросах `web_state` (CONTENT_VERSION-бамп, конфликт PUT, race
 condition). XP считается по `max(events count, completedScripts.length)`
@@ -663,7 +663,7 @@ scriptId дневника, `/api/admin/normalize-counters` синхронизи�
 - Если `expected_updated_at` не передан — проверка не делается
   (обратная совместимость).
 
-**Фронт** (`App.jsx`):
+**Фронт** (`App.tsx`):
 - `stateVersionRef` хранит последний known `updated_at`.
 - `saveStateGuarded(patch)` — **queue** через promise-chain
   (`lastSavePromiseRef`). Множественные patch-и за один шаг мёрджатся в
@@ -671,14 +671,14 @@ scriptId дневника, `/api/admin/normalize-counters` синхронизи�
   ref всегда свежий между ними, race condition «сам с собой» исключён.
 - На 409: тихое обновление ref из тела 409 (без `loadFromApi` — он был
   слишком агрессивным, триггерил «загрузку» и откатывал локальный state).
-- Все вызовы PUT /api/state в App.jsx идут через `saveStateGuarded`
+- Все вызовы PUT /api/state в App.tsx идут через `saveStateGuarded`
   (saveJourney/saveHistory/achievements-grant).
 
 ### Обязательный insight после T/S/R-шага
 
 `handleScriptAction` для `theory/word/reflection` action='next' ставит
 `awaitingInput='step-insight'` вместо мгновенного `awardXP+advance`.
-Chat.jsx рендерит `<StepInsightPrompt kind={script.type} onSubmit={...}/>`
+Chat.tsx рендерит `<StepInsightPrompt kind={script.type} onSubmit={...}/>`
 — textarea с минимумом 10 символов, кнопка disabled пока пусто.
 В `handleSend` ветка `awaitingInput === 'step-insight'`: пишет в дневник
 `source='journey-step-insight'` + scriptId/promptTitle, потом `awardXP`
@@ -753,9 +753,9 @@ Backend admin endpoints (`backend/app/web/routes/admin.py`):
 
 ### Page Aspects: обогащённые карточки
 
-`AspectsGrid` (`AspectsView.jsx`) показывает на каждой плитке:
+`AspectsGrid` (`AspectsView.tsx`) показывает на каждой плитке:
 - Код аспекта + scores[key]/10 (текущая оценка).
-- Название + sub (новые теглайны «мир X и Y», см. `aspects.js`).
+- Название + sub (новые теглайны «мир X и Y», см. `aspects.ts`).
 - **Прогресс-бар** — процент пройденности текущего уровня
   (`completedScripts ∩ levelScripts / levelScripts.length`). Берётся
   из `getJourney(key).levels[currentLevel].core`. Если уровень пустой
@@ -774,7 +774,7 @@ HallView.subline.
 как `MiniWheel` в дашборде. История оценок (line chart) не использовалась
 и удалена вместе с Recharts (–430 KB bundle). Гость после WelcomeScreen
 → «Начать бесплатно» попадает в `AspectsView` (read-only с teaser-
-механикой из blocks.js). Default view для гостя: `aspects`. Для
+механикой из blocks.ts). Default view для гостя: `aspects`. Для
 залогиненного: `dashboard`.
 
 Dev-admin пасхалка (5 кликов → toggle `localStorage.slw_dev_admin`)

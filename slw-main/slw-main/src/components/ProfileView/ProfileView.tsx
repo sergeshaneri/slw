@@ -148,6 +148,12 @@ export default function ProfileView({
   const [insightText, setInsightText] = useState<string>('')
   const [insightPublic, setInsightPublic] = useState<boolean>(true)
 
+  // Collapse-by-default для длинного списка своих инсайтов (у активного
+  // юзера легко 50+). Inspirations в ProfileView — edit-форма, её не
+  // сворачиваем (юзеру нужно видеть всё чтобы редактировать).
+  // Collapse inspirations на чужом профиле — в PublicProfileView.
+  const [showAllInsights, setShowAllInsights] = useState<boolean>(false)
+
   useEffect(() => {
     fetchMyProfile()
       .then(resp => {
@@ -659,7 +665,10 @@ export default function ProfileView({
         </div>
 
         <div className={styles.insightList}>
-          {(profile.insights ?? []).map(ins => (
+          {((profile.insights ?? []).slice(
+            0,
+            showAllInsights ? undefined : 10
+          )).map(ins => (
             <div
               key={ins.id}
               className={styles.insightCard}
@@ -709,6 +718,17 @@ export default function ProfileView({
           ))}
           {(profile.insights ?? []).length === 0 && (
             <div className={styles.muted}>Пока пусто — добавь первый инсайт.</div>
+          )}
+          {(profile.insights ?? []).length > 10 && (
+            <button
+              type="button"
+              className={styles.achievementsExpandBtn}
+              onClick={() => setShowAllInsights(v => !v)}
+            >
+              {showAllInsights
+                ? '↑ Свернуть'
+                : `↓ Показать все ${(profile.insights ?? []).length} инсайтов`}
+            </button>
           )}
         </div>
       </Section>

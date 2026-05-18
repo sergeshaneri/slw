@@ -829,6 +829,7 @@ export default function App() {
         }
         user={appUser}
         userAvatar={myAvatar}
+        totalStepsCompleted={journey?.totalCompleted ?? 0}
         onLogin={() => setShowAuth(true)}
         onLogout={logout}
         onOpenMyProfile={() => handleViewChange('profile')}

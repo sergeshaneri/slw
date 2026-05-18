@@ -101,6 +101,10 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
   const [error, setError] = useState<string | null>(null)
   // id инсайтов, для которых раскрыт список реагировавших
   const [reactorsOpen, setReactorsOpen] = useState<Set<number | string>>(() => new Set())
+  // Collapse-by-default для длинных списков. У активного юзера может
+  // быть 20+ inspirations и 50+ инсайтов — раскрываются по кнопке.
+  const [showAllInspirations, setShowAllInspirations] = useState<boolean>(false)
+  const [showAllInsights, setShowAllInsights] = useState<boolean>(false)
 
   useEffect(() => {
     if (!userId) return
@@ -284,7 +288,9 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
       {(profile.inspirations ?? []).length > 0 && (
         <Section label="Что вдохновляет">
           <div className={styles.inspirationGrid}>
-            {profile.inspirations!.map((it, idx) => (
+            {profile.inspirations!
+              .slice(0, showAllInspirations ? undefined : 6)
+              .map((it, idx) => (
               <div
                 key={idx}
                 className={styles.inspirationCard}
@@ -305,6 +311,17 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
               </div>
             ))}
           </div>
+          {(profile.inspirations ?? []).length > 6 && (
+            <button
+              type="button"
+              className={styles.expandBtn}
+              onClick={() => setShowAllInspirations(v => !v)}
+            >
+              {showAllInspirations
+                ? '↑ Свернуть'
+                : `↓ Показать все ${profile.inspirations!.length} карточек`}
+            </button>
+          )}
         </Section>
       )}
 
@@ -353,7 +370,9 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
       {(profile.insights ?? []).length > 0 && (
         <Section label="Инсайты и рекомендации">
           <div className={styles.insightList}>
-            {profile.insights!.map(ins => (
+            {profile.insights!
+              .slice(0, showAllInsights ? undefined : 10)
+              .map(ins => (
               <div
                 key={ins.id}
                 className={styles.insightCard}
@@ -428,6 +447,17 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
               </div>
             ))}
           </div>
+          {(profile.insights ?? []).length > 10 && (
+            <button
+              type="button"
+              className={styles.expandBtn}
+              onClick={() => setShowAllInsights(v => !v)}
+            >
+              {showAllInsights
+                ? '↑ Свернуть'
+                : `↓ Показать все ${profile.insights!.length} инсайтов`}
+            </button>
+          )}
         </Section>
       )}
 

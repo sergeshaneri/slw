@@ -286,6 +286,26 @@
   .authBlock { margin-left: 0; }
 }
 
+/* На узких экранах (≤520) подзаголовок «Соционика» прячем — он
+   декоративный, а длинный mainTitle «Колесо Баланса» становится
+   главным и больше не упирается в ellipsis. */
+@media (max-width: 520px) {
+  .subtitle { display: none; }
+  .mainTitle {
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    /* Дайте тексту переноситься на 2 строки, если не помещается. */
+    white-space: normal;
+    line-height: 1.15;
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
+
+@media (max-width: 360px) {
+  .mainTitle { font-size: 13px; }
+}
+
 /* ── Кликабельный аватар справа ─────────────── */
 .avatarBtn {
   display: inline-flex;
@@ -330,4 +350,19 @@
 @media (max-width: 1024px) {
   .avatarName { display: none; }
   .avatarBtn { padding: 4px; }
+}
+
+/* ── Locked nav button (ИИ-коуч до 5 шагов и т.п.) ── */
+.navLocked {
+  opacity: 0.4;
+  cursor: help;
+  position: relative;
+}
+.navLocked:hover {
+  opacity: 0.6;
+}
+.navLockIcon {
+  margin-left: 4px;
+  font-size: 10px;
+  opacity: 0.7;
 }

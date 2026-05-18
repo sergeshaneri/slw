@@ -290,52 +290,91 @@ export default function DashboardView({
       </div>
 
       <div className={styles.grid}>
-        {/* ── Сегодня ─────────────────────────── */}
-        <Section label="🎯 Сегодня" className={styles.spanFull}>
-          {data.habits.length === 0 ? (
-            <div className={styles.emptyCard}>
-              <p className={styles.muted}>
-                Ты ещё не выбрал ни одной ежедневной практики. Открой страницу аспекта и нажми «+ Выбрать практику».
+        {/* ── Новичок: большой призыв на путешествие ─────────────────
+            Если юзер ещё не сделал ни одного шага путешествия — заменяем
+            блоки «Сегодня/практики/К аспектам» одним крупным CTA-блоком,
+            который ясно говорит «смысл игры — пройти путешествие по 8
+            сферам жизни». Для опытных всё как было. */}
+        {data.is_newbie ? (
+          <Section className={styles.spanFull}>
+            <div className={styles.newbieHero}>
+              <div className={styles.newbieIcon}>🌌</div>
+              <h2 className={styles.newbieTitle}>
+                Пройди путешествие по 8 сферам своей жизни
+              </h2>
+              <p className={styles.newbieText}>
+                Каждая планета — одна из 8 сфер: быт, отношения, дело, идеи, эмоции,
+                воля, время, логика. На каждой ты проходишь уровни L0 → L3:
+                знакомство, практика, интеграция, мастерство. По пути формируешь
+                свои привычки, ведёшь дневник, видишь как растёт колесо баланса.
               </p>
-              <button type="button" className={styles.btnPrimary} onClick={onOpenAspects}>
-                → К аспектам
+              <p className={styles.newbieText}>
+                Это <strong>самокоучинговая игра</strong> — не «развлечение», а
+                инструмент для жизни. Чем дальше — тем глубже.
+              </p>
+              <button
+                type="button"
+                className={styles.newbieCta}
+                onClick={onOpenJourney}
+              >
+                🚀 Начать путешествие
               </button>
+              <div className={styles.muted} style={{ marginTop: 10 }}>
+                После первых шагов на этом экране появятся твои сегодняшние
+                практики, фокус-аспекты и быстрый дневник.
+              </div>
             </div>
-          ) : (
-            <div className={styles.habitsList}>
-              {data.habits.map(h => (
-                <button
-                  key={h.aspect}
-                  type="button"
-                  className={`${styles.habitRow} ${h.ticked_today ? styles.habitRowDone : ''}`}
-                  onClick={() => handleHabitToggle(h)}
-                  style={{ '--accent': ASPECT_COLORS[h.aspect] } as React.CSSProperties}
-                >
-                  <span className={styles.habitAspect} style={{ color: ASPECT_COLORS[h.aspect] }}>
-                    {h.aspect}
-                  </span>
-                  <span className={styles.habitTitle}>{h.title}</span>
-                  <span className={styles.habitTick}>
-                    {h.ticked_today ? '✓' : '☐'}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </Section>
+          </Section>
+        ) : (
+          <>
+            {/* ── Сегодня ─────────────────────────── */}
+            <Section label="🎯 Сегодня" className={styles.spanFull}>
+              {data.habits.length === 0 ? (
+                <div className={styles.emptyCard}>
+                  <p className={styles.muted}>
+                    Ты ещё не выбрал ни одной ежедневной практики. Открой страницу аспекта и нажми «+ Выбрать практику».
+                  </p>
+                  <button type="button" className={styles.btnPrimary} onClick={onOpenAspects}>
+                    → К аспектам
+                  </button>
+                </div>
+              ) : (
+                <div className={styles.habitsList}>
+                  {data.habits.map(h => (
+                    <button
+                      key={h.aspect}
+                      type="button"
+                      className={`${styles.habitRow} ${h.ticked_today ? styles.habitRowDone : ''}`}
+                      onClick={() => handleHabitToggle(h)}
+                      style={{ '--accent': ASPECT_COLORS[h.aspect] } as React.CSSProperties}
+                    >
+                      <span className={styles.habitAspect} style={{ color: ASPECT_COLORS[h.aspect] }}>
+                        {h.aspect}
+                      </span>
+                      <span className={styles.habitTitle}>{h.title}</span>
+                      <span className={styles.habitTick}>
+                        {h.ticked_today ? '✓' : '☐'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </Section>
 
-        {/* ── Какая сфера интересна ────────────── */}
-        <Section className={styles.spanFull}>
-          <div className={styles.sphereCta}>
-            <div>
-              <div className={styles.sphereCtaTitle}>Какая сфера жизни тебе интересна сейчас?</div>
-              <div className={styles.muted}>Выбери — увидишь карту аспекта, тематический холл и упражнения.</div>
-            </div>
-            <button type="button" className={styles.btnPrimary} onClick={onOpenAspects}>
-              → К аспектам
-            </button>
-          </div>
-        </Section>
+            {/* ── Какая сфера интересна ────────────── */}
+            <Section className={styles.spanFull}>
+              <div className={styles.sphereCta}>
+                <div>
+                  <div className={styles.sphereCtaTitle}>Какая сфера жизни тебе интересна сейчас?</div>
+                  <div className={styles.muted}>Выбери — увидишь карту аспекта, тематический холл и упражнения.</div>
+                </div>
+                <button type="button" className={styles.btnPrimary} onClick={onOpenAspects}>
+                  → К аспектам
+                </button>
+              </div>
+            </Section>
+          </>
+        )}
 
         {/* ── Личное: профиль + сообщения ───────── */}
         <Section label="✦ Я" className={styles.spanFull}>

@@ -10,6 +10,11 @@
   --accent: #b39ddb;
   --danger: #e57373;
   color: var(--text);
+  /* Жёсткое ограничение чтобы внутренний контент (грид/таблицы) не
+     раздували родителя и не делали страницу скроллируемой по горизонтали. */
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .muted { color: var(--text-muted); font-size: 13px; padding: 6px 0; }
@@ -129,7 +134,16 @@
   font: inherit;
   color: var(--text);
   transition: background .12s, border-color .15s;
+  /* Длинные строки без пробелов не должны раздувать строку грида. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  box-sizing: border-box;
 }
+
+.rowHead > * { min-width: 0; }
+.name { overflow-wrap: anywhere; word-break: break-word; }
+.fieldValue { overflow-wrap: anywhere; word-break: break-word; }
 
 .row:hover { border-color: var(--line-strong); }
 

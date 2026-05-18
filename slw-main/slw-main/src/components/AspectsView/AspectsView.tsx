@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { getJourney } from '../../data/journey/registry'
@@ -504,6 +504,9 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
   const [noteText, setNoteText] = useState('')
   const [noteSaved, setNoteSaved] = useState(false)
   const [pickedItemId, setPickedItemId] = useState('')
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const readerRootRef = useRef<HTMLDivElement | null>(null)
 
   const blockItems = useMemo<BlockItem[]>(() => getBlockItems(block, data), [block, data])
   const pickedItem = useMemo<BlockItem | null>(
@@ -511,13 +514,44 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
     [blockItems, pickedItemId]
   )
 
-  // Закрыть форму и сбросить при смене блока
+  // Закрыть форму и сбросить при смене блока + скролл вверх + закрыть drawer.
+  // Без скролла на мобиле после тапа в TOC/sidebar контент блока остаётся
+  // ниже сайдбара/списка и пользователь не понимает, что что-то изменилось.
   useEffect(() => {
     setNoteOpen(false)
     setNoteText('')
     setNoteSaved(false)
     setPickedItemId('')
+    setDrawerOpen(false)
+    const main = readerRootRef.current?.closest('main') as HTMLElement | null
+    if (main) main.scrollTop = 0
   }, [block?.id])
+
+  // Reading-progress: сколько прочитано в текущем блоке. Считаем по
+  // scrollTop главного контейнера (.main в App.tsx) — он скроллится, не window.
+  useEffect(() => {
+    const main = readerRootRef.current?.closest('main') as HTMLElement | null
+    if (!main) return
+    const compute = () => {
+      const max = main.scrollHeight - main.clientHeight
+      setProgress(max > 0 ? Math.min(1, Math.max(0, main.scrollTop / max)) : 0)
+    }
+    compute()
+    main.addEventListener('scroll', compute, { passive: true })
+    window.addEventListener('resize', compute)
+    return () => {
+      main.removeEventListener('scroll', compute)
+      window.removeEventListener('resize', compute)
+    }
+  }, [block?.id])
+
+  // Блокировка фонового скролла, когда открыт drawer на мобиле.
+  useEffect(() => {
+    if (!drawerOpen) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prevOverflow }
+  }, [drawerOpen])
 
   const handleSaveNote = () => {
     const text = noteText.trim()
@@ -543,14 +577,40 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
     setTimeout(() => setNoteSaved(false), 2200)
   }
 
+  const totalBlocks = available.length
+  const currentBlockIdx = available.findIndex(b => b.id === block.id)
+
   return (
-    <div className={`${styles.readerLayout} ${styles.fadeIn}`} style={{ '--accent': color } as unknown as CSSProperties}>
-      {/* Левая колонка: sidebar */}
-      <aside className={styles.sidebar}>
-        <button type="button" className={styles.sidebarBack} onClick={onBack}>
-          <span className={styles.backArrow}>←</span>
-          <span>все блоки</span>
-        </button>
+    <div
+      ref={readerRootRef}
+      className={`${styles.readerLayout} ${styles.fadeIn}`}
+      style={{ '--accent': color } as unknown as CSSProperties}
+    >
+      {/* Drawer backdrop (mobile only) */}
+      {drawerOpen && (
+        <div
+          className={styles.drawerBackdrop}
+          onClick={() => setDrawerOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Левая колонка: sidebar (на мобиле — drawer) */}
+      <aside className={`${styles.sidebar} ${drawerOpen ? styles.sidebarOpen : ''}`}>
+        <div className={styles.sidebarHead}>
+          <button type="button" className={styles.sidebarBack} onClick={onBack}>
+            <span className={styles.backArrow}>←</span>
+            <span>все блоки</span>
+          </button>
+          <button
+            type="button"
+            className={styles.drawerClose}
+            onClick={() => setDrawerOpen(false)}
+            aria-label="Закрыть оглавление"
+          >
+            ×
+          </button>
+        </div>
         <div className={styles.sidebarAspect}>
           <span className={styles.sidebarAspectCode} style={{ color }}>{ASPECT_DISPLAY_KEY[aspect]}</span>
           <span className={styles.sidebarAspectName}>{data.name}</span>
@@ -590,6 +650,30 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
 
       {/* Правая колонка: чтение */}
       <article className={styles.reader}>
+        {/* Sticky toolbar мобильный: прогресс-бар + кнопка-меню. На десктопе скрыт. */}
+        <div className={styles.readerToolbar} aria-hidden={false}>
+          <button
+            type="button"
+            className={styles.sidebarToggle}
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Открыть оглавление"
+          >
+            <span className={styles.sidebarToggleIcon} aria-hidden="true">☰</span>
+            <span className={styles.sidebarToggleText}>
+              <span className={styles.sidebarToggleCounter}>
+                {currentBlockIdx + 1}/{totalBlocks}
+              </span>
+              <span className={styles.sidebarToggleLabel}>Разделы</span>
+            </span>
+          </button>
+          <div className={styles.readProgress} aria-hidden="true">
+            <div
+              className={styles.readProgressFill}
+              style={{ transform: `scaleX(${progress})`, background: color, boxShadow: `0 0 10px ${color}aa` }}
+            />
+          </div>
+        </div>
+
         <div
           className={styles.readerBackdrop}
           style={{ background: `radial-gradient(ellipse at 50% -10%, ${color}22, transparent 60%)` }}
