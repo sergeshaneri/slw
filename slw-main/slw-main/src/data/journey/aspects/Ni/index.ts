@@ -10,6 +10,8 @@
 // в l0.md как часть L0-чата. Полное дерево навыков БИ (43 навыка по 4
 // архетипам) и анкеты для архетипных навыков пока не интегрированы.
 
+import type { Script } from '@/types/script'
+import type { CompleteEntry, IntroEntry } from '../../parseScripts'
 import { parseJourneyMd } from '../../parseScripts'
 import niL0Md from './l0.md?raw'
 import niL1Md from './l1.md?raw'
@@ -23,19 +25,19 @@ const l3 = parseJourneyMd(niL3Md)
 
 // «intro» в md превращается в массив с id='intro-1', 'intro-2', …
 // Журнал ожидает id вида 'ni-intro-N'.
-export const NI_ASPECT_INTRO = l0.intro.map((entry, i) => ({
+export const NI_ASPECT_INTRO: IntroEntry[] = l0.intro.map((entry, i) => ({
   ...entry,
   id: `ni-intro-${i + 1}`
 }))
 
-export const NI_LEVEL_0_CORE = l0.scripts
-export const NI_LEVEL_0_COMPLETE = l0.complete ?? { text: 'Уровень пройден.' }
+export const NI_LEVEL_0_CORE: Script[] = l0.scripts
+export const NI_LEVEL_0_COMPLETE: CompleteEntry = l0.complete ?? { text: 'Уровень пройден.' }
 
-export const NI_LEVEL_1_CORE = l1.scripts
-export const NI_LEVEL_1_COMPLETE = l1.complete ?? { text: 'Уровень пройден.' }
+export const NI_LEVEL_1_CORE: Script[] = l1.scripts
+export const NI_LEVEL_1_COMPLETE: CompleteEntry = l1.complete ?? { text: 'Уровень пройден.' }
 
-export const NI_LEVEL_2_CORE = l2.scripts
-export const NI_LEVEL_2_COMPLETE = l2.complete ?? { text: 'Уровень пройден.' }
+export const NI_LEVEL_2_CORE: Script[] = l2.scripts
+export const NI_LEVEL_2_COMPLETE: CompleteEntry = l2.complete ?? { text: 'Уровень пройден.' }
 
-export const NI_LEVEL_3_CORE = l3.scripts
-export const NI_LEVEL_3_COMPLETE = l3.complete ?? { text: 'Уровень пройден.' }
+export const NI_LEVEL_3_CORE: Script[] = l3.scripts
+export const NI_LEVEL_3_COMPLETE: CompleteEntry = l3.complete ?? { text: 'Уровень пройден.' }

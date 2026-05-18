@@ -8,8 +8,11 @@
 // Уровни идут линейным core-маршрутом. Анкеты лежат отдельно от L0
 // и доступны только через дерево навыков (Колесо Te), не из L0-чата.
 
+import type { Script } from '@/types/script'
+import type { CompleteEntry, IntroEntry } from '../../parseScripts'
 import { parseJourneyMd } from '../../parseScripts'
 import { SKILL_TO_ARCHETYPE, ARCHETYPE_KEYS } from '../../skills/te-tree'
+import type { TeArchetypeKey } from '../../skills/te-tree'
 import teL0Md from './l0.md?raw'
 import teL0SurveysMd from './l0-surveys.md?raw'
 import teL1Md from './l1.md?raw'
@@ -24,12 +27,13 @@ const l3 = parseJourneyMd(teL3Md)
 
 // Survey-шаги идут «по очереди» через 4 архетипа, чтобы пользователь
 // видел разные ветки навыков, а не сидел 14 анкет подряд по Виртуозу.
-function interleaveSurveysByArchetype(surveys) {
-  const buckets = {}
-  for (const key of ARCHETYPE_KEYS) buckets[key] = []
-  const others = []
+function interleaveSurveysByArchetype(surveys: Script[]): Script[] {
+  const buckets: Record<TeArchetypeKey, Script[]> = {
+    virtuoso: [], technologist: [], organizer: [], engineer: []
+  }
+  const others: Script[] = []
   for (const s of surveys) {
-    const arche = SKILL_TO_ARCHETYPE[s.skill]
+    const arche = s.skill ? SKILL_TO_ARCHETYPE[s.skill] : undefined
     if (arche && buckets[arche]) buckets[arche].push(s)
     else others.push(s)
   }
@@ -37,7 +41,7 @@ function interleaveSurveysByArchetype(surveys) {
   // Round-robin: на каждом круге берём по одному из каждого ведра,
   // пока все не опустеют. Архетипы в порядке ARCHETYPE_KEYS:
   // Виртуоз → Технолог → Организатор → Инженер.
-  const interleaved = []
+  const interleaved: Script[] = []
   let added = true
   let cursor = 0
   while (added) {
@@ -57,20 +61,20 @@ function interleaveSurveysByArchetype(surveys) {
 
 // «intro» в md превращается в массив с id='intro-1', 'intro-2', …
 // Журнал ожидает id вида 'te-intro-N', поэтому переименуем.
-export const TE_ASPECT_INTRO = l0.intro.map((entry, i) => ({
+export const TE_ASPECT_INTRO: IntroEntry[] = l0.intro.map((entry, i) => ({
   ...entry,
   id: `te-intro-${i + 1}`
 }))
 
-export const TE_LEVEL_0_CORE = l0.scripts
-export const TE_LEVEL_0_SURVEYS = interleaveSurveysByArchetype(l0Surveys.scripts)
-export const TE_LEVEL_0_COMPLETE = l0.complete ?? { text: 'Уровень пройден.' }
+export const TE_LEVEL_0_CORE: Script[] = l0.scripts
+export const TE_LEVEL_0_SURVEYS: Script[] = interleaveSurveysByArchetype(l0Surveys.scripts)
+export const TE_LEVEL_0_COMPLETE: CompleteEntry = l0.complete ?? { text: 'Уровень пройден.' }
 
-export const TE_LEVEL_1_CORE = l1.scripts
-export const TE_LEVEL_1_COMPLETE = l1.complete ?? { text: 'Уровень пройден.' }
+export const TE_LEVEL_1_CORE: Script[] = l1.scripts
+export const TE_LEVEL_1_COMPLETE: CompleteEntry = l1.complete ?? { text: 'Уровень пройден.' }
 
-export const TE_LEVEL_2_CORE = l2.scripts
-export const TE_LEVEL_2_COMPLETE = l2.complete ?? { text: 'Уровень пройден.' }
+export const TE_LEVEL_2_CORE: Script[] = l2.scripts
+export const TE_LEVEL_2_COMPLETE: CompleteEntry = l2.complete ?? { text: 'Уровень пройден.' }
 
-export const TE_LEVEL_3_CORE = l3.scripts
-export const TE_LEVEL_3_COMPLETE = l3.complete ?? { text: 'Уровень пройден.' }
+export const TE_LEVEL_3_CORE: Script[] = l3.scripts
+export const TE_LEVEL_3_COMPLETE: CompleteEntry = l3.complete ?? { text: 'Уровень пройден.' }

@@ -9,6 +9,7 @@
 // Идентификаторы навыков Fe имеют префикс `fe-` для глобальной уникальности
 // в едином `state.skills` map.
 
+import type { Survey } from '@/types/script'
 import { parseSurveys } from './parseSurveys'
 import surveysMd from './surveys.md?raw'
 import {
@@ -18,7 +19,7 @@ import {
   calcArchetypeAvg, calcFeScoreFromSkills, getSkillProgress
 } from './tree'
 
-const SURVEYS_FE = parseSurveys(surveysMd)
+const SURVEYS_FE: Record<string, Survey> = parseSurveys(surveysMd)
 
 export {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE, SKILL_TO_ARCHETYPE,
@@ -29,9 +30,9 @@ export {
 }
 
 // Возвращает анкету Fe по skillId или null.
-export function getSurveyFe(skillId) {
+export function getSurveyFe(skillId: string): Survey | null {
   return SURVEYS_FE[skillId] ?? null
 }
 
 // Множество всех id анкет Fe (для маршрутизации getSurvey между Si и Fe).
-export const FE_SKILL_ID_SET = new Set(Object.keys(SURVEYS_FE))
+export const FE_SKILL_ID_SET: Set<string> = new Set(Object.keys(SURVEYS_FE))

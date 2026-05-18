@@ -10,6 +10,7 @@
 //   по 5 утверждений. Pass=1 — берём первое утверждение из каждого блока,
 //   pass=2 — второе, pass=3 — третье.
 
+import type { Survey } from '@/types/script'
 import { parseSurveys } from './parseSurveys'
 import teSurveysMd from './te-surveys.md?raw'
 import {
@@ -18,10 +19,12 @@ import {
   SKILL_BY_RUS_NAME, ALL_SKILL_IDS, getSkillsForArchetype,
   calcArchetypeAvg as calcArchetypeAvgFromTree
 } from './te-tree'
+import type { TeArchetypeKey } from './te-tree'
+import type { SkillStateEntry, SurveyStatement } from './index'
 // Названия блоков (5 штук) и ключи — общие для БС/ЧИ/ЧЛ.
 import { BLOCK_RUS_TO_KEY, SURVEY_BLOCK_KEYS, SURVEY_BLOCKS } from './tree'
 
-const TE_SURVEYS = parseSurveys(teSurveysMd, {
+const TE_SURVEYS: Record<string, Survey> = parseSurveys(teSurveysMd, {
   skillByRusName: SKILL_BY_RUS_NAME,
   skillToArchetype: SKILL_TO_ARCHETYPE_FOR_PARSER,
   blockRusToKey: BLOCK_RUS_TO_KEY,
@@ -35,14 +38,17 @@ export {
   TE_SURVEYS,
 }
 
-export function getTeSurvey(skillId) {
+export function getTeSurvey(skillId: string): Survey | null {
   return TE_SURVEYS[skillId] ?? null
 }
 
 // Среднее по 5 имеющимся блокам.
-export function calcTeSurveyResult(answers) {
-  const blocks = {}
-  const blockAvgs = []
+export function calcTeSurveyResult(answers: Record<string, number[]> | undefined): {
+  blocks: Record<string, number | null>
+  skill: number | null
+} {
+  const blocks: Record<string, number | null> = {}
+  const blockAvgs: number[] = []
   for (const key of SURVEY_BLOCK_KEYS) {
     const arr = answers?.[key] ?? []
     const valid = arr.filter(n => Number.isFinite(n))
@@ -58,9 +64,9 @@ export function calcTeSurveyResult(answers) {
   return { blocks, skill }
 }
 
-export function getTeCompletedPasses(skillEntry) {
+export function getTeCompletedPasses(skillEntry: SkillStateEntry | undefined): number {
   if (!skillEntry) return 0
-  if (Number.isFinite(skillEntry.passes)) return skillEntry.passes
+  if (Number.isFinite(skillEntry.passes)) return skillEntry.passes as number
   const answers = skillEntry.answers ?? {}
   let max = 0
   for (const key of SURVEY_BLOCK_KEYS) {
@@ -71,15 +77,15 @@ export function getTeCompletedPasses(skillEntry) {
   return max
 }
 
-export function getTeNextPass(skillEntry) {
+export function getTeNextPass(skillEntry: SkillStateEntry | undefined): number {
   const done = getTeCompletedPasses(skillEntry)
   return done >= 3 ? 0 : done + 1
 }
 
-export function getTeStatementsForPass(survey, pass) {
+export function getTeStatementsForPass(survey: Survey | null | undefined, pass: number): SurveyStatement[] {
   if (!survey || !pass) return []
   const stmtIndex = Math.max(0, Math.min(2, pass - 1))
-  const out = []
+  const out: SurveyStatement[] = []
   for (const blockKey of SURVEY_BLOCK_KEYS) {
     const arr = survey.blocks?.[blockKey] ?? []
     if (arr.length === 0) continue
@@ -89,37 +95,52 @@ export function getTeStatementsForPass(survey, pass) {
   return out
 }
 
-export function getTeStatementsForFullRange(survey, startPass, endPass = 3) {
+export function getTeStatementsForFullRange(
+  survey: Survey | null | undefined,
+  startPass: number,
+  endPass = 3
+): SurveyStatement[] {
   if (!survey) return []
-  const out = []
+  const out: SurveyStatement[] = []
   for (let p = startPass; p <= endPass; p++) {
     out.push(...getTeStatementsForPass(survey, p))
   }
   return out
 }
 
-export function buildTeSurveyStatements(survey, mode, startPass) {
+export function buildTeSurveyStatements(
+  survey: Survey | null | undefined,
+  mode: 'short' | 'full',
+  startPass: number
+): SurveyStatement[] {
   if (mode === 'full') return getTeStatementsForFullRange(survey, startPass, 3)
   return getTeStatementsForPass(survey, startPass)
 }
 
 // Среднее по архетипу: 4 общих + специфичные. Используется в Колесе ЧЛ.
-export function calcTeArchetypeAvg(skills, archetypeKey) {
+export function calcTeArchetypeAvg(
+  skills: Record<string, SkillStateEntry> | undefined,
+  archetypeKey: TeArchetypeKey
+): number | null {
   return calcArchetypeAvgFromTree(skills, archetypeKey)
 }
 
 // Общая оценка ЧЛ: среднее по архетипам, в которых есть хоть одна анкета.
 // Используется JourneyView для записи scores['Te'] после анкеты.
-export function calcTeScoreFromSkills(skills) {
+export function calcTeScoreFromSkills(skills: Record<string, SkillStateEntry> | undefined): number | null {
   const archeAvgs = ARCHETYPE_KEYS
     .map(k => calcTeArchetypeAvg(skills, k))
-    .filter(v => v != null)
+    .filter((v): v is number => v != null)
   if (archeAvgs.length === 0) return null
   return archeAvgs.reduce((s, n) => s + n, 0) / archeAvgs.length
 }
 
 // Сколько навыков ЧЛ оценено всего (из 62).
-export function getTeSkillProgress(skills) {
+export function getTeSkillProgress(skills: Record<string, SkillStateEntry> | undefined): {
+  completed: number
+  total: number
+  remaining: number
+} {
   const completed = ALL_SKILL_IDS.filter(id =>
     Number.isFinite(skills?.[id]?.result)
   ).length

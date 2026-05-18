@@ -18,7 +18,20 @@
 // id навыка — короткий латинский ключ. Используется как имя файла md
 // (или как ключ в один md-файле через парсер) и как id анкеты.
 
-export const ARCHETYPES = {
+import type { SkillStateEntry } from './index'
+import type { SkillTreeNode, SurveyBlock } from './tree'
+
+export type SeArchetypeKey = 'defender' | 'ruler' | 'builder' | 'hero'
+
+export type SeArchetypeInfo = {
+  id: SeArchetypeKey
+  name: string
+  subtitle: string
+  blurb: string
+  glyph: string
+}
+
+export const ARCHETYPES: Record<SeArchetypeKey, SeArchetypeInfo> = {
   defender: {
     id: 'defender',
     name: 'Защитник',
@@ -49,7 +62,7 @@ export const ARCHETYPES = {
   }
 }
 
-export const ARCHETYPE_KEYS = ['defender', 'ruler', 'builder', 'hero']
+export const ARCHETYPE_KEYS: SeArchetypeKey[] = ['defender', 'ruler', 'builder', 'hero']
 
 // Четыре общих базовых навыка ЧС — сквозной квартет тело-восприятие-выбор-
 // исполнение, проходящий через все четыре архетипа. Входят в каждый
@@ -64,20 +77,20 @@ export const ARCHETYPE_KEYS = ['defender', 'ruler', 'builder', 'hero']
 //
 // Эти 4 анкеты включены в L0-чат ЧС как первая оценка ЧС
 // (SURV-100..103 в `Se/l0.md`).
-export const COMMON_BASE_SKILLS = [
+export const COMMON_BASE_SKILLS: SkillTreeNode[] = [
   { id: 'groundedness',       name: 'Физическая Заземлённость', isCommon: true },
   { id: 'forces-assessment',  name: 'Реалистичная Оценка Сил (Своих и Чужих)', isCommon: true },
   { id: 'decision-making',    name: 'Принятие Решения', isCommon: true },
   { id: 'willpower',          name: 'Сила Воли', isCommon: true }
 ]
 
-export const COMMON_BASE_SKILL_IDS = new Set(COMMON_BASE_SKILLS.map(s => s.id))
+export const COMMON_BASE_SKILL_IDS: Set<string> = new Set(COMMON_BASE_SKILLS.map(s => s.id))
 
 // Раскладка 43 архетипных навыков по 4 веткам.
 // Порядок внутри каждой ветки совпадает с исходником
 // `Se/вопросы для оценки навыков ЧС.md`.
 // В UI к каждой ветке добавляются 4 общих базовых сверху.
-export const SKILL_TREE = {
+export const SKILL_TREE: Record<SeArchetypeKey, SkillTreeNode[]> = {
   defender: [
     { id: 'boundary-setting',         name: 'Постановка Границ' },
     { id: 'constructive-confrontation', name: 'Конструктивное Противостояние' },
@@ -135,16 +148,16 @@ export const SKILL_TREE = {
 // Обратный индекс: skillId → archetypeKey. Только для архетип-специфичных
 // навыков. Общие базовые в этот индекс НЕ попадают (они принадлежат
 // всем 4 архетипам сразу). Использовать с проверкой на COMMON_BASE_SKILL_IDS.
-export const SKILL_TO_ARCHETYPE = Object.fromEntries(
+export const SKILL_TO_ARCHETYPE: Record<string, SeArchetypeKey> = Object.fromEntries(
   Object.entries(SKILL_TREE).flatMap(([arche, skills]) =>
-    skills.map(s => [s.id, arche])
+    skills.map(s => [s.id, arche as SeArchetypeKey])
   )
 )
 
 // Возвращает полный список навыков, отображаемых под архетипом в UI:
 // 4 общих базовых сверху + специфичные навыки архетипа.
 // Используется для отображения и для расчёта среднего.
-export function getSkillsForArchetype(archetypeKey) {
+export function getSkillsForArchetype(archetypeKey: SeArchetypeKey): SkillTreeNode[] {
   const specific = SKILL_TREE[archetypeKey] ?? []
   return [...COMMON_BASE_SKILLS, ...specific]
 }
@@ -152,11 +165,14 @@ export function getSkillsForArchetype(archetypeKey) {
 // Среднее по архетипу: общие базовые + специфичные навыки архетипа.
 // skills — { [skillId]: { result: number, ... } }.
 // Возвращает null, если ни одного валидного результата.
-export function calcArchetypeAvg(skills, archetypeKey) {
+export function calcArchetypeAvg(
+  skills: Record<string, SkillStateEntry> | undefined,
+  archetypeKey: SeArchetypeKey
+): number | null {
   const ids = getSkillsForArchetype(archetypeKey).map(s => s.id)
   const values = ids
     .map(id => skills?.[id]?.result)
-    .filter(v => Number.isFinite(v))
+    .filter((v): v is number => Number.isFinite(v))
   if (values.length === 0) return null
   return values.reduce((s, n) => s + n, 0) / values.length
 }
@@ -165,7 +181,7 @@ export function calcArchetypeAvg(skills, archetypeKey) {
 // общие базовые получают «virtual» архетип 'common'. Парсер по этому индексу
 // находит, к какому ведру отнести навык. В UI общие отображаются в каждом
 // из 4 архетипов, а 'common' остаётся внутренним маркером.
-export const SKILL_TO_ARCHETYPE_FOR_PARSER = {
+export const SKILL_TO_ARCHETYPE_FOR_PARSER: Record<string, string> = {
   ...SKILL_TO_ARCHETYPE,
   'groundedness': 'common',
   'forces-assessment': 'common',
@@ -175,13 +191,13 @@ export const SKILL_TO_ARCHETYPE_FOR_PARSER = {
 
 // Все skill id одним массивом, в порядке отображения.
 // 4 общих + 12 + 9 + 10 + 12 = 47.
-export const ALL_SKILL_IDS = [
+export const ALL_SKILL_IDS: string[] = [
   ...COMMON_BASE_SKILLS.map(s => s.id),
   ...ARCHETYPE_KEYS.flatMap(k => SKILL_TREE[k].map(s => s.id))
 ]
 
 // Имена 5 блоков анкеты — общие для всех навыков ЧС (та же схема, что в БС/ЧЛ).
-export const SURVEY_BLOCKS = [
+export const SURVEY_BLOCKS: SurveyBlock[] = [
   { id: 'knowledge',   name: 'Теоретическое знание' },
   { id: 'practice',    name: 'Практическое умение' },
   { id: 'awareness',   name: 'Осознанность выполнения' },
@@ -189,10 +205,10 @@ export const SURVEY_BLOCKS = [
   { id: 'confidence',  name: 'Уверенность и помощь другим' }
 ]
 
-export const SURVEY_BLOCK_KEYS = SURVEY_BLOCKS.map(b => b.id)
+export const SURVEY_BLOCK_KEYS: string[] = SURVEY_BLOCKS.map(b => b.id)
 
 // Маппинг русского заголовка блока (как в исходном md) → ключ блока.
-export const BLOCK_RUS_TO_KEY = Object.fromEntries(
+export const BLOCK_RUS_TO_KEY: Record<string, string> = Object.fromEntries(
   SURVEY_BLOCKS.map(b => [b.name, b.id])
 )
 
@@ -201,7 +217,7 @@ export const BLOCK_RUS_TO_KEY = Object.fromEntries(
 //
 // ВАЖНО: текст должен совпадать с исходником в `se-surveys.md` точно
 // (включая скобки и кавычки), иначе навык не будет распознан.
-export const SKILL_BY_RUS_NAME = {
+export const SKILL_BY_RUS_NAME: Record<string, string> = {
   // Common base (универсальные сквозные навыки) — 4 шт.
   'Физическая Заземлённость': 'groundedness',
   'Реалистичная Оценка Сил (Своих и Чужих)': 'forces-assessment',
