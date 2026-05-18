@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
-import { HALL_CONTENT } from '../../data/hallContent'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from 'react'
+import { ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY, type AspectInfo } from '../../data/aspects'
+import { HALL_CONTENT, type HallContent, type HallQuote, type HallFigure, type HallArt, type HallArchetype } from '../../data/hallContent'
 import {
   fetchHallOverview,
   fetchHallMessages,
@@ -22,9 +22,127 @@ import {
   bookmarkInsight,
   unbookmarkInsight,
 } from '../../api/client'
+import type { AspectKey } from '@/types/aspect'
 import styles from './HallView.module.css'
 
-const TABS = [
+// Backend hall.py routes (no response_model). Local types mirror the fields
+// the UI reads.
+// TODO(ts): tighten when backend adds OpenAPI response_model for /api/hall/*.
+type HallTab = 'overview' | 'chat' | 'questions' | 'insights' | 'community'
+
+type HallPreviewInsight = {
+  id: number
+  user_id: number
+  display_name: string
+  avatar?: string | null
+  text: string
+}
+
+type HallPreviewMessage = {
+  id: number
+  user_id: number
+  display_name: string
+  avatar?: string | null
+  text: string
+}
+
+type HallOverview = {
+  my_score?: number | null
+  my_insights: number
+  my_rank?: number | null
+  active_24h: number
+  last_insights: HallPreviewInsight[]
+  last_messages: HallPreviewMessage[]
+}
+
+type HallMessage = {
+  id: number
+  user_id: number
+  display_name: string
+  avatar?: string | null
+  text: string
+  is_mine: boolean
+  created_at: string
+}
+
+type HallMessagesResp = {
+  messages: HallMessage[]
+  last_id: number
+}
+
+type ReactionType = 'heart' | 'thanks' | 'aha' | 'fire'
+
+type HallInsight = {
+  id: number
+  user_id: number
+  display_name: string
+  avatar?: string | null
+  text: string
+  kind: 'insight' | 'recommendation' | string
+  created_at: string
+  reactions?: Partial<Record<ReactionType, number>>
+  my_reaction?: ReactionType | null
+  likes?: number
+  bookmarked_by_me?: boolean
+}
+
+type ReactionResp = {
+  my_reaction: ReactionType | null
+  reactions: Partial<Record<ReactionType, number>>
+  total: number
+}
+
+type LeaderboardEntry = {
+  user_id: number
+  rank: number
+  display_name: string
+  avatar?: string | null
+  insights_count: number
+  likes_received: number
+  is_me?: boolean
+}
+
+type InspirationType = 'film' | 'book' | 'music' | 'activity' | 'person' | 'other' | string
+
+type Inspiration = {
+  user_id: number
+  display_name: string
+  type: InspirationType
+  title: string
+  note?: string | null
+}
+
+type HallQuestion = {
+  id: number
+  user_id: number
+  display_name: string
+  avatar?: string | null
+  text: string
+  created_at: string
+  answers_count: number
+  has_best_answer?: boolean
+}
+
+type HallAnswer = {
+  id: number
+  user_id: number
+  display_name: string
+  avatar?: string | null
+  text: string
+  created_at: string
+  is_best?: boolean
+}
+
+type HallThread = {
+  question: HallQuestion
+  answers: HallAnswer[]
+}
+
+type HabitsTodayResp = {
+  aspects: Array<AspectKey | string>
+}
+
+const TABS: ReadonlyArray<{ id: HallTab; label: string }> = [
   { id: 'overview',  label: 'Обзор' },
   { id: 'chat',      label: 'Чат' },
   { id: 'questions', label: 'Вопросы' },
@@ -32,27 +150,39 @@ const TABS = [
   { id: 'community', label: 'Сообщество' },
 ]
 
-const REACTIONS = [
+const REACTIONS: ReadonlyArray<{ type: ReactionType; emoji: string }> = [
   { type: 'heart',  emoji: '♥' },
   { type: 'thanks', emoji: '🙏' },
   { type: 'aha',    emoji: '💡' },
   { type: 'fire',   emoji: '🔥' },
 ]
 
-const INSPIRATION_ICON = {
+const INSPIRATION_ICON: Record<string, string> = {
   film: '🎬', book: '📚', music: '🎵', activity: '🏃', person: '👤', other: '✦',
 }
 
 const POLL_INTERVAL_MS = 5000
 
-export default function HallView({ aspect, currentUserId, onBack, onOpenProfile }) {
-  const [tab, setTab] = useState('overview')
+type HallViewProps = {
+  aspect: AspectKey
+  currentUserId: number | null
+  onBack: () => void
+  onOpenProfile?: (userId: number) => void
+}
+
+// Style extension for setting CSS custom properties via inline style.
+type AccentCSS = CSSProperties & { '--accent'?: string }
+
+export default function HallView({ aspect, currentUserId, onBack, onOpenProfile }: HallViewProps) {
+  const [tab, setTab] = useState<HallTab>('overview')
   const accent = ASPECT_COLORS[aspect] || '#b39ddb'
-  const meta = ASPECT_DATA[aspect] || {}
-  const content = HALL_CONTENT[aspect] || {}
+  const meta: AspectInfo = ASPECT_DATA[aspect]
+  const content: HallContent = HALL_CONTENT[aspect] ?? {}
+
+  const containerStyle: AccentCSS = { '--accent': accent }
 
   return (
-    <div className={styles.container} style={{ '--accent': accent }}>
+    <div className={styles.container} style={containerStyle}>
       <button type="button" className={styles.backBtn} onClick={onBack}>← Назад</button>
 
       <div className={styles.titleBlock}>
@@ -86,7 +216,7 @@ export default function HallView({ aspect, currentUserId, onBack, onOpenProfile 
         />
       )}
       {tab === 'chat' && (
-        <ChatTab aspect={aspect} currentUserId={currentUserId} onOpenProfile={onOpenProfile} />
+        <ChatTab aspect={aspect} onOpenProfile={onOpenProfile} />
       )}
       {tab === 'questions' && (
         <QuestionsTab aspect={aspect} currentUserId={currentUserId} onOpenProfile={onOpenProfile} />
@@ -98,7 +228,6 @@ export default function HallView({ aspect, currentUserId, onBack, onOpenProfile 
         <CommunityTab
           aspect={aspect}
           content={content}
-          currentUserId={currentUserId}
           onOpenProfile={onOpenProfile}
         />
       )}
@@ -108,14 +237,21 @@ export default function HallView({ aspect, currentUserId, onBack, onOpenProfile 
 
 // ── Overview ────────────────────────────────────────────────────────────────
 
-function OverviewTab({ aspect, meta, content, onOpenProfile }) {
-  const [data, setData] = useState(null)
-  const [error, setError] = useState(null)
+type OverviewProps = {
+  aspect: AspectKey
+  meta: AspectInfo
+  content: HallContent
+  onOpenProfile?: (userId: number) => void
+}
+
+function OverviewTab({ aspect, meta, content, onOpenProfile }: OverviewProps) {
+  const [data, setData] = useState<HallOverview | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchHallOverview(aspect)
-      .then(setData)
-      .catch(e => setError(e.message ?? 'Не удалось загрузить'))
+      .then((d) => setData(d as HallOverview))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Не удалось загрузить'))
   }, [aspect])
 
   return (
@@ -186,7 +322,7 @@ function OverviewTab({ aspect, meta, content, onOpenProfile }) {
       {(content.archetypes ?? []).length > 0 && (
         <Section label="Архетипы аспекта">
           <div className={styles.archetypeGrid}>
-            {content.archetypes.map(a => (
+            {(content.archetypes ?? []).map((a: HallArchetype) => (
               <div key={a.id ?? a.title} className={styles.archetypeCard}>
                 <div className={styles.archetypeIcon}>{a.emoji}</div>
                 <div className={styles.archetypeTitle}>{a.title}</div>
@@ -202,24 +338,30 @@ function OverviewTab({ aspect, meta, content, onOpenProfile }) {
 
 // ── Chat ────────────────────────────────────────────────────────────────────
 
-function ChatTab({ aspect, currentUserId, onOpenProfile }) {
-  const [messages, setMessages] = useState([])
+type ChatTabProps = {
+  aspect: AspectKey
+  onOpenProfile?: (userId: number) => void
+}
+
+function ChatTab({ aspect, onOpenProfile }: ChatTabProps) {
+  const [messages, setMessages] = useState<HallMessage[]>([])
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [lastId, setLastId] = useState(0)
-  const listRef = useRef(null)
+  const listRef = useRef<HTMLDivElement | null>(null)
 
   // Initial load.
   useEffect(() => {
     let cancelled = false
     fetchHallMessages(aspect, 0, 100)
-      .then(({ messages: msgs, last_id }) => {
+      .then((resp) => {
         if (cancelled) return
+        const { messages: msgs, last_id } = resp as HallMessagesResp
         setMessages(msgs)
         setLastId(last_id)
       })
-      .catch(e => setError(e.message ?? 'Не удалось загрузить чат'))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Не удалось загрузить чат'))
     return () => { cancelled = true }
   }, [aspect])
 
@@ -228,7 +370,8 @@ function ChatTab({ aspect, currentUserId, onOpenProfile }) {
     if (lastId === 0) return
     const id = setInterval(async () => {
       try {
-        const { messages: fresh, last_id } = await fetchHallMessages(aspect, lastId, 100)
+        const { messages: fresh, last_id } =
+          (await fetchHallMessages(aspect, lastId, 100)) as HallMessagesResp
         if (fresh.length === 0) return
         setMessages(prev => [...prev, ...fresh])
         setLastId(last_id)
@@ -250,23 +393,23 @@ function ChatTab({ aspect, currentUserId, onOpenProfile }) {
     setBusy(true)
     setError(null)
     try {
-      const msg = await postHallMessage(aspect, t)
+      const msg = (await postHallMessage(aspect, t)) as HallMessage
       setMessages(prev => [...prev, msg])
       setLastId(prev => Math.max(prev, msg.id))
       setText('')
-    } catch (e) {
-      setError(e.message ?? 'Не удалось отправить')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось отправить')
     } finally {
       setBusy(false)
     }
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: number) => {
     try {
       await deleteHallMessage(aspect, id)
       setMessages(prev => prev.filter(m => m.id !== id))
-    } catch (e) {
-      setError(e.message ?? 'Не удалось удалить')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось удалить')
     }
   }
 
@@ -337,21 +480,28 @@ function ChatTab({ aspect, currentUserId, onOpenProfile }) {
 
 // ── Insights feed ───────────────────────────────────────────────────────────
 
-function InsightsTab({ aspect, currentUserId, onOpenProfile }) {
-  const [items, setItems] = useState([])
+type InsightsTabProps = {
+  aspect: AspectKey
+  currentUserId: number | null
+  onOpenProfile?: (userId: number) => void
+}
+
+function InsightsTab({ aspect, currentUserId, onOpenProfile }: InsightsTabProps) {
+  const [items, setItems] = useState<HallInsight[]>([])
   const [busy, setBusy] = useState(true)
-  const [sort, setSort] = useState('new')
+  const [sort, setSort] = useState<'new' | 'popular'>('new')
   const [text, setText] = useState('')
-  const [kind, setKind] = useState('insight')
+  const [kind, setKind] = useState<'insight' | 'recommendation'>('insight')
   const [posting, setPosting] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   const reload = async () => {
     setBusy(true)
     try {
-      setItems(await fetchHallInsights(aspect, sort))
-    } catch (e) {
-      setError(e.message ?? 'Не удалось загрузить')
+      const list = (await fetchHallInsights(aspect, sort)) as HallInsight[]
+      setItems(list ?? [])
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось загрузить')
     } finally {
       setBusy(false)
     }
@@ -368,36 +518,36 @@ function InsightsTab({ aspect, currentUserId, onOpenProfile }) {
       await postInsight({ aspect, kind, text: t, isPublic: true })
       setText('')
       await reload()
-    } catch (e) {
-      setError(e.message ?? 'Не удалось опубликовать')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось опубликовать')
     } finally {
       setPosting(false)
     }
   }
 
-  const handleReact = async (insightId, reaction) => {
+  const handleReact = async (insightId: number, reaction: ReactionType) => {
     try {
       const { my_reaction, reactions, total } =
-        await reactToInsightWithComment(insightId, reaction)
+        (await reactToInsightWithComment(insightId, reaction)) as ReactionResp
       setItems(prev => prev.map(i =>
         i.id === insightId
           ? { ...i, my_reaction, reactions, likes: total }
           : i
       ))
-    } catch (e) {
-      setError(e.message ?? 'Не удалось реакция')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось реакция')
     }
   }
 
-  const handleBookmark = async (insightId, current) => {
+  const handleBookmark = async (insightId: number, current: boolean | undefined) => {
     try {
       if (current) await unbookmarkInsight(insightId)
       else await bookmarkInsight(insightId)
       setItems(prev => prev.map(i =>
         i.id === insightId ? { ...i, bookmarked_by_me: !current } : i
       ))
-    } catch (e) {
-      setError(e.message ?? 'Не удалось')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось')
     }
   }
 
@@ -409,7 +559,7 @@ function InsightsTab({ aspect, currentUserId, onOpenProfile }) {
             <select
               className={styles.select}
               value={kind}
-              onChange={e => setKind(e.target.value)}
+              onChange={e => setKind(e.target.value as 'insight' | 'recommendation')}
             >
               <option value="insight">Инсайт</option>
               <option value="recommendation">Рекомендация</option>
@@ -508,7 +658,7 @@ function InsightsTab({ aspect, currentUserId, onOpenProfile }) {
 
 // Утилита: вернуть n случайных уникальных элементов массива (или меньше, если
 // массив короче). Seed используется для детерминированности на одно «обновление».
-function pickRandom(arr, n, seed) {
+function pickRandom<T>(arr: ReadonlyArray<T> | undefined | null, n: number, seed: number): T[] {
   if (!Array.isArray(arr) || arr.length === 0) return []
   // Простой PRNG на seed (Mulberry32) — детерминированный для конкретного seed.
   let s = seed | 0
@@ -524,32 +674,52 @@ function pickRandom(arr, n, seed) {
   return pool.slice(0, n).map(x => x.item)
 }
 
-function CommunityTab({ aspect, content, currentUserId, onOpenProfile }) {
-  const [top, setTop] = useState([])
-  const [inspirations, setInspirations] = useState([])
-  const [error, setError] = useState(null)
-  const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9))
+type CommunityTabProps = {
+  aspect: AspectKey
+  content: HallContent
+  onOpenProfile?: (userId: number) => void
+}
+
+function CommunityTab({ aspect, content, onOpenProfile }: CommunityTabProps) {
+  const [top, setTop] = useState<LeaderboardEntry[]>([])
+  const [inspirations, setInspirations] = useState<Inspiration[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [seed, setSeed] = useState<number>(() => Math.floor(Math.random() * 1e9))
   const refresh = () => setSeed(Math.floor(Math.random() * 1e9))
 
   // Случайные подборки: 3 цитаты, 1 Дар + 1 Тень из figures, 3 произведения.
-  const quotesSample = useMemo(() => pickRandom(content.quotes ?? [], 3, seed), [content.quotes, seed])
-  const figuresSample = useMemo(() => {
+  const quotesSample = useMemo<HallQuote[]>(
+    () => pickRandom<HallQuote>(content.quotes, 3, seed),
+    [content.quotes, seed],
+  )
+  const figuresSample = useMemo<HallFigure[]>(() => {
     const all = content.figures ?? []
     const gifts = all.filter(f => /^Дар\./i.test(f.name ?? ''))
     const shadows = all.filter(f => /^Тень\./i.test(f.name ?? ''))
-    const giftPick = pickRandom(gifts, 1, seed)
-    const shadowPick = pickRandom(shadows, 1, seed + 1)
+    const giftPick = pickRandom<HallFigure>(gifts, 1, seed)
+    const shadowPick = pickRandom<HallFigure>(shadows, 1, seed + 1)
     // Если разметка «Дар./Тень.» отсутствует — берём 2 случайных.
-    if (giftPick.length + shadowPick.length === 0) return pickRandom(all, 2, seed)
+    if (giftPick.length + shadowPick.length === 0) return pickRandom<HallFigure>(all, 2, seed)
     return [...giftPick, ...shadowPick]
   }, [content.figures, seed])
-  const artsSample = useMemo(() => pickRandom(content.arts ?? [], 3, seed), [content.arts, seed])
+  const artsSample = useMemo<HallArt[]>(
+    () => pickRandom<HallArt>(content.arts, 3, seed),
+    [content.arts, seed],
+  )
 
   useEffect(() => {
     Promise.all([fetchHallLeaderboard(aspect), fetchHallInspirations(aspect)])
-      .then(([t, i]) => { setTop(t); setInspirations(i) })
-      .catch(e => setError(e.message ?? 'Не удалось загрузить'))
+      .then(([t, i]) => {
+        setTop((t as LeaderboardEntry[]) ?? [])
+        setInspirations((i as Inspiration[]) ?? [])
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Не удалось загрузить'))
   }, [aspect])
+
+  const hasCurated =
+    (content.quotes?.length ?? 0) > 0 ||
+    (content.figures?.length ?? 0) > 0 ||
+    (content.arts?.length ?? 0) > 0
 
   return (
     <div className={styles.tabBody}>
@@ -611,7 +781,7 @@ function CommunityTab({ aspect, content, currentUserId, onOpenProfile }) {
         )}
       </Section>
 
-      {(content.quotes?.length || content.figures?.length || content.arts?.length) > 0 && (
+      {hasCurated && (
         <div className={styles.curatedHead}>
           <span className={styles.curatedHeadText}>
             Случайные подборки для обсуждения. Нажми «🔀 Другая подборка», чтобы получить новый набор.
@@ -623,7 +793,7 @@ function CommunityTab({ aspect, content, currentUserId, onOpenProfile }) {
       )}
 
       {quotesSample.length > 0 && (
-        <Section label={`Цитаты дня — ${quotesSample.length} из ${content.quotes.length}`}>
+        <Section label={`Цитаты дня — ${quotesSample.length} из ${content.quotes?.length ?? 0}`}>
           <div className={styles.quoteList}>
             {quotesSample.map((q, i) => (
               <blockquote key={`${seed}-q-${i}`} className={styles.quote}>
@@ -642,7 +812,7 @@ function CommunityTab({ aspect, content, currentUserId, onOpenProfile }) {
       )}
 
       {figuresSample.length > 0 && (
-        <Section label={`Личности дня — ${figuresSample.length} из ${content.figures.length}`}>
+        <Section label={`Личности дня — ${figuresSample.length} из ${content.figures?.length ?? 0}`}>
           <ul className={styles.figureList}>
             {figuresSample.map((f, i) => (
               <li key={`${seed}-f-${i}`} className={styles.figureItem}>
@@ -660,7 +830,7 @@ function CommunityTab({ aspect, content, currentUserId, onOpenProfile }) {
       )}
 
       {artsSample.length > 0 && (
-        <Section label={`Произведения дня — ${artsSample.length} из ${content.arts.length}`}>
+        <Section label={`Произведения дня — ${artsSample.length} из ${content.arts?.length ?? 0}`}>
           <div className={styles.artList}>
             {artsSample.map((a, i) => (
               <div key={`${seed}-a-${i}`} className={styles.artItem}>
@@ -682,22 +852,29 @@ function CommunityTab({ aspect, content, currentUserId, onOpenProfile }) {
 
 // ── Subcomponents ───────────────────────────────────────────────────────────
 
-function QuestionsTab({ aspect, currentUserId, onOpenProfile }) {
-  const [list, setList] = useState([])
-  const [openId, setOpenId] = useState(null)
-  const [thread, setThread] = useState(null)
+type QuestionsTabProps = {
+  aspect: AspectKey
+  currentUserId: number | null
+  onOpenProfile?: (userId: number) => void
+}
+
+function QuestionsTab({ aspect, currentUserId, onOpenProfile }: QuestionsTabProps) {
+  const [list, setList] = useState<HallQuestion[]>([])
+  const [openId, setOpenId] = useState<number | null>(null)
+  const [thread, setThread] = useState<HallThread | null>(null)
   const [busy, setBusy] = useState(true)
   const [posting, setPosting] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [askText, setAskText] = useState('')
   const [answerText, setAnswerText] = useState('')
 
   const reloadList = async () => {
     setBusy(true)
     try {
-      setList(await fetchHallQuestions(aspect, 50))
-    } catch (e) {
-      setError(e.message ?? 'Не удалось загрузить вопросы')
+      const data = (await fetchHallQuestions(aspect, 50)) as HallQuestion[]
+      setList(data ?? [])
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось загрузить вопросы')
     } finally {
       setBusy(false)
     }
@@ -708,8 +885,8 @@ function QuestionsTab({ aspect, currentUserId, onOpenProfile }) {
   useEffect(() => {
     if (!openId) { setThread(null); return }
     fetchHallQuestion(aspect, openId)
-      .then(setThread)
-      .catch(e => setError(e.message ?? 'Не удалось'))
+      .then((t) => setThread(t as HallThread))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Не удалось'))
   }, [aspect, openId])
 
   const handleAsk = async () => {
@@ -721,8 +898,8 @@ function QuestionsTab({ aspect, currentUserId, onOpenProfile }) {
       await postHallQuestion(aspect, t)
       setAskText('')
       reloadList()
-    } catch (e) {
-      setError(e.message ?? 'Не удалось')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось')
     } finally {
       setPosting(false)
     }
@@ -736,25 +913,25 @@ function QuestionsTab({ aspect, currentUserId, onOpenProfile }) {
     try {
       await postHallAnswer(aspect, openId, t)
       setAnswerText('')
-      const fresh = await fetchHallQuestion(aspect, openId)
+      const fresh = (await fetchHallQuestion(aspect, openId)) as HallThread
       setThread(fresh)
       reloadList()
-    } catch (e) {
-      setError(e.message ?? 'Не удалось')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось')
     } finally {
       setPosting(false)
     }
   }
 
-  const handleMarkBest = async (answerId) => {
+  const handleMarkBest = async (answerId: number) => {
     if (!openId) return
     try {
       await markBestAnswer(aspect, openId, answerId)
-      const fresh = await fetchHallQuestion(aspect, openId)
+      const fresh = (await fetchHallQuestion(aspect, openId)) as HallThread
       setThread(fresh)
       reloadList()
-    } catch (e) {
-      setError(e.message ?? 'Не удалось')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось')
     }
   }
 
@@ -907,12 +1084,19 @@ function QuestionsTab({ aspect, currentUserId, onOpenProfile }) {
 //  - postHallMessage — попадает в чат по аспекту (для оживления процесса)
 // В тексте поста цитата идёт первой строкой (через markdown blockquote/префикс)
 // чтобы было ясно, какой именно объект обсуждается.
-function DiscussCuratedItem({ aspect, quoteBlock, itemLabel }) {
+
+type DiscussCuratedItemProps = {
+  aspect: AspectKey
+  quoteBlock: string
+  itemLabel: string
+}
+
+function DiscussCuratedItem({ aspect, quoteBlock, itemLabel }: DiscussCuratedItemProps) {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   const canSubmit = text.trim().length > 0 && !busy
 
@@ -930,8 +1114,8 @@ function DiscussCuratedItem({ aspect, quoteBlock, itemLabel }) {
       setText('')
       setOpen(false)
       setTimeout(() => setDone(false), 4000)
-    } catch (e) {
-      setError(e?.message ?? 'Не удалось опубликовать')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось опубликовать')
     } finally {
       setBusy(false)
     }
@@ -997,14 +1181,18 @@ function DiscussCuratedItem({ aspect, quoteBlock, itemLabel }) {
   )
 }
 
-function HabitTickButton({ aspect }) {
+function HabitTickButton({ aspect }: { aspect: AspectKey }) {
   const [busy, setBusy] = useState(false)
   const [ticked, setTicked] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     fetchHabitsToday()
-      .then(({ aspects }) => { if (!cancelled) setTicked(aspects.includes(aspect)) })
+      .then((data) => {
+        if (cancelled) return
+        const { aspects } = (data as HabitsTodayResp) ?? { aspects: [] }
+        setTicked(aspects.includes(aspect))
+      })
       .catch(() => {})
     return () => { cancelled = true }
   }, [aspect])
@@ -1037,7 +1225,12 @@ function HabitTickButton({ aspect }) {
   )
 }
 
-function Section({ label, children }) {
+type SectionProps = {
+  label: string
+  children: ReactNode
+}
+
+function Section({ label, children }: SectionProps) {
   return (
     <section className={styles.section}>
       <div className={styles.sectionLabel}>{label}</div>
@@ -1046,7 +1239,12 @@ function Section({ label, children }) {
   )
 }
 
-function Stat({ label, value }) {
+type StatProps = {
+  label: string
+  value: ReactNode
+}
+
+function Stat({ label, value }: StatProps) {
   return (
     <div className={styles.statItem}>
       <div className={styles.statValue}>{value}</div>
@@ -1055,19 +1253,19 @@ function Stat({ label, value }) {
   )
 }
 
-function trim(text, n) {
+function trim(text: string | null | undefined, n: number): string {
   if (!text) return ''
   const s = text.replace(/\n/g, ' ')
   return s.length > n ? s.slice(0, n - 1) + '…' : s
 }
 
-function formatTime(iso) {
+function formatTime(iso: string | null | undefined): string {
   if (!iso) return ''
   const d = new Date(iso)
   return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
 }
 
-function formatDate(iso) {
+function formatDate(iso: string | null | undefined): string {
   if (!iso) return ''
   const d = new Date(iso)
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' })

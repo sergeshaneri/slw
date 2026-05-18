@@ -1,17 +1,34 @@
 import { useEffect, useState } from 'react'
 import { ASPECT_COLORS, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { fetchLeaderboard } from '../../api/client'
+import type { AspectKey } from '@/types/aspect'
 import styles from './LeaderboardView.module.css'
 
-export default function LeaderboardView({ currentUserId, onOpenPublicProfile }) {
-  const [rows, setRows] = useState([])
+// Backend returns rows from leaderboard.py (no response_model). Shape mirrors
+// what AspectsView UI expects: per-user row with XP + focus aspects.
+// TODO(ts): tighten when backend adds OpenAPI response_model for /api/leaderboard.
+type LeaderboardRow = {
+  user_id: number
+  rank: number
+  display_name: string
+  xp: number
+  focus_aspects?: AspectKey[] | string[]
+}
+
+type Props = {
+  currentUserId: number | null
+  onOpenPublicProfile?: (userId: number) => void
+}
+
+export default function LeaderboardView({ currentUserId, onOpenPublicProfile }: Props) {
+  const [rows, setRows] = useState<LeaderboardRow[]>([])
   const [busy, setBusy] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchLeaderboard(20)
-      .then(setRows)
-      .catch(e => setError(e.message ?? 'Не удалось загрузить топ'))
+      .then((data) => setRows((data as LeaderboardRow[]) ?? []))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Не удалось загрузить топ'))
       .finally(() => setBusy(false))
   }, [])
 
@@ -52,15 +69,18 @@ export default function LeaderboardView({ currentUserId, onOpenPublicProfile }) 
                 {isMe && <span className={styles.youBadge}>ты</span>}
               </button>
               <div className={styles.focus}>
-                {(row.focus_aspects ?? []).map(a => (
-                  <span
-                    key={a}
-                    className={styles.aspectChip}
-                    style={{ color: ASPECT_COLORS[a], borderColor: `${ASPECT_COLORS[a]}55` }}
-                  >
-                    {ASPECT_DISPLAY_KEY[a] ?? a}
-                  </span>
-                ))}
+                {(row.focus_aspects ?? []).map((a) => {
+                  const key = a as AspectKey
+                  return (
+                    <span
+                      key={a}
+                      className={styles.aspectChip}
+                      style={{ color: ASPECT_COLORS[key], borderColor: `${ASPECT_COLORS[key]}55` }}
+                    >
+                      {ASPECT_DISPLAY_KEY[key] ?? a}
+                    </span>
+                  )
+                })}
               </div>
               <div className={styles.xp}>{row.xp} XP</div>
             </li>

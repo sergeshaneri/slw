@@ -4,16 +4,51 @@ import {
   fetchUnreadCount,
   markNotificationsRead,
 } from '../../api/client'
+import type { AspectKey } from '@/types/aspect'
 import styles from './NotificationsBell.module.css'
 
 const POLL_MS = 30_000
 
-const TYPE_LABEL = {
+// Тип уведомления. Бэкенд хранит type как строку + payload как JSON. Поле
+// payload разное для каждого type — внутри describe() мы разбираем его как
+// частичный object с известными ключами.
+// TODO(ts): tighten when backend adds OpenAPI response_model for /api/notifications.
+type NotificationType = 'reaction' | 'follow' | 'dm' | 'hall_reply' | 'achievement'
+
+type NotificationPayload = {
+  actor_id?: number
+  actor_name?: string
+  sender_id?: number
+  sender_name?: string
+  reaction?: string
+  preview?: string
+  aspect?: AspectKey | string
+  title?: string
+  code?: string
+}
+
+type NotificationItem = {
+  id: number
+  type: NotificationType | string
+  payload?: NotificationPayload
+  is_read: boolean
+  created_at: string
+}
+
+type UnreadCountResp = { unread_count: number }
+
+const TYPE_LABEL: Record<string, string> = {
   reaction: '♥ реакция',
   follow:   '+ подписчик',
   dm:       '💬 сообщение',
   hall_reply: '✦ в холле',
   achievement: '🏆 достижение',
+}
+
+type Props = {
+  onOpenProfile?: (userId: number) => void
+  onOpenDM?: (userId: number) => void
+  onOpenHall?: (aspect: AspectKey | string) => void
 }
 
 /**
@@ -24,17 +59,17 @@ const TYPE_LABEL = {
  * onOpenProfile / onOpenDM — callbacks из App.jsx для перехода по клику
  * на конкретное уведомление.
  */
-export default function NotificationsBell({ onOpenProfile, onOpenDM, onOpenHall }) {
+export default function NotificationsBell({ onOpenProfile, onOpenDM, onOpenHall }: Props) {
   const [unread, setUnread] = useState(0)
   const [open, setOpen] = useState(false)
-  const [items, setItems] = useState([])
+  const [items, setItems] = useState<NotificationItem[]>([])
   const [busy, setBusy] = useState(false)
-  const wrapRef = useRef(null)
+  const wrapRef = useRef<HTMLDivElement | null>(null)
 
   const refreshCount = async () => {
     try {
-      const { unread_count } = await fetchUnreadCount()
-      setUnread(unread_count)
+      const data = (await fetchUnreadCount()) as UnreadCountResp
+      setUnread(data?.unread_count ?? 0)
     } catch {
       // молча
     }
@@ -49,8 +84,8 @@ export default function NotificationsBell({ onOpenProfile, onOpenDM, onOpenHall 
   // Закрыть при клике вне.
   useEffect(() => {
     if (!open) return
-    const onClick = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
+    const onClick = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
@@ -61,7 +96,7 @@ export default function NotificationsBell({ onOpenProfile, onOpenDM, onOpenHall 
     setOpen(true)
     setBusy(true)
     try {
-      const list = await fetchNotifications(30)
+      const list = ((await fetchNotifications(30)) as NotificationItem[]) ?? []
       setItems(list)
       // Помечаем как прочитанные.
       if (list.some(n => !n.is_read)) {
@@ -75,7 +110,7 @@ export default function NotificationsBell({ onOpenProfile, onOpenDM, onOpenHall 
     }
   }
 
-  const handleClick = (n) => {
+  const handleClick = (n: NotificationItem) => {
     setOpen(false)
     const p = n.payload || {}
     if (n.type === 'reaction' && p.actor_id && onOpenProfile) {
@@ -126,7 +161,7 @@ export default function NotificationsBell({ onOpenProfile, onOpenDM, onOpenHall 
   )
 }
 
-function describe(n) {
+function describe(n: NotificationItem): string {
   const p = n.payload || {}
   switch (n.type) {
     case 'reaction':
@@ -136,7 +171,7 @@ function describe(n) {
     case 'dm':
       return `${p.sender_name ?? 'Кто-то'}: «${trim(p.preview ?? '', 80)}»`
     case 'hall_reply':
-      return `${p.actor_name ?? 'Кто-то'} в холле ${p.aspect}: «${trim(p.preview ?? '', 80)}»`
+      return `${p.actor_name ?? 'Кто-то'} в холле ${p.aspect ?? ''}: «${trim(p.preview ?? '', 80)}»`
     case 'achievement':
       return `Разблокировано: ${p.title ?? p.code ?? '—'}`
     default:
@@ -144,16 +179,17 @@ function describe(n) {
   }
 }
 
-function reactionEmoji(r) {
-  return ({ heart: '♥', thanks: '🙏', aha: '💡', fire: '🔥' })[r] ?? '♥'
+function reactionEmoji(r: string | undefined): string {
+  if (!r) return '♥'
+  return ({ heart: '♥', thanks: '🙏', aha: '💡', fire: '🔥' } as Record<string, string>)[r] ?? '♥'
 }
 
-function trim(t, n) {
+function trim(t: string, n: number): string {
   if (!t) return ''
   return t.length > n ? t.slice(0, n - 1) + '…' : t
 }
 
-function formatTime(iso) {
+function formatTime(iso: string | null | undefined): string {
   if (!iso) return ''
   const d = new Date(iso)
   const now = new Date()
