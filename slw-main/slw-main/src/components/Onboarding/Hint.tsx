@@ -6,11 +6,10 @@ type HintPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left'
 
 // Минимальная shape юзера, которая нужна Hint'у. App.jsx даёт сюда полный
 // объект из /api/auth/me — там shape "{ [key: string]: unknown }" пока бэк
-// не объявит response_model. Поэтому фиксируем только используемые поля.
+// не объявит response_model. Поэтому принимаем любой объект и узко тянем
+// hints_seen через runtime narrow.
 // TODO(ts): swap to canonical User type when API gets response_model.
-type HintUser = {
-  hints_seen?: Record<string, boolean | undefined>
-} | null | undefined
+type HintUser = unknown
 
 type Props = {
   id: string
@@ -42,7 +41,8 @@ export default function Hint({
   onDismiss,
   position = 'top-right',
 }: Props) {
-  const seenServer = !!(user?.hints_seen?.[id])
+  const hintsSeen = user && typeof user === 'object' ? (user as { hints_seen?: Record<string, boolean | undefined> }).hints_seen : undefined
+  const seenServer = !!hintsSeen?.[id]
   const seenLocal = typeof window !== 'undefined' &&
     localStorage.getItem(`hint_${id}`) === '1'
   const [dismissed, setDismissed] = useState(false)

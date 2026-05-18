@@ -14,7 +14,6 @@ import TeWheel from './TeWheel'
 import TiWheel from './TiWheel'
 import SeWheel from './SeWheel'
 import HabitSection from './HabitSection'
-// @ts-expect-error Onboarding/Hint is still .jsx (P2A scope); resolves after P2A merges.
 import Hint from '../Onboarding/Hint'
 import type { AspectKey } from '@/types/aspect'
 import type { JourneyState, SkillState } from '@/types/journey'
