@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { downloadVaultZip, getToken } from '../../api/client'
 import styles from './VaultSyncTab.module.css'
 
-const BACKEND_URL = import.meta.env.VITE_API_URL ?? ''
+const BACKEND_URL: string = import.meta.env.VITE_API_URL ?? ''
 
 /**
  * Sync-вкладка: экспорт vault'а ZIP-архивом + инструкция по импорту через
@@ -14,26 +14,26 @@ const BACKEND_URL = import.meta.env.VITE_API_URL ?? ''
  *  - ссылка на репо со скриптом
  */
 export default function VaultSyncTab() {
-  const [downloading, setDownloading] = useState(false)
-  const [error, setError] = useState(null)
-  const [tokenVisible, setTokenVisible] = useState(false)
-  const [tokenCopied, setTokenCopied] = useState(false)
+  const [downloading, setDownloading] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
+  const [tokenVisible, setTokenVisible] = useState<boolean>(false)
+  const [tokenCopied, setTokenCopied] = useState<boolean>(false)
 
   const token = getToken()
 
-  const handleDownload = async () => {
+  const handleDownload = async (): Promise<void> => {
     setDownloading(true)
     setError(null)
     try {
       await downloadVaultZip()
-    } catch (e) {
-      setError(e.message ?? 'Не удалось скачать архив')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось скачать архив')
     } finally {
       setDownloading(false)
     }
   }
 
-  const handleCopyToken = async () => {
+  const handleCopyToken = async (): Promise<void> => {
     if (!token) return
     try {
       await navigator.clipboard.writeText(token)

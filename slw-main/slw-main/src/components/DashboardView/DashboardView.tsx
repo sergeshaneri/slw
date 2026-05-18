@@ -11,12 +11,16 @@ import MiniWheel from './MiniWheel'
 import Heatmap from '../Heatmap/Heatmap'
 import Hint from '../Onboarding/Hint'
 import DiscoverMore from './DiscoverMore'
+import type { AspectKey, AspectScores } from '@/types/aspect'
+import type { JourneyState } from '@/types/journey'
 import styles from './DashboardView.module.css'
 
 // Маленький цветок-глиф для лейбла «Колесо баланса». 8 лепестков по
 // цветам аспектов. Заменяет красный emoji ⭕ на цветной знак, который
 // тематически вяжется с самим колесом.
-function WheelFlowerGlyph({ size = 18 }) {
+type WheelFlowerGlyphProps = { size?: number }
+
+function WheelFlowerGlyph({ size = 18 }: WheelFlowerGlyphProps) {
   const cx = size / 2
   const cy = size / 2
   const petalR = size * 0.32 // расстояние от центра до центра лепестка
@@ -51,12 +55,112 @@ function WheelFlowerGlyph({ size = 18 }) {
   )
 }
 
-const STREAK_STATUS_LABEL = {
+const STREAK_STATUS_LABEL: Record<string, string> = {
   none:         'Стрик ещё не начался',
   ticked_today: 'Сегодня уже отметился ✓',
   due_today:    '⚠ Сделай что-то сегодня — стрик в зоне риска',
   shielded:     '🛡 Защита покрыла пропуск',
   broken:       'Стрик сорвался — начни новый',
+}
+
+// Shape ответа /api/dashboard. У бэка нет response_model, поэтому
+// локальный тип покрывает только load-bearing поля, остальное —
+// Record<string, unknown> для forward-compat.
+// TODO(ts): tighten when backend adds response_model to /api/dashboard.
+type DashboardHabit = {
+  aspect: AspectKey
+  title: string
+  ticked_today?: boolean
+} & Record<string, unknown>
+
+type DashboardStreak = {
+  current?: number
+  status?: 'none' | 'ticked_today' | 'due_today' | 'shielded' | 'broken' | string
+} & Record<string, unknown>
+
+type DashboardUser = {
+  display_name?: string
+  avatar?: string
+  focus_aspects?: AspectKey[]
+  hints_seen?: Record<string, boolean>
+  following_count?: number
+  bio?: string | null
+} & Record<string, unknown>
+
+type DashboardNotification = {
+  id: number | string
+  type: string
+  payload?: Record<string, unknown>
+}
+
+type DashboardCoach = {
+  remaining_today: number
+  daily_limit: number
+  streak_bonus?: number
+}
+
+type DashboardLevelProgress = {
+  completed_steps: number
+} & Record<string, unknown>
+
+type DashboardSubFeedItem = {
+  id: number | string
+  user_id: number | string
+  display_name?: string
+  avatar?: string
+  aspect: AspectKey
+  text?: string
+}
+
+type DashboardSuggestedAuthor = {
+  user_id: number | string
+  display_name?: string
+  avatar?: string
+  insights_count?: number
+  likes_received?: number
+}
+
+type DashboardWordOfDay = {
+  text: string
+  author: string
+  aspect: AspectKey
+}
+
+type DashboardData = {
+  user: DashboardUser
+  today?: string
+  scores: AspectScores
+  streak: DashboardStreak
+  habits: DashboardHabit[]
+  coach: DashboardCoach
+  notifications: {
+    unread_count: number
+    latest: DashboardNotification[]
+  }
+  subs_feed: DashboardSubFeedItem[]
+  suggested_authors: DashboardSuggestedAuthor[]
+  word_of_day?: DashboardWordOfDay | null
+  dm_unread_count?: number
+  active_aspect?: AspectKey | null
+  level_progress?: DashboardLevelProgress | null
+} & Record<string, unknown>
+
+type Props = {
+  currentUserId: number | string | null | undefined
+  user: unknown
+  journey: JourneyState | null | undefined
+  onOpenAspect?: (aspect: AspectKey) => void
+  onOpenAspects?: () => void
+  onOpenJourney?: () => void
+  onOpenCoach?: () => void
+  onOpenDiary?: () => void
+  onOpenHall?: (aspect: AspectKey) => void
+  onOpenProfile?: (userId: number | string) => void
+  onOpenMyProfile?: () => void
+  onOpenDM?: (userId: number | string) => void
+  onOpenDMList?: () => void
+  onOpenLeaderboard?: () => void
+  onOpenTour?: () => void
 }
 
 /**
@@ -72,28 +176,35 @@ export default function DashboardView({
   onOpenJourney,
   onOpenCoach,
   onOpenDiary,
-  onOpenHall,
+  onOpenHall: _onOpenHall,
   onOpenProfile,
   onOpenMyProfile,
-  onOpenDM,
+  onOpenDM: _onOpenDM,
   onOpenDMList,
   onOpenLeaderboard,
   onOpenTour,
-}) {
-  const [data, setData] = useState(null)
-  const [busy, setBusy] = useState(true)
-  const [error, setError] = useState(null)
-  const [diaryText, setDiaryText] = useState('')
-  const [diaryAspect, setDiaryAspect] = useState('general')
-  const [savingDiary, setSavingDiary] = useState(false)
-  const [diarySaved, setDiarySaved] = useState(false)
+}: Props) {
+  const [data, setData] = useState<DashboardData | null>(null)
+  const [busy, setBusy] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+  const [diaryText, setDiaryText] = useState<string>('')
+  const [diaryAspect, setDiaryAspect] = useState<AspectKey | 'general'>('general')
+  const [savingDiary, setSavingDiary] = useState<boolean>(false)
+  const [diarySaved, setDiarySaved] = useState<boolean>(false)
 
-  const reload = async () => {
+  // _onOpenHall and _onOpenDM are accepted to preserve the prop interface
+  // (callers may pass them) but the current dashboard layout doesn't use
+  // them directly — Hall is reached via aspect click, DMs via DMList.
+  void _onOpenHall
+  void _onOpenDM
+
+  const reload = async (): Promise<void> => {
     setBusy(true)
     try {
-      setData(await fetchDashboard())
-    } catch (e) {
-      setError(e.message ?? 'Не удалось загрузить дашборд')
+      const d = await fetchDashboard()
+      setData(d as DashboardData)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось загрузить дашборд')
     } finally {
       setBusy(false)
     }
@@ -115,17 +226,17 @@ export default function DashboardView({
                     : streak.status === 'due_today' ? '#f0c674'
                     : '#b39ddb'
 
-  const handleHabitToggle = async (h) => {
+  const handleHabitToggle = async (h: DashboardHabit): Promise<void> => {
     try {
       if (h.ticked_today) await untickHabit(h.aspect)
       else await tickHabit(h.aspect)
       reload()
-    } catch (e) {
-      setError(e.message ?? 'Не удалось')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось')
     }
   }
 
-  const handleDiarySave = async () => {
+  const handleDiarySave = async (): Promise<void> => {
     const t = diaryText.trim()
     if (!t || savingDiary) return
     setSavingDiary(true)
@@ -139,19 +250,19 @@ export default function DashboardView({
       setDiarySaved(true)
       setTimeout(() => setDiarySaved(false), 2000)
       reload()
-    } catch (e) {
-      setError(e.message ?? 'Не удалось сохранить')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось сохранить')
     } finally {
       setSavingDiary(false)
     }
   }
 
-  const handleFollow = async (userId) => {
+  const handleFollow = async (userId: number | string): Promise<void> => {
     try {
       await followUser(userId)
       reload()
-    } catch (e) {
-      setError(e.message ?? 'Не удалось')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось')
     }
   }
 
@@ -173,7 +284,7 @@ export default function DashboardView({
         <div className={styles.streakBlock} style={{ color: streakColor }}>
           <div className={styles.streakNumber}>🔥 {streak.current ?? 0}</div>
           <div className={styles.streakStatus}>
-            {STREAK_STATUS_LABEL[streak.status] || ''}
+            {STREAK_STATUS_LABEL[streak.status ?? ''] || ''}
           </div>
         </div>
       </div>
@@ -198,7 +309,7 @@ export default function DashboardView({
                   type="button"
                   className={`${styles.habitRow} ${h.ticked_today ? styles.habitRowDone : ''}`}
                   onClick={() => handleHabitToggle(h)}
-                  style={{ '--accent': ASPECT_COLORS[h.aspect] }}
+                  style={{ '--accent': ASPECT_COLORS[h.aspect] } as React.CSSProperties}
                 >
                   <span className={styles.habitAspect} style={{ color: ASPECT_COLORS[h.aspect] }}>
                     {h.aspect}
@@ -239,7 +350,7 @@ export default function DashboardView({
                 <div className={styles.personalTitle}>Мой профиль</div>
                 <div className={styles.muted}>
                   {data.user.display_name}
-                  {(data.user.focus_aspects ?? []).length > 0 && ' · ' + data.user.focus_aspects.map(a => ASPECT_DISPLAY_KEY[a] ?? a).join(', ')}
+                  {(data.user.focus_aspects ?? []).length > 0 && ' · ' + (data.user.focus_aspects ?? []).map(a => ASPECT_DISPLAY_KEY[a] ?? a).join(', ')}
                 </div>
               </div>
               <span className={styles.personalArrow}>→</span>
@@ -254,12 +365,12 @@ export default function DashboardView({
               <div className={styles.personalBody}>
                 <div className={styles.personalTitle}>
                   Сообщения
-                  {data.dm_unread_count > 0 && (
+                  {(data.dm_unread_count ?? 0) > 0 && (
                     <span className={styles.dmBadge}>{data.dm_unread_count}</span>
                   )}
                 </div>
                 <div className={styles.muted}>
-                  {data.dm_unread_count > 0
+                  {(data.dm_unread_count ?? 0) > 0
                     ? `${data.dm_unread_count} непрочитанных`
                     : 'Личные диалоги'}
                 </div>
@@ -319,7 +430,7 @@ export default function DashboardView({
               </div>
               <div className={styles.muted}>
                 осталось сегодня
-                {data.coach.streak_bonus > 0 && ` · бонус +${data.coach.streak_bonus}`}
+                {(data.coach.streak_bonus ?? 0) > 0 && ` · бонус +${data.coach.streak_bonus}`}
               </div>
             </div>
             <button
@@ -346,7 +457,7 @@ export default function DashboardView({
             />
             <select
               value={diaryAspect}
-              onChange={e => setDiaryAspect(e.target.value)}
+              onChange={e => setDiaryAspect(e.target.value as AspectKey | 'general')}
               className={styles.diarySelect}
             >
               <option value="general">— общая запись —</option>
@@ -461,7 +572,7 @@ export default function DashboardView({
           <DiscoverMore
             data={data}
             journey={journey}
-            user={user}
+            user={user as Parameters<typeof DiscoverMore>[0]['user']}
             onOpenDiary={() => onOpenDiary?.()}
             onOpenPlanets={onOpenJourney}
             onOpenLeaderboard={onOpenLeaderboard}
@@ -500,7 +611,13 @@ export default function DashboardView({
   )
 }
 
-function Section({ label, children, className = '' }) {
+type SectionProps = {
+  label?: React.ReactNode
+  children?: React.ReactNode
+  className?: string
+}
+
+function Section({ label, children, className = '' }: SectionProps) {
   return (
     <section className={`${styles.section} ${className}`}>
       {label && <div className={styles.sectionLabel}>{label}</div>}
@@ -509,7 +626,7 @@ function Section({ label, children, className = '' }) {
   )
 }
 
-function greeting() {
+function greeting(): string {
   const h = new Date().getHours()
   if (h < 5) return 'Доброй ночи'
   if (h < 12) return 'Доброе утро'
@@ -517,35 +634,36 @@ function greeting() {
   return 'Добрый вечер'
 }
 
-function prettyDate(iso) {
+function prettyDate(iso: string | undefined | null): string {
   if (!iso) return ''
   const d = new Date(iso)
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'long' })
 }
 
-function trim(t, n) {
+function trim(t: string | null | undefined, n: number): string {
   if (!t) return ''
   return t.length > n ? t.slice(0, n - 1) + '…' : t
 }
 
-function describeNotif(n) {
-  const p = n.payload || {}
+function describeNotif(n: DashboardNotification): string {
+  const p = (n.payload || {}) as Record<string, unknown>
   switch (n.type) {
     case 'reaction':
-      return `${reactEmoji(p.reaction)} ${p.actor_name ?? 'Кто-то'} отреагировал на твой инсайт`
+      return `${reactEmoji(p.reaction as string | undefined)} ${(p.actor_name as string | undefined) ?? 'Кто-то'} отреагировал на твой инсайт`
     case 'follow':
-      return `+ ${p.actor_name ?? 'Кто-то'} подписался на тебя`
+      return `+ ${(p.actor_name as string | undefined) ?? 'Кто-то'} подписался на тебя`
     case 'dm':
-      return `💬 ${p.sender_name ?? 'Кто-то'}: «${trim(p.preview ?? '', 80)}»`
+      return `💬 ${(p.sender_name as string | undefined) ?? 'Кто-то'}: «${trim((p.preview as string | undefined) ?? '', 80)}»`
     case 'hall_reply':
-      return `✦ ${p.actor_name ?? 'Кто-то'} в холле ${p.aspect}: «${trim(p.preview ?? '', 80)}»`
+      return `✦ ${(p.actor_name as string | undefined) ?? 'Кто-то'} в холле ${p.aspect}: «${trim((p.preview as string | undefined) ?? '', 80)}»`
     case 'achievement':
-      return `🏆 Разблокировано: ${p.title ?? p.code ?? '—'}`
+      return `🏆 Разблокировано: ${(p.title as string | undefined) ?? (p.code as string | undefined) ?? '—'}`
     default:
       return n.type
   }
 }
 
-function reactEmoji(r) {
-  return ({ heart: '♥', thanks: '🙏', aha: '💡', fire: '🔥' })[r] ?? '♥'
+function reactEmoji(r: string | undefined): string {
+  const map: Record<string, string> = { heart: '♥', thanks: '🙏', aha: '💡', fire: '🔥' }
+  return r != null ? (map[r] ?? '♥') : '♥'
 }

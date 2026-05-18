@@ -1,9 +1,46 @@
 import { dismissDiscoverCard } from '../../api/client'
+import type { JourneyState } from '@/types/journey'
 import styles from './DiscoverMore.module.css'
+
+// Backend сейчас не имеет response_model для /api/dashboard и /api/auth/me,
+// поэтому в DiscoverMore data/user приходят как непрозрачные мапы. Локально
+// доверяем shape — `?? 0`/`?? false` страхует от undefined полей.
+// TODO(ts): tighten when backend adds response_models for /api/dashboard
+// and /api/auth/me.
+type DashboardLikeUser = {
+  hints_seen?: Record<string, boolean>
+  following_count?: number
+  bio?: string | null
+  avatar?: string | null
+} & Record<string, unknown>
+
+type DashboardData = {
+  user?: DashboardLikeUser
+  diary_today_count_by_source?: Record<string, number>
+  published_insights_count?: number
+} & Record<string, unknown>
+
+type CardAction = 'open-diary' | 'open-planets' | 'open-leaderboard' | 'open-profile'
+
+type CardContext = {
+  data: DashboardData | null | undefined
+  journey: JourneyState | null | undefined
+  user: DashboardLikeUser | null | undefined
+}
+
+type Card = {
+  id: string
+  icon: string
+  title: string
+  desc: string
+  cta: string
+  action: CardAction
+  show: (ctx: CardContext) => boolean
+}
 
 // Список карточек. Каждая знает, при каких условиях она актуальна
 // (`show({ data, journey, user })`), и какое действие делает (`action`).
-const CARDS = [
+const CARDS: Card[] = [
   {
     id: 'daily-review',
     icon: '📅',
@@ -59,6 +96,17 @@ const CARDS = [
   },
 ]
 
+type Props = {
+  data: DashboardData | null | undefined
+  journey: JourneyState | null | undefined
+  user: DashboardLikeUser | null | undefined
+  onOpenDiary?: () => void
+  onOpenPlanets?: () => void
+  onOpenLeaderboard?: () => void
+  onOpenMyProfile?: () => void
+  onReload?: () => void
+}
+
 /**
  * «Открой больше» — секция dynamic-карточек на дашборде (Layer 3).
  * Закрытие карточки крестиком кладёт ключ в hints_seen с префиксом
@@ -78,16 +126,16 @@ export default function DiscoverMore({
   onOpenLeaderboard,
   onOpenMyProfile,
   onReload,
-}) {
+}: Props) {
   // hints_seen может прийти двумя путями: из user (App.jsx — обновляется
   // при логине / перезагрузке страницы) и из data.user (свежий ответ
   // /api/dashboard, который обновляется при reload). Сливаем — так после
   // dismiss карточка исчезает сразу.
-  const seen = { ...(user?.hints_seen ?? {}), ...(data?.user?.hints_seen ?? {}) }
+  const seen: Record<string, boolean> = { ...(user?.hints_seen ?? {}), ...(data?.user?.hints_seen ?? {}) }
   const cards = CARDS.filter(c => !seen[`discover-${c.id}`] && c.show({ data, journey, user }))
   if (cards.length === 0) return null
 
-  const handleAction = (card) => {
+  const handleAction = (card: Card): void => {
     switch (card.action) {
       case 'open-diary':       onOpenDiary?.(); break
       case 'open-planets':     onOpenPlanets?.(); break
@@ -97,7 +145,7 @@ export default function DiscoverMore({
     }
   }
 
-  const handleDismiss = async (card) => {
+  const handleDismiss = async (card: Card): Promise<void> => {
     try { await dismissDiscoverCard(card.id) } catch { /* best-effort */ }
     onReload?.()
   }

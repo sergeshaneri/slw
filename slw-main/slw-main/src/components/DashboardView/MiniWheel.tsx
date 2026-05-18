@@ -1,5 +1,13 @@
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DISPLAY_KEY } from '../../data/aspects'
+import type { AspectKey, AspectScores } from '@/types/aspect'
 import styles from './MiniWheel.module.css'
+
+type Props = {
+  scores: AspectScores
+  size?: number
+  onAspectClick?: (aspect: AspectKey) => void
+  onCenterClick?: () => void
+}
 
 /**
  * Мини-колесо для дашборда. 8 секторов; радиус каждого = его оценка
@@ -11,7 +19,7 @@ import styles from './MiniWheel.module.css'
  * Без интерактивных регуляторов — это компактный обзор. Полное колесо
  * (с настройкой оценок) живёт в WheelView.
  */
-export default function MiniWheel({ scores, size = 240, onAspectClick, onCenterClick }) {
+export default function MiniWheel({ scores, size = 240, onAspectClick, onCenterClick }: Props) {
   const cx = size / 2
   const cy = size / 2
   // Запас наружу под подписи аспектов и под жирный обод колеса.

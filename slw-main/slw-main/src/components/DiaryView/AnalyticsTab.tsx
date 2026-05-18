@@ -2,7 +2,24 @@ import { useEffect, useState } from 'react'
 import { fetchAnalyticsList, fetchAnalyticsReport } from '../../api/client'
 import styles from './AnalyticsTab.module.css'
 
-const TYPE_LABEL = {
+// Shape сохраняемых отчётов в таблице `analytics_reports`. Backend
+// возвращает массив без response_model, поэтому локальный тип.
+// TODO(ts): tighten when backend adds response_model to /api/diary/analytics.
+type AnalyticsReportType = 'week' | 'month' | 'custom' | string
+
+type AnalyticsReportSummary = {
+  id: number | string
+  type: AnalyticsReportType
+  title?: string | null
+  period_start?: string | null
+  period_end?: string | null
+}
+
+type AnalyticsReportFull = AnalyticsReportSummary & {
+  content_md?: string
+}
+
+const TYPE_LABEL: Record<string, string> = {
   week:   'Неделя',
   month:  'Месяц',
   custom: 'Произвольный',
@@ -15,22 +32,22 @@ const TYPE_LABEL = {
  * минимум форматирования и так читаем).
  */
 export default function AnalyticsTab() {
-  const [items, setItems] = useState([])
-  const [busy, setBusy] = useState(true)
-  const [error, setError] = useState(null)
-  const [openId, setOpenId] = useState(null)
-  const [openContent, setOpenContent] = useState(null)
-  const [contentBusy, setContentBusy] = useState(false)
+  const [items, setItems] = useState<AnalyticsReportSummary[]>([])
+  const [busy, setBusy] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<number | string | null>(null)
+  const [openContent, setOpenContent] = useState<AnalyticsReportFull | null>(null)
+  const [contentBusy, setContentBusy] = useState<boolean>(false)
 
   useEffect(() => {
     setBusy(true)
     fetchAnalyticsList()
-      .then(setItems)
-      .catch(e => setError(e.message ?? 'Не удалось загрузить отчёты'))
+      .then((d) => setItems(d as AnalyticsReportSummary[]))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Не удалось загрузить отчёты'))
       .finally(() => setBusy(false))
   }, [])
 
-  const handleOpen = async (id) => {
+  const handleOpen = async (id: number | string): Promise<void> => {
     if (openId === id) {
       setOpenId(null)
       setOpenContent(null)
@@ -41,9 +58,9 @@ export default function AnalyticsTab() {
     setContentBusy(true)
     try {
       const data = await fetchAnalyticsReport(id)
-      setOpenContent(data)
-    } catch (e) {
-      setError(e.message ?? 'Не удалось загрузить отчёт')
+      setOpenContent(data as AnalyticsReportFull)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось загрузить отчёт')
     } finally {
       setContentBusy(false)
     }
