@@ -4,13 +4,54 @@
  * и superpower) — не дублируем.
  *
  * Структура:
- *   { quotes: [{text, author}], figures: [{name, note}],
- *     arts: [{type, title, note}], archetypes: [{emoji, title, desc}] }
+ *   { quotes: [{text, author, note?}], figures: [{name, note}],
+ *     arts: [{type, title, note}], archetypes: [{id?, emoji, title, desc}],
+ *     interestingFacts?: [{name, desc}], subline? }
  *
  * Сейчас наполнено для ЧИ (контент уже есть в Ne/). Для остальных 7 — лёгкие
  * затравки. Юзер расширит руками по мере подготовки .md-файлов.
  */
-export const HALL_CONTENT = {
+import type { AspectKey } from '@/types/aspect'
+
+export type HallQuote = {
+  text: string
+  author: string
+  note?: string
+}
+
+export type HallFigure = {
+  name: string
+  note: string
+}
+
+export type HallArt = {
+  type: string
+  title: string
+  note: string
+}
+
+export type HallArchetype = {
+  id?: string
+  emoji: string
+  title: string
+  desc: string
+}
+
+export type HallFact = {
+  name: string
+  desc: string
+}
+
+export type HallContent = {
+  quotes?: HallQuote[]
+  figures?: HallFigure[]
+  arts?: HallArt[]
+  archetypes?: HallArchetype[]
+  interestingFacts?: HallFact[]
+  subline?: string
+}
+
+export const HALL_CONTENT: Record<AspectKey, HallContent> = {
   Ne: {
     quotes: [
       { text: 'Воображение важнее знания. Знание ограничено, а воображение охватывает весь мир, стимулирует прогресс и порождает эволюцию', author: 'Альберт Эйнштейн', note: 'Каноничная для ЧИ-Первооткрывателя установка: видение возможного выше уже-известного.' },
