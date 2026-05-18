@@ -1,20 +1,56 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { adminStats } from '../../api/client'
 import styles from './AdminView.module.css'
 
+// Backend has no response_model for /api/admin/stats — fields mirror reads.
+// TODO(ts): tighten when backend formalizes admin/stats response.
+type StatsData = {
+  registrations: {
+    total: number
+    last_24h: number
+    last_7d: number
+    last_30d: number
+  }
+  activity: {
+    dau: number
+    wau: number
+    mau: number
+  }
+  content: {
+    diary_total: number
+    diary_last_7d: number
+    insights_total: number
+    insights_last_7d: number
+  }
+  system: {
+    tg_linked: number
+    admins: number
+  }
+  drift_users: Array<{
+    user_id: number | string
+    email?: string | null
+    telegram_username?: string | null
+    totalCompleted: number
+    sum_completedScripts: number
+    drift: number
+  }>
+  drift_users_count: number
+}
+
 export default function StatsTab() {
-  const [data, setData] = useState(null)
-  const [busy, setBusy] = useState(true)
-  const [error, setError] = useState(null)
+  const [data, setData] = useState<StatsData | null>(null)
+  const [busy, setBusy] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setBusy(true)
     setError(null)
     try {
-      const d = await adminStats()
+      const d = await adminStats() as StatsData
       setData(d)
     } catch (e) {
-      setError(e.message ?? 'Ошибка загрузки')
+      setError(e instanceof Error ? e.message : 'Ошибка загрузки')
     } finally {
       setBusy(false)
     }
@@ -102,7 +138,9 @@ export default function StatsTab() {
   )
 }
 
-function StatBlock({ title, children }) {
+type StatBlockProps = { title: string; children: ReactNode }
+
+function StatBlock({ title, children }: StatBlockProps) {
   return (
     <div className={styles.statBlock}>
       <div className={styles.statBlockTitle}>{title}</div>
@@ -111,7 +149,9 @@ function StatBlock({ title, children }) {
   )
 }
 
-function BigNum({ label, value, hint }) {
+type NumProps = { label: string; value: number; hint?: string }
+
+function BigNum({ label, value, hint }: NumProps) {
   return (
     <div className={styles.bigNum}>
       <div className={styles.bigNumValue}>{value}</div>
@@ -121,7 +161,7 @@ function BigNum({ label, value, hint }) {
   )
 }
 
-function SmallNum({ label, value, hint }) {
+function SmallNum({ label, value, hint }: NumProps) {
   return (
     <div className={styles.smallNum}>
       <span className={styles.smallNumLabel}>{label}</span>

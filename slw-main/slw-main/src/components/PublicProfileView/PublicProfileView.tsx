@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
+import type { ReactNode } from 'react'
+import { ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import {
   fetchPublicProfile,
   reactToInsightWithComment,
@@ -11,14 +12,66 @@ import {
 import ReactorsList from './ReactorsList'
 import Heatmap from '../Heatmap/Heatmap'
 import { tmaHaptic } from '../../tma/hooks'
+import type { AspectKey, AspectScores } from '@/types/aspect'
+import type { ApiError } from '../../api/client'
 import styles from './PublicProfileView.module.css'
 
-const KIND_LABEL = {
+// Public profile shape — backend has no response_model for /api/profile/{id}
+// yet. Captures the fields we actually read.
+// TODO(ts): tighten when backend tightens /api/profile/{user_id}.
+type Insight = {
+  id: number | string
+  aspect: AspectKey | string
+  kind: 'insight' | 'recommendation' | string
+  text: string
+  likes?: number
+  reactions?: Record<string, number>
+  my_reaction?: ReactionType | null
+  my_comment?: string | null
+  liked_by_me?: boolean
+  bookmarked_by_me?: boolean
+  is_public?: boolean
+}
+
+type Inspiration = {
+  type: 'film' | 'book' | 'music' | 'activity' | 'person' | 'other' | string
+  title: string
+  note?: string | null
+  aspect?: AspectKey | string | null
+}
+
+type Achievement = {
+  code: string
+  title: string
+  icon: string
+  desc: string
+}
+
+type PublicProfile = {
+  user_id: number | string
+  display_name: string
+  avatar?: string | null
+  bio?: string | null
+  xp: number
+  followers_count?: number
+  is_followed_by_me?: boolean
+  focus_aspects?: Array<AspectKey | string>
+  interests?: string[]
+  goals?: string[]
+  inspirations?: Inspiration[]
+  achievements?: Achievement[]
+  scores?: AspectScores | Record<string, number>
+  insights?: Insight[]
+}
+
+type ReactionType = 'heart' | 'thanks' | 'aha' | 'fire'
+
+const KIND_LABEL: Record<string, string> = {
   insight: 'инсайт',
   recommendation: 'рекомендация',
 }
 
-const INSPIRATION_TYPE_LABEL = {
+const INSPIRATION_TYPE_LABEL: Record<string, string> = {
   film: '🎬',
   book: '📚',
   music: '🎵',
@@ -27,40 +80,54 @@ const INSPIRATION_TYPE_LABEL = {
   other: '✦',
 }
 
-const REACTIONS = [
+const REACTIONS: ReadonlyArray<{ type: ReactionType; emoji: string; title: string }> = [
   { type: 'heart',  emoji: '♥', title: 'нравится' },
   { type: 'thanks', emoji: '🙏', title: 'спасибо' },
   { type: 'aha',    emoji: '💡', title: 'осенило' },
   { type: 'fire',   emoji: '🔥', title: 'топ' },
 ]
 
-export default function PublicProfileView({ userId, currentUserId, onBack, onOpenProfile, onOpenDM }) {
-  const [profile, setProfile] = useState(null)
-  const [busy, setBusy] = useState(true)
-  const [error, setError] = useState(null)
+type Props = {
+  userId: number | string | null | undefined
+  currentUserId: number | string | null | undefined
+  onBack?: () => void
+  onOpenProfile?: (userId: number | string) => void
+  onOpenDM?: (userId: number | string) => void
+}
+
+export default function PublicProfileView({ userId, currentUserId, onBack, onOpenProfile, onOpenDM }: Props) {
+  const [profile, setProfile] = useState<PublicProfile | null>(null)
+  const [busy, setBusy] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
   // id инсайтов, для которых раскрыт список реагировавших
-  const [reactorsOpen, setReactorsOpen] = useState(() => new Set())
+  const [reactorsOpen, setReactorsOpen] = useState<Set<number | string>>(() => new Set())
 
   useEffect(() => {
     if (!userId) return
     setBusy(true)
     setError(null)
     fetchPublicProfile(userId)
-      .then(setProfile)
-      .catch(e => {
-        setError(e.status === 404
+      .then(p => setProfile(p as PublicProfile))
+      .catch((e: ApiError | Error) => {
+        const status = (e as Partial<ApiError>).status
+        setError(status === 404
           ? 'Этот профиль не найден или скрыт владельцем.'
-          : (e.message ?? 'Не удалось загрузить профиль'))
+          : (e instanceof Error ? e.message : 'Не удалось загрузить профиль'))
       })
       .finally(() => setBusy(false))
   }, [userId])
 
-  const handleReact = async (insightId, reaction, comment) => {
+  const handleReact = async (insightId: number | string, reaction: ReactionType, comment?: string) => {
     tmaHaptic('light')   // вибро в TG на тапе по реакции
     try {
-      const { my_reaction, my_comment, reactions, total } =
-        await reactToInsightWithComment(insightId, reaction, comment)
-      setProfile(p => ({
+      const resp = await reactToInsightWithComment(insightId, reaction, comment) as {
+        my_reaction: ReactionType | null
+        my_comment: string | null
+        reactions: Record<string, number>
+        total: number
+      }
+      const { my_reaction, my_comment, reactions, total } = resp
+      setProfile(p => p ? ({
         ...p,
         insights: (p.insights ?? []).map(i =>
           i.id === insightId
@@ -74,34 +141,36 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
               }
             : i
         ),
-      }))
+      }) : p)
     } catch (e) {
-      setError(e.message ?? 'Не удалось поставить реакцию')
+      setError(e instanceof Error ? e.message : 'Не удалось поставить реакцию')
     }
   }
 
-  const handleBookmark = async (insightId, current) => {
+  const handleBookmark = async (insightId: number | string, current: boolean | undefined) => {
     try {
       if (current) await unbookmarkInsight(insightId)
       else await bookmarkInsight(insightId)
-      setProfile(p => ({
+      setProfile(p => p ? ({
         ...p,
         insights: (p.insights ?? []).map(i =>
           i.id === insightId ? { ...i, bookmarked_by_me: !current } : i
         ),
-      }))
+      }) : p)
     } catch (e) {
-      setError(e.message ?? 'Не удалось')
+      setError(e instanceof Error ? e.message : 'Не удалось')
     }
   }
 
   const handleFollow = async () => {
+    if (!profile) return
     try {
-      const fn = profile?.is_followed_by_me ? unfollowUser : followUser
-      const { following, followers_count } = await fn(profile.user_id)
-      setProfile(p => ({ ...p, is_followed_by_me: following, followers_count }))
+      const fn = profile.is_followed_by_me ? unfollowUser : followUser
+      const resp = await fn(profile.user_id) as { following: boolean; followers_count: number }
+      const { following, followers_count } = resp
+      setProfile(p => p ? ({ ...p, is_followed_by_me: following, followers_count }) : p)
     } catch (e) {
-      setError(e.message ?? 'Не удалось изменить подписку')
+      setError(e instanceof Error ? e.message : 'Не удалось изменить подписку')
     }
   }
 
@@ -119,9 +188,16 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
   if (!profile) return null
 
   const isMe = profile.user_id === currentUserId
-  const sortedScores = Object.entries(profile.scores ?? {})
-    .filter(([, v]) => Number.isFinite(v))
+  const sortedScores: Array<[string, number]> = Object.entries(profile.scores ?? {})
+    .filter((entry): entry is [string, number] => Number.isFinite(entry[1] as number))
     .sort((a, b) => b[1] - a[1])
+
+  // ASPECT_COLORS / ASPECT_DATA / ASPECT_DISPLAY_KEY indexed by AspectKey
+  // (Latin). Backend may return Cyrillic codes too — both ends are accessed
+  // by string here, fall back via lookup.
+  const colorOf = (a: string): string => (ASPECT_COLORS as Record<string, string>)[a] ?? ''
+  const nameOf = (a: string): string => (ASPECT_DATA as Record<string, { name: string }>)[a]?.name ?? ''
+  const displayOf = (a: string): string => (ASPECT_DISPLAY_KEY as Record<string, string>)[a] ?? a
 
   return (
     <div className={styles.container}>
@@ -142,13 +218,13 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
               {(profile.focus_aspects ?? []).length > 0 && (
                 <span className={styles.focusList}>
                   · развивает:
-                  {profile.focus_aspects.map(a => (
+                  {profile.focus_aspects!.map(a => (
                     <span
                       key={a}
                       className={styles.focusChip}
-                      style={{ color: ASPECT_COLORS[a], borderColor: `${ASPECT_COLORS[a]}55` }}
+                      style={{ color: colorOf(a), borderColor: `${colorOf(a)}55` }}
                     >
-                      {ASPECT_DISPLAY_KEY[a] ?? a}
+                      {displayOf(a)}
                     </span>
                   ))}
                 </span>
@@ -188,7 +264,7 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
       {(profile.interests ?? []).length > 0 && (
         <Section label="Интересы">
           <div className={styles.tagList}>
-            {profile.interests.map(t => (
+            {profile.interests!.map(t => (
               <span key={t} className={styles.tag}>{t}</span>
             ))}
           </div>
@@ -198,7 +274,7 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
       {(profile.goals ?? []).length > 0 && (
         <Section label="Текущие цели">
           <ol className={styles.goalsList}>
-            {profile.goals.map((g, i) => (
+            {profile.goals!.map((g, i) => (
               <li key={i} className={styles.goalItem}>{g}</li>
             ))}
           </ol>
@@ -208,18 +284,18 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
       {(profile.inspirations ?? []).length > 0 && (
         <Section label="Что вдохновляет">
           <div className={styles.inspirationGrid}>
-            {profile.inspirations.map((it, idx) => (
+            {profile.inspirations!.map((it, idx) => (
               <div
                 key={idx}
                 className={styles.inspirationCard}
-                style={it.aspect ? { borderColor: `${ASPECT_COLORS[it.aspect]}55` } : undefined}
+                style={it.aspect ? { borderColor: `${colorOf(it.aspect)}55` } : undefined}
               >
                 <div className={styles.inspirationHead}>
                   <span className={styles.inspirationIcon}>
                     {INSPIRATION_TYPE_LABEL[it.type] ?? '✦'}
                   </span>
                   {it.aspect && (
-                    <span style={{ color: ASPECT_COLORS[it.aspect] }} className={styles.inspirationAspect}>
+                    <span style={{ color: colorOf(it.aspect) }} className={styles.inspirationAspect}>
                       {it.aspect}
                     </span>
                   )}
@@ -233,9 +309,9 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
       )}
 
       {(profile.achievements ?? []).length > 0 && (
-        <Section label={`Достижения · ${profile.achievements.length}`}>
+        <Section label={`Достижения · ${profile.achievements!.length}`}>
           <div className={styles.achievementsRow}>
-            {profile.achievements.map(a => (
+            {profile.achievements!.map(a => (
               <div key={a.code} className={styles.achievementBadge} title={a.desc}>
                 <span className={styles.achievementBadgeIcon}>{a.icon}</span>
                 <span className={styles.achievementBadgeTitle}>{a.title}</span>
@@ -254,16 +330,16 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
           <div className={styles.scoresList}>
             {sortedScores.map(([aspect, value]) => (
               <div key={aspect} className={styles.scoreRow}>
-                <span style={{ color: ASPECT_COLORS[aspect] }} className={styles.scoreAspect}>
+                <span style={{ color: colorOf(aspect) }} className={styles.scoreAspect}>
                   {aspect}
                 </span>
-                <span className={styles.scoreName}>{ASPECT_DATA[aspect]?.name ?? ''}</span>
+                <span className={styles.scoreName}>{nameOf(aspect)}</span>
                 <div className={styles.scoreBar}>
                   <div
                     className={styles.scoreBarFill}
                     style={{
                       width: `${(value / 10) * 100}%`,
-                      background: ASPECT_COLORS[aspect],
+                      background: colorOf(aspect),
                     }}
                   />
                 </div>
@@ -277,15 +353,15 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
       {(profile.insights ?? []).length > 0 && (
         <Section label="Инсайты и рекомендации">
           <div className={styles.insightList}>
-            {profile.insights.map(ins => (
+            {profile.insights!.map(ins => (
               <div
                 key={ins.id}
                 className={styles.insightCard}
-                style={{ borderColor: `${ASPECT_COLORS[ins.aspect]}55` }}
+                style={{ borderColor: `${colorOf(ins.aspect as string)}55` }}
               >
                 <div className={styles.insightHead}>
-                  <span style={{ color: ASPECT_COLORS[ins.aspect] }} className={styles.insightAspect}>
-                    {ins.aspect} · {ASPECT_DATA[ins.aspect]?.name ?? ''}
+                  <span style={{ color: colorOf(ins.aspect as string) }} className={styles.insightAspect}>
+                    {ins.aspect} · {nameOf(ins.aspect as string)}
                   </span>
                   <span className={styles.insightKind}>{KIND_LABEL[ins.kind] ?? ins.kind}</span>
                 </div>
@@ -320,7 +396,7 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
                 {!isMe && ins.my_reaction && (
                   <ReactionCommentInput
                     initial={ins.my_comment ?? ''}
-                    onSave={(comment) => handleReact(ins.id, ins.my_reaction, comment)}
+                    onSave={(comment) => handleReact(ins.id, ins.my_reaction as ReactionType, comment)}
                   />
                 )}
                 {(() => {
@@ -369,7 +445,9 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
   )
 }
 
-function Section({ label, children }) {
+type SectionProps = { label: string; children: ReactNode }
+
+function Section({ label, children }: SectionProps) {
   return (
     <section className={styles.section}>
       <div className={styles.sectionLabel}>{label}</div>
@@ -378,7 +456,7 @@ function Section({ label, children }) {
   )
 }
 
-function BackBtn({ onBack }) {
+function BackBtn({ onBack }: { onBack?: () => void }) {
   if (!onBack) return null
   return (
     <button type="button" className={styles.backBtn} onClick={onBack}>
@@ -387,15 +465,20 @@ function BackBtn({ onBack }) {
   )
 }
 
+type CommentInputProps = {
+  initial: string
+  onSave: (comment: string) => void | Promise<void>
+}
+
 /**
  * Inline-инпут для коммента к реакции. Появляется когда юзер уже поставил
  * реакцию на инсайт. По нажатию «Сохранить» обновляет коммент через
  * существующий react-эндпоинт (тот же reaction + новый comment).
  */
-function ReactionCommentInput({ initial, onSave }) {
-  const [text, setText] = useState(initial)
-  const [editing, setEditing] = useState(false)
-  const [saving, setSaving] = useState(false)
+function ReactionCommentInput({ initial, onSave }: CommentInputProps) {
+  const [text, setText] = useState<string>(initial)
+  const [editing, setEditing] = useState<boolean>(false)
+  const [saving, setSaving] = useState<boolean>(false)
 
   useEffect(() => { setText(initial) }, [initial])
 

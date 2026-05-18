@@ -1,6 +1,35 @@
 import { useEffect, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
 import { login, register, linkTelegram, addEmail } from '../../api/client'
 import styles from './AuthModal.module.css'
+
+// Three internal modes — see component-jsdoc below. 'link' state is implicit
+// (driven by `user` prop), but the tab toggle for guests is 'login'|'register'.
+type AuthMode = 'login' | 'register' | 'link'
+
+// Backend /api/auth/me has no response_model yet, so user is a permissive
+// shape with the fields we actually read here.
+// TODO(ts): tighten when /api/auth/me adds a response model.
+type AuthUser = {
+  email?: string | null
+  telegram_id?: number | string | null
+  [key: string]: unknown
+}
+
+type Props = {
+  onSuccess: (data: unknown) => void
+  onClose?: () => void
+  user?: AuthUser | null
+}
+
+// Telegram-Login-Widget posts back via `window.__slwTgLink(user)`. We type
+// the global slot as `unknown` callback — the widget passes a TG user object
+// which we forward to linkTelegram() as-is.
+declare global {
+  interface Window {
+    __slwTgLink?: (tgUser: unknown) => void
+  }
+}
 
 /**
  * AuthModal — три режима в зависимости от user-prop:
@@ -14,17 +43,17 @@ import styles from './AuthModal.module.css'
  *   !user.email && user.telegram_id     → "Добавить email и пароль"
  *                                         (только форма email+пароль, без виджета)
  */
-export default function AuthModal({ onSuccess, onClose, user = null }) {
+export default function AuthModal({ onSuccess, onClose, user = null }: Props) {
   const isAddingEmail = !!(user && !user.email && user.telegram_id)
   const isLinkingTelegram = !!(user && user.email && !user.telegram_id)
 
-  const [tab, setTab] = useState('login')      // 'login' | 'register' (только для гостя)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [name, setName] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const tgRef = useRef(null)
+  const [tab, setTab] = useState<AuthMode>('login')      // 'login' | 'register' (только для гостя)
+  const [email, setEmail] = useState<string>('')
+  const [password, setPassword] = useState<string>('')
+  const [name, setName] = useState<string>('')
+  const [error, setError] = useState<string>('')
+  const [loading, setLoading] = useState<boolean>(false)
+  const tgRef = useRef<HTMLDivElement | null>(null)
 
   // TG-виджет нужен только для линка email→TG (пользователь уже залогинен).
   // Для гостевого логина используем прямую ссылку (без виджета и popup).
@@ -44,14 +73,14 @@ export default function AuthModal({ onSuccess, onClose, user = null }) {
     script.async = true
     tgRef.current.appendChild(script)
 
-    window.__slwTgLink = async (tgUser) => {
+    window.__slwTgLink = async (tgUser: unknown) => {
       setError('')
       setLoading(true)
       try {
         const data = await linkTelegram(tgUser)
         onSuccess(data)
       } catch (e) {
-        setError(e.message)
+        setError(e instanceof Error ? e.message : String(e))
       } finally {
         setLoading(false)
       }
@@ -60,12 +89,12 @@ export default function AuthModal({ onSuccess, onClose, user = null }) {
     return () => { delete window.__slwTgLink }
   }, [isLinkingTelegram, onSuccess])
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      let data
+      let data: unknown
       if (isAddingEmail) {
         data = await addEmail(email, password)
       } else {
@@ -74,7 +103,7 @@ export default function AuthModal({ onSuccess, onClose, user = null }) {
       }
       onSuccess(data)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }

@@ -1,13 +1,38 @@
 import { useEffect, useState } from 'react'
 import { ASPECT_COLORS } from '../../data/aspects'
 import { fetchInsightReactions } from '../../api/client'
+import type { AspectKey } from '@/types/aspect'
 import styles from './PublicProfileView.module.css'
 
-const REACTION_EMOJI = {
+// Single reactor entry from /api/profile/insights/{id}/reactions. Backend has
+// no response_model yet, so the shape here mirrors the actual JSON we read.
+// TODO(ts): tighten when /api/profile/insights/{id}/reactions adds a model.
+type Reactor = {
+  user_id: number | string
+  created_at: string
+  avatar?: string | null
+  display_name: string
+  reaction: 'heart' | 'thanks' | 'aha' | 'fire' | string
+  focus_aspects?: Array<AspectKey | string> | null
+  comment?: string | null
+}
+
+type ReactionsResponse = {
+  reactors: Reactor[]
+  hidden_count: number
+}
+
+const REACTION_EMOJI: Record<string, string> = {
   heart: '♥',
   thanks: '🙏',
   aha: '💡',
   fire: '🔥',
+}
+
+type Props = {
+  insightId: number | string
+  open: boolean
+  onOpenProfile?: (userId: number | string) => void
 }
 
 /**
@@ -17,17 +42,17 @@ const REACTION_EMOJI = {
  * Главная задача — давать «коннект»: клик по имени переводит на
  * публичный профиль реактора (через onOpenProfile).
  */
-export default function ReactorsList({ insightId, open, onOpenProfile }) {
-  const [data, setData] = useState(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
+export default function ReactorsList({ insightId, open, onOpenProfile }: Props) {
+  const [data, setData] = useState<ReactionsResponse | null>(null)
+  const [busy, setBusy] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open || data) return
     setBusy(true)
     fetchInsightReactions(insightId)
-      .then(setData)
-      .catch(e => setError(e.message ?? 'Не удалось загрузить'))
+      .then(resp => setData(resp as ReactionsResponse))
+      .catch(e => setError(e instanceof Error ? e.message : 'Не удалось загрузить'))
       .finally(() => setBusy(false))
   }, [open, insightId, data])
 
@@ -56,15 +81,18 @@ export default function ReactorsList({ insightId, open, onOpenProfile }) {
                 >
                   {r.display_name}
                 </button>
-                {(r.focus_aspects ?? []).slice(0, 2).map(a => (
-                  <span
-                    key={a}
-                    className={styles.reactorAspect}
-                    style={{ color: ASPECT_COLORS[a], borderColor: `${ASPECT_COLORS[a]}55` }}
-                  >
-                    {a}
-                  </span>
-                ))}
+                {(r.focus_aspects ?? []).slice(0, 2).map(a => {
+                  const color = (ASPECT_COLORS as Record<string, string>)[a as string]
+                  return (
+                    <span
+                      key={a}
+                      className={styles.reactorAspect}
+                      style={{ color, borderColor: `${color}55` }}
+                    >
+                      {a}
+                    </span>
+                  )
+                })}
               </div>
               {r.comment && (
                 <div className={styles.reactorComment}>{r.comment}</div>
