@@ -667,7 +667,7 @@ export default function ProfileView({
             >
               <div className={styles.insightHead}>
                 <span style={{ color: colorOf(ins.aspect as string) }} className={styles.insightAspect}>
-                  {ins.aspect}
+                  {displayOf(ins.aspect as string)}
                 </span>
                 <span className={styles.insightKind}>{KIND_LABEL[ins.kind] ?? ins.kind}</span>
                 {!ins.is_public && <span className={styles.insightPrivate}>🔒 личное</span>}
@@ -886,7 +886,9 @@ function MyHabitsSection() {
         <ul className={styles.habitsList}>
           {habits.map(h => (
             <li key={h.aspect} className={styles.habitItem}>
-              <span className={styles.habitAspect}>{h.aspect}</span>
+              <span className={styles.habitAspect}>
+                {(ASPECT_DISPLAY_KEY as Record<string, string>)[h.aspect] ?? h.aspect}
+              </span>
               <span className={styles.habitTitle}>{h.title}</span>
               <span className={`${styles.habitDot} ${h.ticked_today ? styles.habitDotDone : ''}`}>
                 {h.ticked_today ? '✓ сегодня' : '☐ сегодня'}
@@ -959,7 +961,9 @@ function MyBookmarksSection({ onOpenProfile }: { onOpenProfile?: (userId: number
         {items.map((b) => (
           <div key={`${b.kind}-${b.target_id}-${b.saved_at}`} className={styles.insightCard}>
             <div className={styles.insightHead}>
-              <span className={styles.insightAspect}>{b.aspect ?? '—'}</span>
+              <span className={styles.insightAspect}>
+                {b.aspect ? ((ASPECT_DISPLAY_KEY as Record<string, string>)[b.aspect] ?? b.aspect) : '—'}
+              </span>
               {b.available && b.display_name && b.user_id != null && (
                 <button
                   type="button"

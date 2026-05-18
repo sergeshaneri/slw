@@ -188,7 +188,7 @@ export default function HallView({ aspect, currentUserId, onBack, onOpenProfile 
       <div className={styles.titleBlock}>
         <span className={styles.eyebrow}>Холл</span>
         <h1 className={styles.title} style={{ color: accent }}>
-          {aspect} · {meta.name ?? 'Аспект'}
+          {ASPECT_DISPLAY_KEY[aspect] ?? aspect} · {meta.name ?? 'Аспект'}
         </h1>
         {meta.metaphor && <div className={styles.subline}>{meta.metaphor}</div>}
         <HabitTickButton aspect={aspect} />
@@ -757,7 +757,7 @@ function CommunityTab({ aspect, content, onOpenProfile }: CommunityTabProps) {
       <Section label="Уголок вдохновения">
         {inspirations.length === 0 ? (
           <div className={styles.muted}>
-            Пока пусто. Добавь карточку вдохновения с тегом «{aspect}» в свой профиль — появится здесь.
+            Пока пусто. Добавь карточку вдохновения с тегом «{ASPECT_DISPLAY_KEY[aspect] ?? aspect}» в свой профиль — появится здесь.
           </div>
         ) : (
           <div className={styles.inspirationGrid}>

@@ -296,7 +296,7 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
                   </span>
                   {it.aspect && (
                     <span style={{ color: colorOf(it.aspect) }} className={styles.inspirationAspect}>
-                      {it.aspect}
+                      {displayOf(it.aspect)}
                     </span>
                   )}
                 </div>
@@ -361,7 +361,7 @@ export default function PublicProfileView({ userId, currentUserId, onBack, onOpe
               >
                 <div className={styles.insightHead}>
                   <span style={{ color: colorOf(ins.aspect as string) }} className={styles.insightAspect}>
-                    {ins.aspect} · {nameOf(ins.aspect as string)}
+                    {displayOf(ins.aspect as string)} · {nameOf(ins.aspect as string)}
                   </span>
                   <span className={styles.insightKind}>{KIND_LABEL[ins.kind] ?? ins.kind}</span>
                 </div>

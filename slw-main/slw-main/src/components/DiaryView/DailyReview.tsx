@@ -362,7 +362,7 @@ export default function DailyReview({ diary, onDiaryChange }: Props) {
                     className={styles.dayHabitAspect}
                     style={{ color: ASPECT_COLORS[h.aspect] }}
                   >
-                    {h.aspect}
+                    {ASPECT_DISPLAY_KEY[h.aspect] ?? h.aspect}
                   </span>
                   <span className={styles.dayHabitTitle}>{h.title}</span>
                 </label>
