@@ -1,16 +1,40 @@
+import type { CSSProperties } from 'react'
+import type { JourneyState, AspectState } from '@/types/journey'
 import styles from './JourneyView.module.css'
 
-const ACHIEVEMENTS = [
+type FlatState = JourneyState & Partial<AspectState>
+
+type AchievementDef = {
+  code: string
+  name: string
+  desc: string
+  test: (s: FlatState, totalSteps?: number | null) => boolean
+}
+
+const ACHIEVEMENTS: AchievementDef[] = [
   { code: 'first_step',  name: 'Первый шаг',         desc: 'Начал путешествие',                  test: s => s.xp > 0 },
-  { code: 'theorist',    name: 'Теоретик',           desc: 'Прочитал первую теорию',             test: s => s.completedScripts.includes('T-1') },
-  { code: 'honest',      name: 'Честный взгляд',     desc: 'Ответил на вопрос самооценки',       test: s => s.completedScripts.includes('B-1') },
-  { code: 'practitioner',name: 'Практик',            desc: 'Выполнил первое упражнение',         test: s => s.completedScripts.includes('U-1') },
+  { code: 'theorist',    name: 'Теоретик',           desc: 'Прочитал первую теорию',             test: s => (s.completedScripts ?? []).includes('T-1') },
+  { code: 'honest',      name: 'Честный взгляд',     desc: 'Ответил на вопрос самооценки',       test: s => (s.completedScripts ?? []).includes('B-1') },
+  { code: 'practitioner',name: 'Практик',            desc: 'Выполнил первое упражнение',         test: s => (s.completedScripts ?? []).includes('U-1') },
   { code: 'collector',   name: 'Коллекционер слов',  desc: 'Собрал 3 слова дня',                 test: s => s.stardust >= 3 },
   { code: 'on_fire',     name: 'На огне',            desc: 'Streak 3 дня подряд',                test: s => s.streak >= 3 },
-  { code: 'master_l0',   name: 'Первый Мастер',      desc: 'Завершил Уровень 0',                 test: (s, n) => n != null && s.currentScriptIndex >= n }
+  { code: 'master_l0',   name: 'Первый Мастер',      desc: 'Завершил Уровень 0',                 test: (s, n) => n != null && (s.currentScriptIndex ?? 0) >= n }
 ]
 
-export default function JourneyProfile({ state, accent, totalSteps, progressPct, levelTitle, planet, aspectName, onContinue, onReset, onOpenPlanetMap }) {
+type Props = {
+  state: FlatState
+  accent?: string
+  totalSteps: number
+  progressPct: number
+  levelTitle?: string
+  planet?: string
+  aspectName?: string
+  onContinue: () => void
+  onReset: () => void
+  onOpenPlanetMap?: () => void
+}
+
+export default function JourneyProfile({ state, accent, totalSteps, progressPct, levelTitle, planet, aspectName, onContinue, onReset, onOpenPlanetMap }: Props) {
   return (
     <>
       <div className={styles.topbar}>
@@ -36,13 +60,13 @@ export default function JourneyProfile({ state, accent, totalSteps, progressPct,
               {aspectName ?? 'Путешествие'}{' '}
               <span className={styles.topbarChevron} aria-hidden="true">▾</span>
             </div>
-            <div className={styles.profileSubtitle}>{planet} · Уровень {state.currentLevel}</div>
+            <div className={styles.profileSubtitle}>{planet} · Уровень {state.currentLevel ?? 0}</div>
           </button>
         ) : (
           <div className={styles.profileHero}>
             <div className={styles.profilePlanet}>◐</div>
             <div className={styles.profileTitle}>{aspectName ?? 'Путешествие'}</div>
-            <div className={styles.profileSubtitle}>{planet} · Уровень {state.currentLevel}</div>
+            <div className={styles.profileSubtitle}>{planet} · Уровень {state.currentLevel ?? 0}</div>
           </div>
         )}
 
@@ -56,7 +80,7 @@ export default function JourneyProfile({ state, accent, totalSteps, progressPct,
         <div className={styles.progressBox}>
           <div className={styles.progressTitle}>
             <span>Прогресс уровня · {levelTitle ?? '—'}</span>
-            <span className={styles.progressCount}>{state.currentScriptIndex}/{totalSteps}</span>
+            <span className={styles.progressCount}>{state.currentScriptIndex ?? 0}/{totalSteps}</span>
           </div>
           <div className={styles.progressBarWrap}>
             <div
@@ -80,7 +104,7 @@ export default function JourneyProfile({ state, accent, totalSteps, progressPct,
           })}
         </div>
 
-        {state.currentScriptIndex < totalSteps && (
+        {(state.currentScriptIndex ?? 0) < totalSteps && (
           <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`} onClick={onContinue}>
             Продолжить путешествие
           </button>
@@ -104,10 +128,17 @@ export default function JourneyProfile({ state, accent, totalSteps, progressPct,
   )
 }
 
-function Stat({ val, lbl, accent }) {
+type StatProps = {
+  val: number | string
+  lbl: string
+  accent?: string
+}
+
+function Stat({ val, lbl, accent }: StatProps) {
+  const valStyle: CSSProperties = accent ? { color: accent } : {}
   return (
     <div className={styles.statCard}>
-      <div className={styles.statVal} style={{ color: accent }}>{val}</div>
+      <div className={styles.statVal} style={valStyle}>{val}</div>
       <div className={styles.statLbl}>{lbl}</div>
     </div>
   )

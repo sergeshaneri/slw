@@ -1,17 +1,40 @@
 import { useState } from 'react'
+import type { AspectKey } from '@/types/aspect'
+import type { JourneyState, AspectState } from '@/types/journey'
 import { getJourney, getAllPlanets } from '../../data/journey/registry'
 import styles from './AdminPanel.module.css'
 
 // Dev-панель для админ-аккаунтов (user.is_admin === true).
 // Видна только им, обычные пользователи её не видят.
-//
-// Функции:
-//   1. Switch planet    — быстрое переключение между доступными аспектами.
-//   2. Skip step        — пропустить текущий шаг в чате (без XP, без записи).
-//   3. Auto-fill survey — заполнить активную анкету на 7/10 и завершить.
-//   4. Fill all skills  — все БС-навыки = 7/10 (мгновенно открывает БС-колесо).
-//   5. Jump to level    — выбор уровня L0/L1, mode='core'.
-//   6. Reset            — полный сброс journey state (без подтверждения).
+
+// Структурный shape планеты из registry.getAllPlanets().
+// NOTE(ts): tightened in P3 — registry экспортирует Planet тип.
+type Planet = {
+  aspect: AspectKey
+  name: string
+  available: boolean
+}
+
+// Структурный shape уровня в journey.levels.
+type LevelLike = {
+  title?: string
+}
+
+// JourneyView передаёт «плоский» state — глобальный + поля активной папки.
+type FlatState = JourneyState & Partial<AspectState>
+
+type Props = {
+  state: FlatState
+  onSkipStep: () => void
+  onFillSurvey: () => void
+  onFillAllSkills: () => void
+  onOpenSkillsEditor?: () => void
+  onJumpLevel: (level: number) => void
+  onReset: () => void
+  onSwitchAspect?: (aspect: AspectKey) => void
+  aspect?: AspectKey
+}
+
 export default function AdminPanel({
   state,
   onSkipStep,
@@ -22,17 +45,19 @@ export default function AdminPanel({
   onReset,
   onSwitchAspect,
   aspect = 'Si'
-}) {
-  const [open, setOpen] = useState(false)
+}: Props) {
+  const [open, setOpen] = useState<boolean>(false)
 
-  const journey = getJourney(aspect)
+  const journey = getJourney(aspect) as { levels?: Record<string, LevelLike> } | null | undefined
   const levels = journey?.levels ?? {}
   const levelKeys = Object.keys(levels).map(n => parseInt(n, 10)).sort((a, b) => a - b)
 
-  const planets = getAllPlanets().filter(p => p.available)
+  const planets = (getAllPlanets() as Planet[]).filter(p => p.available)
 
   const isChat = state.screen === 'chat'
   const isSurvey = state.screen === 'survey' && !!state.activeSurvey
+
+  const currentLevel = state.currentLevel ?? 0
 
   return (
     <div className={styles.wrap}>
@@ -115,7 +140,7 @@ export default function AdminPanel({
               <button
                 key={n}
                 type="button"
-                className={`${styles.levelBtn} ${state.currentLevel === n ? styles.levelBtnActive : ''}`}
+                className={`${styles.levelBtn} ${currentLevel === n ? styles.levelBtnActive : ''}`}
                 onClick={() => onJumpLevel(n)}
                 title={levels[n]?.title ?? `L${n}`}
               >

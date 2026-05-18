@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import type { CSSProperties } from 'react'
+import type { SkillState } from '@/types/journey'
 import {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE,
   getCompletedPasses
@@ -9,22 +11,35 @@ import styles from './AdminSkillsEditor.module.css'
  * Гранулярный редактор навыков для admin/dev.
  * Список всех 33 навыков с per-skill контролями: включить/выключить, значение,
  * глубина проходов. Применить — пишет всё в state.skills одним setState.
- *
- * Props:
- *   skills: object        — текущий state.skills
- *   onApply: (edits) => void   — вызывается с {[id]: {enabled, value, passes}}
- *   onClose: () => void
  */
-export default function AdminSkillsEditor({ skills, onApply, onClose }) {
-  const [edits, setEdits] = useState(() => {
-    const init = {}
+
+export type SkillEdit = {
+  enabled: boolean
+  value: number
+  passes: number
+}
+
+export type SkillEdits = Record<string, SkillEdit>
+
+type Props = {
+  skills: Record<string, SkillState> | undefined
+  onApply: (edits: SkillEdits) => void
+  onClose: () => void
+}
+
+// CSS custom property `--val` для слайдера-«ползунка»-ranger.
+type RangeStyle = CSSProperties & { '--val'?: number }
+
+export default function AdminSkillsEditor({ skills, onApply, onClose }: Props) {
+  const [edits, setEdits] = useState<SkillEdits>(() => {
+    const init: SkillEdits = {}
     for (const arche of ARCHETYPE_KEYS) {
       for (const s of SKILL_TREE[arche] ?? []) {
         const cur = skills?.[s.id]
         const passes = getCompletedPasses(cur)
         init[s.id] = {
           enabled: passes > 0,
-          value: Number.isFinite(cur?.result) ? Math.round(cur.result) : 7,
+          value: typeof cur?.result === 'number' && Number.isFinite(cur.result) ? Math.round(cur.result) : 7,
           passes: passes > 0 ? passes : 3,
         }
       }
@@ -33,8 +48,8 @@ export default function AdminSkillsEditor({ skills, onApply, onClose }) {
   })
 
   // Какие архетипы раскрыты. По умолчанию все, чтобы видеть всё сразу.
-  const [expanded, setExpanded] = useState(() => new Set(ARCHETYPE_KEYS))
-  const toggleBranch = (key) => {
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set<string>(ARCHETYPE_KEYS))
+  const toggleBranch = (key: string) => {
     setExpanded(prev => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
@@ -43,30 +58,30 @@ export default function AdminSkillsEditor({ skills, onApply, onClose }) {
     })
   }
 
-  const update = (id, patch) => {
+  const update = (id: string, patch: Partial<SkillEdit>) => {
     setEdits(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }))
   }
 
-  const setAllEnabled = (en) => {
+  const setAllEnabled = (en: boolean) => {
     setEdits(prev => {
-      const next = { ...prev }
+      const next: SkillEdits = { ...prev }
       for (const id in next) next[id] = { ...next[id], enabled: en }
       return next
     })
   }
 
-  const setAllValue = (v) => {
+  const setAllValue = (v: number) => {
     setEdits(prev => {
-      const next = { ...prev }
+      const next: SkillEdits = { ...prev }
       for (const id in next) next[id] = { ...next[id], value: v, enabled: true }
       return next
     })
   }
 
-  const setBranchEnabled = (archeKey, en) => {
+  const setBranchEnabled = (archeKey: string, en: boolean) => {
     setEdits(prev => {
-      const next = { ...prev }
-      for (const s of SKILL_TREE[archeKey] ?? []) {
+      const next: SkillEdits = { ...prev }
+      for (const s of SKILL_TREE[archeKey as keyof typeof SKILL_TREE] ?? []) {
         next[s.id] = { ...next[s.id], enabled: en }
       }
       return next
@@ -134,6 +149,7 @@ export default function AdminSkillsEditor({ skills, onApply, onClose }) {
                     {branch.map(skill => {
                       const e = edits[skill.id]
                       if (!e) return null
+                      const rangeStyle: RangeStyle = { '--val': ((e.value - 1) / 9) * 100 }
                       return (
                         <li key={skill.id} className={`${styles.skill} ${e.enabled ? styles.skillOn : ''}`}>
                           <label className={styles.skillToggleLabel}>
@@ -156,7 +172,7 @@ export default function AdminSkillsEditor({ skills, onApply, onClose }) {
                                   value={e.value}
                                   onChange={ev => update(skill.id, { value: parseInt(ev.target.value, 10) })}
                                   className={styles.range}
-                                  style={{ '--val': ((e.value - 1) / 9) * 100 }}
+                                  style={rangeStyle}
                                 />
                                 <span className={styles.valueNum}>{e.value}/10</span>
                               </div>

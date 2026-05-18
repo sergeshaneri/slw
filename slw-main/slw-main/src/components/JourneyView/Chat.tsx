@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import type { Script } from '@/types/script'
+import type { JourneyState, AspectState, ChatMessage } from '@/types/journey'
 import ScriptCard from './ScriptCard'
 import ScriptButtons from './ScriptButtons'
 import Slider from './Slider'
@@ -6,23 +8,53 @@ import StepInsightPrompt from './StepInsightPrompt'
 import Hint from '../Onboarding/Hint'
 import styles from './JourneyView.module.css'
 
+// JourneyView передаёт «плоский» state — глобальный + поля активной папки
+// аспекта. Здесь читаем поля обоих типов.
+type FlatState = JourneyState & Partial<AspectState>
+
+type Props = {
+  state: FlatState
+  accent?: string
+  chatRef: React.RefObject<HTMLDivElement>
+  inputRef?: React.RefObject<HTMLTextAreaElement>
+  isTyping: boolean
+  inputVal: string
+  setInputVal: (v: string) => void
+  currentScript?: Script | null
+  scripts?: Script[] | null
+  resolveScript?: (scriptId: string, level?: number) => Script | null | undefined
+  onAction: (action: string, scriptId: string) => void
+  onSend: (override?: string) => void
+  onOpenProfile: () => void
+  onOpenTasks: () => void
+  pendingCount?: number
+  onGoToSurveys?: () => void
+  surveyRemaining?: number
+  onOpenPlanetMap?: () => void
+  aspectName?: string
+  planet?: string
+  // NOTE(ts): tightened in P3 after App.jsx conversion.
+  user?: unknown
+}
+
 export default function Chat({
-  state, accent, chatRef, inputRef, isTyping,
+  state, chatRef, inputRef, isTyping,
   inputVal, setInputVal, currentScript, scripts, resolveScript, onAction, onSend,
   onOpenProfile, onOpenTasks, pendingCount = 0,
   onGoToSurveys, surveyRemaining = 0,
   onOpenPlanetMap,
   aspectName, planet, user
-}) {
+}: Props) {
   // Резолвер из props учитывает level, fallback на текущие scripts.
-  const lookup = (m) => {
+  const lookup = (m: ChatMessage): Script | null | undefined => {
+    if (!m.scriptId) return null
     if (resolveScript) return resolveScript(m.scriptId, m.level)
     return scripts?.find(s => s.id === m.scriptId) ?? null
   }
 
   // Локальный стейт ползунка для awaitingInput='number'. Сбрасывается на 5
   // каждый раз, когда новый шаг просит число.
-  const [sliderVal, setSliderVal] = useState(5)
+  const [sliderVal, setSliderVal] = useState<number>(5)
   useEffect(() => {
     if (state.awaitingInput === 'number') setSliderVal(5)
   }, [state.awaitingInput, currentScript?.id])
@@ -49,7 +81,7 @@ export default function Chat({
   //   • Когда клавиатура поднимается, visualViewport.height сжимается
   // Плюс onFocus/onBlur как мгновенный fallback (пока visualViewport ещё не
   // обновился — даёт быстрый отклик UI на тап).
-  const [inputFocused, setInputFocused] = useState(false)
+  const [inputFocused, setInputFocused] = useState<boolean>(false)
 
   // visualViewport detection — основной механизм
   useEffect(() => {
@@ -94,6 +126,8 @@ export default function Chat({
     }, 250)
     return () => clearTimeout(id)
   }, [inputFocused, chatRef])
+
+  const messages: ChatMessage[] = state.messages ?? []
 
   return (
     <>
@@ -158,7 +192,8 @@ export default function Chat({
             юзер прошёл хотя бы один шаг в текущем аспекте. Иначе
             обе подсказки сыпались одновременно — было перегружено. */}
         {(() => {
-          const chatIntroSeen = !!(user?.hints_seen?.['journey-chat-intro'])
+          const userObj = user as { hints_seen?: Record<string, unknown> } | null | undefined
+          const chatIntroSeen = !!(userObj?.hints_seen?.['journey-chat-intro'])
             || (typeof window !== 'undefined' && localStorage.getItem('hint_journey-chat-intro') === '1')
           const folder = state.aspects?.[state.currentAspect]
           const completedCount = (folder?.completedScripts ?? []).length
@@ -169,7 +204,7 @@ export default function Chat({
             </Hint>
           )
         })()}
-        {state.messages.map(m => {
+        {messages.map(m => {
           if (m.kind === 'script') {
             const sc = lookup(m)
             if (!sc) return null
@@ -248,7 +283,7 @@ export default function Chat({
             }}
             rows={1}
           />
-          <button type="button" className={styles.sendBtn} onClick={onSend} disabled={!inputVal.trim()}>
+          <button type="button" className={styles.sendBtn} onClick={() => onSend()} disabled={!inputVal.trim()}>
             ↑
           </button>
         </div>

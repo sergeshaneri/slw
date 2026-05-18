@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { buildSurveyStatements, SURVEY_BLOCKS } from '../../data/journey/skills'
 import { resolveSurvey } from '../../data/journey/skills/resolve'
 import Slider from './Slider'
@@ -15,7 +16,29 @@ const INSIGHT_HINT_KEY = 'survey_insight_hint_dismissed'
 // Список утверждений вычисляется через buildSurveyStatements:
 //   short → 5 утверждений (только startPass)
 //   full  → все утверждения от startPass до 3 (5/10/15)
-export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, onComplete, onCancel }) {
+
+// NOTE(ts): tightened in P3 after JourneyView lands.
+type ActiveSurveyLike = {
+  skillId: string
+  scriptId?: string
+  mode?: 'short' | 'full'
+  startPass?: number
+  stepIndex?: number
+  answers?: Record<string, Array<number | null | undefined>>
+}
+
+type AccentStyle = CSSProperties & { '--accent'?: string }
+
+type Props = {
+  activeSurvey: ActiveSurveyLike
+  accent?: string
+  onAnswer: (value: number, insightText: string) => void
+  onBack: () => void
+  onComplete: () => void
+  onCancel: () => void
+}
+
+export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, onComplete, onCancel }: Props) {
   const survey = resolveSurvey(activeSurvey.skillId)
   const mode = activeSurvey.mode ?? 'short'
   const startPass = activeSurvey.startPass ?? 1
@@ -43,18 +66,18 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
   const prevAnswer = blockKey
     ? activeSurvey.answers?.[blockKey]?.[statementIndex]
     : null
-  const initialValue = Number.isFinite(prevAnswer) ? prevAnswer : 5
-  const [value, setValue] = useState(initialValue)
+  const initialValue: number = typeof prevAnswer === 'number' && Number.isFinite(prevAnswer) ? prevAnswer : 5
+  const [value, setValue] = useState<number>(initialValue)
   // Инсайт по конкретному утверждению — сбрасывается на каждом новом вопросе.
-  const [insightOpen, setInsightOpen] = useState(false)
-  const [insightText, setInsightText] = useState('')
+  const [insightOpen, setInsightOpen] = useState<boolean>(false)
+  const [insightText, setInsightText] = useState<string>('')
   // Подсказка-тултип: показывается на стартовых вопросах, закрывается крестиком
   // (запоминается в localStorage), и поднимается на ховер через 3 сек.
-  const [hintVisible, setHintVisible] = useState(() =>
+  const [hintVisible, setHintVisible] = useState<boolean>(() =>
     typeof window !== 'undefined' && localStorage.getItem(INSIGHT_HINT_KEY) !== '1'
   )
-  const [hintHover, setHintHover] = useState(false)
-  const hoverTimerRef = useRef(null)
+  const [hintHover, setHintHover] = useState<boolean>(false)
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     setValue(initialValue)
@@ -67,7 +90,7 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
 
   const dismissHint = () => {
     setHintVisible(false)
-    try { localStorage.setItem(INSIGHT_HINT_KEY, '1') } catch {}
+    try { localStorage.setItem(INSIGHT_HINT_KEY, '1') } catch { /* ignore */ }
   }
 
   const startHoverTimer = () => {
@@ -106,8 +129,10 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
       ? `Полный · проход ${currentPass}/3`
       : `Короткий · проход ${currentPass}/3`
 
+  const shellStyle: AccentStyle = { '--accent': accent }
+
   return (
-    <div className={styles.surveyShell} style={{ '--accent': accent }}>
+    <div className={styles.surveyShell} style={shellStyle}>
       <div className={styles.surveyHeader}>
         <button type="button" className={styles.surveyClose} onClick={onCancel} aria-label="Прервать">✕</button>
         <div className={styles.surveyTitleBlock}>

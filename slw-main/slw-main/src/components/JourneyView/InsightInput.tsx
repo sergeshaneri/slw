@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { CSSProperties } from 'react'
 import styles from './JourneyView.module.css'
 
 /**
@@ -6,16 +7,23 @@ import styles from './JourneyView.module.css'
  * До раскрытия — кнопка-плашка. После клика — textarea + Сохранить/Отмена.
  *
  * Используется на карточках уровней SkillDetail и SkillTraits.
- *
- * Props:
- *   onSave: (text) => void
- *   placeholder?: string  — подсказка в textarea
- *   accent?: string       — цвет акцента (передаётся как --accent CSS-var)
  */
-export default function InsightInput({ onSave, placeholder = 'Что заметил, что хочешь сохранить?', accent }) {
-  const [expanded, setExpanded] = useState(false)
-  const [text, setText] = useState('')
+
+type Props = {
+  onSave: (text: string) => void
+  placeholder?: string
+  accent?: string
+}
+
+// CSS custom property `--accent` used inline for theming.
+type AccentStyle = CSSProperties & { '--accent'?: string }
+
+export default function InsightInput({ onSave, placeholder = 'Что заметил, что хочешь сохранить?', accent }: Props) {
+  const [expanded, setExpanded] = useState<boolean>(false)
+  const [text, setText] = useState<string>('')
   const canSave = text.trim().length > 0
+
+  const accentStyle: AccentStyle | undefined = accent ? { '--accent': accent } : undefined
 
   if (!expanded) {
     return (
@@ -23,7 +31,7 @@ export default function InsightInput({ onSave, placeholder = 'Что замет�
         type="button"
         className={styles.insightInputBtn}
         onClick={() => setExpanded(true)}
-        style={accent ? { '--accent': accent } : undefined}
+        style={accentStyle}
       >
         ✎ Записать инсайт
       </button>
@@ -31,7 +39,7 @@ export default function InsightInput({ onSave, placeholder = 'Что замет�
   }
 
   return (
-    <div className={styles.insightInputBox} style={accent ? { '--accent': accent } : undefined}>
+    <div className={styles.insightInputBox} style={accentStyle}>
       <textarea
         className={styles.insightInputTextarea}
         placeholder={placeholder}

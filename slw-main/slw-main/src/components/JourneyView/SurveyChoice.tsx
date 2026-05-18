@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react'
+import type { SkillState } from '@/types/journey'
 import { getCompletedPasses } from '../../data/journey/skills'
 import { resolveSurvey } from '../../data/journey/skills/resolve'
 import styles from './JourneyView.module.css'
@@ -7,16 +9,22 @@ import styles from './JourneyView.module.css'
  * полный (все оставшиеся утверждения за один присест).
  *
  * Показывается, когда юзер тыкнул на навык в дереве и нет draft.
- *
- * Props:
- *   skillId: string
- *   skillName: string
- *   skillEntry: state.skills[skillId] | undefined
- *   accent: string
- *   onChoose: (mode: 'short' | 'full') => void
- *   onCancel: () => void
  */
-export default function SurveyChoice({ skillId, skillName, skillEntry, accent, onChoose, onCancel }) {
+
+type SurveyMode = 'short' | 'full'
+
+type AccentStyle = CSSProperties & { '--accent'?: string }
+
+type Props = {
+  skillId: string
+  skillName?: string
+  skillEntry?: SkillState | undefined
+  accent?: string
+  onChoose: (mode: SurveyMode) => void
+  onCancel: () => void
+}
+
+export default function SurveyChoice({ skillId, skillName, skillEntry, accent, onChoose, onCancel }: Props) {
   const survey = resolveSurvey(skillId)
   const passesDone = getCompletedPasses(skillEntry)
   const nextPass = passesDone + 1
@@ -36,8 +44,10 @@ export default function SurveyChoice({ skillId, skillName, skillEntry, accent, o
     )
   }
 
+  const shellStyle: AccentStyle = { '--accent': accent }
+
   return (
-    <div className={styles.surveyShell} style={{ '--accent': accent }}>
+    <div className={styles.surveyShell} style={shellStyle}>
       <div className={styles.surveyHeader}>
         <button type="button" className={styles.surveyClose} onClick={onCancel} aria-label="Назад">←</button>
         <div className={styles.surveyTitleBlock}>
