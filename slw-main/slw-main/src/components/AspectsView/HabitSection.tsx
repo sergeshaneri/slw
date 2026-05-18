@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { CSSProperties } from 'react'
 import {
   fetchMyHabits,
   chooseHabit,
@@ -7,7 +8,27 @@ import {
   untickHabit,
   fetchHabitsHistory,
 } from '../../api/client'
+import type { AspectKey } from '@/types/aspect'
 import styles from './HabitSection.module.css'
+
+// Запись об активной практике юзера по аспекту. Прилетает из
+// `fetchMyHabits()` → массив `habits`. Бэк возвращает кириллический ключ
+// аспекта, но к моменту попадания в этот компонент `translateAspectsInResponse`
+// в client.ts уже перевёл его на латиницу.
+//
+// TODO(ts): пробросить точный shape из @/types/api после P1A — fetchMyHabits
+// сейчас отдаёт `unknown`.
+type Habit = {
+  aspect: AspectKey | string
+  title: string
+  exercise_id?: string | number | null
+  ticked_today?: boolean
+}
+
+type Props = {
+  aspect: AspectKey
+  color: string
+}
 
 /**
  * Секция «Моя практика» на странице аспекта.
@@ -19,26 +40,27 @@ import styles from './HabitSection.module.css'
  *
  * Тик питает серверный стрик (через POST /habits/{aspect}/tick).
  */
-export default function HabitSection({ aspect, color }) {
-  const [habit, setHabit] = useState(null)        // {title, exercise_id, ticked_today}
+export default function HabitSection({ aspect, color }: Props) {
+  const [habit, setHabit] = useState<Habit | null>(null)        // {title, exercise_id, ticked_today}
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
-  const [history, setHistory] = useState([])      // last 30 dates
+  const [history, setHistory] = useState<string[]>([])      // last 30 dates
   const [busy, setBusy] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   const reload = async () => {
     setBusy(true)
     setError(null)
     try {
-      const { habits } = await fetchMyHabits()
+      const habitsResp = (await fetchMyHabits()) as { habits?: Habit[] } | undefined
+      const habits = habitsResp?.habits ?? []
       const mine = habits.find(h => h.aspect === aspect) || null
       setHabit(mine)
       setDraft(mine?.title ?? '')
-      const hist = await fetchHabitsHistory(aspect, 30)
-      setHistory(hist.dates ?? [])
+      const histResp = (await fetchHabitsHistory(aspect, 30)) as { dates?: string[] } | undefined
+      setHistory(histResp?.dates ?? [])
     } catch (e) {
-      setError(e.message ?? 'Не удалось загрузить')
+      setError((e as Error)?.message ?? 'Не удалось загрузить')
     } finally {
       setBusy(false)
     }
@@ -54,7 +76,7 @@ export default function HabitSection({ aspect, color }) {
       setEditing(false)
       reload()
     } catch (e) {
-      setError(e.message ?? 'Не удалось сохранить')
+      setError((e as Error)?.message ?? 'Не удалось сохранить')
     }
   }
 
@@ -65,7 +87,7 @@ export default function HabitSection({ aspect, color }) {
       await clearHabit(aspect)
       reload()
     } catch (e) {
-      setError(e.message ?? 'Не удалось снять')
+      setError((e as Error)?.message ?? 'Не удалось снять')
     }
   }
 
@@ -79,14 +101,14 @@ export default function HabitSection({ aspect, color }) {
       }
       reload()
     } catch (e) {
-      setError(e.message ?? 'Не удалось')
+      setError((e as Error)?.message ?? 'Не удалось')
     }
   }
 
   const streak = computeStreak(history)
 
   return (
-    <section className={styles.wrap} style={{ '--accent': color }}>
+    <section className={styles.wrap} style={{ '--accent': color } as unknown as CSSProperties}>
       <div className={styles.head}>
         <span className={styles.eyebrow}>Моя практика</span>
         {streak > 0 && (
@@ -171,7 +193,7 @@ export default function HabitSection({ aspect, color }) {
   )
 }
 
-function computeStreak(dates) {
+function computeStreak(dates: string[]): number {
   // dates — массив 'YYYY-MM-DD' от новых к старым.
   if (!Array.isArray(dates) || dates.length === 0) return 0
   const sorted = [...dates].sort((a, b) => b.localeCompare(a))
@@ -197,7 +219,7 @@ function computeStreak(dates) {
   return streak
 }
 
-function pluralDays(n) {
+function pluralDays(n: number): string {
   const m = n % 10
   if (n % 100 >= 11 && n % 100 <= 14) return 'дней'
   if (m === 1) return 'день'
