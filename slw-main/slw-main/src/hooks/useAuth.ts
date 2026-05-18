@@ -7,10 +7,28 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import { fetchMe, logout as apiLogout, getToken, setToken, telegramAuth } from '../api/client'
+import type { paths } from '@/types/api'
 
-export function useAuth() {
-  const [user, setUser] = useState(null)        // null = not loaded yet | false = unauthenticated
-  const [loading, setLoading] = useState(true)
+// /api/auth/me — response shape is currently { [key: string]: unknown } in
+// OpenAPI (backend has no response_model). The path-helper carries that as
+// User; once backend tightens schemas, types tighten automatically.
+// TODO(ts): tighten when backend adds /api/auth/me response_model.
+type User = paths['/api/auth/me']['get']['responses']['200']['content']['application/json']
+
+// `false` is the unauthenticated sentinel preserved from the .js source —
+// distinguishes "not loaded yet" (null) from "definitely no user" (false).
+type UserState = User | null | false
+
+type UseAuthReturn = {
+  user: UserState
+  loading: boolean
+  onAuthSuccess: (userData: User) => void
+  logout: () => void
+}
+
+export function useAuth(): UseAuthReturn {
+  const [user, setUser] = useState<UserState>(null)        // null = not loaded yet | false = unauthenticated
+  const [loading, setLoading] = useState<boolean>(true)
 
   useEffect(() => {
     // Fallback for Telegram widget-mode callback: result arrives as
@@ -58,7 +76,7 @@ export function useAuth() {
       .finally(() => setLoading(false))
   }, [])
 
-  const onAuthSuccess = useCallback((userData) => {
+  const onAuthSuccess = useCallback((userData: User) => {
     setUser(userData)
   }, [])
 

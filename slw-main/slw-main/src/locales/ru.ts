@@ -51,4 +51,6 @@ export const ru = {
     noEntries: 'Записей пока нет',
   },
   loading: 'ЗАГРУЗКА...',
-}
+} as const
+
+export type LocaleKey = keyof typeof ru

@@ -15,9 +15,12 @@
  *   4. useAuth дальше работает как обычно — токен есть, fetchMe() проходит.
  */
 
+import type { TelegramWebApp } from '@/types/telegram'
+
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
-export const tma = typeof window !== 'undefined' ? window.Telegram?.WebApp : null
+export const tma: TelegramWebApp | null =
+  typeof window !== 'undefined' ? window.Telegram?.WebApp ?? null : null
 
 // Детект «мы внутри Telegram Mini App» через platform, а не initData.
 //
@@ -33,7 +36,7 @@ export const tma = typeof window !== 'undefined' ? window.Telegram?.WebApp : nul
 //
 // Для bootstrapTMA (где НУЖЕН initData чтобы получить JWT) отдельная
 // проверка initData.length > 0 — см. ниже.
-export const isTMA = !!(
+export const isTMA: boolean = !!(
   tma &&
   tma.platform &&
   tma.platform !== 'unknown'
@@ -41,13 +44,13 @@ export const isTMA = !!(
 
 // Есть ли валидный initData для бэкенд-авторизации. Отдельно от isTMA, потому
 // что хуки MainButton/BackButton не зависят от initData, а bootstrap зависит.
-export const hasInitData = !!(tma && tma.initData && tma.initData.length > 0)
+export const hasInitData: boolean = !!(tma && tma.initData && tma.initData.length > 0)
 
 /**
  * Стартовый параметр из t.me/<bot>/<app>?startapp=XYZ.
  * Используется как замена web-deeplink ?u=<id>.
  */
-export function getStartParam() {
+export function getStartParam(): string | null {
   return tma?.initDataUnsafe?.start_param || null
 }
 
@@ -58,8 +61,8 @@ export function getStartParam() {
  * Идемпотентна: если токен в localStorage уже есть, повторно не дёргает бэк.
  * Это важно для UX — открыл, закрыл, снова открыл → не ждём сетевой round-trip.
  */
-export async function bootstrapTMA() {
-  if (!isTMA) return null
+export async function bootstrapTMA(): Promise<string | null> {
+  if (!isTMA || !tma) return null
 
   // SDK-стандартные сигналы Telegram: «UI готов» + «развернуть на весь экран».
   try {
@@ -93,7 +96,7 @@ export async function bootstrapTMA() {
       console.error('TMA auth failed:', res.status, await res.text().catch(() => ''))
       return null
     }
-    const data = await res.json()
+    const data = (await res.json()) as { token?: string } | null
     if (data?.token) {
       localStorage.setItem('slw_token', data.token)
       return data.token
