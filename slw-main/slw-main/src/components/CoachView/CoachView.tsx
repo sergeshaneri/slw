@@ -5,7 +5,65 @@ import {
   summonCoach,
   fetchCoachHistory,
 } from '../../api/client'
+import type { AspectKey } from '@/types/aspect'
+import type { JourneyState } from '@/types/journey'
 import styles from './CoachView.module.css'
+
+// Backend coach.py routes (no response_model). Local types mirror the fields
+// the UI reads from /api/coach/quota, /api/coach/summon, /api/coach/history.
+// TODO(ts): tighten when backend adds OpenAPI response_model for /api/coach/*.
+type CoachQuota = {
+  used_today: number
+  daily_limit: number
+  remaining_today: number
+  streak_bonus: number
+  stardust_cost: number
+}
+
+type CoachCall = {
+  id: number | string
+  created_at: string
+  prompt: string
+  response?: string | null
+  error?: string | null
+  focus_aspect?: string | null
+  paid_with_stardust?: boolean
+}
+
+type SummonResp = {
+  call_id: number | string
+  response: string
+  remaining_today: number
+}
+
+type CoachResponseState = {
+  call_id: number | string
+  text: string
+  focus_aspect: AspectKey | null
+  prompt: string
+}
+
+// Diary entry shape mirrors how App.jsx mutates diary in coach. Minimal local
+// shape — full diary typing belongs to P2D zone.
+// TODO(ts): replace with shared DiaryEntry type once P2D defines it.
+type DiaryEntry = {
+  id: string
+  date: string
+  ts: number
+  aspect: AspectKey | 'general'
+  text: string
+  source: string
+  promptTitle?: string
+  prompt?: string
+  coachCallId?: number | string
+}
+
+type Props = {
+  diary: DiaryEntry[] | null | undefined
+  onDiaryChange: (next: DiaryEntry[]) => void
+  journey: JourneyState | null | undefined
+  onJourneyChange: (next: JourneyState) => Promise<void> | void
+}
 
 const PROMPT_TEMPLATE =
   'Хороший запрос состоит из трёх частей:\n\n' +
@@ -16,16 +74,16 @@ const PROMPT_TEMPLATE =
   '«Будь моим наставником по белой сенсорике. Помоги понять, почему я откладываю заботу о своём теле. ' +
   'Контекст: уже месяц забиваю на сон, вчера снова не успел поужинать, и это начинает сказываться на работе.»'
 
-export default function CoachView({ diary, onDiaryChange, journey, onJourneyChange }) {
+export default function CoachView({ diary, onDiaryChange, journey, onJourneyChange }: Props) {
   const [prompt, setPrompt] = useState('')
-  const [focusAspect, setFocusAspect] = useState('')
-  const [quota, setQuota] = useState(null)
-  const [history, setHistory] = useState([])
+  const [focusAspect, setFocusAspect] = useState<AspectKey | ''>('')
+  const [quota, setQuota] = useState<CoachQuota | null>(null)
+  const [history, setHistory] = useState<CoachCall[]>([])
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [response, setResponse] = useState(null) // {call_id, text, focus_aspect}
+  const [response, setResponse] = useState<CoachResponseState | null>(null)
   const [savedToDiary, setSavedToDiary] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   const stardustCost = quota?.stardust_cost ?? 100
   const stardust = journey?.stardust ?? 0
@@ -40,26 +98,26 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
     Promise.all([fetchCoachQuota(), fetchCoachHistory(20)])
       .then(([q, h]) => {
         if (cancelled) return
-        setQuota(q)
-        setHistory(h)
+        setQuota(q as CoachQuota)
+        setHistory((h as CoachCall[]) ?? [])
       })
-      .catch(e => {
+      .catch((e: unknown) => {
         if (cancelled) return
-        setError(e.message ?? 'Не удалось загрузить квоту')
+        setError(e instanceof Error ? e.message : 'Не удалось загрузить квоту')
       })
     return () => { cancelled = true }
   }, [])
 
   const refreshHistory = async () => {
     try {
-      const h = await fetchCoachHistory(20)
-      setHistory(h)
+      const h = (await fetchCoachHistory(20)) as CoachCall[]
+      setHistory(h ?? [])
     } catch (e) {
       console.error(e)
     }
   }
 
-  const handleSubmit = async (payWithStardust) => {
+  const handleSubmit = async (payWithStardust: boolean): Promise<void> => {
     const text = prompt.trim()
     if (!text || busy) return
     setBusy(true)
@@ -69,15 +127,15 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
     try {
       // Списываем стардаст ДО вызова бэка — так бэк может верить флагу.
       // См. план фичи, секция «Что важно про стардаст-оплату».
-      if (payWithStardust && onJourneyChange) {
+      if (payWithStardust && onJourneyChange && journey) {
         await onJourneyChange({ ...journey, stardust: stardust - stardustCost })
       }
 
-      const data = await summonCoach({
+      const data = (await summonCoach({
         prompt: text,
         focusAspect: focusAspect || null,
         payWithStardust,
-      })
+      })) as SummonResp
       setResponse({
         call_id: data.call_id,
         text: data.response,
@@ -90,10 +148,10 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
         remaining_today: data.remaining_today,
       } : q)
       refreshHistory()
-    } catch (e) {
-      setError(e.message ?? 'Ошибка вызова')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Ошибка вызова')
       // Откатываем списание стардаста, если бэк отбил.
-      if (payWithStardust && onJourneyChange) {
+      if (payWithStardust && onJourneyChange && journey) {
         await onJourneyChange({ ...journey, stardust })
       }
     } finally {
@@ -103,7 +161,7 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
 
   const handleSaveToDiary = () => {
     if (!response || !onDiaryChange || savedToDiary) return
-    const entry = {
+    const entry: DiaryEntry = {
       id: `coach-${response.call_id}-${Date.now()}`,
       date: new Date().toLocaleDateString('ru-RU'),
       ts: Date.now(),
@@ -142,7 +200,7 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
         <div className={styles.row}>
           <select
             value={focusAspect}
-            onChange={e => setFocusAspect(e.target.value)}
+            onChange={e => setFocusAspect(e.target.value as AspectKey | '')}
             className={styles.select}
           >
             <option value="">Без фокус-аспекта</option>
@@ -243,12 +301,13 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
   )
 }
 
-function HistoryItem({ call }) {
+function HistoryItem({ call }: { call: CoachCall }) {
   const [open, setOpen] = useState(false)
   const date = new Date(call.created_at).toLocaleString('ru-RU', {
     day: '2-digit', month: '2-digit', year: '2-digit',
     hour: '2-digit', minute: '2-digit',
   })
+  const aspectKey = call.focus_aspect as AspectKey | null | undefined
   return (
     <div className={styles.historyItem}>
       <button
@@ -257,10 +316,10 @@ function HistoryItem({ call }) {
         onClick={() => setOpen(v => !v)}
       >
         <span className={styles.historyDate}>{date}</span>
-        {call.focus_aspect && (
+        {aspectKey && (
           <span
             className={styles.historyAspect}
-            style={{ color: ASPECT_COLORS[call.focus_aspect] }}
+            style={{ color: ASPECT_COLORS[aspectKey] }}
           >
             {call.focus_aspect}
           </span>
