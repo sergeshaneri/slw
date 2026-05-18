@@ -220,24 +220,60 @@ def _display_name(user: WebUser) -> str:
     return f"user{user.id}"
 
 
+def compute_xp_from_state(journey: object) -> tuple[int, int]:
+    """Pure-функция: считает (real_xp, count_scripts) из journey-JSONB.
+
+    real_xp — серверная сумма XP с весами скриптов (T=5, B=10, U=15...),
+              фронт пишет в `journey.xp` через `awardXP(script.xp, ...)`.
+              Это самая точная метрика.
+    count   — сумма len(completedScripts) по всем aspects-папкам.
+              Используется как fallback / sanity-check.
+
+    Возвращает (0, 0) если journey не объект или пустой.
+    """
+    if not isinstance(journey, dict):
+        return (0, 0)
+    real_xp = int(journey.get("xp") or 0)
+
+    count = 0
+    aspects = journey.get("aspects") or {}
+    if isinstance(aspects, dict):
+        for folder in aspects.values():
+            if isinstance(folder, dict):
+                cs = folder.get("completedScripts")
+                if isinstance(cs, list):
+                    count += len(cs)
+    # Backwards compat — старая плоская структура (до v8).
+    legacy_cs = journey.get("completedScripts")
+    if isinstance(legacy_cs, list):
+        count = max(count, len(legacy_cs))
+
+    return (real_xp, count)
+
+
 async def _xp(session: AsyncSession, user: WebUser) -> int:
-    """Серверный XP-эквивалент: MAX между journey_events и completedScripts.
+    """Серверный XP юзера. MAX между тремя источниками:
 
-    Источники:
-      1. journey_events.web_user_id == user.id (события от веба — пока никто
-         не пишет, заготовка)
-      2. journey_events.telegram_id == user.telegram_id (события от бота)
-      3. web_state.journey -> 'completedScripts' (массив id шагов, веб-чат
-         туда дописывает; фронт также мерджит туда bot-события).
+      1. **real_xp** — `web_state.journey.xp`. Фронт через `awardXP`
+         кладёт сумму с весами (T=5/B=10/U=15/R=10/...). Это
+         «настоящий» XP, который видит юзер в шапке чата.
+      2. **count_scripts** — количество ID в `completedScripts` по
+         всем папкам аспектов. Простой fallback, если фронтовый xp
+         потерялся (старый state до v8 / частичный сброс).
+      3. **events_count** — count записей `step_completed` в
+         `journey_events` для этого юзера (бот + веб).
 
-    Берём MAX (а не SUM): фронт уже мерджит bot-events в completedScripts,
-    поэтому суммирование задвоит. См. также leaderboard.py.
+    Берём MAX чтобы:
+    - Веб-юзер с реальным `journey.xp=1500` показал 1500 (а не 30
+      скриптов как раньше).
+    - Бот-юзер без веб-state показал событийный count.
+    - Сбой одного источника не обнулял остальные.
     """
     from sqlalchemy import and_, or_
     conditions = [JourneyEvent.web_user_id == user.id]
     if user.telegram_id:
         conditions.append(JourneyEvent.telegram_id == user.telegram_id)
-    events_xp = int((
+    events_count = int((
         await session.execute(
             select(func.count(func.distinct(JourneyEvent.id)))
             .where(
@@ -250,13 +286,9 @@ async def _xp(session: AsyncSession, user: WebUser) -> int:
     ).scalar_one())
 
     state = await session.get(WebState, user.id)
-    scripts_xp = 0
-    if state and isinstance(state.journey, dict):
-        cs = state.journey.get("completedScripts")
-        if isinstance(cs, list):
-            scripts_xp = len(cs)
+    real_xp, count_scripts = compute_xp_from_state(state.journey if state else None)
 
-    return max(events_xp, scripts_xp)
+    return max(real_xp, count_scripts, events_count)
 
 
 async def _streak(session: AsyncSession, user: WebUser) -> int:

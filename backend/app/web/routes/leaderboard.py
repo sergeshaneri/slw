@@ -3,15 +3,24 @@ Leaderboard:
 
   GET /api/leaderboard?limit=20  — топ юзеров по XP
 
-XP считается из двух источников и берётся MAX:
-  1. journey_events (`type='step_completed'`):
-       • events.web_user_id = web_users.id (события от web — пока не пишутся)
-       • events.telegram_id = web_users.telegram_id (события от бота)
-  2. web_state.journey -> 'completedScripts' (массив short_id, фронт его
-     обновляет и при прохождении в вебе, и при подтягивании bot-events).
+XP считается из трёх источников, MAX (синхронизировано с profile._xp):
+  1. **real_xp** — `web_state.journey.xp`. Реальная сумма с весами
+     скриптов (T=5/B=10/U=15/R=10/...), которую фронт пишет через
+     `awardXP`. Это «настоящий» XP юзера — тот, что виден в шапке чата.
+  2. **count_scripts** — сумма `len(completedScripts)` по всем папкам
+     `aspects`. Fallback для случаев, когда `journey.xp` потерян.
+  3. **events_count** — count записей step_completed в journey_events
+     (от бота + от веба через POST /api/events/step-completed).
 
-Зачем MAX, а не сумма: фронт мерджит bot-events в completedScripts при
-каждой загрузке, поэтому списки часто пересекаются — суммирование завысит.
+Берём MAX: фронт мерджит bot-events в completedScripts при загрузке,
+поэтому source overlapping — суммирование задвоит. MAX даёт точку
+истины — какой бы источник ни оказался самым полным.
+
+До 2026-05 leaderboard смотрел только на легаси плоский
+`journey.completedScripts` (всегда 0 в новой структуре) + count
+событий. Веб-юзеры показывались с XP = только bot-event-count, реальный
+weighted journey.xp игнорировался — отсюда расхождение с тем, что
+показано в шапке чата.
 
 Юзеры с приватным профилем (public_profiles.is_public=false) исключаются.
 Юзеры с XP=0 в топ не попадают — иначе свежие регистрации перебивают
@@ -25,17 +34,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import JourneyEvent, PublicProfile, WebState, WebUser
 from app.db.session import get_session
+from app.web.routes.profile import compute_xp_from_state
 
 router = APIRouter()
-
-
-def _scripts_count(journey: object) -> int:
-    if not isinstance(journey, dict):
-        return 0
-    cs = journey.get("completedScripts")
-    if isinstance(cs, list):
-        return len(cs)
-    return 0
 
 
 @router.get("/leaderboard")
@@ -88,17 +89,17 @@ async def get_leaderboard(
         ).all()
     }
 
-    # web_state.journey для всех — нужен completedScripts.length.
+    # web_state.journey для всех — нужен journey.xp и aspects-completedScripts.
     state_rows = (await session.execute(select(WebState))).scalars().all()
     state_map = {s.web_user_id: s.journey for s in state_rows}
 
     items = []
     for user, profile in users_rows:
-        events_xp = web_counts.get(user.id, 0)
+        events_count = web_counts.get(user.id, 0)
         if user.telegram_id:
-            events_xp += tg_counts.get(user.telegram_id, 0)
-        scripts_xp = _scripts_count(state_map.get(user.id))
-        xp = max(events_xp, scripts_xp)
+            events_count += tg_counts.get(user.telegram_id, 0)
+        real_xp, count_scripts = compute_xp_from_state(state_map.get(user.id))
+        xp = max(real_xp, count_scripts, events_count)
         if xp > 0:
             items.append((user, profile, xp))
 
