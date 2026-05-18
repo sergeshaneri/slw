@@ -58,40 +58,56 @@ export type AspectState = {
   pendingTasks: PendingTask[]
 }
 
-// One answer recorded against a skill survey block. Surveys use numeric
-// 1..10 scale, but B-question shortcuts can also store free-text inputs.
-export type SkillAnswer = {
-  pass: number
-  statementIndex: number
-  value: number | string
-  timestamp: number
+// Survey draft saved when user interrupts an in-flight survey. Mirrors the
+// `active` snapshot trimmed down — JourneyView's dismissActiveSurveyToDraft
+// writes exactly this shape into SkillState.draft, and SkillTree status code
+// reads `mode`/`startPass`/`stepIndex` back off it.
+export type SurveyDraft = {
+  mode?: 'short' | 'full'
+  startPass?: number
+  stepIndex?: number
+  // legacy field name from pre-refactor draft shape (read-only, kept for
+  // backward compat with persisted states).
+  pass?: number
+  blockIndex?: number
+  answers?: Record<string, Array<number | null | undefined>>
 }
 
 // Per-skill state inside state.skills[<skillId>]. The actual stored object
 // in JourneyView.jsx is broader (passes, insights, blocks averages, etc.);
 // we model the load-bearing fields here and allow extras via index signature
-// in callers as needed. TODO(ts): tighten after Phase 1/2 covers skill UI.
+// in callers as needed.
 export type SkillState = {
   id: string
   // Survey answers are stored as plain number arrays keyed by block name.
-  // The richer SkillAnswer object shape was a P0 guess but runtime uses number[].
   answers?: Record<string, number[]>
   blocks?: Record<string, number>
   passes?: number
   result?: number
-  draft?: unknown
+  draft?: SurveyDraft | null
   insights?: unknown[]
   completedAt?: number
   lastUpdated?: number
 }
 
 // Active survey progress (transient, lives only while screen='survey').
+// Runtime shape — see JourneyView.handleStartSkillSurvey /
+// handleChooseSurveyMode / handleSurveyAnswer. The pre-refactor
+// `blockIndex`+`statementIndex` fields were replaced by `mode` +
+// `startPass` + `stepIndex` (see SurveyScreen which is the single
+// consumer); both legacy fields are kept optional for backward compat
+// during the refactor window.
 export type ActiveSurvey = {
   scriptId?: string
   skillId: string
-  blockIndex: number
-  statementIndex: number
-  answers: Record<string, number[]>
+  mode?: 'short' | 'full'
+  startPass?: number
+  stepIndex?: number
+  answers?: Record<string, Array<number | null | undefined>>
+  // Legacy fields from pre-refactor shape; not used by the current
+  // SurveyScreen but harmless to retain in serialized state.
+  blockIndex?: number
+  statementIndex?: number
 }
 
 // Root journey state. Mirrors DEFAULT_JOURNEY in JourneyView.jsx.

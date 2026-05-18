@@ -23,7 +23,8 @@ const FEATURES = [
 type Props = {
   // AuthModal передаёт сюда auth-response (token + user). Точная shape
   // приходит из api/client, тут он только пробрасывается вверх.
-  // TODO(ts): tighten to AuthResponse when AuthModal becomes .tsx (P2E).
+  // NOTE(ts): AuthModal forwards the raw /auth response object — its
+  // exact shape lives behind the same response_model gap as /auth/me.
   onAuthSuccess: (data: unknown) => void
   onContinueAsGuest: () => void
 }

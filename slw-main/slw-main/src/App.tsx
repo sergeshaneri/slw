@@ -2,20 +2,21 @@ import { useState, useEffect, useRef } from 'react'
 import Header from './components/Header/Header'
 import AspectsView from './components/AspectsView/AspectsView'
 import DiaryView from './components/DiaryView/DiaryView'
-import JourneyView, { DEFAULT_JOURNEY } from './components/JourneyView/JourneyView'
+import JourneyView, { DEFAULT_JOURNEY, DEFAULT_ASPECT_STATE } from './components/JourneyView/JourneyView'
 import CoachView from './components/CoachView/CoachView'
 import ProfileView from './components/ProfileView/ProfileView'
 import PublicProfileView from './components/PublicProfileView/PublicProfileView'
 import LeaderboardView from './components/LeaderboardView/LeaderboardView'
 import HallView from './components/HallView/HallView'
 import DMView from './components/DMView/DMView'
-import SearchView from './components/SearchView/SearchView'
 import DashboardView from './components/DashboardView/DashboardView'
 import SettingsView from './components/SettingsView/SettingsView'
 import AdminView from './components/AdminView/AdminView'
 import AchievementToast from './components/Toast/AchievementToast'
+import type { Toast } from './components/Toast/AchievementToast'
 import IntroTour from './components/Onboarding/IntroTour'
 import { fetchMyProfile, markOnboardingDone, markHintSeen } from './api/client'
+import type { ApiError } from './api/client'
 import LoadingScreen from './components/LoadingScreen/LoadingScreen'
 import AuthModal from './components/Auth/AuthModal'
 import WelcomeScreen from './components/Welcome/WelcomeScreen'
@@ -33,9 +34,17 @@ import {
   fetchBotState,
   fetchEvents,
 } from './api/client'
+import type { AspectKey, AspectScores } from '@/types/aspect'
+import type { JourneyState, AspectState, ChatMessage } from '@/types/journey'
+import type { DiaryEntry } from '@/types/diary'
+import type { User } from '@/types/user'
+import type { ViewName } from '@/types/view'
 import styles from './App.module.css'
 
-const initScores = () => ASPECT_KEYS.reduce((acc, key) => ({ ...acc, [key]: 5 }), {})
+// ── localStorage helpers ────────────────────────────────────────────────────
+
+const initScores = (): AspectScores =>
+  ASPECT_KEYS.reduce<AspectScores>((acc, key) => ({ ...acc, [key]: 5 }), {})
 
 // localStorage ключи для гостевого режима (без auth).
 // При логине данные с локалки могут переехать на бэк (миграцию пока не делаем).
@@ -43,56 +52,161 @@ const LS = {
   scores: 'whl_scores',
   history: 'whl_history',
   diary: 'whl_diary',
-  journey: 'whl_journey'
-}
+  journey: 'whl_journey',
+} as const
 
-const lsGet = (key, fallback) => {
+function lsGet<T>(key: string, fallback: T): T {
   try {
     const v = localStorage.getItem(key)
-    return v ? JSON.parse(v) : fallback
-  } catch { return fallback }
+    return v ? (JSON.parse(v) as T) : fallback
+  } catch {
+    return fallback
+  }
 }
 
-const lsSet = (key, value) => {
+function lsSet(key: string, value: unknown): void {
   try { localStorage.setItem(key, JSON.stringify(value)) } catch (e) { console.error(e) }
 }
 
+// ── Loose shapes for API responses (no response_model on backend yet) ───────
+
+// `/api/state` GET response: { journey, history, updated_at }.
+type FetchStateResponse = {
+  journey?: JourneyState | Record<string, unknown> | null
+  history?: unknown
+  updated_at?: string | null
+} & Record<string, unknown>
+
+// `/api/scores` GET response (object keyed by aspect → number).
+type ScoresResponse = Record<string, number>
+
+// Single bot-state aspect row from `/api/sync/bot-state`.
+type BotAspectRow = {
+  aspect?: AspectKey | string
+  current_level?: number
+}
+
+type BotState = {
+  current_aspect?: AspectKey | string
+  current_level?: number
+  aspects?: BotAspectRow[]
+  streak_days?: number
+}
+
+type BotSyncResponse = {
+  linked?: boolean
+  state?: BotState | null
+} & Record<string, unknown>
+
+type JourneyEventItem = {
+  type?: string
+  aspect?: AspectKey | string
+  short_id?: string
+  // additional fields permitted but not read here
+} & Record<string, unknown>
+
+type EventsResponse = {
+  events?: JourneyEventItem[]
+} & Record<string, unknown>
+
+// `/api/diary` GET item shape — we map it into the canonical DiaryEntry below.
+type DiaryRow = {
+  id: number
+  created_at: string
+  aspect: AspectKey | 'general' | string
+  text: string
+  source?: string
+  extra?: Record<string, unknown> | null
+} & Record<string, unknown>
+
+// `/api/profile/me` response — only the load-bearing fields we read here.
+type ProfileMe = {
+  avatar?: string | null
+  newly_unlocked?: string[]
+  achievements_catalog?: Array<{
+    code: string
+    title?: string
+    icon?: string
+    desc?: string
+  }>
+} & Record<string, unknown>
+
+// `/api/state` PUT response — returns the new updated_at (and a few other fields).
+type SaveStateResponse = {
+  updated_at?: string | null
+} & Record<string, unknown>
+
+// State-conflict body in a 409 — emitted by saveState's optimistic locking.
+type StateConflictDetail = {
+  code?: string
+  current_updated_at?: string
+  your_expected?: string
+} & Record<string, unknown>
+
+// ── Diary normalization ─────────────────────────────────────────────────────
+
+function normalizeDiaryRow(row: DiaryRow): DiaryEntry {
+  const extra = (row.extra && typeof row.extra === 'object' ? row.extra : {}) as Record<string, unknown>
+  return {
+    id: row.id,
+    date: new Date(row.created_at).toLocaleDateString('ru-RU'),
+    ts: new Date(row.created_at).getTime(),
+    aspect: row.aspect as AspectKey | 'general',
+    text: row.text,
+    source: row.source,
+    ...extra,
+  } as DiaryEntry
+}
+
+// ── App root ────────────────────────────────────────────────────────────────
+
+const HOME_VIEWS: ReadonlyArray<ViewName> = ['dashboard', 'aspects']
+
 export default function App() {
   const { user, loading: authLoading, onAuthSuccess, logout } = useAuth()
+
+  // `user` from useAuth is `User | null | false`. We pass through to children
+  // as `User | null` (false → null, both mean "no logged-in user" for UI).
+  const appUser: User | null = user ? (user as User) : null
 
   // Дефолт: залогиненным — дашборд, гостям — колесо.
   // Конкретный view выставится в useEffect после того как `user` определится.
   // Дефолтный view. Для гостя — 'aspects' (read-only с teaser-механикой).
   // Залогиненный сразу перекидывается на 'dashboard' (см. useEffect ниже).
-  const [view, setView] = useState('aspects')
-  const [scores, setScores] = useState(initScores())
-  const [history, setHistory] = useState([])
-  const [diary, setDiary] = useState([])
-  const [journey, setJourney] = useState(DEFAULT_JOURNEY)
-  const [selectedAspect, setSelectedAspect] = useState(null)
+  const [view, setView] = useState<ViewName>('aspects')
+  const [scores, setScores] = useState<AspectScores>(initScores())
+  const [history, setHistory] = useState<unknown[]>([])
+  const [diary, setDiary] = useState<DiaryEntry[]>([])
+  const [journey, setJourney] = useState<JourneyState>(DEFAULT_JOURNEY)
+  const [selectedAspect, setSelectedAspect] = useState<AspectKey | null>(null)
   // Чей публичный профиль смотрим (id WebUser). null — не открыт.
-  const [viewingProfileId, setViewingProfileId] = useState(null)
+  const [viewingProfileId, setViewingProfileId] = useState<number | string | null>(null)
   // В каком холле сейчас юзер (ключ аспекта). null — не в холле.
-  const [hallAspect, setHallAspect] = useState(null)
+  const [hallAspect, setHallAspect] = useState<AspectKey | null>(null)
   // С каким юзером открыт DM-тред. null — список тредов.
-  const [dmPartnerId, setDmPartnerId] = useState(null)
+  const [dmPartnerId, setDmPartnerId] = useState<number | string | null>(null)
   // Очередь тостов (новые ачивки и т.п.). Каждый { id, icon, title, desc, kind, stardust }.
-  const [toasts, setToasts] = useState([])
-  const [dataLoading, setDataLoading] = useState(false)
-  const [showAuth, setShowAuth] = useState(false)
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const [dataLoading, setDataLoading] = useState<boolean>(false)
+  const [showAuth, setShowAuth] = useState<boolean>(false)
   // welcomeDismissed: гость нажал «Начать бесплатно» и вошёл в приложение
   // без аутентификации. Запоминаем в localStorage, чтобы при следующем
   // визите сразу попадал на колесо. Сбрасывается на logout (см. ниже).
-  const [welcomeDismissed, setWelcomeDismissed] = useState(
+  const [welcomeDismissed, setWelcomeDismissed] = useState<boolean>(
     () => localStorage.getItem('welcome_seen') === '1'
   )
   // devAdmin: «пасхалочный» админский режим без бэка. Включается 5 кликами
   // по букве «й» в конце фразы «… дней» в Heatmap-заголовке (DashboardView).
   // Хранится в localStorage, переживает logout. ИЛИ-сложение с user.is_admin.
-  const [devAdmin, setDevAdmin] = useState(
+  const [devAdmin, setDevAdmin] = useState<boolean>(
     () => localStorage.getItem('slw_dev_admin') === '1'
   )
-  const toggleDevAdmin = () => {
+  // toggleDevAdmin: пасхалка, переключение dev-admin режима. Хук-в-перчатке
+  // для DashboardView (Heatmap), оставлен в App.tsx как часть публичного
+  // API на будущее. NOTE(ts): keep declared even if unused at this point;
+  // .jsx исходник тоже его декларировал.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const toggleDevAdmin = (): void => {
     setDevAdmin(prev => {
       const next = !prev
       if (next) localStorage.setItem('slw_dev_admin', '1')
@@ -100,30 +214,35 @@ export default function App() {
       return next
     })
   }
-  const isAdmin = (user?.is_admin === true) || devAdmin
+  void toggleDevAdmin
+  const isAdmin: boolean = (appUser?.is_admin === true) || devAdmin
   const t = ru
   // IntroTour (Layer 1) — Quick Tour. Видим если:
   //   • залогиненный юзер ещё не прошёл (user.onboarding_done === false)
   //   • гость в режиме welcomeDismissed и без localStorage['slw_intro_seen']='1'
   // Re-open из Profile через кнопку «📖 Гид».
-  const [showIntroTour, setShowIntroTour] = useState(false)
+  const [showIntroTour, setShowIntroTour] = useState<boolean>(false)
 
   // Аватар юзера из public_profiles. Источник правды — бэк
   // (/api/profile/me). Фетчим при логине, обновляем после save в ProfileView.
-  const [myAvatar, setMyAvatar] = useState('')
+  const [myAvatar, setMyAvatar] = useState<string>('')
   useEffect(() => {
-    if (!user) { setMyAvatar(''); return }
+    if (!appUser) { setMyAvatar(''); return }
     let cancelled = false
     fetchMyProfile()
-      .then(p => { if (!cancelled) setMyAvatar(p.avatar ?? '') })
+      .then(p => {
+        if (cancelled) return
+        const profile = (p ?? {}) as ProfileMe
+        setMyAvatar(profile.avatar ?? '')
+      })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [user?.id])
+  }, [appUser?.id])
 
   // Скроллим `.main` наверх при смене view или selectedAspect.
   // Без этого позиция сохраняется и страница может оказаться на середине/внизу.
   // Чат (journey) сам управляет скроллом — его не трогаем.
-  const mainRef = useRef(null)
+  const mainRef = useRef<HTMLElement | null>(null)
   useEffect(() => {
     if (view === 'journey') return
     if (mainRef.current) mainRef.current.scrollTop = 0
@@ -134,14 +253,14 @@ export default function App() {
   // кто-то ещё изменил (admin restore, другая вкладка, impersonation) —
   // бэк ответит 409 и мы перечитаем свежее значение.
   // ОБЪЯВЛЕНО ДО loadFromApi, чтобы избежать TDZ при использовании в closure.
-  const stateVersionRef = useRef(null)
+  const stateVersionRef = useRef<string | null>(null)
 
   // Загрузка данных при изменении статуса auth.
   // Залогинен → API. Гость → localStorage.
   useEffect(() => {
     if (user === null) return  // ещё проверяем токен — ничего не делаем
     if (user) {
-      loadFromApi()
+      void loadFromApi()
       // При первом логине переключаем на дашборд (если ещё на стартовом 'aspects').
       setView(v => v === 'aspects' ? 'dashboard' : v)
     } else {
@@ -149,15 +268,15 @@ export default function App() {
     }
   }, [user])
 
-  const loadFromApi = async () => {
+  const loadFromApi = async (): Promise<void> => {
     setDataLoading(true)
     try {
       const [stateRes, scoresRes, diaryRes, botSync, eventsRes] = await Promise.all([
-        fetchState(),
-        fetchScores(),
-        fetchDiary(),
-        fetchBotState().catch(() => null),
-        fetchEvents(0).catch(() => ({ events: [] })),
+        fetchState() as Promise<FetchStateResponse>,
+        fetchScores() as Promise<ScoresResponse>,
+        fetchDiary() as Promise<DiaryRow[]>,
+        (fetchBotState() as Promise<BotSyncResponse>).catch(() => null),
+        (fetchEvents(0) as Promise<EventsResponse>).catch(() => ({ events: [] } as EventsResponse)),
       ])
 
       // Запоминаем версию state с сервера для optimistic locking.
@@ -178,25 +297,35 @@ export default function App() {
       //
       // bs.aspects может отсутствовать на старом бэке — fallback на
       // одиночные top-level поля (current_aspect/current_level).
-      let journeyOverride = stateRes.journey ?? null
+      let journeyOverride: (JourneyState & Record<string, unknown>) | null =
+        (stateRes.journey as (JourneyState & Record<string, unknown>) | undefined) ?? null
 
-      const readAspectFolder = (jo, aspect) => {
+      const readAspectFolder = (
+        jo: (JourneyState & Record<string, unknown>) | null,
+        aspect: AspectKey | string
+      ): Partial<AspectState> | null => {
         if (!jo) return null
-        if (jo.aspects && jo.aspects[aspect]) return jo.aspects[aspect]
+        if (jo.aspects && (jo.aspects as Record<string, AspectState | undefined>)[aspect]) {
+          return (jo.aspects as Record<string, AspectState>)[aspect]
+        }
         // Старый плоский state с бэка — читаем поля как есть.
         return {
-          currentLevel: jo.currentLevel,
-          currentScriptIndex: jo.currentScriptIndex,
-          currentScriptId: jo.currentScriptId,
-          awaitingInput: jo.awaitingInput,
-          messages: jo.messages,
-          completedScripts: jo.completedScripts,
-          pendingTasks: jo.pendingTasks,
+          currentLevel: (jo as Record<string, unknown>).currentLevel as AspectState['currentLevel'] | undefined,
+          currentScriptIndex: (jo as Record<string, unknown>).currentScriptIndex as number | undefined,
+          currentScriptId: (jo as Record<string, unknown>).currentScriptId as string | null | undefined,
+          awaitingInput: (jo as Record<string, unknown>).awaitingInput as AspectState['awaitingInput'] | undefined,
+          messages: (jo as Record<string, unknown>).messages as ChatMessage[] | undefined,
+          completedScripts: (jo as Record<string, unknown>).completedScripts as string[] | undefined,
+          pendingTasks: (jo as Record<string, unknown>).pendingTasks as AspectState['pendingTasks'] | undefined,
         }
       }
 
-      const writeAspectFolder = (jo, aspect, patch) => {
-        const base = jo ?? {}
+      const writeAspectFolder = (
+        jo: (JourneyState & Record<string, unknown>) | null,
+        aspect: AspectKey | string,
+        patch: Partial<AspectState>,
+      ): JourneyState & Record<string, unknown> => {
+        const base = jo ?? ({} as JourneyState & Record<string, unknown>)
         const prevFolder = readAspectFolder(base, aspect) ?? {}
         return {
           ...base,
@@ -204,23 +333,30 @@ export default function App() {
             ...(base.aspects ?? {}),
             [aspect]: { ...prevFolder, ...patch },
           },
-        }
+        } as JourneyState & Record<string, unknown>
       }
 
-      const bumpAspectFromBot = (jo, aspect, botLevel) => {
+      const bumpAspectFromBot = (
+        jo: (JourneyState & Record<string, unknown>) | null,
+        aspect: AspectKey | string,
+        botLevel: number,
+      ): (JourneyState & Record<string, unknown>) | null => {
         const folder = readAspectFolder(jo, aspect) ?? {}
         const webLevel = folder.currentLevel ?? 0
         if (botLevel <= webLevel) return jo
-        const nextLevelData = getJourney(aspect)?.levels?.[botLevel]
+        const journeyData = getJourney(aspect as AspectKey)
+        const nextLevelData = journeyData?.levels?.[botLevel as 0 | 1 | 2 | 3] as
+          | { core?: Array<{ id: string }>; scripts?: Array<{ id: string }> }
+          | undefined
         const firstScript = (nextLevelData?.core ?? nextLevelData?.scripts ?? [])[0]
         return writeAspectFolder(jo, aspect, {
-          currentLevel: botLevel,
+          currentLevel: botLevel as AspectState['currentLevel'],
           currentScriptIndex: 0,
           currentScriptId: firstScript?.id ?? null,
           awaitingInput: null,
           messages: firstScript
             ? [
-                ...(folder.messages ?? []),
+                ...((folder.messages ?? []) as ChatMessage[]),
                 {
                   id: Date.now() + Math.random(),
                   role: 'bot',
@@ -229,19 +365,19 @@ export default function App() {
                   level: botLevel,
                 },
               ]
-            : (folder.messages ?? []),
+            : ((folder.messages ?? []) as ChatMessage[]),
         })
       }
 
       if (botSync?.linked && botSync.state) {
         const bs = botSync.state
-        const isWebFresh = !journeyOverride || journeyOverride.screen === 'onboarding'
+        const isWebFresh = !journeyOverride || (journeyOverride.screen as string | undefined) === 'onboarding'
 
         if (isWebFresh && bs.current_aspect) {
           journeyOverride = {
-            ...(journeyOverride ?? {}),
-            currentAspect: bs.current_aspect,
-          }
+            ...((journeyOverride ?? {}) as JourneyState & Record<string, unknown>),
+            currentAspect: bs.current_aspect as AspectKey,
+          } as JourneyState & Record<string, unknown>
         }
 
         if (Array.isArray(bs.aspects) && bs.aspects.length > 0) {
@@ -254,15 +390,15 @@ export default function App() {
         } else if (bs.current_aspect) {
           // Legacy: одиночные поля. Бампаем только текущий аспект.
           journeyOverride = bumpAspectFromBot(
-            journeyOverride, bs.current_aspect, bs.current_level ?? 0
+            journeyOverride, bs.current_aspect, bs.current_level ?? 0,
           )
         }
 
         if (bs.streak_days) {
           journeyOverride = {
-            ...(journeyOverride ?? {}),
+            ...((journeyOverride ?? {}) as JourneyState & Record<string, unknown>),
             streak: Math.max(journeyOverride?.streak ?? 0, bs.streak_days),
-          }
+          } as JourneyState & Record<string, unknown>
         }
       }
 
@@ -277,17 +413,18 @@ export default function App() {
       // обнулиться, а журнал в БД останется — и при следующей загрузке
       // мы пересоберём полный список завершённых скриптов.
       const botEvents = (eventsRes?.events ?? []).filter(
-        e => e.type === 'step_completed' && e.short_id && e.aspect
+        (e): e is JourneyEventItem & { aspect: string; short_id: string } =>
+          e.type === 'step_completed' && !!e.short_id && !!e.aspect
       )
       if (botEvents.length > 0) {
         // Группируем по аспекту → раскладываем по папкам.
-        const byAspect = botEvents.reduce((acc, e) => {
+        const byAspect = botEvents.reduce<Record<string, string[]>>((acc, e) => {
           (acc[e.aspect] ??= []).push(e.short_id)
           return acc
         }, {})
         for (const [aspect, ids] of Object.entries(byAspect)) {
           const folder = readAspectFolder(journeyOverride, aspect) ?? {}
-          const merged = new Set(folder.completedScripts ?? [])
+          const merged = new Set<string>(folder.completedScripts ?? [])
           ids.forEach(id => merged.add(id))
           journeyOverride = writeAspectFolder(journeyOverride, aspect, {
             completedScripts: Array.from(merged),
@@ -295,20 +432,16 @@ export default function App() {
         }
       }
 
-      if (journeyOverride) setJourney(j => ({ ...j, ...journeyOverride }))
-      if (stateRes.history) setHistory(stateRes.history)
-      if (Object.keys(scoresRes).length > 0) setScores(scoresRes)
+      if (journeyOverride) {
+        setJourney(j => ({ ...j, ...(journeyOverride as JourneyState) }))
+      }
+      if (stateRes.history) setHistory(stateRes.history as unknown[])
+      if (Object.keys(scoresRes).length > 0) {
+        setScores(scoresRes as AspectScores)
+      }
 
       if (diaryRes.length > 0) {
-        setDiary(diaryRes.map(e => ({
-          id: e.id,
-          date: new Date(e.created_at).toLocaleDateString('ru-RU'),
-          ts: new Date(e.created_at).getTime(),
-          aspect: e.aspect,
-          text: e.text,
-          source: e.source,
-          ...(e.extra ?? {}),
-        })))
+        setDiary(diaryRes.map(normalizeDiaryRow))
       }
     } catch (e) {
       console.error('Error loading data:', e)
@@ -317,17 +450,17 @@ export default function App() {
     }
   }
 
-  const loadFromLocal = () => {
-    setScores(lsGet(LS.scores, initScores()))
-    setHistory(lsGet(LS.history, []))
-    setDiary(lsGet(LS.diary, []))
-    setJourney(lsGet(LS.journey, DEFAULT_JOURNEY))
+  const loadFromLocal = (): void => {
+    setScores(lsGet<AspectScores>(LS.scores, initScores()))
+    setHistory(lsGet<unknown[]>(LS.history, []))
+    setDiary(lsGet<DiaryEntry[]>(LS.diary, []))
+    setJourney(lsGet<JourneyState>(LS.journey, DEFAULT_JOURNEY))
   }
 
-  const saveScores = async (newScores) => {
+  const saveScores = async (newScores: AspectScores): Promise<void> => {
     setScores(newScores)
-    if (user) {
-      try { await apiSaveScores(newScores) } catch (e) { console.error(e) }
+    if (appUser) {
+      try { await apiSaveScores(newScores as Record<string, number>) } catch (e) { console.error(e) }
     } else {
       lsSet(LS.scores, newScores)
     }
@@ -344,10 +477,11 @@ export default function App() {
   // обновляет ref из тела ответа и продолжает. Если бы был настоящий
   // конфликт — следующий save отправит свежий ref. Полный reload через
   // loadFromApi оказался слишком агрессивным — он триггерил «загрузку».
-  const saveDebounceRef = useRef(null)
-  const lastSavePromiseRef = useRef(Promise.resolve())
+  type SavePatch = { journey?: JourneyState; history?: unknown }
+  const saveDebounceRef = useRef<SavePatch | null>(null)
+  const lastSavePromiseRef = useRef<Promise<SaveStateResponse | null>>(Promise.resolve(null))
 
-  const saveStateGuarded = (patch) => {
+  const saveStateGuarded = (patch: SavePatch): Promise<SaveStateResponse | null> => {
     // Сохраняем последний патч, чтобы при дебаунсе слать актуальный.
     saveDebounceRef.current = { ...(saveDebounceRef.current ?? {}), ...patch }
 
@@ -360,18 +494,19 @@ export default function App() {
         const res = await saveState({
           ...merged,
           expected_updated_at: stateVersionRef.current,
-        })
+        }) as SaveStateResponse | null
         if (res?.updated_at) stateVersionRef.current = res.updated_at
         return res
-      } catch (e) {
-        if (e.status === 409) {
+      } catch (e: unknown) {
+        const err = e as ApiError
+        if (err?.status === 409) {
           // Обновляем ref свежим значением из тела 409 — следующий save
           // пойдёт с ним. Loading-индикатор не показываем, тост не сыпем.
           // Если на самом деле что-то поменялось снаружи (admin) — следующая
           // ручная перезагрузка страницы подтянет свежий state.
-          const detail = (e && e.detail) || null
+          const detail = err.detail as StateConflictDetail | null | undefined
           const fresh = detail && typeof detail === 'object'
-            ? detail.current_updated_at
+            ? detail.current_updated_at ?? null
             : null
           if (fresh) stateVersionRef.current = fresh
           console.warn('state PUT 409, ref refreshed to', fresh)
@@ -385,19 +520,22 @@ export default function App() {
     return lastSavePromiseRef.current
   }
 
-  const saveHistory = async (newHistory) => {
+  const saveHistory = async (newHistory: unknown[]): Promise<void> => {
     setHistory(newHistory)
-    if (user) {
+    if (appUser) {
       try { await saveStateGuarded({ history: newHistory }) } catch (e) { console.error(e) }
     } else {
       lsSet(LS.history, newHistory)
     }
   }
+  // saveHistory is plumbed through `history` state for future use; reference
+  // to silence unused-warning until a child wires it.
+  void saveHistory
 
-  const saveDiary = async (newDiary) => {
+  const saveDiary = async (newDiary: DiaryEntry[]): Promise<void> => {
     const prev = diary
     setDiary(newDiary)
-    if (user) {
+    if (appUser) {
       const newEntries = newDiary.filter(e => !prev.find(p => p.id === e.id))
       for (const entry of newEntries) {
         try {
@@ -419,205 +557,51 @@ export default function App() {
     }
   }
 
-  const saveJourney = async (newJourney) => {
+  const saveJourney = async (newJourney: JourneyState): Promise<void> => {
     setJourney(newJourney)
-    if (user) {
+    if (appUser) {
       try { await saveStateGuarded({ journey: newJourney }) } catch (e) { console.error(e) }
     } else {
       lsSet(LS.journey, newJourney)
     }
   }
 
-  const goToJourney = async (screen) => {
-    // Путешествие требует авторизации — гостям показываем AuthModal.
-    // Исключение: dev-admin (пасхалка) пускает без логина.
-    if (!user && !devAdmin) {
-      setShowAuth(true)
-      return
-    }
-    if (screen) await saveJourney({ ...journey, screen })
-    setView('journey')
-  }
+  // ── Surveys-entry helpers per aspect ──────────────────────────────────────
 
-  const goToSiSurveys = async () => {
-    if (!user && !devAdmin) {
+  const makeGoToAspectSurveys = (aspect: AspectKey) => async (): Promise<void> => {
+    if (!appUser && !devAdmin) {
       setShowAuth(true)
       return
     }
     // L0 должен быть пройден (currentLevel >= 1). Админу можно всегда.
     // currentLevel и awaitingInput теперь живут в journey.aspects[aspect].
-    const siFolder = journey?.aspects?.['Si'] ?? {}
-    if (!isAdmin && (siFolder.currentLevel ?? 0) < 1) {
+    const folder: AspectState = journey?.aspects?.[aspect] ?? DEFAULT_ASPECT_STATE
+    if (!isAdmin && (folder.currentLevel ?? 0) < 1) {
       return
     }
     await saveJourney({
       ...journey,
-      currentAspect: 'Si',
+      currentAspect: aspect,
       screen: 'skill-tree',
       aspects: {
         ...(journey?.aspects ?? {}),
-        'Si': { ...siFolder, awaitingInput: null },
+        [aspect]: { ...folder, awaitingInput: null },
       },
     })
     setView('journey')
   }
 
-  const goToFeSurveys = async () => {
-    if (!user && !devAdmin) {
-      setShowAuth(true)
-      return
-    }
-    // L0 ЧЭ должен быть пройден (currentLevel >= 1). Админу можно всегда.
-    const feFolder = journey?.aspects?.['Fe'] ?? {}
-    if (!isAdmin && (feFolder.currentLevel ?? 0) < 1) {
-      return
-    }
-    await saveJourney({
-      ...journey,
-      currentAspect: 'Fe',
-      screen: 'skill-tree',
-      aspects: {
-        ...(journey?.aspects ?? {}),
-        'Fe': { ...feFolder, awaitingInput: null },
-      },
-    })
-    setView('journey')
-  }
+  const goToSiSurveys = makeGoToAspectSurveys('Si')
+  const goToFeSurveys = makeGoToAspectSurveys('Fe')
+  const goToNeSurveys = makeGoToAspectSurveys('Ne')
+  const goToNiSurveys = makeGoToAspectSurveys('Ni')
+  const goToFiSurveys = makeGoToAspectSurveys('Fi')
+  const goToTeSurveys = makeGoToAspectSurveys('Te')
+  const goToTiSurveys = makeGoToAspectSurveys('Ti')
+  const goToSeSurveys = makeGoToAspectSurveys('Se')
 
-  const goToNeSurveys = async () => {
-    if (!user && !devAdmin) {
-      setShowAuth(true)
-      return
-    }
-    // L0 ЧИ должен быть пройден (currentLevel >= 1). Админу можно всегда.
-    const neFolder = journey?.aspects?.['Ne'] ?? {}
-    if (!isAdmin && (neFolder.currentLevel ?? 0) < 1) {
-      return
-    }
-    await saveJourney({
-      ...journey,
-      currentAspect: 'Ne',
-      screen: 'skill-tree',
-      aspects: {
-        ...(journey?.aspects ?? {}),
-        'Ne': { ...neFolder, awaitingInput: null },
-      },
-    })
-    setView('journey')
-  }
-
-  const goToNiSurveys = async () => {
-    if (!user && !devAdmin) {
-      setShowAuth(true)
-      return
-    }
-    // L0 БИ должен быть пройден (currentLevel >= 1). Админу можно всегда.
-    const niFolder = journey?.aspects?.['Ni'] ?? {}
-    if (!isAdmin && (niFolder.currentLevel ?? 0) < 1) {
-      return
-    }
-    await saveJourney({
-      ...journey,
-      currentAspect: 'Ni',
-      screen: 'skill-tree',
-      aspects: {
-        ...(journey?.aspects ?? {}),
-        'Ni': { ...niFolder, awaitingInput: null },
-      },
-    })
-    setView('journey')
-  }
-
-  const goToFiSurveys = async () => {
-    if (!user && !devAdmin) {
-      setShowAuth(true)
-      return
-    }
-    // L0 БЭ должен быть пройден (currentLevel >= 1). Админу можно всегда.
-    const fiFolder = journey?.aspects?.['Fi'] ?? {}
-    if (!isAdmin && (fiFolder.currentLevel ?? 0) < 1) {
-      return
-    }
-    await saveJourney({
-      ...journey,
-      currentAspect: 'Fi',
-      screen: 'skill-tree',
-      aspects: {
-        ...(journey?.aspects ?? {}),
-        'Fi': { ...fiFolder, awaitingInput: null },
-      },
-    })
-    setView('journey')
-  }
-
-  const goToTeSurveys = async () => {
-    if (!user && !devAdmin) {
-      setShowAuth(true)
-      return
-    }
-    // L0 ЧЛ должен быть пройден (currentLevel >= 1). Админу можно всегда.
-    const teFolder = journey?.aspects?.['Te'] ?? {}
-    if (!isAdmin && (teFolder.currentLevel ?? 0) < 1) {
-      return
-    }
-    await saveJourney({
-      ...journey,
-      currentAspect: 'Te',
-      screen: 'skill-tree',
-      aspects: {
-        ...(journey?.aspects ?? {}),
-        'Te': { ...teFolder, awaitingInput: null },
-      },
-    })
-    setView('journey')
-  }
-
-  const goToTiSurveys = async () => {
-    if (!user && !devAdmin) {
-      setShowAuth(true)
-      return
-    }
-    // L0 БЛ должен быть пройден (currentLevel >= 1). Админу можно всегда.
-    const tiFolder = journey?.aspects?.['Ti'] ?? {}
-    if (!isAdmin && (tiFolder.currentLevel ?? 0) < 1) {
-      return
-    }
-    await saveJourney({
-      ...journey,
-      currentAspect: 'Ti',
-      screen: 'skill-tree',
-      aspects: {
-        ...(journey?.aspects ?? {}),
-        'Ti': { ...tiFolder, awaitingInput: null },
-      },
-    })
-    setView('journey')
-  }
-
-  const goToSeSurveys = async () => {
-    if (!user && !devAdmin) {
-      setShowAuth(true)
-      return
-    }
-    // L0 ЧС должен быть пройден (currentLevel >= 1). Админу можно всегда.
-    const seFolder = journey?.aspects?.['Se'] ?? {}
-    if (!isAdmin && (seFolder.currentLevel ?? 0) < 1) {
-      return
-    }
-    await saveJourney({
-      ...journey,
-      currentAspect: 'Se',
-      screen: 'skill-tree',
-      aspects: {
-        ...(journey?.aspects ?? {}),
-        'Se': { ...seFolder, awaitingInput: null },
-      },
-    })
-    setView('journey')
-  }
-
-  const handleAuthSuccess = (userData) => {
-    onAuthSuccess(userData)
+  const handleAuthSuccess = (userData: unknown): void => {
+    onAuthSuccess(userData as User)
     setShowAuth(false)
     // После любого успешного логина — Welcome больше не показываем,
     // даже если юзер потом разлогинится (у него уже есть прогресс).
@@ -625,27 +609,27 @@ export default function App() {
     setWelcomeDismissed(true)
   }
 
-  const handleViewChange = (newView) => {
-    if (newView === 'journey' && !user && !devAdmin) {
+  const handleViewChange = (newView: ViewName): void => {
+    if (newView === 'journey' && !appUser && !devAdmin) {
       setShowAuth(true)
       return
     }
     // Коуч и Профиль требуют авторизации — бэк всё равно отобьёт без JWT,
     // но проверяем здесь чтобы не показывать пустой экран с ошибкой.
-    if ((newView === 'coach' || newView === 'profile' || newView === 'search') && !user) {
+    if ((newView === 'coach' || newView === 'profile' || newView === 'search') && !appUser) {
       setShowAuth(true)
       return
     }
     // Гасим подсветку Аспектов при первом клике. Best-effort: пишем
     // на бэк (hints_seen) и в localStorage, чтобы условие подсветки
-    // в App.jsx больше не срабатывало.
-    if (newView === 'aspects' && user && !user?.hints_seen?.['nav-aspects-cta']) {
+    // в App.tsx больше не срабатывало.
+    if (newView === 'aspects' && appUser && !appUser?.hints_seen?.['nav-aspects-cta']) {
       try { localStorage.setItem('hint_nav-aspects-cta', '1') } catch { /* ignore */ }
       markHintSeen('nav-aspects-cta').catch(() => {})
       onAuthSuccess({
-        ...user,
-        hints_seen: { ...(user.hints_seen ?? {}), 'nav-aspects-cta': true },
-      })
+        ...appUser,
+        hints_seen: { ...(appUser.hints_seen ?? {}), 'nav-aspects-cta': true },
+      } as User)
     }
     setView(newView)
     setSelectedAspect(null)
@@ -654,13 +638,13 @@ export default function App() {
     if (newView !== 'dm') setDmPartnerId(null)
   }
 
-  const openPublicProfile = (userId) => {
+  const openPublicProfile = (userId: number | string): void => {
     setViewingProfileId(userId)
     setView('public-profile')
   }
 
-  const enterHall = (aspect) => {
-    if (!user) {
+  const enterHall = (aspect: AspectKey): void => {
+    if (!appUser) {
       setShowAuth(true)
       return
     }
@@ -668,13 +652,13 @@ export default function App() {
     setView('hall')
   }
 
-  const openDM = (partnerId = null) => {
-    if (!user) { setShowAuth(true); return }
+  const openDM = (partnerId: number | string | null = null): void => {
+    if (!appUser) { setShowAuth(true); return }
     setDmPartnerId(partnerId)
     setView('dm')
   }
 
-  const dismissToast = (id) => {
+  const dismissToast = (id: string): void => {
     setToasts(prev => prev.filter(t => t.id !== id))
   }
 
@@ -683,7 +667,6 @@ export default function App() {
   // дашборд для залогиненных или aspects для гостей.
   // Если открыт чужой профиль или холл — сначала закрываем их (возврат на
   // дашборд), иначе двойной back не нужен.
-  const HOME_VIEWS = ['dashboard', 'aspects']
   const tmaBackHandler = isTMA && !HOME_VIEWS.includes(view)
     ? () => {
         // Чужой профиль/холл/DM-тред: закрываем их и идём на «домашний» view.
@@ -691,7 +674,7 @@ export default function App() {
         setHallAspect(null)
         setDmPartnerId(null)
         setSelectedAspect(null)
-        setView(user ? 'dashboard' : 'aspects')
+        setView(appUser ? 'dashboard' : 'aspects')
       }
     : null
   useBackButton(tmaBackHandler)
@@ -700,21 +683,22 @@ export default function App() {
   // и возвращает newly_unlocked — ставим тосты и +1 стардаст за каждую.
   // Хук срабатывает только когда user стал не-null (loadFromApi уже отработал).
   useEffect(() => {
-    if (!user) return
+    if (!appUser) return
     let cancelled = false
     fetchMyProfile()
       .then(p => {
         if (cancelled) return
-        const newCodes = p.newly_unlocked ?? []
+        const profile = (p ?? {}) as ProfileMe
+        const newCodes = profile.newly_unlocked ?? []
         if (newCodes.length === 0) return
-        const catalog = new Map((p.achievements_catalog ?? []).map(a => [a.code, a]))
-        const newToasts = newCodes.map(code => {
-          const meta = catalog.get(code) || { title: code, icon: '✨', desc: '' }
+        const catalog = new Map((profile.achievements_catalog ?? []).map(a => [a.code, a]))
+        const newToasts: Toast[] = newCodes.map(code => {
+          const meta = catalog.get(code) ?? { code, title: code, icon: '✨', desc: '' }
           return {
             id: `ach-${code}-${Date.now()}`,
             kind: 'achievement',
-            icon: meta.icon,
-            title: meta.title,
+            icon: meta.icon ?? '✨',
+            title: meta.title ?? code,
             desc: meta.desc,
             stardust: 1,
           }
@@ -725,7 +709,7 @@ export default function App() {
         const grant = newCodes.length
         if (grant > 0) {
           setJourney(j => {
-            const updated = { ...j, stardust: (j?.stardust ?? 0) + grant }
+            const updated: JourneyState = { ...j, stardust: (j?.stardust ?? 0) + grant }
             saveStateGuarded({ journey: updated }).catch(() => {})
             return updated
           })
@@ -734,7 +718,7 @@ export default function App() {
       .catch(() => {})
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id])
+  }, [appUser?.id])
 
   // IntroTour: 2026-05 — автоматический показ отключён. Раньше открывался
   // при первом контакте (5 полноэкранных шагов после короткого онбординга
@@ -744,23 +728,23 @@ export default function App() {
   // можно через кнопку «🎓 Пройти обучение» в дашборде или «📖 Гид» в
   // ProfileView. Сразу-после-логина авто-показ больше НЕ инициируется.
 
-  const handleTourClose = async () => {
+  const handleTourClose = async (): Promise<void> => {
     setShowIntroTour(false)
-    if (user) {
+    if (appUser) {
       try { await markOnboardingDone() } catch (e) { console.error(e) }
       // Локально ставим флаг в user, чтобы повторный логин не открывал тур
       // снова из useEffect выше (useAuth кэширует user).
-      onAuthSuccess({ ...user, onboarding_done: true })
+      onAuthSuccess({ ...appUser, onboarding_done: true } as User)
     } else {
       localStorage.setItem('slw_intro_seen', '1')
     }
   }
 
-  const handleTourComplete = async () => {
+  const handleTourComplete = async (): Promise<void> => {
     await handleTourClose()
     // Финальный CTA — переключаемся на journey (Карта Планет открывается
     // по умолчанию для тех, кто ещё не входил в чат).
-    if (user || devAdmin) setView('journey')
+    if (appUser || devAdmin) setView('journey')
     else setView('aspects')
   }
 
@@ -788,10 +772,10 @@ export default function App() {
   // Гость (вне TG), который ещё не нажал «Начать бесплатно» — экран приветствия.
   // После клика на «Начать бесплатно» — выпадает в общее приложение
   // (данные пишутся в localStorage, путешествие гейтится).
-  if (!user && !welcomeDismissed && !isTMA) {
+  if (!appUser && !welcomeDismissed && !isTMA) {
     return (
       <WelcomeScreen
-        onAuthSuccess={onAuthSuccess}
+        onAuthSuccess={onAuthSuccess as (data: unknown) => void}
         onContinueAsGuest={() => {
           localStorage.setItem('welcome_seen', '1')
           setWelcomeDismissed(true)
@@ -800,7 +784,7 @@ export default function App() {
     )
   }
   // Залогиненный юзер ждёт данные с бэка — лоадер.
-  if (user && dataLoading) return <LoadingScreen text={t.loading} />
+  if (appUser && dataLoading) return <LoadingScreen text={t.loading} />
 
   // В Telegram Mini App на странице путешествия скрываем Header —
   // там и так есть свой топбар внутри Chat (с avatar/планетой/XP),
@@ -808,12 +792,17 @@ export default function App() {
   // съедают половину экрана, чат и клавиатура не помещаются.
   const hideHeader = isTMA && view === 'journey'
 
+  const activeAspect = journey?.currentAspect
+  const pendingCount = activeAspect
+    ? journey?.aspects?.[activeAspect]?.pendingTasks?.length ?? 0
+    : 0
+
   return (
     <div className={styles.app}>
       <AchievementToast items={toasts} onDismiss={dismissToast} />
       {showIntroTour && (
         <IntroTour
-          isGuest={!user}
+          isGuest={!appUser}
           onClose={handleTourClose}
           onGoToPlanets={handleTourComplete}
         />
@@ -821,31 +810,31 @@ export default function App() {
       {!hideHeader && <Header
         view={view}
         onViewChange={handleViewChange}
-        journeyPendingCount={journey?.aspects?.[journey?.currentAspect]?.pendingTasks?.length ?? 0}
+        journeyPendingCount={pendingCount}
         // Подсвечиваем «Путешествие» если юзер залогинен, на дашборде и
         // ни разу не начинал путешествие. Условие выключается само,
         // как только totalCompleted > 0 (юзер прошёл хотя бы один шаг).
-        journeyHighlight={!!user && view === 'dashboard' && (journey?.totalCompleted ?? 0) === 0}
+        journeyHighlight={!!appUser && view === 'dashboard' && (journey?.totalCompleted ?? 0) === 0}
         // Подсветка «Аспекты» — для юзера который УЖЕ начал проходить
         // путешествие (3+ шагов), но ещё не открывал страницу Аспектов.
         // Цель: напомнить про теорию/контент сфер, когда у юзера накопился
         // интерес к деталям. Отключается через hints_seen['nav-aspects-cta']
         // при первом клике на кнопку.
         aspectsHighlight={
-          !!user
+          !!appUser
           && view === 'dashboard'
           && (journey?.totalCompleted ?? 0) >= 3
-          && !user?.hints_seen?.['nav-aspects-cta']
+          && !appUser?.hints_seen?.['nav-aspects-cta']
           && localStorage.getItem('hint_nav-aspects-cta') !== '1'
         }
-        user={user}
+        user={appUser}
         userAvatar={myAvatar}
         onLogin={() => setShowAuth(true)}
         onLogout={logout}
         onOpenMyProfile={() => handleViewChange('profile')}
         onOpenProfile={openPublicProfile}
         onOpenDM={openDM}
-        onOpenHall={enterHall}
+        onOpenHall={(aspect) => enterHall(aspect as AspectKey)}
         onOpenAdmin={() => setView('admin')}
         t={t}
       />}
@@ -854,7 +843,7 @@ export default function App() {
         <AuthModal
           onSuccess={handleAuthSuccess}
           onClose={() => setShowAuth(false)}
-          user={user || null}
+          user={appUser || null}
         />
       )}
 
@@ -862,10 +851,10 @@ export default function App() {
         ref={mainRef}
         className={view === 'journey' ? styles.mainJourney : styles.main}
       >
-        {view === 'dashboard' && user && (
+        {view === 'dashboard' && appUser && (
           <DashboardView
-            currentUserId={user.id}
-            user={user}
+            currentUserId={appUser.id}
+            user={appUser}
             journey={journey}
             onOpenAspect={(aspect) => {
               setSelectedAspect(aspect)
@@ -895,7 +884,7 @@ export default function App() {
             onDiaryChange={saveDiary}
             t={t}
             isAdmin={isAdmin}
-            user={user}
+            user={appUser}
           />
         )}
 
@@ -918,7 +907,7 @@ export default function App() {
             onEnterHall={enterHall}
             isAdmin={isAdmin}
             t={t}
-            user={user}
+            user={appUser}
           />
         )}
 
@@ -927,7 +916,7 @@ export default function App() {
             diary={diary}
             onDiaryChange={saveDiary}
             t={t}
-            user={user}
+            user={appUser}
             onOpenProfile={openPublicProfile}
           />
         )}
@@ -941,7 +930,7 @@ export default function App() {
           />
         )}
 
-        {view === 'profile' && user && (
+        {view === 'profile' && appUser && (
           <ProfileView
             onOpenPublicProfile={openPublicProfile}
             onOpenSettings={() => handleViewChange('settings')}
@@ -952,18 +941,18 @@ export default function App() {
           />
         )}
 
-        {view === 'dm' && user && (
+        {view === 'dm' && appUser && (
           <DMView
             initialPartnerId={dmPartnerId}
-            currentUserId={user.id}
+            currentUserId={appUser.id}
             onOpenProfile={openPublicProfile}
           />
         )}
 
-{view === 'public-profile' && viewingProfileId && (
+        {view === 'public-profile' && viewingProfileId && (
           <PublicProfileView
             userId={viewingProfileId}
-            currentUserId={user?.id}
+            currentUserId={appUser?.id}
             onBack={() => {
               setViewingProfileId(null)
               setView('leaderboard')
@@ -975,15 +964,15 @@ export default function App() {
 
         {view === 'leaderboard' && (
           <LeaderboardView
-            currentUserId={user?.id}
+            currentUserId={appUser?.id}
             onOpenPublicProfile={openPublicProfile}
           />
         )}
 
-        {view === 'hall' && hallAspect && user && (
+        {view === 'hall' && hallAspect && appUser && (
           <HallView
             aspect={hallAspect}
-            currentUserId={user?.id}
+            currentUserId={appUser?.id}
             onBack={() => {
               setHallAspect(null)
               setView('aspects')
@@ -994,8 +983,8 @@ export default function App() {
 
         {view === 'settings' && (
           <SettingsView
-            user={user}
-            onUserUpdate={onAuthSuccess}
+            user={appUser}
+            onUserUpdate={(u) => onAuthSuccess(u as User)}
             onAccountDeleted={() => {
               logout()
               setView('aspects')
@@ -1004,7 +993,7 @@ export default function App() {
           />
         )}
 
-        {view === 'admin' && user?.is_admin && (
+        {view === 'admin' && appUser?.is_admin && (
           <AdminView
             onBack={() => setView('dashboard')}
             onImpersonateApply={() => window.location.reload()}

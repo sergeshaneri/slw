@@ -5,7 +5,7 @@ import styles from './EmotionsTab.module.css'
 // Backend table `emotions` (vault-import). Все поля кроме id опциональны —
 // vault может прислать частичную запись. API не имеет response_model,
 // поэтому локальный тип.
-// TODO(ts): tighten when backend adds response_model to /api/diary/emotions.
+// NOTE(ts): pending backend response_model for /api/diary/emotions.
 type EmotionEntry = {
   id: number | string
   date?: string

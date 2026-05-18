@@ -66,7 +66,7 @@ const STREAK_STATUS_LABEL: Record<string, string> = {
 // Shape ответа /api/dashboard. У бэка нет response_model, поэтому
 // локальный тип покрывает только load-bearing поля, остальное —
 // Record<string, unknown> для forward-compat.
-// TODO(ts): tighten when backend adds response_model to /api/dashboard.
+// NOTE(ts): pending backend response_model for /api/dashboard.
 type DashboardHabit = {
   aspect: AspectKey
   title: string

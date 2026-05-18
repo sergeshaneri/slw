@@ -17,18 +17,9 @@ import HabitSection from './HabitSection'
 import Hint from '../Onboarding/Hint'
 import type { AspectKey } from '@/types/aspect'
 import type { JourneyState, SkillState } from '@/types/journey'
+import type { DiaryEntry } from '@/types/diary'
+import type { User } from '@/types/user'
 import styles from './AspectsView.module.css'
-
-// Запись дневника, передаваемая в `diary` / `onDiaryChange`. AspectsView
-// добавляет в неё «aspect-note» через handleSaveNote — расширенный shape
-// зависит от App.jsx (Phase 3). Минимум, который трогает этот файл —
-// массив записей с произвольным shape; TODO(ts) перейти на DiaryEntry
-// из @/types/api когда P2D его пробросит.
-type DiaryEntry = Record<string, unknown>
-
-// Объект юзера. AspectsView читает только `hints_seen` через Hint —
-// прокидывает пропс дальше. Полный shape — в @/types/api (web_users).
-type User = unknown
 
 type AspectsViewProps = {
   selectedAspect: AspectKey | null
@@ -48,7 +39,7 @@ type AspectsViewProps = {
   onEnterHall?: (aspect: AspectKey, section?: HallSection) => void
   isAdmin?: boolean
   t?: unknown
-  user?: User
+  user?: User | null
 }
 
 export default function AspectsView({
@@ -117,7 +108,7 @@ type AspectsGridProps = {
   scores: Partial<Record<AspectKey, number>>
   onAspectSelect: (aspect: AspectKey | null) => void
   journey?: JourneyState
-  user?: User
+  user?: User | null
 }
 
 function AspectsGrid({ scores, onAspectSelect, journey, user }: AspectsGridProps) {
@@ -137,7 +128,7 @@ function AspectsGrid({ scores, onAspectSelect, journey, user }: AspectsGridProps
         // Прогресс по текущему уровню = сколько скриптов уровня пройдено.
         // Берём из getJourney — для аспектов без контента (Se/Fi) вернётся 0.
         const levelData = getJourney(key)?.levels?.[currentLevel]
-        // TODO(ts): levelData.scripts — алиас на levelData.core; в registry
+        // NOTE(ts): levelData.scripts — алиас на levelData.core; в registry
         // оба определены, читаем core с фолбэком.
         const levelScripts = levelData?.core ?? levelData?.scripts ?? []
         const levelTotal = levelScripts.length
@@ -488,7 +479,7 @@ type BlockReaderProps = {
   onGoto: (id: string) => void
   journey?: JourneyState
   isAdmin?: boolean
-  user?: User
+  user?: User | null
   onEnterHall?: (aspect: AspectKey, section?: HallSection) => void
 }
 
@@ -746,8 +737,9 @@ type BlockBodyProps = {
   // `data` — это либо ASPECT_DATA[aspect] (когда блок разблокирован), либо
   // результат teaseBlockData (когда залочен). teaseBlockData возвращает
   // объект с подмножеством полей, поэтому подбираем тип на уровне
-  // конкретных полевых обращений ниже. TODO(ts): сузить до union AspectInfo
-  // | TeaserCopy после Phase 3.
+  // конкретных полевых обращений ниже. NOTE(ts): a precise union
+  // AspectInfo | TeaserCopy would require teaseBlockData to be a typed
+  // mapped operation per block-kind — overkill; runtime checks each field.
   data: typeof ASPECT_DATA[AspectKey] | Record<string, unknown>
   color: string
   aspect: AspectKey
@@ -1105,9 +1097,9 @@ type HallStubProps = {
 
 function HallStubBlock({ block, color, aspect, onEnterHall }: HallStubProps) {
   const section = block.hallSection
-  // TODO(ts): HALL_CONTENT[aspect].{figures|arts|quotes|interestingFacts}
-  // имеют разные shape — здесь обращение по строковому ключу секции,
-  // поэтому работаем через узкий каст.
+  // NOTE(ts): HALL_CONTENT[aspect].{figures|arts|quotes|interestingFacts}
+  // have heterogeneous shapes; section is a dynamic string key, so we
+  // narrow each item field at render time rather than typing the union.
   const hall = (HALL_CONTENT?.[aspect] ?? {}) as Record<string, Array<Record<string, unknown>> | undefined>
   const items = (section ? hall[section] : []) ?? []
   const teaserSize = 3

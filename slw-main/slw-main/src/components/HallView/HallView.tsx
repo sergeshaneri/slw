@@ -27,7 +27,7 @@ import styles from './HallView.module.css'
 
 // Backend hall.py routes (no response_model). Local types mirror the fields
 // the UI reads.
-// TODO(ts): tighten when backend adds OpenAPI response_model for /api/hall/*.
+// NOTE(ts): pending backend response_model for /api/hall/*.
 type HallTab = 'overview' | 'chat' | 'questions' | 'insights' | 'community'
 
 type HallPreviewInsight = {
@@ -165,9 +165,9 @@ const POLL_INTERVAL_MS = 5000
 
 type HallViewProps = {
   aspect: AspectKey
-  currentUserId: number | null
+  currentUserId: number | string | null | undefined
   onBack: () => void
-  onOpenProfile?: (userId: number) => void
+  onOpenProfile?: (userId: number | string) => void
 }
 
 // Style extension for setting CSS custom properties via inline style.
@@ -482,8 +482,8 @@ function ChatTab({ aspect, onOpenProfile }: ChatTabProps) {
 
 type InsightsTabProps = {
   aspect: AspectKey
-  currentUserId: number | null
-  onOpenProfile?: (userId: number) => void
+  currentUserId: number | string | null | undefined
+  onOpenProfile?: (userId: number | string) => void
 }
 
 function InsightsTab({ aspect, currentUserId, onOpenProfile }: InsightsTabProps) {
@@ -854,8 +854,8 @@ function CommunityTab({ aspect, content, onOpenProfile }: CommunityTabProps) {
 
 type QuestionsTabProps = {
   aspect: AspectKey
-  currentUserId: number | null
-  onOpenProfile?: (userId: number) => void
+  currentUserId: number | string | null | undefined
+  onOpenProfile?: (userId: number | string) => void
 }
 
 function QuestionsTab({ aspect, currentUserId, onOpenProfile }: QuestionsTabProps) {

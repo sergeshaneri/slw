@@ -245,8 +245,8 @@ type Props = {
 }
 
 export default function SeWheel({ skills, color, onContinueSurveys, isLocked = false }: Props) {
-  // TODO(ts): см. SiWheel — SkillState vs SkillStateEntry (answers shape).
-  const skillsArg = skills as unknown as Parameters<typeof calcSeScoreFromSkills>[0]
+  // SkillState ↔ SkillStateEntry are structurally compatible — see SiWheel.
+  const skillsArg = skills
   const seScore = calcSeScoreFromSkills(skillsArg)
   const progress = getSeSkillProgress(skillsArg)
 

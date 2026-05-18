@@ -255,12 +255,10 @@ type Props = {
 }
 
 export default function SiWheel({ skills, color, onContinueSurveys, isLocked = false }: Props) {
-  // TODO(ts): calc*FromSkills / calcArchetypeAvg / getSkillProgress в
-  // data/journey/skills принимают локальный SkillStateEntry (answers:
-  // Record<string,number[]>), который не структурно-совместим с
-  // SkillState из @/types/journey (answers: SkillAnswer[]). Эти функции
-  // читают только .result, так что cast безопасен. Унификация — Phase 3.
-  const skillsArg = skills as unknown as Parameters<typeof calcSiScoreFromSkills>[0]
+  // SkillState (@/types/journey) is structurally compatible with
+  // SkillStateEntry (data/journey/skills) — both expose
+  // `answers?: Record<string, number[]>` plus optional `result/passes`.
+  const skillsArg = skills
   const siScore = calcSiScoreFromSkills(skillsArg)
   const progress = getSkillProgress(skillsArg)
 

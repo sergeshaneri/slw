@@ -4,7 +4,7 @@ import styles from './AdminView.module.css'
 
 // Backend has no response_model for /api/admin/bulk-restore — shape mirrors
 // what the JSX actually reads.
-// TODO(ts): tighten when backend adds bulk-restore response model.
+// NOTE(ts): pending backend response_model for /admin/bulk-restore.
 type BumpAspect = {
   aspect: string
   from: number

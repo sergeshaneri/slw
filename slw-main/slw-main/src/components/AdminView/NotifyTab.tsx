@@ -29,7 +29,7 @@ const TYPE_LABELS: Record<NotifyType, string> = {
 // Backend has no response_model for /api/admin/notify/config. Captures the
 // fields read by JSX (singleton notification_settings + per-type flags via
 // `type_<key>` index keys).
-// TODO(ts): tighten when backend formalizes notify/config response.
+// NOTE(ts): pending backend response_model for notify/config.
 type NotifyConfig = {
   enabled: boolean
   notify_hour_utc: number

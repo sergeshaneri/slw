@@ -12,7 +12,7 @@ const POLL_MS = 30_000
 // Тип уведомления. Бэкенд хранит type как строку + payload как JSON. Поле
 // payload разное для каждого type — внутри describe() мы разбираем его как
 // частичный object с известными ключами.
-// TODO(ts): tighten when backend adds OpenAPI response_model for /api/notifications.
+// NOTE(ts): pending backend response_model for /api/notifications.
 type NotificationType = 'reaction' | 'follow' | 'dm' | 'hall_reply' | 'achievement'
 
 type NotificationPayload = {

@@ -242,8 +242,8 @@ type Props = {
 }
 
 export default function TeWheel({ skills, color, onContinueSurveys, isLocked = false }: Props) {
-  // TODO(ts): см. SiWheel — SkillState vs SkillStateEntry (answers shape).
-  const skillsArg = skills as unknown as Parameters<typeof calcTeScoreFromSkills>[0]
+  // SkillState ↔ SkillStateEntry are structurally compatible — see SiWheel.
+  const skillsArg = skills
   const teScore = calcTeScoreFromSkills(skillsArg)
   const progress = getTeSkillProgress(skillsArg)
 

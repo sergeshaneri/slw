@@ -5,7 +5,7 @@ import styles from './Heatmap.module.css'
 // Shape of one day-cell coming back from GET /api/profile/{user_id}/heatmap.
 // Backend returns `{ data: [{date, count}], total_active_days, ... }` —
 // FastAPI has no response_model, so we ship a local type.
-// TODO(ts): tighten when backend adds explicit response_model.
+// NOTE(ts): pending backend response_model for /api/profile/{id}/heatmap.
 type HeatmapDay = {
   date: string
   count: number

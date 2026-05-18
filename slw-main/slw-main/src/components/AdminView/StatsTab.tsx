@@ -4,7 +4,7 @@ import { adminStats } from '../../api/client'
 import styles from './AdminView.module.css'
 
 // Backend has no response_model for /api/admin/stats — fields mirror reads.
-// TODO(ts): tighten when backend formalizes admin/stats response.
+// NOTE(ts): pending backend response_model for admin/stats.
 type StatsData = {
   registrations: {
     total: number

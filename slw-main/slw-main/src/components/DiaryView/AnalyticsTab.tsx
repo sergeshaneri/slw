@@ -4,7 +4,7 @@ import styles from './AnalyticsTab.module.css'
 
 // Shape сохраняемых отчётов в таблице `analytics_reports`. Backend
 // возвращает массив без response_model, поэтому локальный тип.
-// TODO(ts): tighten when backend adds response_model to /api/diary/analytics.
+// NOTE(ts): pending backend response_model for /api/diary/analytics.
 type AnalyticsReportType = 'week' | 'month' | 'custom' | string
 
 type AnalyticsReportSummary = {

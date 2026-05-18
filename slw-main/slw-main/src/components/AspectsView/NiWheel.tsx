@@ -243,8 +243,8 @@ type Props = {
 }
 
 export default function NiWheel({ skills, color, onContinueSurveys, isLocked = false }: Props) {
-  // TODO(ts): см. SiWheel — SkillState vs SkillStateEntry (answers shape).
-  const skillsArg = skills as unknown as Parameters<typeof calcNiScoreFromSkills>[0]
+  // SkillState ↔ SkillStateEntry are structurally compatible — see SiWheel.
+  const skillsArg = skills
   const niScore = calcNiScoreFromSkills(skillsArg)
   const progress = getNiSkillProgress(skillsArg)
 

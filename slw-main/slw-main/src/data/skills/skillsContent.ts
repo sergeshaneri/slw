@@ -19,9 +19,9 @@
 
 import type { Skill } from '@/types/skill'
 
-// TODO(ts): legacy 'scan' skill has shape { id, name, domain, levels } —
-// without archetype/role, with `domain` field, and practices without `xp`.
-// Cast through `unknown` until this content is migrated to the canonical
+// NOTE(ts): the legacy 'scan' skill has shape { id, name, domain, levels }
+// without archetype/role and with practices missing `xp`. Cast via `unknown`
+// is the pragmatic exit until the content is migrated to the canonical
 // Skill shape (or moved into the Si/ aspect-aware tree).
 export const SKILLS_CONTENT: Record<string, Skill> = {
   scan: {

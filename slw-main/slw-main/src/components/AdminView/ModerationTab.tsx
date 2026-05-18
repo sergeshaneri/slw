@@ -26,7 +26,7 @@ const ASPECT_FILTERS: ReadonlyArray<{ id: CyrAspectFilter; label: string }> = [
 
 // Insight shape returned by /api/admin/insights. Backend has no
 // response_model — fields mirror what JSX reads.
-// TODO(ts): tighten when backend formalizes admin/insights response.
+// NOTE(ts): pending backend response_model for admin/insights.
 type AdminInsight = {
   id: number | string
   aspect: string

@@ -10,57 +10,22 @@ import AnalyticsTab from './AnalyticsTab'
 import VaultSyncTab from './VaultSyncTab'
 import { isTMA } from '../../tma'
 import type { AspectKey } from '@/types/aspect'
+import type { DiaryEntry, SurveyDetailsData } from '@/types/diary'
+import type { User } from '@/types/user'
 import { ru } from '@/locales/ru'
 import styles from './DiaryView.module.css'
 
 type T = typeof ru
 
-// Локальный shape diary-entry: дневник на фронте формируется из веб-ввода
-// (manual / daily-review) и серверных bot-источников (journey-survey,
-// aspect-item, coach, и т.п.). `aspect: 'general'` — общая запись без
-// привязки к аспекту. Все вспомогательные поля опциональны.
-type DiarySource =
-  | 'manual'
-  | 'web'
-  | 'daily-review'
-  | 'journey'
-  | 'journey-question'
-  | 'journey-survey'
-  | 'journey-survey-statement'
-  | 'journey-step-insight'
-  | 'aspect'
-  | 'aspect-item'
-  | 'coach'
-  | 'vault'
-  | string
-
-type SurveyBlockId = string
-
-type SurveyDetailsData = {
-  blocks?: Record<SurveyBlockId, string[]>
-  answers?: Record<SurveyBlockId, number[]>
-  blockAvgs?: Record<SurveyBlockId, number>
-  skillAvg?: number
-}
-
-type DiaryEntryRecord = {
-  id: number
-  date: string
-  ts: number
-  aspect: AspectKey | 'general'
-  text: string
-  source?: DiarySource
-  promptTitle?: string
-  prompt?: string
-  survey?: SurveyDetailsData
-} & Record<string, unknown>
+// Local alias kept to preserve the historical name used in this file's body.
+type DiaryEntryRecord = DiaryEntry
 
 type Props = {
   diary: DiaryEntryRecord[]
   onDiaryChange: (next: DiaryEntryRecord[]) => void
   t: T
   onOpenProfile?: (userId: number | string) => void
-  user: Record<string, unknown> | null
+  user: User | null
 }
 
 type DiaryTab = 'entries' | 'today' | 'search' | 'emotions' | 'trainings' | 'analytics' | 'sync'
@@ -96,7 +61,7 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
     setText('')
   }
 
-  const handleDelete = (id: number): void => {
+  const handleDelete = (id: number | string): void => {
     onDiaryChange(diary.filter(e => e.id !== id))
   }
 
@@ -174,8 +139,7 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
           <Hint id="daily-review-intro" user={user}>
             Один экран — весь день. Все блоки опциональны. Привычки в самом низу.
           </Hint>
-          {/* TODO(ts): unify DiaryEntry vs DiaryEntryRecord across DiaryView/DailyReview in P3 */}
-          <DailyReview diary={diary as unknown as Parameters<typeof DailyReview>[0]['diary']} onDiaryChange={onDiaryChange as unknown as Parameters<typeof DailyReview>[0]['onDiaryChange']} />
+          <DailyReview diary={diary} onDiaryChange={onDiaryChange} />
         </>
       )}
 

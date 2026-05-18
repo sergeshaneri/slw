@@ -7,11 +7,12 @@ import {
 } from '../../api/client'
 import type { AspectKey } from '@/types/aspect'
 import type { JourneyState } from '@/types/journey'
+import type { DiaryEntry } from '@/types/diary'
 import styles from './CoachView.module.css'
 
 // Backend coach.py routes (no response_model). Local types mirror the fields
 // the UI reads from /api/coach/quota, /api/coach/summon, /api/coach/history.
-// TODO(ts): tighten when backend adds OpenAPI response_model for /api/coach/*.
+// NOTE(ts): pending backend response_model for /api/coach/*.
 type CoachQuota = {
   used_today: number
   daily_limit: number
@@ -41,21 +42,6 @@ type CoachResponseState = {
   text: string
   focus_aspect: AspectKey | null
   prompt: string
-}
-
-// Diary entry shape mirrors how App.jsx mutates diary in coach. Minimal local
-// shape — full diary typing belongs to P2D zone.
-// TODO(ts): replace with shared DiaryEntry type once P2D defines it.
-type DiaryEntry = {
-  id: string
-  date: string
-  ts: number
-  aspect: AspectKey | 'general'
-  text: string
-  source: string
-  promptTitle?: string
-  prompt?: string
-  coachCallId?: number | string
 }
 
 type Props = {

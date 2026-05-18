@@ -69,9 +69,9 @@ export function parseSurveys(
     // Общие базовые (signals/interoception/honesty у БС, attention-essence/
     // metacognition/mindfulness у ЧИ и т.п.) не имеют конкретного архетипа —
     // они входят в каждый архетип сквозным слоем. Помечаем их как 'common'.
-    // TODO(ts): tighten archetype source typing — skillToArchetype может
-    // отдать ключ, которого нет в ArchetypeId; парсер сам по себе не знает
-    // про union, поэтому касается значения как ArchetypeId.
+    // NOTE(ts): skillToArchetype may return a key absent from ArchetypeId
+    // (legacy / future archetypes). The parser doesn't know the union, so
+    // we cast — runtime parse-errors are logged separately, not type-checked.
     const archetype = (skillToArchetype[id] ?? 'common') as ArchetypeId
 
     const matchIndex = match.index ?? 0

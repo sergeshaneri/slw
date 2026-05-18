@@ -243,8 +243,8 @@ type Props = {
 }
 
 export default function TiWheel({ skills, color, onContinueSurveys, isLocked = false }: Props) {
-  // TODO(ts): см. SiWheel — SkillState vs SkillStateEntry (answers shape).
-  const skillsArg = skills as unknown as Parameters<typeof calcTiScoreFromSkills>[0]
+  // SkillState ↔ SkillStateEntry are structurally compatible — see SiWheel.
+  const skillsArg = skills
   const tiScore = calcTiScoreFromSkills(skillsArg)
   const progress = getTiSkillProgress(skillsArg)
 

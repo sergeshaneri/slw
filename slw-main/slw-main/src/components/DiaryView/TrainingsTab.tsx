@@ -5,7 +5,7 @@ import styles from './TrainingsTab.module.css'
 // Backend table `trainings` (vault-import). Все поля кроме id опциональны —
 // vault может прислать строку без веса/повторов. API не имеет
 // response_model, поэтому локальный тип.
-// TODO(ts): tighten when backend adds response_model to /api/diary/trainings.
+// NOTE(ts): pending backend response_model for /api/diary/trainings.
 type TrainingEntry = {
   id: number | string
   date?: string

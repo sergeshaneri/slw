@@ -51,9 +51,9 @@ export function parseSurveys(md: string): Record<string, Survey> {
       continue
     }
     // Для ядерных архетип не определён — ставим 'common'.
-    // TODO(ts): tighten archetype source typing — SKILL_TO_ARCHETYPE отдаёт
-    // FeArchetypeKey-строку, парсер сам по себе не знает про union, поэтому
-    // касается значения как ArchetypeId.
+    // NOTE(ts): SKILL_TO_ARCHETYPE returns a FeArchetypeKey-string; this
+    // module doesn't know the global ArchetypeId union, so we cast at the
+    // boundary — see parseSurveys.ts (Si) for the same pattern.
     const archetypeStr = COMMON_BASE_SKILL_IDS.has(id) ? 'common' : SKILL_TO_ARCHETYPE[id]
     if (!archetypeStr) {
       // eslint-disable-next-line no-console

@@ -49,9 +49,10 @@ export type HallSection = 'figures' | 'arts' | 'quotes' | 'interestingFacts'
 // `teaserCount` — per-block override для тизер-режима (если блок заблокирован
 // по уровню). Иначе берётся из TEASER_BY_KIND.
 //
-// TODO(ts): данные ASPECT_DATA — это `AspectInfo` (см. `src/data/aspects`),
-// но `has`/`field` обращаются к произвольным полям; здесь сознательно
-// оставляем `unknown` чтобы не тянуть в blocks.ts всю модель аспекта.
+// NOTE(ts): ASPECT_DATA is `AspectInfo` (see src/data/aspects), but
+// `has`/`field` poke at arbitrary fields by string key — keeping the
+// callback param `unknown` avoids pulling the full aspect model into
+// blocks.ts. Runtime narrowing happens inside each `has` predicate.
 export type Block = {
   id: string
   level: BlockLevel

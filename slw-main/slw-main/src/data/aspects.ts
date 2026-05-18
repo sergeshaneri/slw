@@ -13,7 +13,8 @@ import type { AspectKey } from '@/types/aspect'
 // а Fi доращивается через Object.assign(FI_EXTENSION). Поэтому
 // почти всё опционально. Содержательные значения P1B-зоны (skill-blocks)
 // принимаются как unknown — реальный shape определит финальный pass.
-// TODO(ts): typed skill-block fields when P1B types are merged.
+// NOTE(ts): skill-block fields stay `unknown` — the precise shape lives in
+// per-aspect skill modules (P1B zone) and is consumed via runtime narrowing.
 
 export type AspectDilemma = { t: string; s: string; g: string }
 

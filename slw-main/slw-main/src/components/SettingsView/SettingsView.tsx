@@ -15,7 +15,7 @@ import styles from './SettingsView.module.css'
 
 // Backend has no response_model for /api/auth/me yet — the user shape we
 // actually read is captured here.
-// TODO(ts): tighten when backend tightens /api/auth/me.
+// NOTE(ts): pending backend response_model for /api/auth/me.
 type SettingsUser = {
   email?: string | null
   display_name?: string | null

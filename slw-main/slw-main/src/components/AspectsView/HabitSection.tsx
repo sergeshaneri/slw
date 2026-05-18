@@ -16,8 +16,7 @@ import styles from './HabitSection.module.css'
 // аспекта, но к моменту попадания в этот компонент `translateAspectsInResponse`
 // в client.ts уже перевёл его на латиницу.
 //
-// TODO(ts): пробросить точный shape из @/types/api после P1A — fetchMyHabits
-// сейчас отдаёт `unknown`.
+// NOTE(ts): pending backend response_model — fetchMyHabits returns `unknown`.
 type Habit = {
   aspect: AspectKey | string
   title: string
