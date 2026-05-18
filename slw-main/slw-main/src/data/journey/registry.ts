@@ -9,6 +9,9 @@
 // последовательности) и опционально `surveys` — анкеты по навыкам
 // аспекта, доступные параллельно через дерево навыков (Колесо).
 
+import type { AspectKey } from '@/types/aspect'
+import type { Script } from '@/types/script'
+import type { CompleteEntry, IntroEntry } from './parseScripts'
 import {
   SI_ASPECT_INTRO,
   SI_LEVEL_0_CORE, SI_LEVEL_0_SURVEYS, SI_LEVEL_0_COMPLETE,
@@ -67,9 +70,41 @@ import {
 } from './aspects/Se'
 import { ASPECT_KEYS, ASPECT_DATA, ASPECT_REALMS, ASPECT_COLORS } from '../aspects'
 
+// Уровень путешествия. `surveys` присутствует только у L0 для аспектов
+// с интегрированным анкетным пулом (Si/Ti/Te/Se).
+export type JourneyLevel = {
+  title: string
+  core: Script[]
+  surveys?: Script[]
+  complete: CompleteEntry
+  // Алиас для совместимости с местами, которые читали `scripts` напрямую.
+  scripts: Script[]
+}
+
+export type Journey = {
+  available: boolean
+  planet: string
+  intro: IntroEntry[]
+  levels: {
+    0: JourneyLevel
+    1: JourneyLevel
+    2: JourneyLevel
+    3: JourneyLevel
+  }
+}
+
+export type Planet = {
+  aspect: AspectKey
+  name: string
+  realm: string
+  color: string
+  planet: string | null
+  available: boolean
+}
+
 // Латинские имена планет. Только для тех, у кого они уже придуманы.
 // Остальные — отображаются на карте без латинской подписи.
-const PLANETS = {
+const PLANETS: Record<AspectKey, string> = {
   Si: 'Terra Harmonia',
   Ti: 'Structura Mentalis',
   Fe: 'Passio Ignis',
@@ -80,7 +115,7 @@ const PLANETS = {
   Se: 'Imperium Magnum',
 }
 
-export const JOURNEYS = {
+export const JOURNEYS: Record<AspectKey, Journey> = {
   Si: {
     available: true,
     planet: PLANETS.Si,
@@ -338,7 +373,7 @@ export const JOURNEYS = {
 
 // Список карточек для экрана выбора планеты — все 8 аспектов.
 // available: false означает «скоро».
-export function getAllPlanets() {
+export function getAllPlanets(): Planet[] {
   return ASPECT_KEYS.map(key => ({
     aspect: key,
     name: ASPECT_DATA[key].name,
@@ -349,6 +384,6 @@ export function getAllPlanets() {
   }))
 }
 
-export function getJourney(aspect) {
+export function getJourney(aspect: AspectKey): Journey | null {
   return JOURNEYS[aspect] ?? null
 }

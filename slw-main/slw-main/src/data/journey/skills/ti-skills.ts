@@ -10,6 +10,7 @@
 //   по 5 утверждений. Pass=1 — берём первое утверждение из каждого блока,
 //   pass=2 — второе, pass=3 — третье.
 
+import type { Survey } from '@/types/script'
 import { parseSurveys } from './parseSurveys'
 import tiSurveysMd from './ti-surveys.md?raw'
 import {
@@ -18,10 +19,12 @@ import {
   SKILL_BY_RUS_NAME, ALL_SKILL_IDS, getSkillsForArchetype,
   calcArchetypeAvg as calcArchetypeAvgFromTree
 } from './ti-tree'
+import type { TiArchetypeKey } from './ti-tree'
+import type { SkillStateEntry, SurveyStatement } from './index'
 // Названия блоков (5 штук) и ключи — общие для БС/ЧИ/ЧЛ/БЛ.
 import { BLOCK_RUS_TO_KEY, SURVEY_BLOCK_KEYS, SURVEY_BLOCKS } from './tree'
 
-const TI_SURVEYS = parseSurveys(tiSurveysMd, {
+const TI_SURVEYS: Record<string, Survey> = parseSurveys(tiSurveysMd, {
   skillByRusName: SKILL_BY_RUS_NAME,
   skillToArchetype: SKILL_TO_ARCHETYPE_FOR_PARSER,
   blockRusToKey: BLOCK_RUS_TO_KEY,
@@ -35,14 +38,17 @@ export {
   TI_SURVEYS,
 }
 
-export function getTiSurvey(skillId) {
+export function getTiSurvey(skillId: string): Survey | null {
   return TI_SURVEYS[skillId] ?? null
 }
 
 // Среднее по 5 имеющимся блокам.
-export function calcTiSurveyResult(answers) {
-  const blocks = {}
-  const blockAvgs = []
+export function calcTiSurveyResult(answers: Record<string, number[]> | undefined): {
+  blocks: Record<string, number | null>
+  skill: number | null
+} {
+  const blocks: Record<string, number | null> = {}
+  const blockAvgs: number[] = []
   for (const key of SURVEY_BLOCK_KEYS) {
     const arr = answers?.[key] ?? []
     const valid = arr.filter(n => Number.isFinite(n))
@@ -58,9 +64,9 @@ export function calcTiSurveyResult(answers) {
   return { blocks, skill }
 }
 
-export function getTiCompletedPasses(skillEntry) {
+export function getTiCompletedPasses(skillEntry: SkillStateEntry | undefined): number {
   if (!skillEntry) return 0
-  if (Number.isFinite(skillEntry.passes)) return skillEntry.passes
+  if (Number.isFinite(skillEntry.passes)) return skillEntry.passes as number
   const answers = skillEntry.answers ?? {}
   let max = 0
   for (const key of SURVEY_BLOCK_KEYS) {
@@ -71,15 +77,15 @@ export function getTiCompletedPasses(skillEntry) {
   return max
 }
 
-export function getTiNextPass(skillEntry) {
+export function getTiNextPass(skillEntry: SkillStateEntry | undefined): number {
   const done = getTiCompletedPasses(skillEntry)
   return done >= 3 ? 0 : done + 1
 }
 
-export function getTiStatementsForPass(survey, pass) {
+export function getTiStatementsForPass(survey: Survey | null | undefined, pass: number): SurveyStatement[] {
   if (!survey || !pass) return []
   const stmtIndex = Math.max(0, Math.min(2, pass - 1))
-  const out = []
+  const out: SurveyStatement[] = []
   for (const blockKey of SURVEY_BLOCK_KEYS) {
     const arr = survey.blocks?.[blockKey] ?? []
     if (arr.length === 0) continue
@@ -89,37 +95,52 @@ export function getTiStatementsForPass(survey, pass) {
   return out
 }
 
-export function getTiStatementsForFullRange(survey, startPass, endPass = 3) {
+export function getTiStatementsForFullRange(
+  survey: Survey | null | undefined,
+  startPass: number,
+  endPass = 3
+): SurveyStatement[] {
   if (!survey) return []
-  const out = []
+  const out: SurveyStatement[] = []
   for (let p = startPass; p <= endPass; p++) {
     out.push(...getTiStatementsForPass(survey, p))
   }
   return out
 }
 
-export function buildTiSurveyStatements(survey, mode, startPass) {
+export function buildTiSurveyStatements(
+  survey: Survey | null | undefined,
+  mode: 'short' | 'full',
+  startPass: number
+): SurveyStatement[] {
   if (mode === 'full') return getTiStatementsForFullRange(survey, startPass, 3)
   return getTiStatementsForPass(survey, startPass)
 }
 
 // Среднее по архетипу: 3 общих + специфичные. Используется в Колесе БЛ.
-export function calcTiArchetypeAvg(skills, archetypeKey) {
+export function calcTiArchetypeAvg(
+  skills: Record<string, SkillStateEntry> | undefined,
+  archetypeKey: TiArchetypeKey
+): number | null {
   return calcArchetypeAvgFromTree(skills, archetypeKey)
 }
 
 // Общая оценка БЛ: среднее по архетипам, в которых есть хоть одна анкета.
 // Используется JourneyView для записи scores['Ti'] после анкеты.
-export function calcTiScoreFromSkills(skills) {
+export function calcTiScoreFromSkills(skills: Record<string, SkillStateEntry> | undefined): number | null {
   const archeAvgs = ARCHETYPE_KEYS
     .map(k => calcTiArchetypeAvg(skills, k))
-    .filter(v => v != null)
+    .filter((v): v is number => v != null)
   if (archeAvgs.length === 0) return null
   return archeAvgs.reduce((s, n) => s + n, 0) / archeAvgs.length
 }
 
 // Сколько навыков БЛ оценено всего (из 41).
-export function getTiSkillProgress(skills) {
+export function getTiSkillProgress(skills: Record<string, SkillStateEntry> | undefined): {
+  completed: number
+  total: number
+  remaining: number
+} {
   const completed = ALL_SKILL_IDS.filter(id =>
     Number.isFinite(skills?.[id]?.result)
   ).length

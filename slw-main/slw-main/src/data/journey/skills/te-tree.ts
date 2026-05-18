@@ -24,7 +24,20 @@
 // id навыка — короткий латинский ключ. Используется как имя файла md
 // (или как ключ в один md-файле через парсер) и как id анкеты.
 
-export const ARCHETYPES = {
+import type { SkillStateEntry } from './index'
+import type { SkillTreeNode, SurveyBlock } from './tree'
+
+export type TeArchetypeKey = 'virtuoso' | 'technologist' | 'organizer' | 'engineer'
+
+export type TeArchetypeInfo = {
+  id: TeArchetypeKey
+  name: string
+  subtitle: string
+  blurb: string
+  glyph: string
+}
+
+export const ARCHETYPES: Record<TeArchetypeKey, TeArchetypeInfo> = {
   virtuoso: {
     id: 'virtuoso',
     name: 'Виртуоз',
@@ -55,7 +68,7 @@ export const ARCHETYPES = {
   }
 }
 
-export const ARCHETYPE_KEYS = ['virtuoso', 'technologist', 'organizer', 'engineer']
+export const ARCHETYPE_KEYS: TeArchetypeKey[] = ['virtuoso', 'technologist', 'organizer', 'engineer']
 
 // Четыре общих базовых навыка ЧЛ — сквозные качества деятельности и
 // КПД-чутья, проходящие через все четыре архетипа. Входят в каждый
@@ -71,20 +84,20 @@ export const ARCHETYPE_KEYS = ['virtuoso', 'technologist', 'organizer', 'enginee
 //
 // Эти 4 анкеты включены в L0-чат ЧЛ как первая оценка ЧЛ
 // (SURV-100..103 в `Te/l0.md`).
-export const COMMON_BASE_SKILLS = [
+export const COMMON_BASE_SKILLS: SkillTreeNode[] = [
   { id: 'work-vs-busyness',       name: 'Различение работы и суеты', isCommon: true },
   { id: 'goal-holding',           name: 'Удержание цели в действии', isCommon: true },
   { id: 'cost-benefit-vision',    name: 'Видение затрат и отдачи', isCommon: true },
   { id: 'technological-thinking', name: 'Технологичность мышления', isCommon: true }
 ]
 
-export const COMMON_BASE_SKILL_IDS = new Set(COMMON_BASE_SKILLS.map(s => s.id))
+export const COMMON_BASE_SKILL_IDS: Set<string> = new Set(COMMON_BASE_SKILLS.map(s => s.id))
 
 // Раскладка 58 архетипных навыков по 4 веткам.
 // Порядок внутри каждой ветки — от ядерных навыков к расширяющим
 // (см. матрицу психчерт ЧЛ для разделения на ★-ядерные).
 // В UI к каждой ветке добавляются 4 общих базовых сверху.
-export const SKILL_TREE = {
+export const SKILL_TREE: Record<TeArchetypeKey, SkillTreeNode[]> = {
   virtuoso: [
     // Универсальные из матрицы психчерт, распределённые в virtuoso
     { id: 'pragmatic-thinking',   name: 'Прагматическое мышление' },
@@ -166,16 +179,16 @@ export const SKILL_TREE = {
 // Обратный индекс: skillId → archetypeKey. Только для архетип-специфичных
 // навыков. Общие базовые в этот индекс НЕ попадают (они принадлежат
 // всем 4 архетипам сразу). Использовать с проверкой на COMMON_BASE_SKILL_IDS.
-export const SKILL_TO_ARCHETYPE = Object.fromEntries(
+export const SKILL_TO_ARCHETYPE: Record<string, TeArchetypeKey> = Object.fromEntries(
   Object.entries(SKILL_TREE).flatMap(([arche, skills]) =>
-    skills.map(s => [s.id, arche])
+    skills.map(s => [s.id, arche as TeArchetypeKey])
   )
 )
 
 // Возвращает полный список навыков, отображаемых под архетипом в UI:
 // 4 общих базовых сверху + специфичные навыки архетипа.
 // Используется для отображения и для расчёта среднего.
-export function getSkillsForArchetype(archetypeKey) {
+export function getSkillsForArchetype(archetypeKey: TeArchetypeKey): SkillTreeNode[] {
   const specific = SKILL_TREE[archetypeKey] ?? []
   return [...COMMON_BASE_SKILLS, ...specific]
 }
@@ -183,11 +196,14 @@ export function getSkillsForArchetype(archetypeKey) {
 // Среднее по архетипу: общие базовые + специфичные навыки архетипа.
 // skills — { [skillId]: { result: number, ... } }.
 // Возвращает null, если ни одного валидного результата.
-export function calcArchetypeAvg(skills, archetypeKey) {
+export function calcArchetypeAvg(
+  skills: Record<string, SkillStateEntry> | undefined,
+  archetypeKey: TeArchetypeKey
+): number | null {
   const ids = getSkillsForArchetype(archetypeKey).map(s => s.id)
   const values = ids
     .map(id => skills?.[id]?.result)
-    .filter(v => Number.isFinite(v))
+    .filter((v): v is number => Number.isFinite(v))
   if (values.length === 0) return null
   return values.reduce((s, n) => s + n, 0) / values.length
 }
@@ -196,7 +212,7 @@ export function calcArchetypeAvg(skills, archetypeKey) {
 // общие базовые получают «virtual» архетип 'common'. Парсер по этому индексу
 // находит, к какому ведру отнести навык. В UI общие отображаются в каждом
 // из 4 архетипов, а 'common' остаётся внутренним маркером.
-export const SKILL_TO_ARCHETYPE_FOR_PARSER = {
+export const SKILL_TO_ARCHETYPE_FOR_PARSER: Record<string, string> = {
   ...SKILL_TO_ARCHETYPE,
   'work-vs-busyness': 'common',
   'goal-holding': 'common',
@@ -206,13 +222,13 @@ export const SKILL_TO_ARCHETYPE_FOR_PARSER = {
 
 // Все skill id одним массивом, в порядке отображения.
 // 4 общих + 14 + 14 + 19 + 11 = 62.
-export const ALL_SKILL_IDS = [
+export const ALL_SKILL_IDS: string[] = [
   ...COMMON_BASE_SKILLS.map(s => s.id),
   ...ARCHETYPE_KEYS.flatMap(k => SKILL_TREE[k].map(s => s.id))
 ]
 
 // Имена 5 блоков анкеты — общие для всех навыков ЧЛ (та же схема, что в БС).
-export const SURVEY_BLOCKS = [
+export const SURVEY_BLOCKS: SurveyBlock[] = [
   { id: 'knowledge',   name: 'Теоретическое знание' },
   { id: 'practice',    name: 'Практическое умение' },
   { id: 'awareness',   name: 'Осознанность выполнения' },
@@ -220,10 +236,10 @@ export const SURVEY_BLOCKS = [
   { id: 'confidence',  name: 'Уверенность и помощь другим' }
 ]
 
-export const SURVEY_BLOCK_KEYS = SURVEY_BLOCKS.map(b => b.id)
+export const SURVEY_BLOCK_KEYS: string[] = SURVEY_BLOCKS.map(b => b.id)
 
 // Маппинг русского заголовка блока (как в исходном md) → ключ блока.
-export const BLOCK_RUS_TO_KEY = Object.fromEntries(
+export const BLOCK_RUS_TO_KEY: Record<string, string> = Object.fromEntries(
   SURVEY_BLOCKS.map(b => [b.name, b.id])
 )
 
@@ -232,7 +248,7 @@ export const BLOCK_RUS_TO_KEY = Object.fromEntries(
 //
 // ВАЖНО: текст должен совпадать с исходником в `surveys.md` точно
 // (включая скобки и кавычки), иначе навык не будет распознан.
-export const SKILL_BY_RUS_NAME = {
+export const SKILL_BY_RUS_NAME: Record<string, string> = {
   // Common base (универсальные сквозные навыки) — 4 шт.
   'Различение работы и суеты': 'work-vs-busyness',
   'Удержание цели в действии': 'goal-holding',

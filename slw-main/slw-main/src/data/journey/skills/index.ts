@@ -21,6 +21,7 @@
 //       completedAt: number
 //   } }
 
+import type { Survey } from '@/types/script'
 import { parseSurveys } from './parseSurveys'
 import surveysMd from './surveys.md?raw'
 import {
@@ -28,9 +29,10 @@ import {
   COMMON_BASE_SKILLS, COMMON_BASE_SKILL_IDS, getSkillsForArchetype,
   ALL_SKILL_IDS, SURVEY_BLOCKS, SURVEY_BLOCK_KEYS
 } from './tree'
+import type { ArchetypeKey } from './tree'
 import { SURVEYS_FE } from '../fe-skills'
 
-const SURVEYS = parseSurveys(surveysMd)
+const SURVEYS: Record<string, Survey> = parseSurveys(surveysMd)
 
 export {
   ARCHETYPES, ARCHETYPE_KEYS, SKILL_TREE, SKILL_TO_ARCHETYPE,
@@ -41,10 +43,24 @@ export {
 
 // Универсальный getSurvey — пробует Si, потом Fe.
 // Skill id у Fe имеют префикс `fe-`, у Si — без префикса; коллизий нет.
-export function getSurvey(skillId) {
+export function getSurvey(skillId: string): Survey | null {
   if (SURVEYS[skillId]) return SURVEYS[skillId]
   if (SURVEYS_FE[skillId]) return SURVEYS_FE[skillId]
   return null
+}
+
+// Хранимая запись по навыку в state.skills. Из JourneyView видно, что
+// фактическая форма шире, чем мы используем здесь; жёсткий тип ставить
+// нельзя — оставляем минимально-достаточный для расчётных функций.
+export type SkillStateEntry = {
+  result?: number
+  passes?: number
+  answers?: Record<string, number[]>
+}
+
+export type SurveyResult = {
+  blocks: Record<string, number | null>
+  skill: number | null
 }
 
 // Считает средние блоков и общую среднюю по навыку.
@@ -53,9 +69,9 @@ export function getSurvey(skillId) {
 // avg по блоку — среднее имеющихся утверждений (1, 2 или 3).
 // avg по навыку — среднее 5 средних блоков (каждый блок весит одинаково).
 // Если в блоке нет ответов — он не учитывается в skill avg.
-export function calcSurveyResult(answers) {
-  const blocks = {}
-  const blockAvgs = []
+export function calcSurveyResult(answers: Record<string, number[]> | undefined): SurveyResult {
+  const blocks: Record<string, number | null> = {}
+  const blockAvgs: number[] = []
   for (const key of SURVEY_BLOCK_KEYS) {
     const arr = answers?.[key] ?? []
     const valid = arr.filter(n => Number.isFinite(n))
@@ -74,9 +90,9 @@ export function calcSurveyResult(answers) {
 // Сколько проходов уже сделано по навыку.
 // passes = max длина массива ответов по всем блокам (если есть answers),
 // иначе stored passes (для обратной совместимости).
-export function getCompletedPasses(skillEntry) {
+export function getCompletedPasses(skillEntry: SkillStateEntry | undefined): number {
   if (!skillEntry) return 0
-  if (Number.isFinite(skillEntry.passes)) return skillEntry.passes
+  if (Number.isFinite(skillEntry.passes)) return skillEntry.passes as number
   // Fallback: вычисляем по answers (на случай миграции старых записей).
   const answers = skillEntry.answers ?? {}
   let max = 0
@@ -90,14 +106,16 @@ export function getCompletedPasses(skillEntry) {
 
 // Какой будет следующий проход (1, 2 или 3). Возвращает 0 если все 3 пройдены
 // (для UI «больше нечего проходить»).
-export function getNextPass(skillEntry) {
+export function getNextPass(skillEntry: SkillStateEntry | undefined): number {
   const done = getCompletedPasses(skillEntry)
   return done >= 3 ? 0 : done + 1
 }
 
+export type SkillDepth = 'idle' | 'light' | 'medium' | 'full'
+
 // Глубина навыка для UI. 'idle' = ничего не пройдено, 'light' = 1 проход,
 // 'medium' = 2 прохода, 'full' = 3. Используется в SkillTree, SiWheel.
-export function getSkillDepth(skillEntry) {
+export function getSkillDepth(skillEntry: SkillStateEntry | undefined): SkillDepth {
   const passes = getCompletedPasses(skillEntry)
   if (passes === 0) return 'idle'
   if (passes === 1) return 'light'
@@ -105,14 +123,21 @@ export function getSkillDepth(skillEntry) {
   return 'full'
 }
 
+export type SurveyStatement = {
+  blockKey: string
+  statement: string
+  statementIndex: number
+  pass: number
+}
+
 // Возвращает 5 утверждений для конкретного прохода — по одному из каждого
 // блока, индекс утверждения = pass - 1.
 // Возвращает [{blockKey, statement, statementIndex, pass}], всегда 5 элементов
 // (если в блоке меньше 3 утверждений — возьмём последнее существующее).
-export function getStatementsForPass(survey, pass) {
+export function getStatementsForPass(survey: Survey | null | undefined, pass: number): SurveyStatement[] {
   if (!survey || !pass) return []
   const stmtIndex = Math.max(0, Math.min(2, pass - 1))
-  const out = []
+  const out: SurveyStatement[] = []
   for (const blockKey of SURVEY_BLOCK_KEYS) {
     const arr = survey.blocks?.[blockKey] ?? []
     if (arr.length === 0) continue
@@ -125,9 +150,13 @@ export function getStatementsForPass(survey, pass) {
 // Возвращает все утверждения от startPass до endPass включительно — для
 // «полного» режима. На startPass=1, endPass=3 → 15 утверждений.
 // Сначала идут все 5 утверждений pass-1, потом pass-2, потом pass-3.
-export function getStatementsForFullRange(survey, startPass, endPass = 3) {
+export function getStatementsForFullRange(
+  survey: Survey | null | undefined,
+  startPass: number,
+  endPass = 3
+): SurveyStatement[] {
   if (!survey) return []
-  const out = []
+  const out: SurveyStatement[] = []
   for (let p = startPass; p <= endPass; p++) {
     out.push(...getStatementsForPass(survey, p))
   }
@@ -136,7 +165,11 @@ export function getStatementsForFullRange(survey, startPass, endPass = 3) {
 
 // Универсальный билдер: вернёт нужный список утверждений по mode/startPass.
 // mode: 'short' = только startPass; 'full' = от startPass до 3.
-export function buildSurveyStatements(survey, mode, startPass) {
+export function buildSurveyStatements(
+  survey: Survey | null | undefined,
+  mode: 'short' | 'full',
+  startPass: number
+): SurveyStatement[] {
   if (mode === 'full') return getStatementsForFullRange(survey, startPass, 3)
   return getStatementsForPass(survey, startPass)
 }
@@ -144,11 +177,14 @@ export function buildSurveyStatements(survey, mode, startPass) {
 // Среднее по архетипу. skills — мапа state.skills.
 // Включает 3 общих базовых навыка + специфичные для ветки. Только те,
 // у которых уже есть валидный result. Если ни одного — null.
-export function calcArchetypeAvg(skills, archetypeKey) {
+export function calcArchetypeAvg(
+  skills: Record<string, SkillStateEntry> | undefined,
+  archetypeKey: ArchetypeKey
+): number | null {
   const ids = getSkillsForArchetype(archetypeKey).map(s => s.id)
   const values = ids
     .map(id => skills?.[id]?.result)
-    .filter(v => Number.isFinite(v))
+    .filter((v): v is number => Number.isFinite(v))
   if (values.length === 0) return null
   return values.reduce((s, n) => s + n, 0) / values.length
 }
@@ -156,28 +192,44 @@ export function calcArchetypeAvg(skills, archetypeKey) {
 // Общая оценка БС: среднее по архетипам, в которых есть хоть одна анкета.
 // Если ни одной анкеты не пройдено — возвращает null (вызывающий сам
 // решает, использовать fallback или нет).
-export function calcSiScoreFromSkills(skills) {
+export function calcSiScoreFromSkills(skills: Record<string, SkillStateEntry> | undefined): number | null {
   const archeAvgs = ARCHETYPE_KEYS
     .map(k => calcArchetypeAvg(skills, k))
-    .filter(v => v != null)
+    .filter((v): v is number => v != null)
   if (archeAvgs.length === 0) return null
   return archeAvgs.reduce((s, n) => s + n, 0) / archeAvgs.length
 }
 
 // Сколько анкет пройдено всего и сколько ещё осталось.
-export function getSkillProgress(skills) {
+export function getSkillProgress(skills: Record<string, SkillStateEntry> | undefined): {
+  completed: number
+  total: number
+  remaining: number
+} {
   const completed = ALL_SKILL_IDS.filter(id => Number.isFinite(skills?.[id]?.result)).length
   return { completed, total: ALL_SKILL_IDS.length, remaining: ALL_SKILL_IDS.length - completed }
+}
+
+// Минимально-нужная форма пула скриптов уровня для поиска первого
+// непройденного survey-шага. Реальная форма — Script из @/types/script.
+// Локальный тип, чтобы не тянуть зависимости в places, использующие
+// findFirstUnansweredSurveyIndex.
+type SurveyPoolEntry = {
+  type?: string
+  skill?: string
 }
 
 // Найти индекс первого непройденного survey-шага в pool.
 // Используется для перехода «Продолжить анкеты»: всегда стартуем с
 // первой неотвеченной, не заставляя пользователя пробегать пройденные.
 // Если все пройдены — возвращает 0 (пусть пройдёт levelcomplete pool).
-export function findFirstUnansweredSurveyIndex(skills, poolScripts) {
+export function findFirstUnansweredSurveyIndex(
+  skills: Record<string, SkillStateEntry> | undefined,
+  poolScripts: SurveyPoolEntry[] | unknown
+): number {
   if (!Array.isArray(poolScripts)) return 0
   for (let i = 0; i < poolScripts.length; i++) {
-    const s = poolScripts[i]
+    const s = poolScripts[i] as SurveyPoolEntry | undefined
     if (s?.type !== 'survey') continue
     if (!s.skill) continue
     if (!Number.isFinite(skills?.[s.skill]?.result)) return i

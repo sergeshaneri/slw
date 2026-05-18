@@ -16,7 +16,20 @@
 // id навыка — короткий латинский ключ. Используется как ключ в state и
 // как имя секции в ni-surveys.md.
 
-export const ARCHETYPES = {
+import type { SkillStateEntry } from './index'
+import type { SkillTreeNode } from './tree'
+
+export type NiArchetypeKey = 'mythmaker' | 'seer' | 'debunker' | 'shaman'
+
+export type NiArchetypeInfo = {
+  id: NiArchetypeKey
+  name: string
+  subtitle: string
+  blurb: string
+  glyph: string
+}
+
+export const ARCHETYPES: Record<NiArchetypeKey, NiArchetypeInfo> = {
   mythmaker: {
     id: 'mythmaker',
     name: 'Мифотворец',
@@ -47,14 +60,14 @@ export const ARCHETYPES = {
   }
 }
 
-export const ARCHETYPE_KEYS = ['mythmaker', 'seer', 'debunker', 'shaman']
+export const ARCHETYPE_KEYS: NiArchetypeKey[] = ['mythmaker', 'seer', 'debunker', 'shaman']
 
 // Три общих базовых навыка БИ. Входят в каждый архетип при подсчёте
 // среднего и отображаются в каждой ветке UI с пометкой «общий».
 //
 // Эти же 3 анкеты включены в L0-чат БИ как первая оценка БИ, до того,
 // как открывается полное дерево навыков.
-export const COMMON_BASE_SKILLS = [
+export const COMMON_BASE_SKILLS: SkillTreeNode[] = [
   { id: 'attunement',             name: 'Сонастройка',          isCommon: true },
   { id: 'subconscious-listening', name: 'Слушание Подсознания', isCommon: true },
   { id: 'inner-silence',          name: 'Внутренняя Тишина',    isCommon: true }
@@ -63,7 +76,7 @@ export const COMMON_BASE_SKILLS = [
 // Раскладка 40 архетипных навыков по 4 веткам (по 10 в каждом).
 // Внутри каждой ветки: 5 ядерных + 5 расширяющих.
 // В UI к каждой ветке добавляются 3 общих базовых сверху.
-export const SKILL_TREE = {
+export const SKILL_TREE: Record<NiArchetypeKey, SkillTreeNode[]> = {
   mythmaker: [
     // Ядерные
     { id: 'meaning-making',       name: 'Смыслообразование' },
@@ -124,7 +137,7 @@ export const SKILL_TREE = {
 
 // Возвращает полный список навыков, отображаемых под архетипом
 // в UI: 3 общих базовых сверху + специфичные навыки архетипа.
-export function getSkillsForArchetype(archetypeKey) {
+export function getSkillsForArchetype(archetypeKey: NiArchetypeKey): SkillTreeNode[] {
   const specific = SKILL_TREE[archetypeKey] ?? []
   return [...COMMON_BASE_SKILLS, ...specific]
 }
@@ -132,18 +145,18 @@ export function getSkillsForArchetype(archetypeKey) {
 // Обратный индекс по специфичным навыкам: skillId → archetypeKey.
 // Общие базовые в этот индекс НЕ попадают (они принадлежат всем
 // четырём архетипам сразу). Использовать с проверкой на isCommon.
-export const SKILL_TO_ARCHETYPE = Object.fromEntries(
+export const SKILL_TO_ARCHETYPE: Record<string, NiArchetypeKey> = Object.fromEntries(
   Object.entries(SKILL_TREE).flatMap(([arche, skills]) =>
-    skills.map(s => [s.id, arche])
+    skills.map(s => [s.id, arche as NiArchetypeKey])
   )
 )
 
 // Множество id общих базовых — для быстрой проверки.
-export const COMMON_BASE_SKILL_IDS = new Set(COMMON_BASE_SKILLS.map(s => s.id))
+export const COMMON_BASE_SKILL_IDS: Set<string> = new Set(COMMON_BASE_SKILLS.map(s => s.id))
 
 // Все уникальные skill id одним массивом (3 общих + 40 архетипных = 43).
 // 3 общих + 10 + 10 + 10 + 10 = 43.
-export const ALL_SKILL_IDS = [
+export const ALL_SKILL_IDS: string[] = [
   ...COMMON_BASE_SKILLS.map(s => s.id),
   ...ARCHETYPE_KEYS.flatMap(k => SKILL_TREE[k].map(s => s.id))
 ]
@@ -151,11 +164,14 @@ export const ALL_SKILL_IDS = [
 // Среднее по архетипу: общие базовые + специфичные навыки архетипа.
 // skills — { [skillId]: { result: number, ... } }.
 // Возвращает null, если ни одного валидного результата.
-export function calcArchetypeAvg(skills, archetypeKey) {
+export function calcArchetypeAvg(
+  skills: Record<string, SkillStateEntry> | undefined,
+  archetypeKey: NiArchetypeKey
+): number | null {
   const ids = getSkillsForArchetype(archetypeKey).map(s => s.id)
   const values = ids
     .map(id => skills?.[id]?.result)
-    .filter(v => Number.isFinite(v))
+    .filter((v): v is number => Number.isFinite(v))
   if (values.length === 0) return null
   return values.reduce((s, n) => s + n, 0) / values.length
 }
@@ -165,7 +181,7 @@ export function calcArchetypeAvg(skills, archetypeKey) {
 //
 // ВАЖНО: текст должен совпадать с исходником в `ni-surveys.md` точно
 // (включая скобки и кавычки), иначе навык не будет распознан.
-export const SKILL_BY_RUS_NAME = {
+export const SKILL_BY_RUS_NAME: Record<string, string> = {
   // Common base
   'Сонастройка': 'attunement',
   'Слушание Подсознания': 'subconscious-listening',
@@ -224,7 +240,7 @@ export const SKILL_BY_RUS_NAME = {
 // базовые получают «virtual» архетип 'common'. Парсер по этому индексу
 // находит, к какому ведру отнести навык. В UI общие отображаются
 // в каждом из 4 архетипов, а 'common' остаётся внутренним маркером.
-export const SKILL_TO_ARCHETYPE_FOR_PARSER = {
+export const SKILL_TO_ARCHETYPE_FOR_PARSER: Record<string, string> = {
   ...SKILL_TO_ARCHETYPE,
   'attunement': 'common',
   'subconscious-listening': 'common',

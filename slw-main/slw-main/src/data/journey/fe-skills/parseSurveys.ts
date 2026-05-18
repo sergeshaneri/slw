@@ -20,6 +20,8 @@
 // skillId и archetype определяются через маппинг SKILL_BY_RUS_NAME и
 // SKILL_TO_ARCHETYPE из tree.js. Для ядерных навыков archetype = 'common'.
 
+import type { Survey, SurveyBlockKey } from '@/types/script'
+import type { ArchetypeId } from '@/types/skill'
 import {
   SKILL_BY_RUS_NAME,
   SKILL_TO_ARCHETYPE,
@@ -29,8 +31,8 @@ import {
 } from './tree'
 
 // Парсит весь md и возвращает мапу skillId → survey-объект.
-export function parseSurveys(md) {
-  const out = {}
+export function parseSurveys(md: string): Record<string, Survey> {
+  const out: Record<string, Survey> = {}
 
   // Разбиваем по `### Навык:` (старый формат БС) или `### Навык N.` (формат Fe-файла,
   // где после номера может идти суффикс · ЯДЕРНЫЙ / · доп. для … — отбрасываем его).
@@ -38,7 +40,8 @@ export function parseSurveys(md) {
   const matches = [...md.matchAll(skillRegex)]
 
   for (let i = 0; i < matches.length; i++) {
-    const fullName = matches[i][1].trim()
+    const match = matches[i]
+    const fullName = match[1].trim()
     // Отрезаем суффикс после ` · ` (например "Эмоциональная осознанность · ЯДЕРНЫЙ").
     const rusName = fullName.split(/\s*·\s*/)[0].trim()
     const id = SKILL_BY_RUS_NAME[rusName]
@@ -48,15 +51,21 @@ export function parseSurveys(md) {
       continue
     }
     // Для ядерных архетип не определён — ставим 'common'.
-    const archetype = COMMON_BASE_SKILL_IDS.has(id) ? 'common' : SKILL_TO_ARCHETYPE[id]
-    if (!archetype) {
+    // TODO(ts): tighten archetype source typing — SKILL_TO_ARCHETYPE отдаёт
+    // FeArchetypeKey-строку, парсер сам по себе не знает про union, поэтому
+    // касается значения как ArchetypeId.
+    const archetypeStr = COMMON_BASE_SKILL_IDS.has(id) ? 'common' : SKILL_TO_ARCHETYPE[id]
+    if (!archetypeStr) {
       // eslint-disable-next-line no-console
       console.warn(`[parseSurveys ЧЭ] Архетип не найден для навыка: ${id}`)
       continue
     }
+    const archetype = archetypeStr as ArchetypeId
 
-    const start = matches[i].index + matches[i][0].length
-    const end = i + 1 < matches.length ? matches[i + 1].index : md.length
+    const matchIndex = match.index ?? 0
+    const start = matchIndex + match[0].length
+    const nextMatch = matches[i + 1]
+    const end = nextMatch ? (nextMatch.index ?? md.length) : md.length
     const body = md.slice(start, end)
 
     const blocks = parseBlocks(body)
@@ -73,20 +82,23 @@ export function parseSurveys(md) {
 }
 
 // Из тела одного навыка вытаскивает 5 блоков и в каждом — 3 утверждения.
-function parseBlocks(body) {
-  const blocks = {}
+function parseBlocks(body: string): Record<SurveyBlockKey, string[]> {
+  const blocks: Record<string, string[]> = {}
   for (const key of SURVEY_BLOCK_KEYS) blocks[key] = []
 
   const blockRegex = /^\*\*\s*([^*\n]+?)\s*\*\*\s*$/gm
   const matches = [...body.matchAll(blockRegex)]
 
   for (let i = 0; i < matches.length; i++) {
-    const rusBlockName = matches[i][1].trim()
+    const match = matches[i]
+    const rusBlockName = match[1].trim()
     const blockKey = BLOCK_RUS_TO_KEY[rusBlockName]
     if (!blockKey) continue
 
-    const start = matches[i].index + matches[i][0].length
-    const end = i + 1 < matches.length ? matches[i + 1].index : body.length
+    const matchIndex = match.index ?? 0
+    const start = matchIndex + match[0].length
+    const nextMatch = matches[i + 1]
+    const end = nextMatch ? (nextMatch.index ?? body.length) : body.length
     const blockBody = body.slice(start, end)
 
     blocks[blockKey] = parseStatements(blockBody)
@@ -96,9 +108,9 @@ function parseBlocks(body) {
 }
 
 // Из тела блока вытаскивает нумерованные утверждения.
-function parseStatements(blockBody) {
+function parseStatements(blockBody: string): string[] {
   const lines = blockBody.split('\n')
-  const statements = []
+  const statements: string[] = []
   for (const raw of lines) {
     const m = raw.match(/^\s*\d+\.\s+(.+?)\s*$/)
     if (m) statements.push(m[1])

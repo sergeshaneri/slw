@@ -50,7 +50,27 @@
 //   сохраняются — id остался прежним, навыки переехали из COMMON_BASE
 //   в SKILL_TREE.healer.
 
-export const ARCHETYPES = {
+// Узел дерева навыков: листовая запись для UI. Si-уровень — плоские
+// списки внутри архетипных веток (без вложенных детей). Другие
+// аспекты (Ne/Ni/Te/Ti/Fi/Se/Fe) повторяют ту же форму, у некоторых
+// (Si/Ne/Ni/Fi/Te/Se/Fe) общие базовые помечены флагом `isCommon`.
+export type SkillTreeNode = {
+  id: string
+  name: string
+  isCommon?: boolean
+}
+
+export type ArchetypeKey = 'healer' | 'aesthete' | 'hedonist' | 'keeper'
+
+export type ArchetypeInfo = {
+  id: ArchetypeKey
+  name: string
+  subtitle: string
+  blurb: string
+  glyph: string
+}
+
+export const ARCHETYPES: Record<ArchetypeKey, ArchetypeInfo> = {
   healer: {
     id: 'healer',
     name: 'Целитель',
@@ -81,7 +101,7 @@ export const ARCHETYPES = {
   }
 }
 
-export const ARCHETYPE_KEYS = ['healer', 'aesthete', 'hedonist', 'keeper']
+export const ARCHETYPE_KEYS: ArchetypeKey[] = ['healer', 'aesthete', 'hedonist', 'keeper']
 
 // Четыре общих базовых навыка БС — сквозные качества восприятия и
 // заботы, проходящие через все четыре архетипа. Входят в каждый
@@ -97,19 +117,19 @@ export const ARCHETYPE_KEYS = ['healer', 'aesthete', 'hedonist', 'keeper']
 //
 // Эти 4 анкеты включены в L0-чат БС как первая оценка БС.
 // Полное описание навыков см. в `Si/Навыки БС — Универсальные.md`.
-export const COMMON_BASE_SKILLS = [
+export const COMMON_BASE_SKILLS: SkillTreeNode[] = [
   { id: 'body-listening',  name: 'Слушать тело', isCommon: true },
   { id: 'needs-awareness', name: 'Осознавать потребности', isCommon: true },
   { id: 'timely-care',     name: 'Своевременно заботиться', isCommon: true },
   { id: 'details',         name: 'Внимание к мелким деталям', isCommon: true },
 ]
 
-export const COMMON_BASE_SKILL_IDS = new Set(COMMON_BASE_SKILLS.map(s => s.id))
+export const COMMON_BASE_SKILL_IDS: Set<string> = new Set(COMMON_BASE_SKILLS.map(s => s.id))
 
 // Раскладка 44 архетипных навыков по 4 веткам.
 // Порядок внутри каждой ветки — от базовых навыков к продвинутым.
 // В UI к каждой ветке добавляются 3 общих базовых сверху.
-export const SKILL_TREE = {
+export const SKILL_TREE: Record<ArchetypeKey, SkillTreeNode[]> = {
   healer: [
     // Базовые / контакт с телом
     { id: 'signals',          name: 'Распознавание базовых сигналов' },
@@ -175,29 +195,34 @@ export const SKILL_TREE = {
 // Обратный индекс: skillId → archetypeKey. Только для архетип-специфичных
 // навыков. Общие базовые в этот индекс НЕ попадают (они принадлежат
 // всем 4 архетипам сразу). Использовать с проверкой на COMMON_BASE_SKILL_IDS.
-export const SKILL_TO_ARCHETYPE = Object.fromEntries(
+export const SKILL_TO_ARCHETYPE: Record<string, ArchetypeKey> = Object.fromEntries(
   Object.entries(SKILL_TREE).flatMap(([arche, skills]) =>
-    skills.map(s => [s.id, arche])
+    skills.map(s => [s.id, arche as ArchetypeKey])
   )
 )
 
 // Возвращает полный список навыков, отображаемых под архетипом в UI:
 // 3 общих базовых сверху + специфичные навыки архетипа.
 // Используется для отображения и для расчёта среднего.
-export function getSkillsForArchetype(archetypeKey) {
+export function getSkillsForArchetype(archetypeKey: ArchetypeKey): SkillTreeNode[] {
   const specific = SKILL_TREE[archetypeKey] ?? []
   return [...COMMON_BASE_SKILLS, ...specific]
 }
 
 // Все skill id одним массивом, в порядке отображения.
 // 4 общих + 17 + 8 + 13 + 9 = 51.
-export const ALL_SKILL_IDS = [
+export const ALL_SKILL_IDS: string[] = [
   ...COMMON_BASE_SKILLS.map(s => s.id),
   ...ARCHETYPE_KEYS.flatMap(k => SKILL_TREE[k].map(s => s.id))
 ]
 
 // Имена 5 блоков анкеты — общие для всех навыков.
-export const SURVEY_BLOCKS = [
+export type SurveyBlock = {
+  id: string
+  name: string
+}
+
+export const SURVEY_BLOCKS: SurveyBlock[] = [
   { id: 'knowledge',   name: 'Теоретическое знание' },
   { id: 'practice',    name: 'Практическое умение' },
   { id: 'awareness',   name: 'Осознанность выполнения' },
@@ -205,10 +230,10 @@ export const SURVEY_BLOCKS = [
   { id: 'confidence',  name: 'Уверенность и помощь другим' }
 ]
 
-export const SURVEY_BLOCK_KEYS = SURVEY_BLOCKS.map(b => b.id)
+export const SURVEY_BLOCK_KEYS: string[] = SURVEY_BLOCKS.map(b => b.id)
 
 // Маппинг русского заголовка блока (как в исходном md) → ключ блока.
-export const BLOCK_RUS_TO_KEY = Object.fromEntries(
+export const BLOCK_RUS_TO_KEY: Record<string, string> = Object.fromEntries(
   SURVEY_BLOCKS.map(b => [b.name, b.id])
 )
 
@@ -224,7 +249,7 @@ export const BLOCK_RUS_TO_KEY = Object.fromEntries(
 // нагрузкой, Библиотека приятных ощущений) удалены из маппинга после
 // слияний. Их секции в `surveys.md` остаются как dead data — парсер
 // логирует warning и пропускает.
-export const SKILL_BY_RUS_NAME = {
+export const SKILL_BY_RUS_NAME: Record<string, string> = {
   // Common base (универсальные сквозные навыки) — 4 шт.
   'Слушать тело': 'body-listening',
   'Осознавать потребности': 'needs-awareness',

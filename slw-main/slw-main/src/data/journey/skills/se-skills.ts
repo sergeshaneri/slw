@@ -10,6 +10,7 @@
 //   по 5 утверждений. Pass=1 — берём первое утверждение из каждого блока,
 //   pass=2 — второе, pass=3 — третье.
 
+import type { Survey } from '@/types/script'
 import { parseSurveys } from './parseSurveys'
 import seSurveysMd from './se-surveys.md?raw'
 import {
@@ -19,8 +20,10 @@ import {
   calcArchetypeAvg as calcArchetypeAvgFromTree,
   SURVEY_BLOCKS, SURVEY_BLOCK_KEYS, BLOCK_RUS_TO_KEY
 } from './se-tree'
+import type { SeArchetypeKey } from './se-tree'
+import type { SkillStateEntry, SurveyStatement } from './index'
 
-const SE_SURVEYS = parseSurveys(seSurveysMd, {
+const SE_SURVEYS: Record<string, Survey> = parseSurveys(seSurveysMd, {
   skillByRusName: SKILL_BY_RUS_NAME,
   skillToArchetype: SKILL_TO_ARCHETYPE_FOR_PARSER,
   blockRusToKey: BLOCK_RUS_TO_KEY,
@@ -34,14 +37,17 @@ export {
   SE_SURVEYS,
 }
 
-export function getSeSurvey(skillId) {
+export function getSeSurvey(skillId: string): Survey | null {
   return SE_SURVEYS[skillId] ?? null
 }
 
 // Среднее по 5 имеющимся блокам.
-export function calcSeSurveyResult(answers) {
-  const blocks = {}
-  const blockAvgs = []
+export function calcSeSurveyResult(answers: Record<string, number[]> | undefined): {
+  blocks: Record<string, number | null>
+  skill: number | null
+} {
+  const blocks: Record<string, number | null> = {}
+  const blockAvgs: number[] = []
   for (const key of SURVEY_BLOCK_KEYS) {
     const arr = answers?.[key] ?? []
     const valid = arr.filter(n => Number.isFinite(n))
@@ -57,9 +63,9 @@ export function calcSeSurveyResult(answers) {
   return { blocks, skill }
 }
 
-export function getSeCompletedPasses(skillEntry) {
+export function getSeCompletedPasses(skillEntry: SkillStateEntry | undefined): number {
   if (!skillEntry) return 0
-  if (Number.isFinite(skillEntry.passes)) return skillEntry.passes
+  if (Number.isFinite(skillEntry.passes)) return skillEntry.passes as number
   const answers = skillEntry.answers ?? {}
   let max = 0
   for (const key of SURVEY_BLOCK_KEYS) {
@@ -70,15 +76,15 @@ export function getSeCompletedPasses(skillEntry) {
   return max
 }
 
-export function getSeNextPass(skillEntry) {
+export function getSeNextPass(skillEntry: SkillStateEntry | undefined): number {
   const done = getSeCompletedPasses(skillEntry)
   return done >= 3 ? 0 : done + 1
 }
 
-export function getSeStatementsForPass(survey, pass) {
+export function getSeStatementsForPass(survey: Survey | null | undefined, pass: number): SurveyStatement[] {
   if (!survey || !pass) return []
   const stmtIndex = Math.max(0, Math.min(2, pass - 1))
-  const out = []
+  const out: SurveyStatement[] = []
   for (const blockKey of SURVEY_BLOCK_KEYS) {
     const arr = survey.blocks?.[blockKey] ?? []
     if (arr.length === 0) continue
@@ -88,37 +94,52 @@ export function getSeStatementsForPass(survey, pass) {
   return out
 }
 
-export function getSeStatementsForFullRange(survey, startPass, endPass = 3) {
+export function getSeStatementsForFullRange(
+  survey: Survey | null | undefined,
+  startPass: number,
+  endPass = 3
+): SurveyStatement[] {
   if (!survey) return []
-  const out = []
+  const out: SurveyStatement[] = []
   for (let p = startPass; p <= endPass; p++) {
     out.push(...getSeStatementsForPass(survey, p))
   }
   return out
 }
 
-export function buildSeSurveyStatements(survey, mode, startPass) {
+export function buildSeSurveyStatements(
+  survey: Survey | null | undefined,
+  mode: 'short' | 'full',
+  startPass: number
+): SurveyStatement[] {
   if (mode === 'full') return getSeStatementsForFullRange(survey, startPass, 3)
   return getSeStatementsForPass(survey, startPass)
 }
 
 // Среднее по архетипу: 4 общих + специфичные. Используется в Колесе ЧС.
-export function calcSeArchetypeAvg(skills, archetypeKey) {
+export function calcSeArchetypeAvg(
+  skills: Record<string, SkillStateEntry> | undefined,
+  archetypeKey: SeArchetypeKey
+): number | null {
   return calcArchetypeAvgFromTree(skills, archetypeKey)
 }
 
 // Общая оценка ЧС: среднее по архетипам, в которых есть хоть одна анкета.
 // Используется JourneyView для записи scores['Se'] после анкеты.
-export function calcSeScoreFromSkills(skills) {
+export function calcSeScoreFromSkills(skills: Record<string, SkillStateEntry> | undefined): number | null {
   const archeAvgs = ARCHETYPE_KEYS
     .map(k => calcSeArchetypeAvg(skills, k))
-    .filter(v => v != null)
+    .filter((v): v is number => v != null)
   if (archeAvgs.length === 0) return null
   return archeAvgs.reduce((s, n) => s + n, 0) / archeAvgs.length
 }
 
 // Сколько навыков ЧС оценено всего (из 47).
-export function getSeSkillProgress(skills) {
+export function getSeSkillProgress(skills: Record<string, SkillStateEntry> | undefined): {
+  completed: number
+  total: number
+  remaining: number
+} {
   const completed = ALL_SKILL_IDS.filter(id =>
     Number.isFinite(skills?.[id]?.result)
   ).length

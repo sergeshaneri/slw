@@ -8,8 +8,11 @@
 // Уровни идут линейным core-маршрутом. Анкеты лежат отдельно от L0
 // и доступны только через дерево навыков (Колесо БЛ), не из L0-чата.
 
+import type { Script } from '@/types/script'
+import type { CompleteEntry, IntroEntry } from '../../parseScripts'
 import { parseJourneyMd } from '../../parseScripts'
 import { SKILL_TO_ARCHETYPE, ARCHETYPE_KEYS } from '../../skills/ti-tree'
+import type { TiArchetypeKey } from '../../skills/ti-tree'
 import tiL0Md from './l0.md?raw'
 import tiL0SurveysMd from './l0-surveys.md?raw'
 import tiL1Md from './l1.md?raw'
@@ -25,17 +28,18 @@ const l3 = parseJourneyMd(tiL3Md)
 // Survey-шаги идут «по очереди» через 4 архетипа, чтобы пользователь
 // видел разные ветки навыков, а не сидел 8/7/11/12 анкет подряд по
 // одному архетипу. Round-robin: Аналитик → Архитектор → Хранитель → Энциклопедист.
-function interleaveSurveysByArchetype(surveys) {
-  const buckets = {}
-  for (const key of ARCHETYPE_KEYS) buckets[key] = []
-  const others = []
+function interleaveSurveysByArchetype(surveys: Script[]): Script[] {
+  const buckets: Record<TiArchetypeKey, Script[]> = {
+    analyst: [], architect: [], guardian: [], encyclopedist: []
+  }
+  const others: Script[] = []
   for (const s of surveys) {
-    const arche = SKILL_TO_ARCHETYPE[s.skill]
+    const arche = s.skill ? SKILL_TO_ARCHETYPE[s.skill] : undefined
     if (arche && buckets[arche]) buckets[arche].push(s)
     else others.push(s)
   }
 
-  const interleaved = []
+  const interleaved: Script[] = []
   let added = true
   let cursor = 0
   while (added) {
@@ -55,20 +59,20 @@ function interleaveSurveysByArchetype(surveys) {
 
 // «intro» в md превращается в массив с id='intro-1', 'intro-2', …
 // Журнал ожидает id вида 'bl-intro-N'.
-export const TI_ASPECT_INTRO = l0.intro.map((entry, i) => ({
+export const TI_ASPECT_INTRO: IntroEntry[] = l0.intro.map((entry, i) => ({
   ...entry,
   id: `bl-intro-${i + 1}`
 }))
 
-export const TI_LEVEL_0_CORE = l0.scripts
-export const TI_LEVEL_0_SURVEYS = interleaveSurveysByArchetype(l0Surveys.scripts)
-export const TI_LEVEL_0_COMPLETE = l0.complete ?? { text: 'Уровень пройден.' }
+export const TI_LEVEL_0_CORE: Script[] = l0.scripts
+export const TI_LEVEL_0_SURVEYS: Script[] = interleaveSurveysByArchetype(l0Surveys.scripts)
+export const TI_LEVEL_0_COMPLETE: CompleteEntry = l0.complete ?? { text: 'Уровень пройден.' }
 
-export const TI_LEVEL_1_CORE = l1.scripts
-export const TI_LEVEL_1_COMPLETE = l1.complete ?? { text: 'Уровень пройден.' }
+export const TI_LEVEL_1_CORE: Script[] = l1.scripts
+export const TI_LEVEL_1_COMPLETE: CompleteEntry = l1.complete ?? { text: 'Уровень пройден.' }
 
-export const TI_LEVEL_2_CORE = l2.scripts
-export const TI_LEVEL_2_COMPLETE = l2.complete ?? { text: 'Уровень пройден.' }
+export const TI_LEVEL_2_CORE: Script[] = l2.scripts
+export const TI_LEVEL_2_COMPLETE: CompleteEntry = l2.complete ?? { text: 'Уровень пройден.' }
 
-export const TI_LEVEL_3_CORE = l3.scripts
-export const TI_LEVEL_3_COMPLETE = l3.complete ?? { text: 'Уровень пройден.' }
+export const TI_LEVEL_3_CORE: Script[] = l3.scripts
+export const TI_LEVEL_3_COMPLETE: CompleteEntry = l3.complete ?? { text: 'Уровень пройден.' }
