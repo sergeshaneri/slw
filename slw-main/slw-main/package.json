@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "typecheck": "tsc --noEmit",
+    "types:api": "openapi-typescript ./scripts/openapi.json -o src/types/api.ts"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -16,8 +18,14 @@
     "recharts": "^2.12.7"
   },
   "devDependencies": {
+    "@types/node": "^25.8.0",
+    "@types/react": "^18.3.28",
+    "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.3.1",
     "gh-pages": "^6.1.1",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.59.3",
     "vite": "^5.4.2"
   }
 }
