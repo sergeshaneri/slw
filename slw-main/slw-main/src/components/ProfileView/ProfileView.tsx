@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import {
   fetchMyProfile,
@@ -17,14 +18,17 @@ import {
 import ReactorsList from '../PublicProfileView/ReactorsList'
 import Heatmap from '../Heatmap/Heatmap'
 import { tmaNotify } from '../../tma/hooks'
+import type { AspectKey } from '@/types/aspect'
+import type { JourneyState } from '@/types/journey'
 import styles from './ProfileView.module.css'
 
+// Эмодзи-набор для аватарок. as const → readonly string[] литерал.
 const AVATAR_OPTIONS = [
   '🧑', '🧙', '🧝', '🌱', '🌟', '🦊', '🦉', '🐻', '🦁', '🐉',
   '🌊', '🔥', '⚡', '🌙', '☀', '🌌', '✨', '💎', '🎭', '🎨',
-]
+] as const
 
-const INSPIRATION_TYPES = [
+const INSPIRATION_TYPES: ReadonlyArray<readonly [InspirationType, string]> = [
   ['film', 'Фильм'],
   ['book', 'Книга'],
   ['music', 'Музыка'],
@@ -33,9 +37,80 @@ const INSPIRATION_TYPES = [
   ['other', 'Другое'],
 ]
 
-const KIND_LABEL = {
+const KIND_LABEL: Record<string, string> = {
   insight: 'инсайт',
   recommendation: 'рекомендация',
+}
+
+type InspirationType = 'film' | 'book' | 'music' | 'activity' | 'person' | 'other'
+type InsightKind = 'insight' | 'recommendation'
+
+// Shape captured from /api/profile/me usage in this file. Backend has no
+// response_model yet, so this list mirrors what the JSX actually reads.
+// TODO(ts): tighten when backend tightens /api/profile/me.
+type Inspiration = {
+  type: InspirationType | string
+  title: string
+  note?: string | null
+  aspect?: AspectKey | string | null
+}
+
+type Insight = {
+  id: number | string
+  aspect: AspectKey | string
+  kind: InsightKind | string
+  text: string
+  likes: number
+  is_public: boolean
+}
+
+type Achievement = {
+  code: string
+  title?: string
+  icon?: string
+  desc?: string
+  unlocked_at?: string
+}
+
+type CatalogEntry = {
+  code: string
+  title: string
+  icon: string
+  desc: string
+}
+
+type MyProfile = {
+  user_id: number | string
+  display_name: string
+  avatar?: string | null
+  bio?: string | null
+  xp: number
+  is_public?: boolean
+  followers_count?: number
+  following_count?: number
+  focus_aspects?: Array<AspectKey | string>
+  interests?: string[]
+  inspirations?: Inspiration[]
+  goals?: string[]
+  insights?: Insight[]
+  achievements?: Achievement[]
+  achievements_catalog?: CatalogEntry[]
+}
+
+type SubscriptionUser = {
+  user_id: number | string
+  display_name: string
+  avatar?: string | null
+  focus_aspects?: Array<AspectKey | string>
+}
+
+type Props = {
+  onOpenPublicProfile?: (userId: number | string) => void
+  onOpenSettings?: () => void
+  onOpenTour?: () => void
+  journey?: JourneyState | null
+  onJourneyChange?: (next: JourneyState) => void | Promise<void>
+  onAvatarChange?: (avatar: string) => void
 }
 
 export default function ProfileView({
@@ -45,37 +120,38 @@ export default function ProfileView({
   journey,
   onJourneyChange,
   onAvatarChange,
-}) {
-  const [profile, setProfile] = useState(null)
-  const [busy, setBusy] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
-  const [savedAt, setSavedAt] = useState(null)
-  const [shareCopied, setShareCopied] = useState(false)
-  const [subsList, setSubsList] = useState([])
-  const [followersList, setFollowersList] = useState([])
-  const [subsTab, setSubsTab] = useState(null) // 'subs' | 'followers' | null
+}: Props) {
+  const [profile, setProfile] = useState<MyProfile | null>(null)
+  const [busy, setBusy] = useState<boolean>(true)
+  const [saving, setSaving] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
+  const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [shareCopied, setShareCopied] = useState<boolean>(false)
+  const [subsList, setSubsList] = useState<SubscriptionUser[]>([])
+  const [followersList, setFollowersList] = useState<SubscriptionUser[]>([])
+  const [subsTab, setSubsTab] = useState<'subs' | 'followers' | null>(null)
   // id своих инсайтов, для которых раскрыт список реагировавших
-  const [reactorsOpen, setReactorsOpen] = useState(() => new Set())
+  const [reactorsOpen, setReactorsOpen] = useState<Set<number | string>>(() => new Set())
 
   // Локальные черновики
-  const [bio, setBio] = useState('')
-  const [avatar, setAvatar] = useState('')
-  const [focusAspects, setFocusAspects] = useState([])
-  const [interestInput, setInterestInput] = useState('')
-  const [interests, setInterests] = useState([])
-  const [inspirations, setInspirations] = useState([])
-  const [goals, setGoals] = useState(['', '', ''])
+  const [bio, setBio] = useState<string>('')
+  const [avatar, setAvatar] = useState<string>('')
+  const [focusAspects, setFocusAspects] = useState<Array<AspectKey | string>>([])
+  const [interestInput, setInterestInput] = useState<string>('')
+  const [interests, setInterests] = useState<string[]>([])
+  const [inspirations, setInspirations] = useState<Inspiration[]>([])
+  const [goals, setGoals] = useState<[string, string, string]>(['', '', ''])
 
   // Новый инсайт
-  const [insightAspect, setInsightAspect] = useState('Si')
-  const [insightKind, setInsightKind] = useState('insight')
-  const [insightText, setInsightText] = useState('')
-  const [insightPublic, setInsightPublic] = useState(true)
+  const [insightAspect, setInsightAspect] = useState<AspectKey>('Si')
+  const [insightKind, setInsightKind] = useState<InsightKind>('insight')
+  const [insightText, setInsightText] = useState<string>('')
+  const [insightPublic, setInsightPublic] = useState<boolean>(true)
 
   useEffect(() => {
     fetchMyProfile()
-      .then(p => {
+      .then(resp => {
+        const p = resp as MyProfile
         setProfile(p)
         setBio(p.bio ?? '')
         setAvatar(p.avatar ?? '')
@@ -85,7 +161,7 @@ export default function ProfileView({
         const g = p.goals ?? []
         setGoals([g[0] ?? '', g[1] ?? '', g[2] ?? ''])
       })
-      .catch(e => setError(e.message ?? 'Ошибка загрузки профиля'))
+      .catch(e => setError(e instanceof Error ? e.message : 'Ошибка загрузки профиля'))
       .finally(() => setBusy(false))
   }, [])
 
@@ -102,21 +178,21 @@ export default function ProfileView({
     }
   }
 
-  const openSubsTab = async (which) => {
+  const openSubsTab = async (which: 'subs' | 'followers') => {
     if (subsTab === which) {
       setSubsTab(null)
       return
     }
     setSubsTab(which)
     try {
-      if (which === 'subs') setSubsList(await fetchMySubscriptions())
-      else setFollowersList(await fetchMyFollowers())
+      if (which === 'subs') setSubsList(await fetchMySubscriptions() as SubscriptionUser[])
+      else setFollowersList(await fetchMyFollowers() as SubscriptionUser[])
     } catch (e) {
-      setError(e.message ?? 'Не удалось загрузить')
+      setError(e instanceof Error ? e.message : 'Не удалось загрузить')
     }
   }
 
-  const toggleFocus = (aspect) => {
+  const toggleFocus = (aspect: AspectKey) => {
     setFocusAspects(prev => {
       if (prev.includes(aspect)) return prev.filter(a => a !== aspect)
       if (prev.length >= 3) return prev
@@ -131,7 +207,7 @@ export default function ProfileView({
     setInterestInput('')
   }
 
-  const removeInterest = (tag) => {
+  const removeInterest = (tag: string) => {
     setInterests(interests.filter(t => t !== tag))
   }
 
@@ -140,11 +216,11 @@ export default function ProfileView({
     setInspirations([...inspirations, { type: 'film', title: '', note: '', aspect: null }])
   }
 
-  const updateInspiration = (idx, patch) => {
+  const updateInspiration = (idx: number, patch: Partial<Inspiration>) => {
     setInspirations(inspirations.map((it, i) => i === idx ? { ...it, ...patch } : it))
   }
 
-  const removeInspiration = (idx) => {
+  const removeInspiration = (idx: number) => {
     setInspirations(inspirations.filter((_, i) => i !== idx))
   }
 
@@ -169,7 +245,7 @@ export default function ProfileView({
         interests,
         inspirations: cleanedInsp,
         goals: cleanedGoals,
-      })
+      }) as MyProfile
       setProfile(updated)
       setSavedAt(Date.now())
       tmaNotify('success')
@@ -177,7 +253,7 @@ export default function ProfileView({
       // (Header читает из App.myAvatar, а не из локального ProfileView state).
       if (onAvatarChange) onAvatarChange(updated.avatar ?? '')
     } catch (e) {
-      setError(e.message ?? 'Не удалось сохранить')
+      setError(e instanceof Error ? e.message : 'Не удалось сохранить')
       tmaNotify('error')
     } finally {
       setSaving(false)
@@ -193,31 +269,34 @@ export default function ProfileView({
         kind: insightKind,
         text,
         isPublic: insightPublic,
-      })
-      setProfile(p => ({
+      }) as Insight
+      setProfile(p => p ? ({
         ...p,
-        insights: [created, ...(p?.insights ?? [])],
-      }))
+        insights: [created, ...(p.insights ?? [])],
+      }) : p)
       setInsightText('')
     } catch (e) {
-      setError(e.message ?? 'Не удалось добавить')
+      setError(e instanceof Error ? e.message : 'Не удалось добавить')
     }
   }
 
-  const handleDeleteInsight = async (id) => {
+  const handleDeleteInsight = async (id: number | string) => {
     try {
       await deleteInsight(id)
-      setProfile(p => ({
+      setProfile(p => p ? ({
         ...p,
-        insights: (p?.insights ?? []).filter(i => i.id !== id),
-      }))
+        insights: (p.insights ?? []).filter(i => i.id !== id),
+      }) : p)
     } catch (e) {
-      setError(e.message ?? 'Не удалось удалить')
+      setError(e instanceof Error ? e.message : 'Не удалось удалить')
     }
   }
 
   if (busy) return <div className={styles.container}><div className={styles.muted}>Загрузка профиля…</div></div>
   if (!profile) return null
+
+  const colorOf = (a: string): string => (ASPECT_COLORS as Record<string, string>)[a] ?? ''
+  const displayOf = (a: string): string => (ASPECT_DISPLAY_KEY as Record<string, string>)[a] ?? a
 
   return (
     <div className={styles.container}>
@@ -269,9 +348,9 @@ export default function ProfileView({
                       <span
                         key={a}
                         className={styles.subsChip}
-                        style={{ color: ASPECT_COLORS[a], borderColor: `${ASPECT_COLORS[a]}55` }}
+                        style={{ color: colorOf(a), borderColor: `${colorOf(a)}55` }}
                       >
-                        {ASPECT_DISPLAY_KEY[a] ?? a}
+                        {displayOf(a)}
                       </span>
                     ))}
                   </li>
@@ -424,7 +503,7 @@ export default function ProfileView({
               <div className={styles.inspirationRow}>
                 <select
                   value={it.type}
-                  onChange={e => updateInspiration(idx, { type: e.target.value })}
+                  onChange={e => updateInspiration(idx, { type: e.target.value as InspirationType })}
                   className={styles.select}
                 >
                   {INSPIRATION_TYPES.map(([v, l]) => (
@@ -433,7 +512,7 @@ export default function ProfileView({
                 </select>
                 <select
                   value={it.aspect ?? ''}
-                  onChange={e => updateInspiration(idx, { aspect: e.target.value || null })}
+                  onChange={e => updateInspiration(idx, { aspect: (e.target.value as AspectKey) || null })}
                   className={styles.select}
                 >
                   <option value="">— без аспекта —</option>
@@ -460,7 +539,7 @@ export default function ProfileView({
               <input
                 type="text"
                 className={styles.input}
-                value={it.note}
+                value={it.note ?? ''}
                 onChange={e => updateInspiration(idx, { note: e.target.value })}
                 placeholder="Заметка (опционально)"
                 maxLength={300}
@@ -486,7 +565,7 @@ export default function ProfileView({
             type="text"
             className={styles.input}
             value={g}
-            onChange={e => setGoals(goals.map((x, i) => i === idx ? e.target.value : x))}
+            onChange={e => setGoals(goals.map((x, i) => i === idx ? e.target.value : x) as [string, string, string])}
             placeholder={`Цель ${idx + 1}`}
             maxLength={200}
           />
@@ -515,7 +594,7 @@ export default function ProfileView({
       />
 
       {/* ── Стрик с бэка + защита ─────────────── */}
-      <StreakSection journey={journey} onJourneyChange={onJourneyChange} />
+      <StreakSection journey={journey ?? null} onJourneyChange={onJourneyChange} />
 
       {/* ── Мои выбранные практики ──────────────── */}
       <MyHabitsSection />
@@ -538,7 +617,7 @@ export default function ProfileView({
           <div className={styles.insightFormRow}>
             <select
               value={insightAspect}
-              onChange={e => setInsightAspect(e.target.value)}
+              onChange={e => setInsightAspect(e.target.value as AspectKey)}
               className={styles.select}
             >
               {ASPECT_KEYS.map(k => (
@@ -547,7 +626,7 @@ export default function ProfileView({
             </select>
             <select
               value={insightKind}
-              onChange={e => setInsightKind(e.target.value)}
+              onChange={e => setInsightKind(e.target.value as InsightKind)}
               className={styles.select}
             >
               <option value="insight">Инсайт</option>
@@ -584,10 +663,10 @@ export default function ProfileView({
             <div
               key={ins.id}
               className={styles.insightCard}
-              style={{ borderColor: `${ASPECT_COLORS[ins.aspect]}55` }}
+              style={{ borderColor: `${colorOf(ins.aspect as string)}55` }}
             >
               <div className={styles.insightHead}>
-                <span style={{ color: ASPECT_COLORS[ins.aspect] }} className={styles.insightAspect}>
+                <span style={{ color: colorOf(ins.aspect as string) }} className={styles.insightAspect}>
                   {ins.aspect}
                 </span>
                 <span className={styles.insightKind}>{KIND_LABEL[ins.kind] ?? ins.kind}</span>
@@ -637,7 +716,9 @@ export default function ProfileView({
   )
 }
 
-function Section({ label, children }) {
+type SectionProps = { label: string; children: ReactNode }
+
+function Section({ label, children }: SectionProps) {
   return (
     <section className={styles.section}>
       <div className={styles.sectionLabel}>{label}</div>
@@ -648,7 +729,7 @@ function Section({ label, children }) {
 
 const SHIELD_COST = 50
 
-const STATUS_DESC = {
+const STATUS_DESC: Record<string, string> = {
   none:         'Стрик ещё не начался — сделай хоть что-то сегодня (тик практики, запись в дневник, инсайт).',
   ticked_today: 'Стрик сегодня уже подтверждён.',
   due_today:    'Стрик ещё держится — сделай что-нибудь сегодня, чтобы продолжить.',
@@ -657,20 +738,34 @@ const STATUS_DESC = {
   active:       '',
 }
 
-function StreakSection({ journey, onJourneyChange }) {
-  const [data, setData] = useState(null)
-  const [busy, setBusy] = useState(true)
-  const [activating, setActivating] = useState(false)
-  const [error, setError] = useState(null)
+type StreakData = {
+  current: number
+  longest: number
+  last_active_date?: string | null
+  shield_until?: string | null
+  today: string
+  status?: string
+}
+
+type StreakSectionProps = {
+  journey: JourneyState | null
+  onJourneyChange?: (next: JourneyState) => void | Promise<void>
+}
+
+function StreakSection({ journey, onJourneyChange }: StreakSectionProps) {
+  const [data, setData] = useState<StreakData | null>(null)
+  const [busy, setBusy] = useState<boolean>(true)
+  const [activating, setActivating] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
 
   const stardust = journey?.stardust ?? 0
 
   const reload = async () => {
     setBusy(true)
     try {
-      setData(await fetchMyStreak())
+      setData(await fetchMyStreak() as StreakData)
     } catch (e) {
-      setError(e.message ?? 'Не удалось загрузить стрик')
+      setError(e instanceof Error ? e.message : 'Не удалось загрузить стрик')
     } finally {
       setBusy(false)
     }
@@ -679,7 +774,7 @@ function StreakSection({ journey, onJourneyChange }) {
   useEffect(() => { reload() }, [])
 
   const handleShield = async () => {
-    if (!onJourneyChange || stardust < SHIELD_COST || activating) return
+    if (!onJourneyChange || !journey || stardust < SHIELD_COST || activating) return
     setActivating(true)
     setError(null)
     try {
@@ -689,8 +784,8 @@ function StreakSection({ journey, onJourneyChange }) {
       await reload()
     } catch (e) {
       // Откатываем стардаст.
-      await onJourneyChange?.({ ...journey, stardust })
-      setError(e.message ?? 'Не удалось активировать')
+      if (journey) await onJourneyChange?.({ ...journey, stardust })
+      setError(e instanceof Error ? e.message : 'Не удалось активировать')
     } finally {
       setActivating(false)
     }
@@ -700,7 +795,7 @@ function StreakSection({ journey, onJourneyChange }) {
   if (!data) return null
 
   const today = data.today
-  const shielded = data.shield_until && data.shield_until >= today
+  const shielded = !!(data.shield_until && data.shield_until >= today)
   const status = data.status || 'active'
 
   return (
@@ -743,18 +838,24 @@ function StreakSection({ journey, onJourneyChange }) {
   )
 }
 
+type HabitItem = {
+  aspect: AspectKey | string
+  title: string
+  ticked_today?: boolean
+}
+
 function MyHabitsSection() {
-  const [habits, setHabits] = useState([])
-  const [busy, setBusy] = useState(true)
-  const [error, setError] = useState(null)
+  const [habits, setHabits] = useState<HabitItem[]>([])
+  const [busy, setBusy] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
 
   const reload = async () => {
     setBusy(true)
     try {
-      const { habits: h } = await fetchMyHabits()
-      setHabits(h)
+      const resp = await fetchMyHabits() as { habits: HabitItem[] }
+      setHabits(resp.habits)
     } catch (e) {
-      setError(e.message ?? 'Не удалось загрузить')
+      setError(e instanceof Error ? e.message : 'Не удалось загрузить')
     } finally {
       setBusy(false)
     }
@@ -762,13 +863,13 @@ function MyHabitsSection() {
 
   useEffect(() => { reload() }, [])
 
-  const handleClear = async (aspect) => {
+  const handleClear = async (aspect: AspectKey | string) => {
     if (!confirm(`Снять активную практику для ${aspect}?`)) return
     try {
       await clearHabit(aspect)
       reload()
     } catch (e) {
-      setError(e.message ?? 'Не удалось снять')
+      setError(e instanceof Error ? e.message : 'Не удалось снять')
     }
   }
 
@@ -806,17 +907,29 @@ function MyHabitsSection() {
   )
 }
 
-function MyBookmarksSection({ onOpenProfile }) {
-  const [items, setItems] = useState([])
-  const [busy, setBusy] = useState(true)
-  const [error, setError] = useState(null)
+type Bookmark = {
+  kind: string
+  target_id: number | string
+  saved_at: string
+  aspect?: AspectKey | string | null
+  text?: string | null
+  available: boolean
+  display_name?: string | null
+  avatar?: string | null
+  user_id?: number | string
+}
+
+function MyBookmarksSection({ onOpenProfile }: { onOpenProfile?: (userId: number | string) => void }) {
+  const [items, setItems] = useState<Bookmark[]>([])
+  const [busy, setBusy] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
 
   const reload = async () => {
     setBusy(true)
     try {
-      setItems(await fetchMyBookmarks())
+      setItems(await fetchMyBookmarks() as Bookmark[])
     } catch (e) {
-      setError(e.message ?? 'Не удалось загрузить')
+      setError(e instanceof Error ? e.message : 'Не удалось загрузить')
     } finally {
       setBusy(false)
     }
@@ -824,12 +937,12 @@ function MyBookmarksSection({ onOpenProfile }) {
 
   useEffect(() => { reload() }, [])
 
-  const handleRemove = async (id) => {
+  const handleRemove = async (id: number | string) => {
     try {
       await unbookmarkInsight(id)
       setItems(prev => prev.filter(b => !(b.kind === 'insight' && b.target_id === id)))
     } catch (e) {
-      setError(e.message ?? 'Не удалось')
+      setError(e instanceof Error ? e.message : 'Не удалось')
     }
   }
 
@@ -847,11 +960,11 @@ function MyBookmarksSection({ onOpenProfile }) {
           <div key={`${b.kind}-${b.target_id}-${b.saved_at}`} className={styles.insightCard}>
             <div className={styles.insightHead}>
               <span className={styles.insightAspect}>{b.aspect ?? '—'}</span>
-              {b.available && b.display_name && (
+              {b.available && b.display_name && b.user_id != null && (
                 <button
                   type="button"
                   className={styles.linkBtn}
-                  onClick={() => onOpenProfile?.(b.user_id)}
+                  onClick={() => onOpenProfile?.(b.user_id!)}
                 >
                   {b.avatar || '🧑'} {b.display_name}
                 </button>
@@ -875,7 +988,7 @@ function MyBookmarksSection({ onOpenProfile }) {
   )
 }
 
-function pluralDays(n) {
+function pluralDays(n: number): string {
   const m = n % 10
   if (n % 100 >= 11 && n % 100 <= 14) return 'дней'
   if (m === 1) return 'день'
@@ -883,7 +996,12 @@ function pluralDays(n) {
   return 'дней'
 }
 
-function AchievementsSection({ unlocked, catalog }) {
+type AchievementsProps = {
+  unlocked: Achievement[]
+  catalog: CatalogEntry[]
+}
+
+function AchievementsSection({ unlocked, catalog }: AchievementsProps) {
   const unlockedCodes = new Set(unlocked.map(a => a.code))
   const total = catalog.length
   const got = unlocked.length
@@ -910,3 +1028,4 @@ function AchievementsSection({ unlocked, catalog }) {
     </Section>
   )
 }
+

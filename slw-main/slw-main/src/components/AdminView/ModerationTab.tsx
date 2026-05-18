@@ -6,7 +6,13 @@ import {
 } from '../../api/client'
 import styles from './AdminView.module.css'
 
-const ASPECT_FILTERS = [
+// Backend stores aspect as Cyrillic code (e.g. 'БС'); admin-list returns it
+// as-is. UsersTab/ModerationTab pass it back to the backend through filters,
+// so we keep the Cyrillic literal type here. Latin frontend keys would have
+// to be translated by adminListInsights — not the case today.
+type CyrAspectFilter = '' | 'БС' | 'ЧС' | 'БЛ' | 'ЧЛ' | 'БЭ' | 'ЧЭ' | 'БИ' | 'ЧИ'
+
+const ASPECT_FILTERS: ReadonlyArray<{ id: CyrAspectFilter; label: string }> = [
   { id: '',     label: 'Все' },
   { id: 'БС',   label: 'БС' },
   { id: 'ЧС',   label: 'ЧС' },
@@ -18,13 +24,34 @@ const ASPECT_FILTERS = [
   { id: 'ЧИ',   label: 'ЧИ' },
 ]
 
+// Insight shape returned by /api/admin/insights. Backend has no
+// response_model — fields mirror what JSX reads.
+// TODO(ts): tighten when backend formalizes admin/insights response.
+type AdminInsight = {
+  id: number | string
+  aspect: string
+  kind: string
+  text: string
+  is_public: boolean
+  created_at?: string | null
+  user_id: number | string
+  user_email?: string | null
+  user_display_name?: string | null
+  user_telegram_username?: string | null
+}
+
+type AdminInsightsResponse = {
+  insights: AdminInsight[]
+  total: number
+}
+
 export default function ModerationTab() {
-  const [insights, setInsights] = useState([])
-  const [total, setTotal] = useState(0)
-  const [aspect, setAspect] = useState('')
-  const [onlyPublic, setOnlyPublic] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
+  const [insights, setInsights] = useState<AdminInsight[]>([])
+  const [total, setTotal] = useState<number>(0)
+  const [aspect, setAspect] = useState<CyrAspectFilter>('')
+  const [onlyPublic, setOnlyPublic] = useState<boolean>(false)
+  const [busy, setBusy] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setBusy(true)
@@ -34,11 +61,11 @@ export default function ModerationTab() {
         limit: 100,
         aspect: aspect || null,
         only_public: onlyPublic,
-      })
+      }) as AdminInsightsResponse
       setInsights(d.insights ?? [])
       setTotal(d.total ?? 0)
     } catch (e) {
-      setError(e.message ?? 'Ошибка')
+      setError(e instanceof Error ? e.message : 'Ошибка')
     } finally {
       setBusy(false)
     }
@@ -46,24 +73,24 @@ export default function ModerationTab() {
 
   useEffect(() => { load() }, [load])
 
-  const togglePublic = async (insight) => {
+  const togglePublic = async (insight: AdminInsight) => {
     try {
-      const r = await adminPatchInsight(insight.id, { is_public: !insight.is_public })
+      const r = await adminPatchInsight(insight.id, { is_public: !insight.is_public }) as { is_public: boolean }
       setInsights(prev => prev.map(i =>
         i.id === insight.id ? { ...i, is_public: r.is_public } : i
       ))
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     }
   }
 
-  const deleteInsight = async insight => {
+  const deleteInsight = async (insight: AdminInsight) => {
     if (!confirm(`Удалить инсайт #${insight.id} от ${insight.user_email || insight.user_id}? Действие необратимо.`)) return
     try {
       await adminDeleteInsight(insight.id)
       setInsights(prev => prev.filter(i => i.id !== insight.id))
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     }
   }
 
@@ -80,7 +107,7 @@ export default function ModerationTab() {
           <select
             className={styles.sortSelect}
             value={aspect}
-            onChange={e => setAspect(e.target.value)}
+            onChange={e => setAspect(e.target.value as CyrAspectFilter)}
           >
             {ASPECT_FILTERS.map(f => (
               <option key={f.id} value={f.id}>{f.label}</option>

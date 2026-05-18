@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import {
   adminAutoPositionFromDiary,
   adminImpersonate,
@@ -17,35 +18,157 @@ import {
 } from '../../api/client'
 import { ASPECT_KEYS, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { getJourney } from '../../data/journey/registry'
+import type { AspectKey } from '@/types/aspect'
 import styles from './AdminView.module.css'
 
-const SORT_OPTIONS = [
+type SortOption = 'recent' | 'xp' | 'created'
+
+const SORT_OPTIONS: ReadonlyArray<{ id: SortOption; label: string }> = [
   { id: 'recent',  label: 'Последняя активность' },
   { id: 'xp',      label: 'По XP' },
   { id: 'created', label: 'Новые' },
 ]
 
-export default function UsersTab({ onImpersonateApply }) {
-  const [users, setUsers] = useState([])
-  const [total, setTotal] = useState(0)
-  const [search, setSearch] = useState('')
-  const [sort, setSort] = useState('recent')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
+// Backend has no response_model for any admin endpoint — types below mirror
+// the JSX reads. Most diagnostic endpoints return a JSON blob with optional
+// fields; we model only the fields actually consumed here and let the rest
+// flow through `unknown`/extra `[key: string]: unknown` index sigs.
+// TODO(ts): tighten when backend formalizes admin schemas.
 
-  const [selectedUser, setSelectedUser] = useState(null)
-  const [diagnostic, setDiagnostic] = useState(null)
-  const [restorePreview, setRestorePreview] = useState(null)
-  const [actionLog, setActionLog] = useState([])
+type AdminUser = {
+  id: number | string
+  email?: string | null
+  display_name?: string | null
+  telegram_id?: number | string | null
+  telegram_username?: string | null
+  xp?: number
+  totalCompleted?: number
+  sum_completedScripts?: number
+  currentAspect?: AspectKey | string | null
+  lastActiveDate?: string | null
+  is_admin?: boolean
+  created_at?: string | null
+}
 
-  const [fullDiary, setFullDiary] = useState(null)
-  const [stateEditor, setStateEditor] = useState(null)  // { text, error } | null
+type AdminUsersResponse = {
+  users: AdminUser[]
+  total: number
+}
+
+type DiagnosticAspectFolder = {
+  currentLevel?: number
+  currentScriptId?: string | null
+  currentScriptIndex?: number
+  completedScripts?: number
+  messages_count?: number
+}
+
+type DiagnosticRecommendation = {
+  scenario?: string
+  action?: string
+}
+
+type DiaryEntry = {
+  id: number | string
+  aspect?: AspectKey | string | null
+  source?: string | null
+  text?: string | null
+  created_at?: string | null
+  extra?: {
+    scriptId?: string | null
+    promptTitle?: string | null
+    [k: string]: unknown
+  } | null
+}
+
+type DiaryScriptRef = {
+  diary_id: number | string
+  aspect: AspectKey | string
+  scriptId: string
+  promptTitle?: string | null
+  created_at?: string | null
+}
+
+type Diagnostic = {
+  recommendation?: DiagnosticRecommendation | null
+  web_state?: {
+    aspects?: Record<string, DiagnosticAspectFolder>
+    xp?: number
+    skillsCount?: number
+    streak?: number
+    totalCompleted?: number
+    contentVersion?: number | string
+    [key: string]: unknown
+  } | null
+  events?: { count?: number } | null
+  diary?: {
+    count?: number
+    with_script_refs_last_50?: DiaryScriptRef[]
+  } | null
+  [key: string]: unknown
+}
+
+type RestoreDiffAspect = {
+  aspect: string
+  currentLevel_before: number
+  currentLevel_after: number
+  completedScripts_added: string[]
+}
+
+type RestorePreview = {
+  bump_levels: boolean
+  any_changes: boolean
+  applied: boolean
+  diff_by_aspect?: RestoreDiffAspect[]
+  unmapped_diary_aspects?: string[]
+}
+
+type FullDiary = {
+  total: number
+  entries: DiaryEntry[]
+}
+
+type StateEditorState = {
+  text: string
+  error: string | null
+}
+
+type PositionEditorState = {
+  aspect: AspectKey | string
+  currentLevel: number | string
+  currentScriptId: string
+  resetMessages: boolean
+}
+
+type TgMessageState = { text: string }
+
+type ActionLogEntry = { ts: number; msg: string }
+
+type Props = {
+  onImpersonateApply?: (token: string, user: unknown) => void
+}
+
+export default function UsersTab({ onImpersonateApply }: Props) {
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [total, setTotal] = useState<number>(0)
+  const [search, setSearch] = useState<string>('')
+  const [sort, setSort] = useState<SortOption>('recent')
+  const [busy, setBusy] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
+  const [diagnostic, setDiagnostic] = useState<Diagnostic | null>(null)
+  const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null)
+  const [actionLog, setActionLog] = useState<ActionLogEntry[]>([])
+
+  const [fullDiary, setFullDiary] = useState<FullDiary | null>(null)
+  const [stateEditor, setStateEditor] = useState<StateEditorState | null>(null)
   // Position-editor: { aspect, currentLevel, currentScriptId, resetMessages } | null
-  const [positionEditor, setPositionEditor] = useState(null)
+  const [positionEditor, setPositionEditor] = useState<PositionEditorState | null>(null)
   // Адресное TG-сообщение: { text } | null
-  const [tgMessage, setTgMessage] = useState(null)
+  const [tgMessage, setTgMessage] = useState<TgMessageState | null>(null)
 
-  const pushLog = useCallback(msg => {
+  const pushLog = useCallback((msg: string) => {
     setActionLog(prev => [{ ts: Date.now(), msg }, ...prev].slice(0, 12))
   }, [])
 
@@ -53,11 +176,11 @@ export default function UsersTab({ onImpersonateApply }) {
     setBusy(true)
     setError(null)
     try {
-      const data = await adminListUsers({ limit: 50, offset: 0, search, sort })
+      const data = await adminListUsers({ limit: 50, offset: 0, search, sort }) as AdminUsersResponse
       setUsers(data.users ?? [])
       setTotal(data.total ?? 0)
     } catch (e) {
-      setError(e.message ?? 'Ошибка загрузки')
+      setError(e instanceof Error ? e.message : 'Ошибка загрузки')
     } finally {
       setBusy(false)
     }
@@ -69,17 +192,17 @@ export default function UsersTab({ onImpersonateApply }) {
     return () => { cancelled = true; clearTimeout(t) }
   }, [loadUsers])
 
-  const openUser = async user => {
+  const openUser = async (user: AdminUser) => {
     setSelectedUser(user)
     setDiagnostic(null)
     setRestorePreview(null)
     setFullDiary(null)
     setStateEditor(null)
     try {
-      const d = await adminUserDiagnostic({ user_id: user.id })
+      const d = await adminUserDiagnostic({ user_id: user.id }) as Diagnostic
       setDiagnostic(d)
     } catch (e) {
-      pushLog(`Diag error: ${e.message}`)
+      pushLog(`Diag error: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -96,11 +219,11 @@ export default function UsersTab({ onImpersonateApply }) {
     try {
       const d = await adminRestoreFromDiary({
         user_id: selectedUser.id, dry_run: true, bump_levels: true,
-      })
+      }) as RestorePreview
       setRestorePreview(d)
       pushLog(`Preview: ${d.any_changes ? 'есть изменения' : 'без изменений'}`)
     } catch (e) {
-      pushLog(`Preview error: ${e.message}`)
+      pushLog(`Preview error: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -110,28 +233,31 @@ export default function UsersTab({ onImpersonateApply }) {
     try {
       const d = await adminRestoreFromDiary({
         user_id: selectedUser.id, dry_run: false, bump_levels: true,
-      })
+      }) as RestorePreview
       setRestorePreview(d)
       pushLog(`Restore applied: ${d.applied ? '✓' : '✗'}`)
       await loadUsers()
     } catch (e) {
-      pushLog(`Restore error: ${e.message}`)
+      pushLog(`Restore error: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
-  const promote = async makeAdmin => {
+  const promote = async (makeAdmin: boolean) => {
     if (!selectedUser) return
     const verb = makeAdmin ? 'дать админа' : 'забрать админа'
     if (!confirm(`${verb} у ${selectedUser.email || selectedUser.id}?`)) return
     try {
-      const d = await adminPromote({ user_id: selectedUser.id, is_admin: makeAdmin })
+      const d = await adminPromote({ user_id: selectedUser.id, is_admin: makeAdmin }) as {
+        is_admin_before: boolean
+        is_admin_after: boolean
+      }
       pushLog(`Promote: ${d.is_admin_before} → ${d.is_admin_after}`)
       setSelectedUser(u => u ? { ...u, is_admin: d.is_admin_after } : u)
       setUsers(prev => prev.map(u =>
         u.id === selectedUser.id ? { ...u, is_admin: d.is_admin_after } : u
       ))
     } catch (e) {
-      pushLog(`Promote error: ${e.message}`)
+      pushLog(`Promote error: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -139,13 +265,16 @@ export default function UsersTab({ onImpersonateApply }) {
     if (!selectedUser) return
     if (!confirm(`Войти от имени ${selectedUser.email || selectedUser.id}? Текущий админский токен будет заменён. Чтобы вернуться, нужно будет перелогиниться.`)) return
     try {
-      const d = await adminImpersonate({ user_id: selectedUser.id })
+      const d = await adminImpersonate({ user_id: selectedUser.id }) as {
+        token: string
+        user: { id: number | string; email?: string | null }
+      }
       setToken(d.token)
       pushLog(`Impersonating: ${d.user.email || d.user.id}`)
       if (onImpersonateApply) onImpersonateApply(d.token, d.user)
       else window.location.reload()
     } catch (e) {
-      pushLog(`Impersonate error: ${e.message}`)
+      pushLog(`Impersonate error: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -153,27 +282,27 @@ export default function UsersTab({ onImpersonateApply }) {
     if (!selectedUser) return
     if (!confirm(`Откатить последний restore для ${selectedUser.email || selectedUser.id}?`)) return
     try {
-      const d = await adminRollbackRestore({ user_id: selectedUser.id })
+      const d = await adminRollbackRestore({ user_id: selectedUser.id }) as { rolled_back_to?: string }
       pushLog(`Rollback: до ${d.rolled_back_to}`)
       setRestorePreview(null)
       if (diagnostic) {
-        const fresh = await adminUserDiagnostic({ user_id: selectedUser.id })
+        const fresh = await adminUserDiagnostic({ user_id: selectedUser.id }) as Diagnostic
         setDiagnostic(fresh)
       }
       await loadUsers()
     } catch (e) {
-      pushLog(`Rollback error: ${e.message}`)
+      pushLog(`Rollback error: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
   const openFullDiary = async () => {
     if (!selectedUser) return
     try {
-      const d = await adminUserDiary(selectedUser.id, { limit: 200 })
+      const d = await adminUserDiary(selectedUser.id, { limit: 200 }) as FullDiary
       setFullDiary(d)
       pushLog(`Diary: ${d.total} entries`)
     } catch (e) {
-      pushLog(`Diary error: ${e.message}`)
+      pushLog(`Diary error: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -181,17 +310,17 @@ export default function UsersTab({ onImpersonateApply }) {
   const refreshDiagnostic = async () => {
     if (!selectedUser) return
     try {
-      const fresh = await adminUserDiagnostic({ user_id: selectedUser.id })
+      const fresh = await adminUserDiagnostic({ user_id: selectedUser.id }) as Diagnostic
       setDiagnostic(fresh)
     } catch (e) {
-      pushLog(`Diag refresh error: ${e.message}`)
+      pushLog(`Diag refresh error: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
   const openPositionEditor = () => {
     if (!diagnostic) return
     const aspects = diagnostic.web_state?.aspects || {}
-    const firstAspect = Object.keys(aspects)[0] || 'Fe'
+    const firstAspect = (Object.keys(aspects)[0] || 'Fe') as AspectKey | string
     const folder = aspects[firstAspect] || {}
     setPositionEditor({
       aspect: firstAspect,
@@ -210,12 +339,15 @@ export default function UsersTab({ onImpersonateApply }) {
         currentLevel: Number(positionEditor.currentLevel),
         currentScriptId: positionEditor.currentScriptId || null,
         resetMessages: positionEditor.resetMessages,
-      })
+      }) as {
+        before?: { currentLevel?: number; currentScriptId?: string | null }
+        after?: { currentLevel?: number; currentScriptId?: string | null }
+      }
       pushLog(`Position ${positionEditor.aspect}: L${r.before?.currentLevel}→L${r.after?.currentLevel}, sid=${r.before?.currentScriptId}→${r.after?.currentScriptId}`)
       setPositionEditor(null)
       await refreshDiagnostic()
     } catch (e) {
-      pushLog(`Position error: ${e.message}`)
+      pushLog(`Position error: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -223,27 +355,33 @@ export default function UsersTab({ onImpersonateApply }) {
     if (!selectedUser) return
     if (!confirm('Авто-проставить позицию по последним записям дневника для всех аспектов?')) return
     try {
-      const r = await adminAutoPositionFromDiary(selectedUser.id)
+      const r = await adminAutoPositionFromDiary(selectedUser.id) as {
+        applied?: boolean
+        changes?: unknown[]
+        reason?: string
+      }
       if (r.applied) {
-        pushLog(`Auto-position: ${r.changes.length} аспектов обновлено`)
+        pushLog(`Auto-position: ${(r.changes ?? []).length} аспектов обновлено`)
       } else {
         pushLog(`Auto-position: ${r.reason || 'no changes'}`)
       }
       await refreshDiagnostic()
     } catch (e) {
-      pushLog(`Auto-position error: ${e.message}`)
+      pushLog(`Auto-position error: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
-  const resetAspectPosition = async (aspect) => {
+  const resetAspectPosition = async (aspect: AspectKey | string) => {
     if (!selectedUser) return
     if (!confirm(`Сбросить позицию ${aspect} на начало текущего уровня? Чат-история сотрётся, completedScripts и currentLevel остаются.`)) return
     try {
-      const r = await adminResetAspectPosition(selectedUser.id, aspect)
+      const r = await adminResetAspectPosition(selectedUser.id, aspect) as {
+        before?: { messages_count?: number }
+      }
       pushLog(`Reset ${aspect}: ${r.before?.messages_count} сообщений стёрто`)
       await refreshDiagnostic()
     } catch (e) {
-      pushLog(`Reset error: ${e.message}`)
+      pushLog(`Reset error: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -251,12 +389,16 @@ export default function UsersTab({ onImpersonateApply }) {
     if (!selectedUser) return
     if (!confirm('Синхронизировать totalCompleted с фактической суммой completedScripts?')) return
     try {
-      const r = await adminNormalizeCounters(selectedUser.id)
+      const r = await adminNormalizeCounters(selectedUser.id) as {
+        totalCompleted_before?: number
+        totalCompleted_after?: number
+        applied?: boolean
+      }
       pushLog(`Counters: ${r.totalCompleted_before}→${r.totalCompleted_after}${r.applied ? '' : ' (already synced)'}`)
       await refreshDiagnostic()
       await loadUsers()
     } catch (e) {
-      pushLog(`Normalize error: ${e.message}`)
+      pushLog(`Normalize error: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -274,7 +416,7 @@ export default function UsersTab({ onImpersonateApply }) {
     if (!text) return
     if (!confirm(`Отправить юзеру ${selectedUser.email || selectedUser.id} это сообщение в TG?\n\n${text}`)) return
     try {
-      const r = await adminNotifySendToUser({ user_id: selectedUser.id, text })
+      const r = await adminNotifySendToUser({ user_id: selectedUser.id, text }) as { ok?: boolean; error?: string }
       if (r.ok) {
         pushLog(`TG → ${selectedUser.email || selectedUser.id}: отправлено ✓`)
         setTgMessage(null)
@@ -282,7 +424,7 @@ export default function UsersTab({ onImpersonateApply }) {
         pushLog(`TG → ${selectedUser.email || selectedUser.id}: ${r.error || 'не удалось'}`)
       }
     } catch (e) {
-      pushLog(`TG send error: ${e.message}`)
+      pushLog(`TG send error: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -297,11 +439,12 @@ export default function UsersTab({ onImpersonateApply }) {
 
   const applyStateEditor = async () => {
     if (!selectedUser || !stateEditor) return
-    let parsed
+    let parsed: unknown
     try {
       parsed = JSON.parse(stateEditor.text)
     } catch (e) {
-      setStateEditor(s => ({ ...s, error: `Невалидный JSON: ${e.message}` }))
+      const msg = e instanceof Error ? e.message : String(e)
+      setStateEditor(s => s ? ({ ...s, error: `Невалидный JSON: ${msg}` }) : s)
       return
     }
     if (!confirm('Применить новый journey? Старый сохранится в _backup_before_state_edit.')) return
@@ -310,13 +453,14 @@ export default function UsersTab({ onImpersonateApply }) {
       // Если юзер хочет редактировать полный journey — он должен предварительно
       // взять его через сырой diagnostic JSON или через export-функцию.
       // Сейчас принимаем то, что в textarea, как journey-объект.
-      const r = await adminPatchUserState(selectedUser.id, parsed)
+      const r = await adminPatchUserState(selectedUser.id, parsed) as { applied?: boolean }
       pushLog(`State patched: ${r.applied ? '✓' : '✗'}`)
       setStateEditor(null)
-      const fresh = await adminUserDiagnostic({ user_id: selectedUser.id })
+      const fresh = await adminUserDiagnostic({ user_id: selectedUser.id }) as Diagnostic
       setDiagnostic(fresh)
     } catch (e) {
-      setStateEditor(s => ({ ...s, error: e.message }))
+      const msg = e instanceof Error ? e.message : String(e)
+      setStateEditor(s => s ? ({ ...s, error: msg }) : s)
     }
   }
 
@@ -333,7 +477,7 @@ export default function UsersTab({ onImpersonateApply }) {
         <select
           className={styles.sortSelect}
           value={sort}
-          onChange={e => setSort(e.target.value)}
+          onChange={e => setSort(e.target.value as SortOption)}
         >
           {SORT_OPTIONS.map(o => (
             <option key={o.id} value={o.id}>{o.label}</option>
@@ -379,7 +523,7 @@ export default function UsersTab({ onImpersonateApply }) {
               onRollbackRestore={rollbackRestore}
               onOpenFullDiary={openFullDiary}
               onOpenStateEditor={openStateEditor}
-              onChangeStateEditor={text => setStateEditor(s => ({ ...s, text, error: null }))}
+              onChangeStateEditor={(text) => setStateEditor(s => s ? ({ ...s, text, error: null }) : { text, error: null })}
               onApplyStateEditor={applyStateEditor}
               onCloseStateEditor={() => setStateEditor(null)}
               onOpenPositionEditor={openPositionEditor}
@@ -390,7 +534,7 @@ export default function UsersTab({ onImpersonateApply }) {
               onResetAspectPosition={resetAspectPosition}
               onNormalizeCounters={normalizeCounters}
               onOpenTgMessage={openTgMessage}
-              onChangeTgMessage={text => setTgMessage(s => ({ ...s, text }))}
+              onChangeTgMessage={(text) => setTgMessage(s => s ? ({ ...s, text }) : { text })}
               onSendTgMessage={sendTgMessage}
               onCloseTgMessage={() => setTgMessage(null)}
             />
@@ -419,7 +563,13 @@ export default function UsersTab({ onImpersonateApply }) {
   )
 }
 
-function UserCard({ user, selected, onClick }) {
+type UserCardProps = {
+  user: AdminUser
+  selected: boolean
+  onClick: () => void
+}
+
+function UserCard({ user, selected, onClick }: UserCardProps) {
   const drift = (user.totalCompleted ?? 0) - (user.sum_completedScripts ?? 0)
   const isDrift = drift > 10
   const initial = (user.display_name || user.email || user.telegram_username || '?').slice(0, 1).toUpperCase()
@@ -461,6 +611,38 @@ function UserCard({ user, selected, onClick }) {
   )
 }
 
+type UserDetailProps = {
+  user: AdminUser
+  diagnostic: Diagnostic | null
+  restorePreview: RestorePreview | null
+  fullDiary: FullDiary | null
+  stateEditor: StateEditorState | null
+  positionEditor: PositionEditorState | null
+  tgMessage: TgMessageState | null
+  onClose: () => void
+  onPreviewRestore: () => void
+  onApplyRestore: () => void
+  onPromote: (makeAdmin: boolean) => void
+  onImpersonate: () => void
+  onRollbackRestore: () => void
+  onOpenFullDiary: () => void
+  onOpenStateEditor: () => void
+  onChangeStateEditor: (text: string) => void
+  onApplyStateEditor: () => void
+  onCloseStateEditor: () => void
+  onOpenPositionEditor: () => void
+  onChangePositionEditor: (next: PositionEditorState | null) => void
+  onApplyPositionEditor: () => void
+  onClosePositionEditor: () => void
+  onAutoPositionFromDiary: () => void
+  onResetAspectPosition: (aspect: AspectKey | string) => void
+  onNormalizeCounters: () => void
+  onOpenTgMessage: () => void
+  onChangeTgMessage: (text: string) => void
+  onSendTgMessage: () => void
+  onCloseTgMessage: () => void
+}
+
 function UserDetail({
   user, diagnostic, restorePreview, fullDiary, stateEditor, positionEditor, tgMessage,
   onClose, onPreviewRestore, onApplyRestore,
@@ -470,7 +652,7 @@ function UserDetail({
   onOpenPositionEditor, onChangePositionEditor, onApplyPositionEditor, onClosePositionEditor,
   onAutoPositionFromDiary, onResetAspectPosition, onNormalizeCounters,
   onOpenTgMessage, onChangeTgMessage, onSendTgMessage, onCloseTgMessage,
-}) {
+}: UserDetailProps) {
   return (
     <div>
       <div className={styles.detailHeader}>
@@ -492,7 +674,7 @@ function UserDetail({
       {diagnostic && (
         <>
           <Section title="Диагностика">
-            <RecommendationCard rec={diagnostic.recommendation} />
+            <RecommendationCard rec={diagnostic.recommendation ?? null} />
             <div className={styles.aspectGrid}>
               {Object.entries(diagnostic.web_state?.aspects || {}).map(([key, folder]) => (
                 <div key={key} className={styles.aspectCell}>
@@ -605,7 +787,7 @@ function UserDetail({
                     className={styles.sortSelect}
                     value={positionEditor.aspect}
                     onChange={e => {
-                      const newAsp = e.target.value
+                      const newAsp = e.target.value as AspectKey | string
                       const folder = (diagnostic.web_state?.aspects || {})[newAsp] || {}
                       onChangePositionEditor({
                         aspect: newAsp,
@@ -637,7 +819,7 @@ function UserDetail({
                 <label className={styles.bulkField} style={{ gridColumn: '1 / -1' }}>
                   <span>currentScriptId — скрипт уровня L{positionEditor.currentLevel}</span>
                   <ScriptSelect
-                    aspect={positionEditor.aspect}
+                    aspect={positionEditor.aspect as AspectKey}
                     level={Number(positionEditor.currentLevel)}
                     value={positionEditor.currentScriptId}
                     onChange={value => onChangePositionEditor({
@@ -709,7 +891,7 @@ function UserDetail({
               </table>
               {(restorePreview.unmapped_diary_aspects || []).length > 0 && (
                 <div className={styles.warnLine}>
-                  Не смогли смаппить аспекты: {restorePreview.unmapped_diary_aspects.join(', ')}
+                  Не смогли смаппить аспекты: {restorePreview.unmapped_diary_aspects!.join(', ')}
                 </div>
               )}
             </Section>
@@ -801,7 +983,9 @@ function UserDetail({
   )
 }
 
-function Section({ title, children }) {
+type SectionProps = { title: string; children: ReactNode }
+
+function Section({ title, children }: SectionProps) {
   return (
     <div className={styles.section}>
       <div className={styles.sectionTitle}>{title}</div>
@@ -810,13 +994,23 @@ function Section({ title, children }) {
   )
 }
 
+type ScriptSelectProps = {
+  aspect: AspectKey
+  level: number
+  value: string
+  onChange: (value: string) => void
+}
+
 // Dropdown скриптов уровня. Подтягивает структуру из data/journey/registry.
 // Каждый option — "T-1 — Слово дня: Внимание". Если в текущем value нет
 // в списке — option «(других уровней / неизвестный) …» сверху, чтобы
 // текущее значение не терялось.
-function ScriptSelect({ aspect, level, value, onChange }) {
+function ScriptSelect({ aspect, level, value, onChange }: ScriptSelectProps) {
   const journey = getJourney(aspect)
-  const levelData = journey?.levels?.[level]
+  // Journey.levels has keys 0|1|2|3; cast safely from numeric level.
+  const levelData = level >= 0 && level <= 3
+    ? journey?.levels?.[level as 0 | 1 | 2 | 3]
+    : undefined
   const scripts = levelData?.core ?? levelData?.scripts ?? []
   const knownIds = new Set(scripts.map(s => s.id))
   const valueNotInList = value && !knownIds.has(value)
@@ -843,9 +1037,9 @@ function ScriptSelect({ aspect, level, value, onChange }) {
   )
 }
 
-function RecommendationCard({ rec }) {
+function RecommendationCard({ rec }: { rec: DiagnosticRecommendation | null }) {
   if (!rec) return null
-  const colorByScenario = {
+  const colorByScenario: Record<string, string> = {
     all_synced: '#a8d97b',
     data_drift_recoverable: '#e6c158',
     data_drift_partial: '#e6c158',
@@ -856,7 +1050,7 @@ function RecommendationCard({ rec }) {
     ghost_progress: '#e57373',
     unclear: '#c8cad1',
   }
-  const color = colorByScenario[rec.scenario] || '#c8cad1'
+  const color = (rec.scenario && colorByScenario[rec.scenario]) || '#c8cad1'
   return (
     <div className={styles.recCard} style={{ borderColor: color }}>
       <div className={styles.recScenario} style={{ color }}>{rec.scenario}</div>

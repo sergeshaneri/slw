@@ -10,17 +10,72 @@ import {
 } from '../../api/client'
 import styles from './AdminView.module.css'
 
-const TARGETS = [
+type BroadcastTarget = 'tg_linked' | 'recent_30d' | 'all'
+
+const TARGETS: ReadonlyArray<{ id: BroadcastTarget; label: string }> = [
   { id: 'tg_linked',  label: 'TG залинкован + включены уведомления' },
   { id: 'recent_30d', label: 'Активные за 30 дней + включены' },
   { id: 'all',        label: 'Все с TG (даже отключившие)' },
 ]
 
-const TYPE_LABELS = {
+type NotifyType = 'pending_task_reminder' | 'practice_check' | 'continue_journey'
+
+const TYPE_LABELS: Record<NotifyType, string> = {
   pending_task_reminder: 'Напоминание про взятое упражнение',
   practice_check:        'Проверка регулярной практики',
   continue_journey:      'Продолжить путешествие',
 }
+
+// Backend has no response_model for /api/admin/notify/config. Captures the
+// fields read by JSX (singleton notification_settings + per-type flags via
+// `type_<key>` index keys).
+// TODO(ts): tighten when backend formalizes notify/config response.
+type NotifyConfig = {
+  enabled: boolean
+  notify_hour_utc: number
+  // type_pending_task_reminder, type_practice_check, type_continue_journey, ...
+  [key: string]: unknown
+}
+
+type RunNowResp = {
+  globally_disabled?: boolean
+  sent?: number
+  skipped?: number
+  errors?: number
+}
+
+type TestResp = {
+  sent?: number
+  of?: number
+  error?: string
+}
+
+type BroadcastResp = {
+  sent?: number
+  errors?: number
+}
+
+type ClearCooldownsResp = {
+  affected?: number
+}
+
+type LogEntry = {
+  id: number | string
+  sent_at?: string | null
+  user_display_name?: string | null
+  user_email?: string | null
+  web_user_id?: number | string | null
+  telegram_id?: number | string | null
+  type?: string
+  error?: string | null
+  text?: string | null
+}
+
+type LogResp = {
+  entries?: LogEntry[]
+}
+
+type ActionLogEntry = { ts: number; msg: string }
 
 /**
  * Admin Panel → 🔔 Уведомления.
@@ -31,18 +86,18 @@ const TYPE_LABELS = {
  *   3. Лог последних отправок
  */
 export default function NotifyTab() {
-  const [config, setConfig] = useState(null)
-  const [configBusy, setConfigBusy] = useState(false)
-  const [configErr, setConfigErr] = useState('')
+  const [config, setConfig] = useState<NotifyConfig | null>(null)
+  const [configBusy, setConfigBusy] = useState<boolean>(false)
+  const [configErr, setConfigErr] = useState<string>('')
 
-  const [logEntries, setLogEntries] = useState([])
-  const [logBusy, setLogBusy] = useState(false)
+  const [logEntries, setLogEntries] = useState<LogEntry[]>([])
+  const [logBusy, setLogBusy] = useState<boolean>(false)
 
-  const [broadcastText, setBroadcastText] = useState('')
-  const [broadcastTarget, setBroadcastTarget] = useState('tg_linked')
+  const [broadcastText, setBroadcastText] = useState<string>('')
+  const [broadcastTarget, setBroadcastTarget] = useState<BroadcastTarget>('tg_linked')
 
-  const [actionLog, setActionLog] = useState([])
-  const pushAction = useCallback(msg => {
+  const [actionLog, setActionLog] = useState<ActionLogEntry[]>([])
+  const pushAction = useCallback((msg: string) => {
     setActionLog(prev => [{ ts: Date.now(), msg }, ...prev].slice(0, 10))
   }, [])
 
@@ -50,10 +105,10 @@ export default function NotifyTab() {
     setConfigBusy(true)
     setConfigErr('')
     try {
-      const data = await adminNotifyGetConfig()
+      const data = await adminNotifyGetConfig() as NotifyConfig
       setConfig(data)
     } catch (e) {
-      setConfigErr(e.message ?? 'Не удалось')
+      setConfigErr(e instanceof Error ? e.message : 'Не удалось')
     } finally {
       setConfigBusy(false)
     }
@@ -62,10 +117,10 @@ export default function NotifyTab() {
   const loadLog = useCallback(async () => {
     setLogBusy(true)
     try {
-      const data = await adminNotifyGetLog({ limit: 100 })
+      const data = await adminNotifyGetLog({ limit: 100 }) as LogResp
       setLogEntries(data.entries ?? [])
     } catch (e) {
-      pushAction(`Лог: ошибка ${e.message}`)
+      pushAction(`Лог: ошибка ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setLogBusy(false)
     }
@@ -76,20 +131,20 @@ export default function NotifyTab() {
     loadLog()
   }, [loadConfig, loadLog])
 
-  const patchConfig = async (patch) => {
+  const patchConfig = async (patch: Partial<NotifyConfig>) => {
     try {
-      const updated = await adminNotifyPatchConfig(patch)
+      const updated = await adminNotifyPatchConfig(patch) as NotifyConfig
       setConfig(updated)
       pushAction('Конфиг сохранён')
     } catch (e) {
-      pushAction(`Конфиг ошибка: ${e.message}`)
+      pushAction(`Конфиг ошибка: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
   const runNow = async () => {
     if (!confirm('Запустить раунд рассылки сейчас? Будут отправлены уведомления всем подходящим юзерам.')) return
     try {
-      const r = await adminNotifyRunNow()
+      const r = await adminNotifyRunNow() as RunNowResp
       if (r.globally_disabled) {
         pushAction('Не отправлено — глобально выключено')
       } else {
@@ -97,18 +152,18 @@ export default function NotifyTab() {
       }
       await loadLog()
     } catch (e) {
-      pushAction(`run-now ошибка: ${e.message}`)
+      pushAction(`run-now ошибка: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
   const sendTest = async () => {
     try {
-      const r = await adminNotifyTest()
+      const r = await adminNotifyTest() as TestResp
       if (r.error) pushAction(`Тест ошибка: ${r.error}`)
       else pushAction(`Тест: отправлено ${r.sent} из ${r.of}`)
       await loadLog()
     } catch (e) {
-      pushAction(`Тест ошибка: ${e.message}`)
+      pushAction(`Тест ошибка: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -120,22 +175,22 @@ export default function NotifyTab() {
     }
     if (!confirm(`Отправить ВСЕМ юзерам (target: ${broadcastTarget})?\n\nТекст:\n${text}`)) return
     try {
-      const r = await adminNotifyBroadcast({ text, target: broadcastTarget })
+      const r = await adminNotifyBroadcast({ text, target: broadcastTarget }) as BroadcastResp
       pushAction(`Broadcast: sent=${r.sent} errors=${r.errors}`)
       setBroadcastText('')
       await loadLog()
     } catch (e) {
-      pushAction(`Broadcast ошибка: ${e.message}`)
+      pushAction(`Broadcast ошибка: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
   const clearAllCooldowns = async () => {
     if (!confirm('Сбросить cooldown\'ы у ВСЕХ юзеров? После этого каждый снова может получить любой тип уведомления сегодня.')) return
     try {
-      const r = await adminNotifyClearCooldowns({})
+      const r = await adminNotifyClearCooldowns({}) as ClearCooldownsResp
       pushAction(`Cooldowns сброшены: affected=${r.affected}`)
     } catch (e) {
-      pushAction(`clear-cooldowns ошибка: ${e.message}`)
+      pushAction(`clear-cooldowns ошибка: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -191,7 +246,7 @@ export default function NotifyTab() {
           <strong>Типы уведомлений:</strong>
         </div>
         <div className={styles.bulkForm} style={{ gridTemplateColumns: '1fr' }}>
-          {Object.entries(TYPE_LABELS).map(([key, label]) => {
+          {(Object.entries(TYPE_LABELS) as Array<[NotifyType, string]>).map(([key, label]) => {
             const fieldKey = `type_${key}`
             return (
               <label
@@ -251,7 +306,7 @@ export default function NotifyTab() {
             <select
               className={styles.sortSelect}
               value={broadcastTarget}
-              onChange={e => setBroadcastTarget(e.target.value)}
+              onChange={e => setBroadcastTarget(e.target.value as BroadcastTarget)}
             >
               {TARGETS.map(t => (
                 <option key={t.id} value={t.id}>{t.label}</option>

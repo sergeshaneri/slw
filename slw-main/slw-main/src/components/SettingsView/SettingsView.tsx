@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import {
   updateProfile,
   updateNotifications,
@@ -12,6 +13,26 @@ import {
 } from '../../api/client'
 import styles from './SettingsView.module.css'
 
+// Backend has no response_model for /api/auth/me yet — the user shape we
+// actually read is captured here.
+// TODO(ts): tighten when backend tightens /api/auth/me.
+type SettingsUser = {
+  email?: string | null
+  display_name?: string | null
+  telegram_id?: number | string | null
+  telegram_first_name?: string | null
+  telegram_username?: string | null
+  notifications_enabled?: boolean
+  [key: string]: unknown
+}
+
+type Props = {
+  user: SettingsUser | null | false
+  onUserUpdate?: (user: unknown) => void
+  onAccountDeleted?: () => void
+  onLogout?: () => void
+}
+
 /**
  * SettingsView — единственная страница настроек.
  *
@@ -24,7 +45,7 @@ import styles from './SettingsView.module.css'
  * После успешного действия дёргает onUserUpdate(updatedUser) или
  * onAccountDeleted() — App обновляет user-стейт.
  */
-export default function SettingsView({ user, onUserUpdate, onAccountDeleted, onLogout }) {
+export default function SettingsView({ user, onUserUpdate, onAccountDeleted, onLogout }: Props) {
   if (!user) {
     return (
       <div className={styles.empty}>
@@ -43,7 +64,7 @@ export default function SettingsView({ user, onUserUpdate, onAccountDeleted, onL
         <NotificationsSection user={user} onUserUpdate={onUserUpdate} />
       )}
       <SecuritySection user={user} onUserUpdate={onUserUpdate} />
-      <DataSection user={user} />
+      <DataSection />
       <DangerSection
         user={user}
         onAccountDeleted={onAccountDeleted ?? onLogout}
@@ -54,11 +75,13 @@ export default function SettingsView({ user, onUserUpdate, onAccountDeleted, onL
 
 // ─── Профиль ───────────────────────────────────────────────────────────────
 
-function ProfileSection({ user, onUserUpdate }) {
-  const [name, setName] = useState(user.display_name || '')
-  const [saving, setSaving] = useState(false)
-  const [msg, setMsg] = useState('')
-  const [err, setErr] = useState('')
+type SectionProps = { user: SettingsUser; onUserUpdate?: (user: unknown) => void }
+
+function ProfileSection({ user, onUserUpdate }: SectionProps) {
+  const [name, setName] = useState<string>(user.display_name || '')
+  const [saving, setSaving] = useState<boolean>(false)
+  const [msg, setMsg] = useState<string>('')
+  const [err, setErr] = useState<string>('')
 
   const dirty = name.trim() !== (user.display_name || '')
 
@@ -72,7 +95,7 @@ function ProfileSection({ user, onUserUpdate }) {
       setMsg('Сохранено')
       setTimeout(() => setMsg(''), 1800)
     } catch (e) {
-      setErr(e.message)
+      setErr(e instanceof Error ? e.message : String(e))
     } finally {
       setSaving(false)
     }
@@ -127,19 +150,22 @@ function ProfileSection({ user, onUserUpdate }) {
 // ─── Приватность публичного профиля ───────────────────────────────────────
 
 function PrivacySection() {
-  const [isPublic, setIsPublic] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState('')
+  const [isPublic, setIsPublic] = useState<boolean | null>(null)
+  const [loading, setLoading] = useState<boolean>(true)
+  const [saving, setSaving] = useState<boolean>(false)
+  const [err, setErr] = useState<string>('')
 
   useEffect(() => {
     fetchMyProfile()
-      .then(p => setIsPublic(p.is_public !== false))
-      .catch(e => setErr(e.message ?? 'Не удалось загрузить'))
+      .then(p => {
+        const prof = p as { is_public?: boolean } | null | undefined
+        setIsPublic(prof?.is_public !== false)
+      })
+      .catch(e => setErr(e instanceof Error ? e.message : 'Не удалось загрузить'))
       .finally(() => setLoading(false))
   }, [])
 
-  const handleToggle = async (e) => {
+  const handleToggle = async (e: ChangeEvent<HTMLInputElement>) => {
     const next = e.target.checked
     setIsPublic(next)
     setSaving(true)
@@ -148,7 +174,7 @@ function PrivacySection() {
       await updateMyProfile({ is_public: next })
     } catch (e) {
       setIsPublic(!next)
-      setErr(e.message ?? 'Не удалось сохранить')
+      setErr(e instanceof Error ? e.message : 'Не удалось сохранить')
     } finally {
       setSaving(false)
     }
@@ -186,12 +212,12 @@ function PrivacySection() {
 
 // ─── TG-нотификации ────────────────────────────────────────────────────────
 
-function NotificationsSection({ user, onUserUpdate }) {
-  const [enabled, setEnabled] = useState(user.notifications_enabled !== false)
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState('')
+function NotificationsSection({ user, onUserUpdate }: SectionProps) {
+  const [enabled, setEnabled] = useState<boolean>(user.notifications_enabled !== false)
+  const [saving, setSaving] = useState<boolean>(false)
+  const [err, setErr] = useState<string>('')
 
-  const handleToggle = async (e) => {
+  const handleToggle = async (e: ChangeEvent<HTMLInputElement>) => {
     const next = e.target.checked
     setEnabled(next)
     setSaving(true)
@@ -201,7 +227,7 @@ function NotificationsSection({ user, onUserUpdate }) {
       onUserUpdate?.(updated)
     } catch (e) {
       setEnabled(!next)
-      setErr(e.message ?? 'Не удалось сохранить')
+      setErr(e instanceof Error ? e.message : 'Не удалось сохранить')
     } finally {
       setSaving(false)
     }
@@ -234,7 +260,7 @@ function NotificationsSection({ user, onUserUpdate }) {
 
 // ─── Безопасность ──────────────────────────────────────────────────────────
 
-function SecuritySection({ user, onUserUpdate }) {
+function SecuritySection({ user, onUserUpdate }: SectionProps) {
   const hasEmail = !!user.email
   const hasTg = !!user.telegram_id
 
@@ -282,14 +308,14 @@ function SecuritySection({ user, onUserUpdate }) {
 }
 
 function ChangePasswordBlock() {
-  const [open, setOpen] = useState(false)
-  const [oldP, setOldP] = useState('')
-  const [newP, setNewP] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState('')
-  const [err, setErr] = useState('')
+  const [open, setOpen] = useState<boolean>(false)
+  const [oldP, setOldP] = useState<string>('')
+  const [newP, setNewP] = useState<string>('')
+  const [busy, setBusy] = useState<boolean>(false)
+  const [msg, setMsg] = useState<string>('')
+  const [err, setErr] = useState<string>('')
 
-  async function submit(e) {
+  async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setErr('')
     setMsg('')
@@ -301,7 +327,7 @@ function ChangePasswordBlock() {
       setMsg('Пароль изменён')
       setTimeout(() => { setMsg(''); setOpen(false) }, 1500)
     } catch (e) {
-      setErr(e.message)
+      setErr(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
     }
@@ -359,9 +385,9 @@ function ChangePasswordBlock() {
 
 // ─── Данные ────────────────────────────────────────────────────────────────
 
-function DataSection({ user }) {
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
+function DataSection() {
+  const [busy, setBusy] = useState<boolean>(false)
+  const [err, setErr] = useState<string>('')
 
   async function handleExport() {
     setErr('')
@@ -379,7 +405,7 @@ function DataSection({ user }) {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (e) {
-      setErr(e.message)
+      setErr(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
     }
@@ -405,15 +431,20 @@ function DataSection({ user }) {
 
 // ─── Опасная зона ──────────────────────────────────────────────────────────
 
-function DangerSection({ user, onAccountDeleted }) {
-  const [open, setOpen] = useState(false)
-  const [confirm, setConfirm] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
+type DangerProps = {
+  user: SettingsUser
+  onAccountDeleted?: () => void
+}
+
+function DangerSection({ user, onAccountDeleted }: DangerProps) {
+  const [open, setOpen] = useState<boolean>(false)
+  const [confirm, setConfirm] = useState<string>('')
+  const [busy, setBusy] = useState<boolean>(false)
+  const [err, setErr] = useState<string>('')
 
   const expected = (user.email || 'удалить').toLowerCase()
 
-  async function submit(e) {
+  async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setErr('')
     setBusy(true)
@@ -421,7 +452,7 @@ function DangerSection({ user, onAccountDeleted }) {
       await deleteAccount(confirm.trim())
       onAccountDeleted?.()
     } catch (e) {
-      setErr(e.message)
+      setErr(e instanceof Error ? e.message : String(e))
       setBusy(false)
     }
   }
@@ -482,7 +513,9 @@ function DangerSection({ user, onAccountDeleted }) {
 
 // ─── Универсальные блоки ───────────────────────────────────────────────────
 
-function Field({ label, children }) {
+type FieldProps = { label: string; children: ReactNode }
+
+function Field({ label, children }: FieldProps) {
   return (
     <div className={styles.field}>
       <div className={styles.fieldLabel}>{label}</div>
@@ -491,11 +524,19 @@ function Field({ label, children }) {
   )
 }
 
-function RiskAction({ label, desc, confirmText, onConfirm, disabled }) {
-  const [open, setOpen] = useState(false)
-  const [val, setVal] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
+type RiskActionProps = {
+  label: string
+  desc: string
+  confirmText: string
+  onConfirm: () => Promise<void>
+  disabled?: boolean
+}
+
+function RiskAction({ label, desc, confirmText, onConfirm, disabled }: RiskActionProps) {
+  const [open, setOpen] = useState<boolean>(false)
+  const [val, setVal] = useState<string>('')
+  const [busy, setBusy] = useState<boolean>(false)
+  const [err, setErr] = useState<string>('')
 
   async function submit() {
     setErr('')
@@ -505,7 +546,7 @@ function RiskAction({ label, desc, confirmText, onConfirm, disabled }) {
       setOpen(false)
       setVal('')
     } catch (e) {
-      setErr(e.message)
+      setErr(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
     }

@@ -6,7 +6,9 @@ import ModerationTab from './ModerationTab'
 import NotifyTab from './NotifyTab'
 import styles from './AdminView.module.css'
 
-const TABS = [
+type TabId = 'users' | 'stats' | 'bulk' | 'moderation' | 'notify'
+
+const TABS: ReadonlyArray<{ id: TabId; label: string }> = [
   { id: 'users',      label: '👥 Юзеры' },
   { id: 'stats',      label: '📊 Статистика' },
   { id: 'bulk',       label: '⚙ Массовые операции' },
@@ -14,12 +16,17 @@ const TABS = [
   { id: 'notify',     label: '🔔 Уведомления' },
 ]
 
+type Props = {
+  onBack?: () => void
+  onImpersonateApply?: (token: string, user: unknown) => void
+}
+
 /**
  * Admin Panel — корневой компонент с вкладками.
  * Виден только юзерам с is_admin=true.
  */
-export default function AdminView({ onBack, onImpersonateApply }) {
-  const [tab, setTab] = useState('users')
+export default function AdminView({ onBack, onImpersonateApply }: Props) {
+  const [tab, setTab] = useState<TabId>('users')
 
   return (
     <div className={styles.container}>

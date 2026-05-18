@@ -2,15 +2,46 @@ import { useState } from 'react'
 import { adminBulkRestore } from '../../api/client'
 import styles from './AdminView.module.css'
 
-export default function BulkTab() {
-  const [threshold, setThreshold] = useState(10)
-  const [limit, setLimit] = useState(50)
-  const [bumpLevels, setBumpLevels] = useState(true)
-  const [result, setResult] = useState(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
+// Backend has no response_model for /api/admin/bulk-restore — shape mirrors
+// what the JSX actually reads.
+// TODO(ts): tighten when backend adds bulk-restore response model.
+type BumpAspect = {
+  aspect: string
+  from: number
+  to: number
+}
 
-  const run = async dryRun => {
+type BulkResultRow = {
+  user_id: number | string
+  email?: string | null
+  drift: number
+  added_scripts_total?: number
+  bumped_aspects?: BumpAspect[]
+  applied: boolean
+  any_changes?: boolean
+  reason?: string | null
+}
+
+type BulkResult = {
+  dry_run: boolean
+  candidates_count: number
+  summary: {
+    users_affected: number
+    total_scripts_added: number
+    users_applied: number
+  }
+  results: BulkResultRow[]
+}
+
+export default function BulkTab() {
+  const [threshold, setThreshold] = useState<number | string>(10)
+  const [limit, setLimit] = useState<number | string>(50)
+  const [bumpLevels, setBumpLevels] = useState<boolean>(true)
+  const [result, setResult] = useState<BulkResult | null>(null)
+  const [busy, setBusy] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const run = async (dryRun: boolean) => {
     if (!dryRun && !confirm(`Применить bulk-restore для всех юзеров с drift > ${threshold} (до ${limit} штук)?`)) return
     setBusy(true)
     setError(null)
@@ -20,10 +51,10 @@ export default function BulkTab() {
         dry_run: dryRun,
         bump_levels: bumpLevels,
         limit: Number(limit),
-      })
+      }) as BulkResult
       setResult(r)
     } catch (e) {
-      setError(e.message ?? 'Ошибка')
+      setError(e instanceof Error ? e.message : 'Ошибка')
     } finally {
       setBusy(false)
     }
