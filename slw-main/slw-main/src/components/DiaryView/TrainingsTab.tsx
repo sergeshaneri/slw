@@ -2,6 +2,20 @@ import { useEffect, useMemo, useState } from 'react'
 import { fetchTrainings } from '../../api/client'
 import styles from './TrainingsTab.module.css'
 
+// Backend table `trainings` (vault-import). Все поля кроме id опциональны —
+// vault может прислать строку без веса/повторов. API не имеет
+// response_model, поэтому локальный тип.
+// TODO(ts): tighten when backend adds response_model to /api/diary/trainings.
+type TrainingEntry = {
+  id: number | string
+  date?: string
+  exercise?: string
+  sets?: number | null
+  reps?: number | null
+  weight_kg?: number | null
+  notes?: string | null
+}
+
 /**
  * Тренировки из дневника. Группируем по дате — на каждый день
  * показываем список упражнений со sets/reps/weight.
@@ -10,31 +24,31 @@ import styles from './TrainingsTab.module.css'
  * (макс. вес × мин. подходы), для базовых паттернов прогресса.
  */
 export default function TrainingsTab() {
-  const [items, setItems] = useState([])
-  const [busy, setBusy] = useState(true)
-  const [error, setError] = useState(null)
+  const [items, setItems] = useState<TrainingEntry[]>([])
+  const [busy, setBusy] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setBusy(true)
     fetchTrainings()
-      .then(setItems)
-      .catch(e => setError(e.message ?? 'Не удалось загрузить тренировки'))
+      .then((d) => setItems(d as TrainingEntry[]))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Не удалось загрузить тренировки'))
       .finally(() => setBusy(false))
   }, [])
 
-  const byDate = useMemo(() => {
-    const map = {}
+  const byDate = useMemo<Record<string, TrainingEntry[]>>(() => {
+    const map: Record<string, TrainingEntry[]> = {}
     for (const t of items) {
       const k = t.date || 'undated'
       if (!map[k]) map[k] = []
-      map[k].push(t)
+      map[k]!.push(t)
     }
     return map
   }, [items])
 
   // Топ упражнений по числу повторений (как часто делается).
-  const exerciseFrequency = useMemo(() => {
-    const map = {}
+  const exerciseFrequency = useMemo<Array<[string, number]>>(() => {
+    const map: Record<string, number> = {}
     for (const t of items) {
       const k = (t.exercise || '').trim()
       if (!k) continue
@@ -44,12 +58,13 @@ export default function TrainingsTab() {
   }, [items])
 
   // Рекорды по весу.
-  const records = useMemo(() => {
-    const map = {}
+  const records = useMemo<TrainingEntry[]>(() => {
+    const map: Record<string, TrainingEntry> = {}
     for (const t of items) {
       if (!t.exercise || t.weight_kg == null) continue
       const k = t.exercise.trim()
-      if (!map[k] || t.weight_kg > map[k].weight_kg) {
+      const existing = map[k]
+      if (!existing || (t.weight_kg ?? 0) > (existing.weight_kg ?? 0)) {
         map[k] = { ...t }
       }
     }
@@ -131,7 +146,7 @@ export default function TrainingsTab() {
           <div key={date} className={styles.day}>
             <div className={styles.dayHead}>{date}</div>
             <ul className={styles.exerciseList}>
-              {byDate[date].map(t => (
+              {(byDate[date] ?? []).map(t => (
                 <li key={t.id} className={styles.exercise}>
                   <span className={styles.exerciseName}>{t.exercise}</span>
                   {(t.sets != null || t.reps != null) && (

@@ -9,9 +9,63 @@ import TrainingsTab from './TrainingsTab'
 import AnalyticsTab from './AnalyticsTab'
 import VaultSyncTab from './VaultSyncTab'
 import { isTMA } from '../../tma'
+import type { AspectKey } from '@/types/aspect'
+import { ru } from '@/locales/ru'
 import styles from './DiaryView.module.css'
 
-const SOURCE_LABEL = {
+type T = typeof ru
+
+// Локальный shape diary-entry: дневник на фронте формируется из веб-ввода
+// (manual / daily-review) и серверных bot-источников (journey-survey,
+// aspect-item, coach, и т.п.). `aspect: 'general'` — общая запись без
+// привязки к аспекту. Все вспомогательные поля опциональны.
+type DiarySource =
+  | 'manual'
+  | 'web'
+  | 'daily-review'
+  | 'journey'
+  | 'journey-question'
+  | 'journey-survey'
+  | 'journey-survey-statement'
+  | 'journey-step-insight'
+  | 'aspect'
+  | 'aspect-item'
+  | 'coach'
+  | 'vault'
+  | string
+
+type SurveyBlockId = string
+
+type SurveyDetailsData = {
+  blocks?: Record<SurveyBlockId, string[]>
+  answers?: Record<SurveyBlockId, number[]>
+  blockAvgs?: Record<SurveyBlockId, number>
+  skillAvg?: number
+}
+
+type DiaryEntryRecord = {
+  id: number
+  date: string
+  ts: number
+  aspect: AspectKey | 'general'
+  text: string
+  source?: DiarySource
+  promptTitle?: string
+  prompt?: string
+  survey?: SurveyDetailsData
+} & Record<string, unknown>
+
+type Props = {
+  diary: DiaryEntryRecord[]
+  onDiaryChange: (next: DiaryEntryRecord[]) => void
+  t: T
+  onOpenProfile?: (userId: number | string) => void
+  user: Record<string, unknown> | null
+}
+
+type DiaryTab = 'entries' | 'today' | 'search' | 'emotions' | 'trainings' | 'analytics' | 'sync'
+
+const SOURCE_LABEL: Record<string, string> = {
   journey: 'из путешествия',
   'journey-question': 'вопрос путешествия',
   'journey-survey': 'анкета навыка',
@@ -20,29 +74,29 @@ const SOURCE_LABEL = {
   coach: 'от ИИ-коуча',
 }
 
-export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user }) {
-  const [text, setText] = useState('')
-  const [aspect, setAspect] = useState('general')
-  const [filter, setFilter] = useState('all')
+export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user }: Props) {
+  const [text, setText] = useState<string>('')
+  const [aspect, setAspect] = useState<AspectKey | 'general'>('general')
+  const [filter, setFilter] = useState<AspectKey | 'general' | 'all'>('all')
   // Вкладки внутри страницы: «entries» (записи) / «search» (поиск).
   // Поиск работает только для залогиненных юзеров (запрос идёт на бэк).
-  const [mode, setMode] = useState('entries')
+  const [mode, setMode] = useState<DiaryTab>('entries')
 
-  const handleAdd = () => {
+  const handleAdd = (): void => {
     if (!text.trim()) return
-    const entry = {
+    const entry: DiaryEntryRecord = {
       id: Date.now(),
       date: new Date().toLocaleDateString('ru-RU'),
       ts: Date.now(),
       aspect,
       text: text.trim(),
-      source: 'manual'
+      source: 'manual',
     }
     onDiaryChange([entry, ...diary])
     setText('')
   }
 
-  const handleDelete = (id) => {
+  const handleDelete = (id: number): void => {
     onDiaryChange(diary.filter(e => e.id !== id))
   }
 
@@ -120,7 +174,8 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
           <Hint id="daily-review-intro" user={user}>
             Один экран — весь день. Все блоки опциональны. Привычки в самом низу.
           </Hint>
-          <DailyReview diary={diary} onDiaryChange={onDiaryChange} />
+          {/* TODO(ts): unify DiaryEntry vs DiaryEntryRecord across DiaryView/DailyReview in P3 */}
+          <DailyReview diary={diary as unknown as Parameters<typeof DailyReview>[0]['diary']} onDiaryChange={onDiaryChange as unknown as Parameters<typeof DailyReview>[0]['onDiaryChange']} />
         </>
       )}
 
@@ -134,7 +189,7 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
         <div className={styles.entryHeader}>
           <select
             value={aspect}
-            onChange={(e) => setAspect(e.target.value)}
+            onChange={(e) => setAspect(e.target.value as AspectKey | 'general')}
             className={styles.select}
           >
             <option value="general">{t.diary.general}</option>
@@ -160,7 +215,13 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
       </div>
 
       <div className={styles.filters}>
-        {[['all', t.diary.filterAll], ['general', t.diary.general], ...ASPECT_KEYS.map(k => [k, k])].map(([value, label]) => (
+        {(
+          [
+            ['all', t.diary.filterAll],
+            ['general', t.diary.general],
+            ...ASPECT_KEYS.map<[AspectKey, string]>(k => [k, k]),
+          ] as Array<[AspectKey | 'general' | 'all', string]>
+        ).map(([value, label]) => (
           <button
             key={value}
             type="button"
@@ -187,8 +248,13 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
   )
 }
 
-function DiaryEntry({ entry, onDelete }) {
-  const [expanded, setExpanded] = useState(false)
+type DiaryEntryProps = {
+  entry: DiaryEntryRecord
+  onDelete: () => void
+}
+
+function DiaryEntry({ entry, onDelete }: DiaryEntryProps) {
+  const [expanded, setExpanded] = useState<boolean>(false)
   const hasPrompt = !!(entry.promptTitle || entry.prompt)
   // Раскрываем, если в исходнике больше ~140 символов или несколько строк.
   const longPrompt = (entry.prompt?.length ?? 0) > 140 || (entry.prompt?.split('\n').length ?? 0) > 3
@@ -197,7 +263,7 @@ function DiaryEntry({ entry, onDelete }) {
     <div
       className={styles.entry}
       style={{
-        borderColor: entry.aspect === 'general' ? undefined : `${ASPECT_COLORS[entry.aspect]}33`
+        borderColor: entry.aspect === 'general' ? undefined : `${ASPECT_COLORS[entry.aspect]}33`,
       }}
     >
       <div className={styles.entryTop}>
@@ -259,10 +325,14 @@ function DiaryEntry({ entry, onDelete }) {
   )
 }
 
+type SurveyDetailsProps = {
+  survey: SurveyDetailsData
+}
+
 // Раскрывающийся блок с подробной разбивкой ответов на анкету.
 // Показывает все 15 утверждений со средней по каждому блоку и общей.
-function SurveyDetails({ survey }) {
-  const [open, setOpen] = useState(false)
+function SurveyDetails({ survey }: SurveyDetailsProps) {
+  const [open, setOpen] = useState<boolean>(false)
   return (
     <div className={styles.surveyDetails}>
       <button
@@ -276,7 +346,7 @@ function SurveyDetails({ survey }) {
       {open && (
         <div className={styles.surveyDetailsBody}>
           {SURVEY_BLOCKS.filter(b => (survey.blocks?.[b.id] ?? []).length > 0).map(block => {
-            const statements = survey.blocks[block.id] ?? []
+            const statements = survey.blocks?.[block.id] ?? []
             const answers = survey.answers?.[block.id] ?? []
             const blockAvg = survey.blockAvgs?.[block.id]
             return (
@@ -302,7 +372,7 @@ function SurveyDetails({ survey }) {
               </div>
             )
           })}
-          {Number.isFinite(survey.skillAvg) && (
+          {survey.skillAvg != null && Number.isFinite(survey.skillAvg) && (
             <div className={styles.surveyDetailsTotal}>
               Средняя по навыку: <strong>{survey.skillAvg.toFixed(1)}/10</strong>
             </div>

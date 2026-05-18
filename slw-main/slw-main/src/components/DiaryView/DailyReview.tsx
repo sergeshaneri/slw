@@ -2,12 +2,40 @@ import { useEffect, useRef, useState } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { fetchHabitsToday, tickHabit, untickHabit } from '../../api/client'
 import { tmaNotify } from '../../tma/hooks'
+import type { AspectKey } from '@/types/aspect'
 import styles from './DiaryView.module.css'
+
+// Backend table `user_habits` (one row per (user, aspect)). Endpoint
+// /api/habits/today returns list (or { habits: [...] }) — нет
+// response_model. Локальный тип.
+// TODO(ts): tighten when backend adds response_model to /api/habits/today.
+type HabitToday = {
+  aspect: AspectKey
+  title: string
+  ticked_today?: boolean
+} & Record<string, unknown>
+
+// Diary entry shape used by DiaryView и Daily Review. Полный список полей —
+// см. DiaryView.tsx; здесь только load-bearing для добавления записи.
+type DiaryEntry = {
+  id: number
+  date: string
+  ts: number
+  aspect: AspectKey | 'general'
+  text: string
+  source: 'daily-review' | 'manual' | string
+  promptTitle?: string
+} & Record<string, unknown>
+
+type Props = {
+  diary: DiaryEntry[]
+  onDiaryChange: (next: DiaryEntry[]) => void
+}
 
 // Подсказки-«вопросы дня» по каждому аспекту. Список — это лишь гайд,
 // юзер пишет свободным текстом. Все блоки опциональны.
 // Ключи — латинские (Si/Se/...) под внутренний state.
-const ASPECT_PROMPTS = {
+const ASPECT_PROMPTS: Record<AspectKey, string[]> = {
   Ne: [
     'Что нового',
     'Что творческого',
@@ -63,44 +91,46 @@ const ASPECT_PROMPTS = {
   ],
 }
 
-function todayPretty() {
+function todayPretty(): string {
   return new Date().toLocaleDateString('ru-RU', {
     weekday: 'long', day: 'numeric', month: 'long',
   })
 }
 
-export default function DailyReview({ diary, onDiaryChange }) {
-  const [eventsText, setEventsText] = useState('')
-  const [aspectTexts, setAspectTexts] = useState({})
+export default function DailyReview({ diary, onDiaryChange }: Props) {
+  const [eventsText, setEventsText] = useState<string>('')
+  const [aspectTexts, setAspectTexts] = useState<Partial<Record<AspectKey, string>>>({})
   // Раскрытые карточки аспектов — по умолчанию все свёрнуты, чтобы экран
   // не был стеной textarea. Юзер раскрывает только то, о чём хочет писать.
-  const [expanded, setExpanded] = useState({})
+  const [expanded, setExpanded] = useState<Partial<Record<AspectKey, boolean>>>({})
 
   // Привычки на сегодня — фетчим один раз. Локальная галочка,
   // финальный sync с бэком при «Сохранить день».
-  const [habits, setHabits] = useState([])
-  const [habitTicks, setHabitTicks] = useState({})
-  const [habitsLoading, setHabitsLoading] = useState(true)
+  const [habits, setHabits] = useState<HabitToday[]>([])
+  const [habitTicks, setHabitTicks] = useState<Partial<Record<AspectKey, boolean>>>({})
+  const [habitsLoading, setHabitsLoading] = useState<boolean>(true)
 
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [error, setError] = useState(null)
+  const [saving, setSaving] = useState<boolean>(false)
+  const [saved, setSaved] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Рефы на каждую аспектную секцию + тик-счётчик для авто-скролла,
   // когда юзер раскрывает аккордеон, и низ секции уезжает под sticky
   // save-панель.
-  const sectionRefs = useRef({})
-  const justOpenedRef = useRef(null)
-  const [scrollTick, setScrollTick] = useState(0)
+  const sectionRefs = useRef<Partial<Record<AspectKey, HTMLElement | null>>>({})
+  const justOpenedRef = useRef<AspectKey | null>(null)
+  const [scrollTick, setScrollTick] = useState<number>(0)
 
   useEffect(() => {
     let cancelled = false
     fetchHabitsToday()
-      .then(list => {
+      .then((list: unknown) => {
         if (cancelled) return
-        const arr = Array.isArray(list) ? list : (list?.habits ?? [])
+        const arr: HabitToday[] = Array.isArray(list)
+          ? (list as HabitToday[])
+          : (((list as { habits?: HabitToday[] } | null | undefined)?.habits) ?? [])
         setHabits(arr)
-        const init = {}
+        const init: Partial<Record<AspectKey, boolean>> = {}
         for (const h of arr) init[h.aspect] = !!h.ticked_today
         setHabitTicks(init)
       })
@@ -115,13 +145,13 @@ export default function DailyReview({ diary, onDiaryChange }) {
     return () => { cancelled = true }
   }, [])
 
-  const setAspectText = (aspect, value) => {
+  const setAspectText = (aspect: AspectKey, value: string): void => {
     setAspectTexts(prev => ({ ...prev, [aspect]: value }))
   }
 
-  const toggleExpanded = (aspect) => {
+  const toggleExpanded = (aspect: AspectKey): void => {
     setExpanded(prev => {
-      const next = { ...prev, [aspect]: !prev[aspect] }
+      const next: Partial<Record<AspectKey, boolean>> = { ...prev, [aspect]: !prev[aspect] }
       // Если раскрываем — запоминаем, чтобы потом авто-скроллом дотянуть
       // textarea выше sticky save-bar.
       if (next[aspect]) {
@@ -138,7 +168,8 @@ export default function DailyReview({ diary, onDiaryChange }) {
     const aspect = justOpenedRef.current
     if (!aspect || scrollTick === 0) return
     // Ждём 2 кадра, чтобы layout с раскрытым textarea успел установиться.
-    let raf1, raf2
+    let raf1: number | undefined
+    let raf2: number | undefined
     raf1 = requestAnimationFrame(() => {
       raf2 = requestAnimationFrame(() => {
         const node = sectionRefs.current[aspect]
@@ -147,7 +178,7 @@ export default function DailyReview({ diary, onDiaryChange }) {
         // Резерв снизу под sticky save-bar (~80px) + воздух.
         const safeBottom = window.innerHeight - 110
         if (rect.bottom <= safeBottom) return
-        const scroller =
+        const scroller: Element =
           node.closest('main') ??
           document.scrollingElement ??
           document.documentElement
@@ -158,22 +189,22 @@ export default function DailyReview({ diary, onDiaryChange }) {
       })
     })
     return () => {
-      if (raf1) cancelAnimationFrame(raf1)
-      if (raf2) cancelAnimationFrame(raf2)
+      if (raf1 !== undefined) cancelAnimationFrame(raf1)
+      if (raf2 !== undefined) cancelAnimationFrame(raf2)
     }
   }, [scrollTick])
 
-  const toggleHabit = (aspect) => {
+  const toggleHabit = (aspect: AspectKey): void => {
     setHabitTicks(prev => ({ ...prev, [aspect]: !prev[aspect] }))
   }
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     setSaving(true)
     setError(null)
     try {
       const ts = Date.now()
       const dateStr = new Date().toLocaleDateString('ru-RU')
-      const newEntries = []
+      const newEntries: DiaryEntry[] = []
       let idCounter = ts
 
       // 1. Общий блок «События дня».
@@ -227,8 +258,8 @@ export default function DailyReview({ diary, onDiaryChange }) {
       setAspectTexts({})
       setExpanded({})
       setTimeout(() => setSaved(false), 2200)
-    } catch (e) {
-      setError(e?.message ?? 'Не удалось сохранить день')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Не удалось сохранить день')
       tmaNotify('error')
     } finally {
       setSaving(false)
@@ -272,14 +303,14 @@ export default function DailyReview({ diary, onDiaryChange }) {
       {/* ── По аспектам ─────────────────────────────── */}
       {ASPECT_KEYS.map(aspect => {
         const text = aspectTexts[aspect] ?? ''
-        const isOpen = expanded[aspect] || !!text
+        const isOpen = !!expanded[aspect] || !!text
         const color = ASPECT_COLORS[aspect]
         return (
           <section
             key={aspect}
             ref={el => { sectionRefs.current[aspect] = el }}
             className={`${styles.daySection} ${styles.daySectionAspect} ${isOpen ? styles.daySectionOpen : ''}`}
-            style={{ '--aspect-color': color }}
+            style={{ '--aspect-color': color } as React.CSSProperties}
           >
             <button
               type="button"
@@ -330,7 +361,7 @@ export default function DailyReview({ diary, onDiaryChange }) {
                 <label
                   key={h.aspect}
                   className={`${styles.dayHabitItem} ${ticked ? styles.dayHabitItemDone : ''}`}
-                  style={{ '--habit-color': ASPECT_COLORS[h.aspect] }}
+                  style={{ '--habit-color': ASPECT_COLORS[h.aspect] } as React.CSSProperties}
                 >
                   <input
                     type="checkbox"
@@ -378,7 +409,7 @@ export default function DailyReview({ diary, onDiaryChange }) {
   )
 }
 
-function pluralize(n, forms) {
+function pluralize(n: number, forms: [string, string, string]): string {
   // forms = [одна, две, пять]
   const m10 = n % 10
   const m100 = n % 100

@@ -2,6 +2,25 @@ import { useEffect, useState } from 'react'
 import { fetchEmotions } from '../../api/client'
 import styles from './EmotionsTab.module.css'
 
+// Backend table `emotions` (vault-import). Все поля кроме id опциональны —
+// vault может прислать частичную запись. API не имеет response_model,
+// поэтому локальный тип.
+// TODO(ts): tighten when backend adds response_model to /api/diary/emotions.
+type EmotionEntry = {
+  id: number | string
+  date?: string
+  name?: string
+  intensity?: number | null
+  trigger?: string | null
+  body_sensation?: string | null
+  roots?: string | null
+  lesson?: string | null
+  action?: string | null
+}
+
+type FilterMode = 'all' | 'peaks'
+type SortMode = 'date' | 'intensity'
+
 /**
  * Таблица эмоций — показывает данные из таблицы `emotions`, которые
  * импортируются из vault'а через tools/vault_sync.py (PIPELINE.md §4 Поток A).
@@ -13,18 +32,18 @@ import styles from './EmotionsTab.module.css'
  * Если эмоций нет — показываем подсказку как импортировать.
  */
 export default function EmotionsTab() {
-  const [items, setItems] = useState([])
-  const [busy, setBusy] = useState(true)
-  const [error, setError] = useState(null)
-  const [filter, setFilter] = useState('all')   // 'all' | 'peaks'
-  const [sort, setSort] = useState('date')      // 'date' | 'intensity'
-  const [expandedId, setExpandedId] = useState(null)
+  const [items, setItems] = useState<EmotionEntry[]>([])
+  const [busy, setBusy] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+  const [filter, setFilter] = useState<FilterMode>('all')
+  const [sort, setSort] = useState<SortMode>('date')
+  const [expandedId, setExpandedId] = useState<number | string | null>(null)
 
   useEffect(() => {
     setBusy(true)
     fetchEmotions(filter === 'peaks' ? 8 : null)
-      .then(setItems)
-      .catch(e => setError(e.message ?? 'Не удалось загрузить эмоции'))
+      .then((d) => setItems(d as EmotionEntry[]))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Не удалось загрузить эмоции'))
       .finally(() => setBusy(false))
   }, [filter])
 
@@ -36,7 +55,7 @@ export default function EmotionsTab() {
   })
 
   // Частота по эмоциям — для блока «топ-5».
-  const frequency = items.reduce((acc, e) => {
+  const frequency = items.reduce<Record<string, number>>((acc, e) => {
     const key = (e.name || '').trim().toLowerCase()
     if (!key) return acc
     acc[key] = (acc[key] || 0) + 1
@@ -158,7 +177,12 @@ export default function EmotionsTab() {
   )
 }
 
-function Field({ label, value }) {
+type FieldProps = {
+  label: string
+  value: string
+}
+
+function Field({ label, value }: FieldProps) {
   return (
     <div className={styles.field}>
       <span className={styles.fieldLabel}>{label}:</span>
@@ -167,7 +191,7 @@ function Field({ label, value }) {
   )
 }
 
-function intensityColor(n) {
+function intensityColor(n: number): string {
   if (n >= 9) return '#ff7d7d'
   if (n >= 7) return '#ffb066'
   if (n >= 5) return '#f0c674'
