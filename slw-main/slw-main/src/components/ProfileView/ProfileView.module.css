@@ -553,6 +553,26 @@
   .achievementsGrid { grid-template-columns: 1fr 1fr; }
 }
 
+/* Кнопка «↓ Показать все» под сеткой ачивок. См. AchievementsSection
+   в ProfileView.tsx — по умолчанию рендерятся только разблокированные,
+   до 15 штук. Эта кнопка раскрывает полный каталог. */
+.achievementsExpandBtn {
+  margin-top: 14px;
+  background: transparent;
+  border: 1px solid rgba(179,157,219,0.30);
+  color: rgba(214,188,250,0.85);
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.achievementsExpandBtn:hover {
+  background: rgba(179,157,219,0.10);
+  border-color: rgba(179,157,219,0.55);
+}
+
 .achievement {
   display: flex;
   align-items: center;

@@ -68,3 +68,23 @@
   font-size: 13px;
   padding: 10px 0;
 }
+
+/* Кнопка-toggle «↓ Показать всю историю» / «↑ Свернуть». Появляется
+   когда props.days > COLLAPSED_DAYS (30) — позволяет юзеру не залипать
+   на длинной сетке за полгода, но при желании развернуть. */
+.expandBtn {
+  margin-top: 10px;
+  background: transparent;
+  border: 1px solid rgba(179,157,219,0.30);
+  color: rgba(214,188,250,0.85);
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.expandBtn:hover {
+  background: rgba(179,157,219,0.10);
+  border-color: rgba(179,157,219,0.55);
+}

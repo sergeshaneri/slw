@@ -1005,14 +1005,32 @@ type AchievementsProps = {
   catalog: CatalogEntry[]
 }
 
+// По умолчанию показываем только разблокированные ачивки (юзеру интереснее
+// видеть свои достижения, чем длинный список locked-карточек). Если их
+// больше LIMIT — обрезаем. Кнопка «Показать все» раскрывает весь каталог.
+const ACHIEVEMENTS_DEFAULT_LIMIT = 15
+
 function AchievementsSection({ unlocked, catalog }: AchievementsProps) {
+  const [expanded, setExpanded] = useState<boolean>(false)
   const unlockedCodes = new Set(unlocked.map(a => a.code))
   const total = catalog.length
   const got = unlocked.length
+
+  // Какие карточки рендерим:
+  //   collapsed → только разблокированные, до ACHIEVEMENTS_DEFAULT_LIMIT
+  //   expanded  → все из каталога (как раньше)
+  const visible = expanded
+    ? catalog
+    : catalog
+        .filter(a => unlockedCodes.has(a.code))
+        .slice(0, ACHIEVEMENTS_DEFAULT_LIMIT)
+
+  const hasMore = got > ACHIEVEMENTS_DEFAULT_LIMIT || total > got
+
   return (
     <Section label={`Достижения · ${got}/${total}`}>
       <div className={styles.achievementsGrid}>
-        {catalog.map(a => {
+        {visible.map(a => {
           const isUnlocked = unlockedCodes.has(a.code)
           return (
             <div
@@ -1028,7 +1046,23 @@ function AchievementsSection({ unlocked, catalog }: AchievementsProps) {
             </div>
           )
         })}
+        {!expanded && got === 0 && (
+          <div className={styles.muted} style={{ gridColumn: '1 / -1' }}>
+            Пока пусто. Жми «Показать все», чтобы увидеть какие ачивки можно открыть.
+          </div>
+        )}
       </div>
+      {hasMore && (
+        <button
+          type="button"
+          className={styles.achievementsExpandBtn}
+          onClick={() => setExpanded(v => !v)}
+        >
+          {expanded
+            ? '↑ Свернуть'
+            : `↓ Показать все (${total} ачивок, ${got} открыто)`}
+        </button>
+      )}
     </Section>
   )
 }

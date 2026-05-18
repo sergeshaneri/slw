@@ -30,14 +30,26 @@ type Props = {
  * Цвет ячейки: чем активнее день, тем насыщеннее. Hover — title с датой
  * и счётчиком.
  */
+// Collapse-by-default порог. Если props.days > этого, по умолчанию
+// рендерим только последние COLLAPSED_DAYS дней (но фетчим всё —
+// чтобы при разворачивании не было нового запроса). Кнопка-toggle
+// внизу.
+const COLLAPSED_DAYS = 30
+
 export default function Heatmap({ userId, days = 180 }: Props) {
   const [data, setData] = useState<HeatmapResponse | null>(null)
   const [busy, setBusy] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<boolean>(false)
+
+  // Сколько дней реально рендерим: collapsed-режим при доступности.
+  const canCollapse = days > COLLAPSED_DAYS
+  const effectiveDays = canCollapse && !expanded ? COLLAPSED_DAYS : days
 
   useEffect(() => {
     if (!userId) return
     setBusy(true)
+    // Фетчим полный диапазон один раз — раскрытие потом локальное.
     fetchHeatmap(userId, days)
       .then((d) => setData(d as HeatmapResponse))
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Не удалось загрузить heatmap'))
@@ -51,7 +63,7 @@ export default function Heatmap({ userId, days = 180 }: Props) {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const allDays: HeatmapCell[] = []
-    for (let i = days - 1; i >= 0; i--) {
+    for (let i = effectiveDays - 1; i >= 0; i--) {
       const d = new Date(today)
       d.setDate(d.getDate() - i)
       const ymd = d.toISOString().slice(0, 10)
@@ -70,10 +82,29 @@ export default function Heatmap({ userId, days = 180 }: Props) {
       w.push(cells.slice(i, i + 7))
     }
     return w
-  }, [data, days])
+  }, [data, effectiveDays])
 
-  const totalActiveDays = data?.data.length ?? 0
-  const totalEvents = (data?.data ?? []).reduce((acc, d) => acc + d.count, 0)
+  // Метрики тоже привязаны к видимому диапазону (effectiveDays), а не
+  // ко всему фетчу — иначе «12 активных за 30 дней» в свёрнутом виде
+  // не сходился бы с тем, что отрисовано.
+  const visibleActiveDays = useMemo(() => {
+    if (!data) return 0
+    const cutoff = new Date()
+    cutoff.setHours(0, 0, 0, 0)
+    cutoff.setDate(cutoff.getDate() - effectiveDays + 1)
+    return data.data.filter(d => d.date >= cutoff.toISOString().slice(0, 10)).length
+  }, [data, effectiveDays])
+
+  const visibleEvents = useMemo(() => {
+    if (!data) return 0
+    const cutoff = new Date()
+    cutoff.setHours(0, 0, 0, 0)
+    cutoff.setDate(cutoff.getDate() - effectiveDays + 1)
+    const cutoffStr = cutoff.toISOString().slice(0, 10)
+    return data.data
+      .filter(d => d.date >= cutoffStr)
+      .reduce((acc, d) => acc + d.count, 0)
+  }, [data, effectiveDays])
 
   if (busy) return <div className={styles.loading}>Загружаем активность…</div>
   if (error) return <div className={styles.error}>{error}</div>
@@ -83,7 +114,7 @@ export default function Heatmap({ userId, days = 180 }: Props) {
     <div className={styles.wrap}>
       <div className={styles.header}>
         <span>
-          {totalActiveDays} активных дней · {totalEvents} событий за {days} дне
+          {visibleActiveDays} активных дней · {visibleEvents} событий за {effectiveDays} дне
           <DevAdminEggLetter />
         </span>
       </div>
@@ -112,6 +143,15 @@ export default function Heatmap({ userId, days = 180 }: Props) {
         ))}
         <span>больше</span>
       </div>
+      {canCollapse && (
+        <button
+          type="button"
+          className={styles.expandBtn}
+          onClick={() => setExpanded(v => !v)}
+        >
+          {expanded ? '↑ Свернуть' : `↓ Показать всю историю (${days} дней)`}
+        </button>
+      )}
     </div>
   )
 }
