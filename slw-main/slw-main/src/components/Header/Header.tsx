@@ -1,5 +1,67 @@
+import type { paths } from '@/types/api'
+import { ru } from '../../locales/ru'
 import NotificationsBell from '../Notifications/NotificationsBell'
 import styles from './Header.module.css'
+
+// Полный union view'ов из App.jsx (см. handleViewChange/setView в App.jsx).
+// Если добавляешь новый view — добавь и сюда, иначе onViewChange сузит к
+// существующим и компилятор отобьёт.
+export type ViewName =
+  | 'dashboard'
+  | 'aspects'
+  | 'journey'
+  | 'diary'
+  | 'coach'
+  | 'hall'
+  | 'profile'
+  | 'public-profile'
+  | 'settings'
+  | 'admin'
+  | 'leaderboard'
+  | 'dm'
+  | 'search'
+
+// /api/auth/me пока без response_model на бэке → схема `{ [key: string]: unknown }`.
+// Дополняем известными полями, которые Header читает напрямую.
+// TODO(ts): убрать augmentation когда бэк объявит response_model для /me.
+type MeRaw = paths['/api/auth/me']['get']['responses']['200']['content']['application/json']
+type User = MeRaw & {
+  email?: string
+  is_admin?: boolean
+  telegram_first_name?: string
+}
+
+// Минимальные слайсы локали, которые Header реально использует. typeof ru
+// даёт точные литеральные ключи, так что опечатка в `t.nav.foo` отобьётся.
+type Locale = typeof ru
+type HeaderLocale = {
+  app: Pick<Locale['app'], 'title' | 'subtitle'>
+  nav: Pick<Locale['nav'], 'dashboard' | 'journey' | 'aspects' | 'diary' | 'leaderboard' | 'coach'>
+}
+
+type Props = {
+  view: ViewName
+  onViewChange: (view: ViewName) => void
+  journeyPendingCount?: number
+  journeyHighlight?: boolean
+  aspectsHighlight?: boolean
+  user: User | null
+  userAvatar?: string
+  onLogin?: () => void
+  onLogout: () => void
+  onOpenMyProfile?: () => void
+  t: HeaderLocale
+  onOpenProfile?: (userId: number | string) => void
+  onOpenDM?: (partnerId?: number | string | null) => void
+  onOpenHall?: (aspect: string) => void
+  onOpenAdmin?: () => void
+}
+
+type NavItem = {
+  id: ViewName
+  label: string
+  badge?: number
+}
 
 export default function Header({
   view,
@@ -17,10 +79,10 @@ export default function Header({
   onOpenDM,
   onOpenHall,
   onOpenAdmin,
-}) {
-  const navItems = [
+}: Props) {
+  const navItems: NavItem[] = [
     // Главная: для залогиненных — Дашборд, гостям — сразу Аспекты (read-only).
-    ...(user ? [{ id: 'dashboard', label: t.nav.dashboard }] : []),
+    ...(user ? [{ id: 'dashboard' as const, label: t.nav.dashboard }] : []),
     { id: 'journey', label: t.nav.journey, badge: journeyPendingCount },
     { id: 'aspects', label: t.nav.aspects },
     { id: 'diary', label: t.nav.diary },
@@ -42,7 +104,7 @@ export default function Header({
 
       <nav className={styles.nav}>
         {navItems.map(item => {
-          let highlightLabel = null
+          let highlightLabel: string | null = null
           if (item.id === 'journey' && journeyHighlight) highlightLabel = '👈 Тут начинается игра'
           else if (item.id === 'aspects' && aspectsHighlight) highlightLabel = '👆 Тут больше информации по сферам жизни'
           const isHighlight = !!highlightLabel
@@ -54,7 +116,7 @@ export default function Header({
               className={`${styles.navButton} ${view === item.id ? styles.active : ''} ${isHighlight ? styles.navHighlight : ''}`}
             >
               <span>{item.label}</span>
-              {item.badge > 0 && <span className={styles.navBadge}>{item.badge}</span>}
+              {item.badge !== undefined && item.badge > 0 && <span className={styles.navBadge}>{item.badge}</span>}
               {isHighlight && (
                 <span className={styles.navHighlightLabel}>
                   {highlightLabel}

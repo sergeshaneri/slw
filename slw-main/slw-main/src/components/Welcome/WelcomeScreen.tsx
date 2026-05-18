@@ -1,5 +1,5 @@
-import AuthModal from '../Auth/AuthModal'
 import { useState } from 'react'
+import AuthModal from '../Auth/AuthModal'
 import styles from './WelcomeScreen.module.css'
 
 const FEATURES = [
@@ -20,7 +20,15 @@ const FEATURES = [
   },
 ]
 
-export default function WelcomeScreen({ onAuthSuccess, onContinueAsGuest }) {
+type Props = {
+  // AuthModal передаёт сюда auth-response (token + user). Точная shape
+  // приходит из api/client, тут он только пробрасывается вверх.
+  // TODO(ts): tighten to AuthResponse when AuthModal becomes .tsx (P2E).
+  onAuthSuccess: (data: unknown) => void
+  onContinueAsGuest: () => void
+}
+
+export default function WelcomeScreen({ onAuthSuccess, onContinueAsGuest }: Props) {
   const [showAuth, setShowAuth] = useState(false)
 
   return (

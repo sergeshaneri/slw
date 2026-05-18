@@ -16,7 +16,11 @@ const SPOKE_COLORS = [
 const R = 78
 const CENTER = 100
 
-export default function LoadingScreen({ text }) {
+type Props = {
+  text?: string
+}
+
+export default function LoadingScreen({ text }: Props) {
   return (
     <div className={styles.container} role="status" aria-busy="true">
       <div className={styles.glow} />
