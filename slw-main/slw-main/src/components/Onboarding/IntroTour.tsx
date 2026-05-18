@@ -2,8 +2,18 @@ import { useState } from 'react'
 import { ASPECT_KEYS, ASPECT_COLORS } from '../../data/aspects'
 import styles from './IntroTour.module.css'
 
+type VisualKind = 'wheel' | 'flow' | 'diary' | 'community' | 'planets'
+
+type TourStep = {
+  id: string
+  eyebrow: string
+  title: string
+  body: string
+  visual: VisualKind
+}
+
 // Quick Tour — 5 шагов. Тексты согласованы заранее (см. INSTRUCT-сценарий).
-const TOUR_STEPS = [
+const TOUR_STEPS: TourStep[] = [
   {
     id: 'intro',
     eyebrow: 'Шаг 1 из 5',
@@ -41,6 +51,12 @@ const TOUR_STEPS = [
   },
 ]
 
+type Props = {
+  onClose: () => void
+  onGoToPlanets?: () => void
+  isGuest?: boolean
+}
+
 /**
  * Полноэкранная модалка-онбординг (Layer 1).
  * Показывается сразу после первого логина (server flag onboarding_done=false)
@@ -51,7 +67,12 @@ const TOUR_STEPS = [
  *   onGoToPlanets — финальный CTA (шаг 5): закрыть + переключить на journey.
  *   isGuest       — true если юзер не залогинен (используем localStorage).
  */
-export default function IntroTour({ onClose, onGoToPlanets, isGuest = false }) {
+// NOTE(ts): isGuest приходит из App.jsx, но в этом компоненте напрямую
+// не используется — поведение «гость vs логин» определяет родитель через
+// разные onClose/onGoToPlanets хендлеры. Оставлен как часть публичного
+// контракта пропсов (вызов `void` гасит unused-vars-предупреждение).
+export default function IntroTour({ onClose, onGoToPlanets, isGuest = false }: Props) {
+  void isGuest
   const [step, setStep] = useState(0)
   const last = step === TOUR_STEPS.length - 1
   const data = TOUR_STEPS[step]
@@ -119,7 +140,7 @@ export default function IntroTour({ onClose, onGoToPlanets, isGuest = false }) {
 
 // ── Визуалы для каждого шага ─────────────────────────────────────────────
 
-function Visual({ kind }) {
+function Visual({ kind }: { kind: VisualKind }) {
   if (kind === 'wheel') return <WheelVisual />
   if (kind === 'flow') return <FlowVisual />
   if (kind === 'diary') return <EmojiVisual emoji="📅" glow="#A8D97B" />
@@ -177,7 +198,7 @@ function FlowVisual() {
   )
 }
 
-function EmojiVisual({ emoji, glow }) {
+function EmojiVisual({ emoji, glow }: { emoji: string; glow: string }) {
   return (
     <div className={styles.emojiVisual}>
       <div

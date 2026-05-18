@@ -1,6 +1,24 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { markHintSeen } from '../../api/client'
 import styles from './Hint.module.css'
+
+type HintPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left'
+
+// Минимальная shape юзера, которая нужна Hint'у. App.jsx даёт сюда полный
+// объект из /api/auth/me — там shape "{ [key: string]: unknown }" пока бэк
+// не объявит response_model. Поэтому фиксируем только используемые поля.
+// TODO(ts): swap to canonical User type when API gets response_model.
+type HintUser = {
+  hints_seen?: Record<string, boolean | undefined>
+} | null | undefined
+
+type Props = {
+  id: string
+  user: HintUser
+  children: ReactNode
+  onDismiss?: (id: string) => void
+  position?: HintPosition
+}
 
 /**
  * Маленькая dismissable подсказка (Layer 2). Показывается один раз,
@@ -23,7 +41,7 @@ export default function Hint({
   children,
   onDismiss,
   position = 'top-right',
-}) {
+}: Props) {
   const seenServer = !!(user?.hints_seen?.[id])
   const seenLocal = typeof window !== 'undefined' &&
     localStorage.getItem(`hint_${id}`) === '1'
