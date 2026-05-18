@@ -6,7 +6,7 @@ import styles from './PublicProfileView.module.css'
 
 // Single reactor entry from /api/profile/insights/{id}/reactions. Backend has
 // no response_model yet, so the shape here mirrors the actual JSON we read.
-// TODO(ts): tighten when /api/profile/insights/{id}/reactions adds a model.
+// NOTE(ts): pending backend response_model for /api/profile/insights/{id}/reactions.
 type Reactor = {
   user_id: number | string
   created_at: string

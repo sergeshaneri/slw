@@ -5,8 +5,7 @@ import styles from './DiscoverMore.module.css'
 // Backend сейчас не имеет response_model для /api/dashboard и /api/auth/me,
 // поэтому в DiscoverMore data/user приходят как непрозрачные мапы. Локально
 // доверяем shape — `?? 0`/`?? false` страхует от undefined полей.
-// TODO(ts): tighten when backend adds response_models for /api/dashboard
-// and /api/auth/me.
+// NOTE(ts): pending backend response_model for /api/dashboard and /api/auth/me.
 type DashboardLikeUser = {
   hints_seen?: Record<string, boolean>
   following_count?: number

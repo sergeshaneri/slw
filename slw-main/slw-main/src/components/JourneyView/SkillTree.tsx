@@ -32,14 +32,7 @@ type SkillStatus =
 function statusFor(skillState: SkillState | undefined): SkillStatus {
   if (!skillState) return { kind: 'idle' }
   if (skillState.draft) {
-    // TODO(ts): widen SkillState.draft from unknown to a structured type.
-    const d = skillState.draft as {
-      mode?: string
-      startPass?: number
-      pass?: number
-      stepIndex?: number
-      blockIndex?: number
-    }
+    const d = skillState.draft
     return {
       kind: 'draft',
       mode: d.mode ?? 'short',

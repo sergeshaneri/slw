@@ -14,7 +14,7 @@ const SCOPES: ReadonlyArray<{ id: Scope; label: string }> = [
 
 // Backend route serializes ad-hoc dicts (search.py, no response_model).
 // Shape mirrors the JSX consumption: three buckets of records.
-// TODO(ts): tighten when backend adds OpenAPI response_model for /api/search.
+// NOTE(ts): pending backend response_model for /api/search.
 type SearchInsight = {
   id: number
   aspect: AspectKey | string
@@ -49,7 +49,7 @@ type SearchResp = {
 
 type Props = {
   initialQuery?: string
-  onOpenProfile?: (userId: number) => void
+  onOpenProfile?: (userId: number | string) => void
 }
 
 /**

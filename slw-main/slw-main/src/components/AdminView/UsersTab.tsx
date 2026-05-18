@@ -33,7 +33,7 @@ const SORT_OPTIONS: ReadonlyArray<{ id: SortOption; label: string }> = [
 // the JSX reads. Most diagnostic endpoints return a JSON blob with optional
 // fields; we model only the fields actually consumed here and let the rest
 // flow through `unknown`/extra `[key: string]: unknown` index sigs.
-// TODO(ts): tighten when backend formalizes admin schemas.
+// NOTE(ts): pending backend response_model for admin schemas.
 
 type AdminUser = {
   id: number | string

@@ -11,7 +11,7 @@ const POLL_MS = 5_000
 
 // Backend: dm.py routes (no response_model). Local types mirror the fields
 // the UI reads.
-// TODO(ts): tighten when backend adds OpenAPI response_model for /api/dm/*.
+// NOTE(ts): pending backend response_model for /api/dm/*.
 type DMMessage = {
   id: number
   text: string
@@ -40,9 +40,9 @@ type DMThread = {
 }
 
 type Props = {
-  initialPartnerId?: number | null
-  currentUserId?: number | null
-  onOpenProfile?: (userId: number) => void
+  initialPartnerId?: number | string | null
+  currentUserId?: number | string | null
+  onOpenProfile?: (userId: number | string) => void
 }
 
 /**
@@ -55,7 +55,13 @@ type Props = {
  */
 export default function DMView({ initialPartnerId, onOpenProfile }: Props) {
   const [threads, setThreads] = useState<DMThreadSummary[]>([])
-  const [activeId, setActiveId] = useState<number | null>(initialPartnerId ?? null)
+  // Internal id is coerced to number — backend partner_ids are numeric.
+  const initialAsNumber = typeof initialPartnerId === 'string'
+    ? Number(initialPartnerId)
+    : (initialPartnerId ?? null)
+  const [activeId, setActiveId] = useState<number | null>(
+    Number.isFinite(initialAsNumber as number) ? (initialAsNumber as number) : null
+  )
   const [thread, setThread] = useState<DMThread | null>(null)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)

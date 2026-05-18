@@ -1,35 +1,8 @@
-import type { paths } from '@/types/api'
 import { ru } from '../../locales/ru'
 import NotificationsBell from '../Notifications/NotificationsBell'
+import type { User } from '@/types/user'
+import type { ViewName } from '@/types/view'
 import styles from './Header.module.css'
-
-// Полный union view'ов из App.jsx (см. handleViewChange/setView в App.jsx).
-// Если добавляешь новый view — добавь и сюда, иначе onViewChange сузит к
-// существующим и компилятор отобьёт.
-export type ViewName =
-  | 'dashboard'
-  | 'aspects'
-  | 'journey'
-  | 'diary'
-  | 'coach'
-  | 'hall'
-  | 'profile'
-  | 'public-profile'
-  | 'settings'
-  | 'admin'
-  | 'leaderboard'
-  | 'dm'
-  | 'search'
-
-// /api/auth/me пока без response_model на бэке → схема `{ [key: string]: unknown }`.
-// Дополняем известными полями, которые Header читает напрямую.
-// TODO(ts): убрать augmentation когда бэк объявит response_model для /me.
-type MeRaw = paths['/api/auth/me']['get']['responses']['200']['content']['application/json']
-type User = MeRaw & {
-  email?: string
-  is_admin?: boolean
-  telegram_first_name?: string
-}
 
 // Минимальные слайсы локали, которые Header реально использует. typeof ru
 // даёт точные литеральные ключи, так что опечатка в `t.nav.foo` отобьётся.

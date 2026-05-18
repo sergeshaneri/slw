@@ -68,6 +68,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Project: SLW — Соционика, Колесо Баланса
 
+**Frontend stack:** TypeScript strict (`tsc --noEmit` is the gate; `npm run build` does typecheck before Vite).
+
 ### Stack
 
 **Frontend** — React 18 + Vite, CSS Modules  

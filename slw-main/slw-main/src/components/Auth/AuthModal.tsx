@@ -9,7 +9,7 @@ type AuthMode = 'login' | 'register' | 'link'
 
 // Backend /api/auth/me has no response_model yet, so user is a permissive
 // shape with the fields we actually read here.
-// TODO(ts): tighten when /api/auth/me adds a response model.
+// NOTE(ts): pending backend response_model for /api/auth/me.
 type AuthUser = {
   email?: string | null
   telegram_id?: number | string | null

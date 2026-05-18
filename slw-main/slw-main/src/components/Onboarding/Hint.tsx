@@ -1,15 +1,15 @@
 import { useState, type ReactNode } from 'react'
 import { markHintSeen } from '../../api/client'
+import type { User } from '@/types/user'
 import styles from './Hint.module.css'
 
 type HintPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left'
 
-// Минимальная shape юзера, которая нужна Hint'у. App.jsx даёт сюда полный
-// объект из /api/auth/me — там shape "{ [key: string]: unknown }" пока бэк
-// не объявит response_model. Поэтому принимаем любой объект и узко тянем
-// hints_seen через runtime narrow.
-// TODO(ts): swap to canonical User type when API gets response_model.
-type HintUser = unknown
+// Hint reads `hints_seen[id]` off the user object. We accept the canonical
+// User (or null/undefined for guests) but keep `unknown` as a fallback for
+// upstream sites still passing arbitrary shapes — runtime narrowing below
+// covers both cases.
+type HintUser = User | null | undefined | unknown
 
 type Props = {
   id: string

@@ -12,7 +12,9 @@ import type { paths } from '@/types/api'
 // /api/auth/me — response shape is currently { [key: string]: unknown } in
 // OpenAPI (backend has no response_model). The path-helper carries that as
 // User; once backend tightens schemas, types tighten automatically.
-// TODO(ts): tighten when backend adds /api/auth/me response_model.
+// NOTE(ts): pending backend response_model for /api/auth/me. The canonical
+// `User` shape in `@/types/user` re-declares the load-bearing fields; this
+// path-derived alias auto-tightens when the backend ships an explicit schema.
 type User = paths['/api/auth/me']['get']['responses']['200']['content']['application/json']
 
 // `false` is the unauthenticated sentinel preserved from the .js source —

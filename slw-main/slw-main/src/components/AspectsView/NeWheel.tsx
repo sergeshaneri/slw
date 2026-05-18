@@ -241,8 +241,8 @@ type Props = {
 }
 
 export default function NeWheel({ skills, color, onContinueSurveys, isLocked = false }: Props) {
-  // TODO(ts): см. SiWheel — SkillState vs SkillStateEntry (answers shape).
-  const skillsArg = skills as unknown as Parameters<typeof calcNeScoreFromSkills>[0]
+  // SkillState ↔ SkillStateEntry are structurally compatible — see SiWheel.
+  const skillsArg = skills
   const neScore = calcNeScoreFromSkills(skillsArg)
   const progress = getNeSkillProgress(skillsArg)
 

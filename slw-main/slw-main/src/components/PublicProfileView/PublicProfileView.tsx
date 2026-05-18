@@ -18,7 +18,7 @@ import styles from './PublicProfileView.module.css'
 
 // Public profile shape — backend has no response_model for /api/profile/{id}
 // yet. Captures the fields we actually read.
-// TODO(ts): tighten when backend tightens /api/profile/{user_id}.
+// NOTE(ts): pending backend response_model for /api/profile/{user_id}.
 type Insight = {
   id: number | string
   aspect: AspectKey | string

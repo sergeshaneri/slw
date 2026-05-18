@@ -109,10 +109,11 @@ export const ANCESTOR: Record<string, Skill> = {
       )
     }
   } as unknown as Skill,
-  // TODO(ts): the `lvl` helper builds objects that match SkillLevel shape but
-  // TS cannot infer that levels[1|2|3] return type satisfies Skill.levels
-  // exactly. Cast above is the pragmatic workaround until Phase 3 widens the
-  // helper signature or inlines the levels.
+  // NOTE(ts): the `lvl` helper builds objects matching SkillLevel, but
+  // TS can't infer that the 1|2|3 object literal satisfies Skill.levels
+  // exactly. The `as unknown as Skill` cast above is the pragmatic exit;
+  // widening lvl's return type to a tuple of three SkillLevels would
+  // require per-key generics that the runtime doesn't need.
 
   'fi-rituals': {
     id: 'fi-rituals',

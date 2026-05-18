@@ -6,7 +6,7 @@ import styles from './LeaderboardView.module.css'
 
 // Backend returns rows from leaderboard.py (no response_model). Shape mirrors
 // what AspectsView UI expects: per-user row with XP + focus aspects.
-// TODO(ts): tighten when backend adds OpenAPI response_model for /api/leaderboard.
+// NOTE(ts): pending backend response_model for /api/leaderboard.
 type LeaderboardRow = {
   user_id: number
   rank: number
@@ -16,8 +16,8 @@ type LeaderboardRow = {
 }
 
 type Props = {
-  currentUserId: number | null
-  onOpenPublicProfile?: (userId: number) => void
+  currentUserId: number | string | null | undefined
+  onOpenPublicProfile?: (userId: number | string) => void
 }
 
 export default function LeaderboardView({ currentUserId, onOpenPublicProfile }: Props) {

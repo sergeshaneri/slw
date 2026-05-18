@@ -36,7 +36,8 @@ export type ScriptMetadata = {
 // One parsed step from a level markdown file. See parseScripts.js: every
 // matched section yields this shape (with `xp` defaulting to 0).
 // followUp is a function that maps a 1-10 answer to bot reaction text.
-// TODO(ts): tighten followUp signature when Chat.jsx is converted.
+// NOTE(ts): followUp is invoked by Chat.tsx with the slider value as string;
+// keeping the param as `string | number` matches the observed runtime sites.
 export type Script = {
   id: string
   type: ScriptType

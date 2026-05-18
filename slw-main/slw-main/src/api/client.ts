@@ -21,7 +21,8 @@ import type { AspectKey, CyrillicAspectKey } from '@/types/aspect'
 // backend routes ship without an explicit response_model, so OpenAPI gives
 // us `{ [key: string]: unknown }` here — the path-helper preserves that
 // shape and will auto-tighten once the backend adds schemas.
-// TODO(ts): tighten when backend adds response_models.
+// NOTE(ts): pending backend response_model rollout — the helper type will
+// auto-tighten once OpenAPI ships explicit schemas for these routes.
 type JsonOk<P extends keyof paths, M extends keyof paths[P]> =
   paths[P][M] extends { responses: { 200: { content: { 'application/json': infer R } } } } ? R : unknown
 
@@ -76,9 +77,10 @@ type TranslateOpts = { skipJourneyBlob?: boolean }
 //   • ключи объектов, в которых ВСЕ ключи — аспект-коды (Cyr→Lat).
 // Не трогает journey-blob: на границе передаём skipJourney=true.
 // NOTE(ts): structural mutation, types preserved by contract.
-// TODO(ts): tighten translateAspectsInResponse — a fully accurate mapped
-// type for this recursive key-renaming is overkill; the generic-passthrough
-// contract is sound at runtime.
+// NOTE(ts): a fully accurate mapped type for this recursive key-renaming
+// would require a recursive `KeysToLat<T>` mapped type — overkill for a
+// single boundary helper; the generic passthrough contract is sound at
+// runtime and exposed callers see the same shape they pass in.
 function translateAspectsInResponse<T>(node: T, opts: TranslateOpts = {}): T {
   const { skipJourneyBlob = false } = opts
   if (node === null || node === undefined) return node

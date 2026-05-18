@@ -6,6 +6,7 @@ import type {
   SkillState, ActiveSurvey
 } from '@/types/journey'
 import type { Script } from '@/types/script'
+import type { DiaryEntry } from '@/types/diary'
 import { postStepCompleted, chooseHabit } from '../../api/client'
 import { tmaHaptic } from '../../tma/hooks'
 import { ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
@@ -87,10 +88,9 @@ void getStatementsForFullRange
 void SURVEYS
 void SURVEYS_FE
 
-// TODO(ts): types/journey.ts:ScreenName needs to include 'tasks' and
-// 'fe-core-overview'. Runtime code uses them, but the union as shipped
-// from Phase 1 doesn't list them. Coordinator/P3 widens the type; here
-// we cast through JourneyState['screen'] at every usage to avoid lying.
+// NOTE(ts): ScreenName already includes 'tasks' and 'fe-core-overview' in
+// types/journey.ts; this comment used to flag the gap before P3 widened
+// the union.
 
 // Маленькая обёртка-хинт для skill-tree экранов (8 типов деревьев — не хочется
 // внедряться в каждый отдельно). Хинт показывается ОДИН раз на любом дереве.
@@ -432,9 +432,8 @@ function calcStreak(s: JourneyState): number {
   return diff === 1 ? s.streak + 1 : 1
 }
 
-// Диарийная запись (App.jsx это знает шире — у нас здесь минимальный shape
-// для входа/выхода). NOTE(ts): tightened in P3 after App.jsx conversion.
-type DiaryEntry = Record<string, unknown>
+// Diary entry shape is the canonical one from @/types/diary — see App.tsx
+// for the full record produced by the API normalization pass.
 
 // Шкала -accent через CSS custom property.
 type AccentVarStyle = CSSProperties & { '--accent'?: string }
@@ -446,8 +445,9 @@ type Props = {
   onScoresChange: (next: Record<string, number>) => void
   diary: DiaryEntry[] | null | undefined
   onDiaryChange: (next: DiaryEntry[]) => void
-  // NOTE(ts): tightened in P3 — locale fn signature живёт в locales/ru.ts.
-  t?: (key: string) => string
+  // NOTE(ts): unused at runtime — JourneyView reads texts inline. The prop
+  // exists for parity with the .jsx call surface (App passes `ru` locale).
+  t?: unknown
   isAdmin?: boolean
   user?: unknown
 }
@@ -758,9 +758,9 @@ export default function JourneyView({
       setState(s => ({
         ...s,
         screen: 'survey',
-        activeSurvey: (draft
+        activeSurvey: draft
           ? { scriptId: script.id, skillId: skillKey, ...draft }
-          : { scriptId: script.id, skillId: skillKey, blockIndex: 0, statementIndex: 0, answers: {} }) as unknown as ActiveSurvey
+          : { scriptId: script.id, skillId: skillKey, blockIndex: 0, statementIndex: 0, answers: {} }
       }))
     }
   }, [scripts, a.currentScriptIndex, state.skills, state.currentAspect, addBotMessage, addUserMessage, deliverScript, enqueueTask, setState])
@@ -943,7 +943,7 @@ export default function JourneyView({
     // отдельной записью с привязкой к навыку и тексту утверждения.
     const trimmedInsight = (insightText ?? '').trim()
     if (trimmedInsight) {
-      const active = state.activeSurvey as (ActiveSurvey & { scriptId?: string; mode?: 'short' | 'full'; startPass?: number; stepIndex?: number }) | null
+      const active = state.activeSurvey
       const survey = active ? resolveSurvey(active.skillId) : null
       const stmts = survey
         ? buildSurveyStatements(survey, active?.mode ?? 'short', active?.startPass ?? 1)
@@ -968,7 +968,7 @@ export default function JourneyView({
     }
 
     setState(s => {
-      const active = s.activeSurvey as (ActiveSurvey & { mode?: 'short' | 'full'; startPass?: number; stepIndex?: number }) | null
+      const active = s.activeSurvey
       if (!active) return s
       const survey = resolveSurvey(active.skillId)
       if (!survey) return s
@@ -987,7 +987,7 @@ export default function JourneyView({
           ...active,
           answers: nextAnswers,
           stepIndex: (active.stepIndex ?? 0) + 1
-        } as unknown as ActiveSurvey
+        }
       }
     })
   }, [setState, state.activeSurvey, state.currentAspect, diary, onDiaryChange])
@@ -995,14 +995,14 @@ export default function JourneyView({
   // Назад на одно утверждение (внутри текущей сессии).
   const handleSurveyBack = useCallback(() => {
     setState(s => {
-      const active = s.activeSurvey as (ActiveSurvey & { stepIndex?: number }) | null
+      const active = s.activeSurvey
       if (!active) return s
       return {
         ...s,
         activeSurvey: {
           ...active,
           stepIndex: Math.max(0, (active.stepIndex ?? 0) - 1)
-        } as unknown as ActiveSurvey
+        }
       }
     })
   }, [setState])
@@ -1020,9 +1020,7 @@ export default function JourneyView({
 
   // Юзер написал инсайт и нажал «Сохранить».
   const handleSurveyInsight = useCallback((insightText: string) => {
-    const active = state.activeSurvey as (ActiveSurvey & {
-      scriptId?: string; mode?: 'short' | 'full'; startPass?: number
-    }) | null
+    const active = state.activeSurvey
     if (!active) return
     const survey = resolveSurvey(active.skillId)
     if (!survey) return
@@ -1189,7 +1187,7 @@ export default function JourneyView({
   // Отмена анкеты или инсайта — сохраняем текущий прогресс как draft.
   const handleSurveyCancel = useCallback(() => {
     setState(s => {
-      const active = s.activeSurvey as (ActiveSurvey & { mode?: 'short' | 'full'; startPass?: number; stepIndex?: number }) | null
+      const active = s.activeSurvey
       if (!active) return { ...s, screen: 'skill-tree' }
       const hasAnyAnswer = Object.values(active.answers ?? {}).some((arr: unknown) =>
         Array.isArray(arr) && arr.some(n => typeof n === 'number' && Number.isFinite(n))
@@ -1247,7 +1245,7 @@ export default function JourneyView({
             startPass: draft.startPass ?? 1,
             stepIndex: draft.stepIndex ?? 0,
             answers: draft.answers ?? {},
-          } as unknown as ActiveSurvey,
+          },
         }))
         return
       }
@@ -1256,7 +1254,7 @@ export default function JourneyView({
         ...s,
         currentAspect: 'Ne',
         screen: 'survey-choice',
-        activeSurvey: { scriptId: `ne-survey-${skillId}`, skillId } as unknown as ActiveSurvey,
+        activeSurvey: { scriptId: `ne-survey-${skillId}`, skillId },
       }))
       return
     }
@@ -1275,7 +1273,7 @@ export default function JourneyView({
             startPass: draft.startPass ?? 1,
             stepIndex: draft.stepIndex ?? 0,
             answers: draft.answers ?? {},
-          } as unknown as ActiveSurvey,
+          },
         }))
         return
       }
@@ -1284,7 +1282,7 @@ export default function JourneyView({
         ...s,
         currentAspect: 'Ni',
         screen: 'survey-choice',
-        activeSurvey: { scriptId: `ni-survey-${skillId}`, skillId } as unknown as ActiveSurvey,
+        activeSurvey: { scriptId: `ni-survey-${skillId}`, skillId },
       }))
       return
     }
@@ -1303,7 +1301,7 @@ export default function JourneyView({
             startPass: draft.startPass ?? 1,
             stepIndex: draft.stepIndex ?? 0,
             answers: draft.answers ?? {},
-          } as unknown as ActiveSurvey,
+          },
         }))
         return
       }
@@ -1312,7 +1310,7 @@ export default function JourneyView({
         ...s,
         currentAspect: 'Te',
         screen: 'survey-choice',
-        activeSurvey: { scriptId: `te-survey-${skillId}`, skillId } as unknown as ActiveSurvey,
+        activeSurvey: { scriptId: `te-survey-${skillId}`, skillId },
       }))
       return
     }
@@ -1331,7 +1329,7 @@ export default function JourneyView({
             startPass: draft.startPass ?? 1,
             stepIndex: draft.stepIndex ?? 0,
             answers: draft.answers ?? {},
-          } as unknown as ActiveSurvey,
+          },
         }))
         return
       }
@@ -1340,7 +1338,7 @@ export default function JourneyView({
         ...s,
         currentAspect: 'Ti',
         screen: 'survey-choice',
-        activeSurvey: { scriptId: `ti-survey-${skillId}`, skillId } as unknown as ActiveSurvey,
+        activeSurvey: { scriptId: `ti-survey-${skillId}`, skillId },
       }))
       return
     }
@@ -1359,7 +1357,7 @@ export default function JourneyView({
             startPass: draft.startPass ?? 1,
             stepIndex: draft.stepIndex ?? 0,
             answers: draft.answers ?? {},
-          } as unknown as ActiveSurvey,
+          },
         }))
         return
       }
@@ -1368,7 +1366,7 @@ export default function JourneyView({
         ...s,
         currentAspect: 'Fi',
         screen: 'survey-choice',
-        activeSurvey: { scriptId: `fi-survey-${skillId}`, skillId } as unknown as ActiveSurvey,
+        activeSurvey: { scriptId: `fi-survey-${skillId}`, skillId },
       }))
       return
     }
@@ -1387,7 +1385,7 @@ export default function JourneyView({
             startPass: draft.startPass ?? 1,
             stepIndex: draft.stepIndex ?? 0,
             answers: draft.answers ?? {},
-          } as unknown as ActiveSurvey,
+          },
         }))
         return
       }
@@ -1396,7 +1394,7 @@ export default function JourneyView({
         ...s,
         currentAspect: 'Se',
         screen: 'survey-choice',
-        activeSurvey: { scriptId: `se-survey-${skillId}`, skillId } as unknown as ActiveSurvey,
+        activeSurvey: { scriptId: `se-survey-${skillId}`, skillId },
       }))
       return
     }
@@ -1425,7 +1423,7 @@ export default function JourneyView({
             startPass: draft.startPass ?? 1,
             stepIndex: draft.stepIndex ?? 0,
             answers: draft.answers ?? {},
-          } as unknown as ActiveSurvey,
+          },
         },
         cur => ({ ...cur, awaitingInput: null })
       ))
@@ -1439,7 +1437,7 @@ export default function JourneyView({
         ...s,
         currentAspect: aspect,
         screen: 'survey-choice',
-        activeSurvey: { scriptId: target.id, skillId } as unknown as ActiveSurvey,
+        activeSurvey: { scriptId: target.id, skillId },
       },
       cur => ({ ...cur, awaitingInput: null })
     ))
@@ -1448,7 +1446,7 @@ export default function JourneyView({
   // Юзер выбрал режим в SurveyChoice. Стартуем активную анкету.
   const handleChooseSurveyMode = useCallback((mode: 'short' | 'full') => {
     setState(s => {
-      const active = s.activeSurvey as (ActiveSurvey & { mode?: 'short' | 'full'; startPass?: number; stepIndex?: number }) | null
+      const active = s.activeSurvey
       if (!active) return s
       const skillEntry = s.skills?.[active.skillId] as StoredSkillEntry | undefined
       const startPass = getNextPass(skillEntry) || 1
@@ -1461,8 +1459,8 @@ export default function JourneyView({
           startPass,
           stepIndex: 0,
           // Накопленные ответы предыдущих проходов сохраняем.
-          answers: ((skillEntry as { answers?: Record<string, unknown> } | undefined)?.answers) ?? {},
-        } as unknown as ActiveSurvey,
+          answers: ((skillEntry as { answers?: Record<string, Array<number | null | undefined>> } | undefined)?.answers) ?? {},
+        },
       }
     })
   }, [setState])
@@ -1474,7 +1472,7 @@ export default function JourneyView({
   // Вспомогательное: если открыта анкета — сохраняем её черновик в
   // state.skills[id].draft и закрываем модалку.
   const dismissActiveSurveyToDraft = useCallback((s: JourneyState): JourneyState => {
-    const active = s.activeSurvey as (ActiveSurvey & { mode?: 'short' | 'full'; startPass?: number; stepIndex?: number }) | null
+    const active = s.activeSurvey
     if (!active) return { ...s, skillDetailId: null }
     const { skillId, mode, startPass, stepIndex, answers } = active
     const skillEntry = (s.skills?.[skillId] as StoredSkillEntry | undefined) ?? { id: skillId }
@@ -1562,7 +1560,7 @@ export default function JourneyView({
   // 2. Заполнить активную анкету. Все утверждения текущей сессии = 7.
   const handleAdminFillSurvey = useCallback(() => {
     setState(s => {
-      const active = s.activeSurvey as (ActiveSurvey & { mode?: 'short' | 'full'; startPass?: number; stepIndex?: number }) | null
+      const active = s.activeSurvey
       if (!active) return s
       const survey = resolveSurvey(active.skillId)
       if (!survey) return s
@@ -1581,7 +1579,7 @@ export default function JourneyView({
           ...active,
           answers,
           stepIndex: stmts.length,
-        } as unknown as ActiveSurvey,
+        },
       }
     })
   }, [setState])
@@ -1864,7 +1862,7 @@ export default function JourneyView({
           onContinue={() => {
             setState(s => {
               let nextSkills = s.skills
-              const active = s.activeSurvey as (ActiveSurvey & { mode?: 'short' | 'full'; startPass?: number; stepIndex?: number }) | null
+              const active = s.activeSurvey
               if (active) {
                 const hasAnyAnswer = Object.values(active.answers ?? {}).some((arr: unknown) =>
                   Array.isArray(arr) && arr.some(n => typeof n === 'number' && Number.isFinite(n))

@@ -3,28 +3,17 @@ import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../
 import { fetchHabitsToday, tickHabit, untickHabit } from '../../api/client'
 import { tmaNotify } from '../../tma/hooks'
 import type { AspectKey } from '@/types/aspect'
+import type { DiaryEntry } from '@/types/diary'
 import styles from './DiaryView.module.css'
 
 // Backend table `user_habits` (one row per (user, aspect)). Endpoint
 // /api/habits/today returns list (or { habits: [...] }) — нет
 // response_model. Локальный тип.
-// TODO(ts): tighten when backend adds response_model to /api/habits/today.
+// NOTE(ts): pending backend response_model for /api/habits/today.
 type HabitToday = {
   aspect: AspectKey
   title: string
   ticked_today?: boolean
-} & Record<string, unknown>
-
-// Diary entry shape used by DiaryView и Daily Review. Полный список полей —
-// см. DiaryView.tsx; здесь только load-bearing для добавления записи.
-type DiaryEntry = {
-  id: number
-  date: string
-  ts: number
-  aspect: AspectKey | 'general'
-  text: string
-  source: 'daily-review' | 'manual' | string
-  promptTitle?: string
 } & Record<string, unknown>
 
 type Props = {

@@ -47,7 +47,7 @@ type InsightKind = 'insight' | 'recommendation'
 
 // Shape captured from /api/profile/me usage in this file. Backend has no
 // response_model yet, so this list mirrors what the JSX actually reads.
-// TODO(ts): tighten when backend tightens /api/profile/me.
+// NOTE(ts): pending backend response_model for /api/profile/me.
 type Inspiration = {
   type: InspirationType | string
   title: string
