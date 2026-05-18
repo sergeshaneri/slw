@@ -6,6 +6,114 @@ import { TE_CORE_BLOCKS as TE_CORE_BLOCKS_DATA, TE_NON_CORE_BLOCKS as TE_NON_COR
 import { FI_CORE_BLOCKS as FI_CORE_BLOCKS_DATA, FI_NON_CORE_BLOCKS as FI_NON_CORE_BLOCKS_DATA } from './skills/Fi/skill-blocks'
 import { TI_CORE_BLOCKS as TI_CORE_BLOCKS_DATA, TI_NON_CORE_BLOCKS as TI_NON_CORE_BLOCKS_DATA } from './skills/Ti/skill-blocks'
 import { FI_EXTENSION } from './aspects-fi-extension'
+import type { AspectKey } from '@/types/aspect'
+
+// ── Типы данных аспекта ────────────────────────────────────────────
+// Поля шире, чем все аспекты заполнили: ASPECT_DATA добивается частями,
+// а Fi доращивается через Object.assign(FI_EXTENSION). Поэтому
+// почти всё опционально. Содержательные значения P1B-зоны (skill-blocks)
+// принимаются как unknown — реальный shape определит финальный pass.
+// TODO(ts): typed skill-block fields when P1B types are merged.
+
+export type AspectDilemma = { t: string; s: string; g: string }
+
+export type AspectArchetypes = { shadow: string[]; gift: string[] }
+
+export type AspectSelfAssessmentPole = { pole: string; qs: string[] }
+
+export type AspectPractice = { name: string; desc: string }
+
+export type AspectIntegration = {
+  opposite: string
+  desc: string
+  practices: AspectPractice[]
+}
+
+export type AspectSynergy = { aspects: string; name: string; desc: string }
+
+export type AspectPolysemy = { word: string; variants: string }
+
+export type AspectSomatic = { shadow: string[]; gift: string[] }
+
+export type AspectArchetypePath = {
+  name: string
+  prerequisite: string
+  lesson: string
+  transition: string
+}
+
+export type AspectMyth = { name: string; desc: string }
+
+export type AspectProfessionSkill = { skill: string; note: string }
+
+export type AspectProfession = {
+  name: string
+  desc: string
+  keySkills?: AspectProfessionSkill[]
+}
+
+export type AspectCharacterTrait = { name: string; desc: string }
+
+export type AspectChildRaisingItem = { name: string; desc: string }
+
+export type AspectHistoricalFigure = { name: string; desc: string }
+
+export type AspectArt = { name: string; desc: string }
+
+export type AspectQuote = { name: string; desc: string }
+
+export type AspectFact = { name: string; desc: string }
+
+export type AspectInfo = {
+  name: string
+  sub: string
+  metaphor?: string
+  essence?: string
+  superpower?: string
+  dilemmas?: AspectDilemma[]
+  archetypes?: AspectArchetypes
+  redFlags?: string[]
+  fears?: string
+  defenses?: string
+  coachTips?: string[]
+  selfAssessment?: AspectSelfAssessmentPole[]
+  goals?: string[]
+  resources?: string[]
+  practices?: AspectPractice[]
+  integration?: AspectIntegration
+  synergy?: AspectSynergy[]
+  polysemy?: AspectPolysemy[]
+  somatic?: AspectSomatic
+  archetypePath?: AspectArchetypePath[]
+  skills?: string[]
+  myths?: AspectMyth[]
+  professions?: AspectProfession[]
+  characterTraits?: AspectCharacterTrait[]
+  culturalDifferences?: string[]
+  childRaising?: AspectChildRaisingItem[]
+  childhoodQuestions?: string[]
+  // ── Fi-extension fields ──
+  historicalFigures?: AspectHistoricalFigure[]
+  art?: AspectArt[]
+  quotes?: AspectQuote[]
+  facts?: AspectFact[]
+  // ── per-aspect skill-block bundles (data lives in skills/ folder) ──
+  teSkillBlocksCore?: unknown
+  teSkillBlocks?: unknown
+  teMoneyPsychology?: unknown
+  tiSkillBlocksCore?: unknown
+  tiSkillBlocks?: unknown
+  feSkillBlocksCore?: unknown
+  feSkillBlocks?: unknown
+  fiSkillBlocksCore?: unknown
+  fiSkillBlocks?: unknown
+  siSkillBlocksCore?: unknown
+  siSkillBlocks?: unknown
+  neSkillBlocksCore?: unknown
+  neSkillBlocks?: unknown
+  niSkillBlocksCore?: unknown
+  niSkillBlocks?: unknown
+}
 
 // Палитра аспектов — премиум tier для тёмного UI.
 //
@@ -27,7 +135,7 @@ import { FI_EXTENSION } from './aspects-fi-extension'
 //   Si → fresh pistachio (мягкая природа, уют, тело)
 //   Ne → luminous electric indigo (искра видения, третий глаз)
 //   Ni → luminous amethyst (мистика, время, подсознание)
-export const ASPECT_COLORS = {
+export const ASPECT_COLORS: Record<AspectKey, string> = {
   Te: '#8FA8BD',  // luminous slate steel (cool metal, lit)
   Ti: '#DCE2EB',  // pearl platinum (bright crystal)
   Fe: '#D85160',  // luminous crimson rose
@@ -38,11 +146,11 @@ export const ASPECT_COLORS = {
   Ni: '#B97FD2'   // luminous amethyst
 }
 
-export const ASPECT_KEYS = ['Te', 'Ti', 'Fe', 'Fi', 'Se', 'Si', 'Ne', 'Ni']
+export const ASPECT_KEYS = ['Te', 'Ti', 'Fe', 'Fi', 'Se', 'Si', 'Ne', 'Ni'] as const satisfies readonly AspectKey[]
 
 // Короткий русский код аспекта для отображения в UI. Латинские ключи
 // (Te/Ti/Fe/…) — внутренние, юзеру показывать не надо.
-export const ASPECT_DISPLAY_KEY = {
+export const ASPECT_DISPLAY_KEY: Record<AspectKey, string> = {
   Te: 'ЧЛ', Ti: 'БЛ',
   Fe: 'ЧЭ', Fi: 'БЭ',
   Se: 'ЧС', Si: 'БС',
@@ -51,7 +159,7 @@ export const ASPECT_DISPLAY_KEY = {
 
 // Короткие описания аспекта-сферы — отображаются на главной, чтобы было
 // очевидно, что в карточку можно тыкнуть и попасть в её мир.
-export const ASPECT_REALMS = {
+export const ASPECT_REALMS: Record<AspectKey, string> = {
   Te: 'мир действий и эффективности',
   Ti: 'мир структур и причин',
   Fe: 'мир эмоций и яркости',
@@ -62,6 +170,11 @@ export const ASPECT_REALMS = {
   Ni: 'мир подсознания и времени'
 }
 
+// ASPECT_DATA инициализируется частично (Te + Ti) и доращивается ниже через
+// прямые присваивания (ASPECT_DATA.Fe = …, Fi через Object.assign из
+// FI_EXTENSION и т.п.). К моменту использования все 8 ключей заполнены,
+// поэтому финальный тип — Record<AspectKey, AspectInfo>; начальный литерал
+// кастуется, т.к. TS не понимает «доращивания» через присваивание свойств.
 export const ASPECT_DATA = {
   Te: {
     name: 'Черная Логика',
@@ -2636,7 +2749,7 @@ export const ASPECT_DATA = {
     tiSkillBlocksCore: TI_CORE_BLOCKS_DATA,
     tiSkillBlocks: TI_NON_CORE_BLOCKS_DATA
   }
-}
+} as unknown as Record<AspectKey, AspectInfo>
 
 // Добавляем остальные аспекты напрямую
 ASPECT_DATA.Fe = {

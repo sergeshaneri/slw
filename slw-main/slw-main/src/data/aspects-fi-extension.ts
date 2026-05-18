@@ -9,8 +9,11 @@
 // импорт FI_*_BLOCKS_DATA из skills/Fi/skill-blocks — расширение не их трогает.
 
 import { FI_CORE_BLOCKS, FI_NON_CORE_BLOCKS } from './skills/Fi/skill-blocks'
+import type { AspectInfo } from './aspects'
 
-export const FI_EXTENSION = {
+// Расширение Fi берёт частичный набор полей AspectInfo. Object.assign в
+// aspects.ts склеивает базовую часть Fi с этим расширением.
+export const FI_EXTENSION: Partial<AspectInfo> = {
   fiSkillBlocksCore: FI_CORE_BLOCKS,
   fiSkillBlocks: FI_NON_CORE_BLOCKS,
 
