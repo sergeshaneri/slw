@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import type { Script, ScriptType } from '@/types/script'
 import type { PendingTask } from '@/types/journey'
 import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
+import { useConfirm } from '../Confirm/ConfirmProvider'
 import styles from './JourneyView.module.css'
 import MarkdownLite from './MarkdownLite'
 
@@ -81,12 +82,31 @@ function TaskItem({ task, script, accent, onCompleteWithNote, onDelete }: ItemPr
   const [sendKeyMode] = useSendKeyMode()
   const [noteOpen, setNoteOpen] = useState<boolean>(false)
   const [noteText, setNoteText] = useState<string>('')
+  const confirm = useConfirm()
 
   const handleSaveWithNote = () => {
     if (!noteText.trim()) return
     onCompleteWithNote(script, noteText.trim())
     setNoteText('')
     setNoteOpen(false)
+  }
+
+  // Удаление задания — без обратной операции. Confirm защищает от случайного
+  // тапа по соседней кнопке на узких экранах (рядом стоит «Выполнить»).
+  const handleDeleteClick = async () => {
+    const ok = await confirm({
+      title: 'Удалить задание?',
+      body: (
+        <>
+          «<strong>{script.title}</strong>» исчезнет из активных. Само
+          задание остаётся в чате — вернуться к нему можно будет позже.
+        </>
+      ),
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Оставить',
+      danger: true,
+    })
+    if (ok) onDelete(script.id)
   }
 
   const accentStyle: AccentStyle | undefined = accent ? { '--accent': accent } : undefined
@@ -126,7 +146,7 @@ function TaskItem({ task, script, accent, onCompleteWithNote, onDelete }: ItemPr
           <button
             type="button"
             className={`${styles.btn} ${styles.btnGhost}`}
-            onClick={() => onDelete(script.id)}
+            onClick={handleDeleteClick}
           >
             Удалить
           </button>

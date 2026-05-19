@@ -8,6 +8,7 @@ import {
   untickHabit,
   fetchHabitsHistory,
 } from '../../api/client'
+import { useConfirm } from '../Confirm/ConfirmProvider'
 import type { AspectKey } from '@/types/aspect'
 import styles from './HabitSection.module.css'
 
@@ -46,6 +47,7 @@ export default function HabitSection({ aspect, color }: Props) {
   const [history, setHistory] = useState<string[]>([])      // last 30 dates
   const [busy, setBusy] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const confirm = useConfirm()
 
   const reload = async () => {
     setBusy(true)
@@ -81,7 +83,19 @@ export default function HabitSection({ aspect, color }: Props) {
 
   const handleClear = async () => {
     if (!habit) return
-    if (!confirm('Снять активную практику для этого аспекта?')) return
+    const ok = await confirm({
+      title: 'Снять активную практику?',
+      body: (
+        <>
+          «<strong>{habit.title}</strong>» больше не будет отображаться
+          как ежедневная для этого аспекта. История тиков и стрик не пропадут —
+          смена практики не «обнуляет» прогресс.
+        </>
+      ),
+      confirmLabel: 'Снять',
+      cancelLabel: 'Оставить',
+    })
+    if (!ok) return
     try {
       await clearHabit(aspect)
       reload()

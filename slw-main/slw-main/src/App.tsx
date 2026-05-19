@@ -21,6 +21,7 @@ import LoadingScreen from './components/LoadingScreen/LoadingScreen'
 import AuthModal from './components/Auth/AuthModal'
 import WelcomeScreen from './components/Welcome/WelcomeScreen'
 import Footer from './components/Footer/Footer'
+import { ConfirmProvider } from './components/Confirm/ConfirmProvider'
 import { isTMA } from './tma'
 import { useBackButton } from './tma/hooks'
 import { ASPECT_KEYS } from './data/aspects'
@@ -918,6 +919,7 @@ export default function App() {
     : 0
 
   return (
+    <ConfirmProvider>
     <div className={styles.app}>
       <AchievementToast items={toasts} onDismiss={dismissToast} />
       {showIntroTour && (
@@ -1131,5 +1133,6 @@ export default function App() {
         {view !== 'journey' && <Footer />}
       </main>
     </div>
+    </ConfirmProvider>
   )
 }

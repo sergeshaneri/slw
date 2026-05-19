@@ -8,6 +8,7 @@ import EmotionsTab from './EmotionsTab'
 import TrainingsTab from './TrainingsTab'
 import AnalyticsTab from './AnalyticsTab'
 import VaultSyncTab from './VaultSyncTab'
+import { useConfirm } from '../Confirm/ConfirmProvider'
 import { isTMA } from '../../tma'
 import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import type { AspectKey } from '@/types/aspect'
@@ -45,6 +46,7 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
   const [sendKeyMode] = useSendKeyMode()
   const [aspect, setAspect] = useState<AspectKey | 'general'>('general')
   const [filter, setFilter] = useState<AspectKey | 'general' | 'all'>('all')
+  const confirm = useConfirm()
   // Сколько последних записей рендерим. У активного юзера дневник
   // может расти до сотен — без collapse страница тормозит.
   // showAll=true → весь отфильтрованный список.
@@ -67,7 +69,22 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
     setText('')
   }
 
-  const handleDelete = (id: number | string): void => {
+  const handleDelete = async (id: number | string): Promise<void> => {
+    const entry = diary.find(e => e.id === id)
+    const preview = (entry?.text ?? '').slice(0, 80)
+    const ok = await confirm({
+      title: 'Удалить запись?',
+      body: (
+        <>
+          {preview ? <>«{preview}{(entry?.text?.length ?? 0) > 80 ? '…' : ''}»</> : 'Эта запись'} исчезнет
+          из дневника. <strong>Восстановить не получится.</strong>
+        </>
+      ),
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Оставить',
+      danger: true,
+    })
+    if (!ok) return
     onDiaryChange(diary.filter(e => e.id !== id))
   }
 

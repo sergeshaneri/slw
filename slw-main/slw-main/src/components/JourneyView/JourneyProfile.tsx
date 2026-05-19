@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { JourneyState, AspectState } from '@/types/journey'
+import { useConfirm } from '../Confirm/ConfirmProvider'
 import styles from './JourneyView.module.css'
 
 type FlatState = JourneyState & Partial<AspectState>
@@ -35,6 +36,30 @@ type Props = {
 }
 
 export default function JourneyProfile({ state, accent, totalSteps, progressPct, levelTitle, planet, aspectName, onContinue, onReset, onOpenPlanetMap }: Props) {
+  const confirm = useConfirm()
+
+  // «Начать заново» стирает весь journey: XP, streak, skills, прогресс
+  // ВСЕХ аспектов, чат-историю. Это самое деструктивное действие в продукте —
+  // требуем типизированное подтверждение (юзер вводит слово), чтобы случайный
+  // тап не мог уничтожить часы прогресса.
+  const handleResetClick = async (): Promise<void> => {
+    const ok = await confirm({
+      title: 'Начать путешествие заново?',
+      body: (
+        <>
+          Будут <strong>удалены</strong>: твой опыт ({state.xp ?? 0} XP),
+          стрик ({state.streak ?? 0} дн.), все навыки и анкеты, прогресс
+          по всем 8 планетам, чат-история. <strong>Восстановить не получится.</strong>
+        </>
+      ),
+      confirmLabel: 'Стереть всё',
+      cancelLabel: 'Оставить как есть',
+      danger: true,
+      typedConfirmation: 'сбросить',
+    })
+    if (ok) onReset()
+  }
+
   return (
     <>
       <div className={styles.topbar}>
@@ -120,7 +145,7 @@ export default function JourneyProfile({ state, accent, totalSteps, progressPct,
           </button>
         )}
 
-        <button type="button" className={`${styles.btn} ${styles.btnGhost} ${styles.btnFull}`} onClick={onReset}>
+        <button type="button" className={`${styles.btn} ${styles.btnGhost} ${styles.btnFull}`} onClick={handleResetClick}>
           Начать заново
         </button>
       </div>

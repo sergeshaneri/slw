@@ -26,6 +26,7 @@ import {
   unbookmarkInsight,
 } from '../../api/client'
 import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
+import { useConfirm } from '../Confirm/ConfirmProvider'
 import type { AspectKey } from '@/types/aspect'
 import styles from './HallView.module.css'
 
@@ -420,6 +421,7 @@ function ChatList({ aspect, onOpenProfile }: ChatListProps) {
   const [lastId, setLastId] = useState(0)
   const listRef = useRef<HTMLDivElement | null>(null)
   const [sendKeyMode] = useSendKeyMode()
+  const confirm = useConfirm()
 
   // Initial load.
   useEffect(() => {
@@ -475,6 +477,21 @@ function ChatList({ aspect, onOpenProfile }: ChatListProps) {
   }
 
   const handleDelete = async (id: number) => {
+    const msg = messages.find(m => m.id === id)
+    const preview = (msg?.text ?? '').slice(0, 80)
+    const ok = await confirm({
+      title: 'Удалить сообщение?',
+      body: (
+        <>
+          {preview ? <>«{preview}{(msg?.text?.length ?? 0) > 80 ? '…' : ''}»</> : 'Это сообщение'} пропадёт
+          из чата холла. <strong>Вернуть не получится.</strong>
+        </>
+      ),
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Оставить',
+      danger: true,
+    })
+    if (!ok) return
     try {
       await deleteHallMessage(aspect, id)
       setMessages(prev => prev.filter(m => m.id !== id))

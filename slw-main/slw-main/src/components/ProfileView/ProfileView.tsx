@@ -17,6 +17,7 @@ import {
 } from '../../api/client'
 import ReactorsList from '../PublicProfileView/ReactorsList'
 import Heatmap from '../Heatmap/Heatmap'
+import { useConfirm } from '../Confirm/ConfirmProvider'
 import { tmaNotify } from '../../tma/hooks'
 import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import type { AspectKey } from '@/types/aspect'
@@ -791,6 +792,7 @@ function StreakSection({ journey, onJourneyChange }: StreakSectionProps) {
   const [busy, setBusy] = useState<boolean>(true)
   const [activating, setActivating] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
+  const confirm = useConfirm()
 
   const stardust = journey?.stardust ?? 0
 
@@ -809,6 +811,23 @@ function StreakSection({ journey, onJourneyChange }: StreakSectionProps) {
 
   const handleShield = async () => {
     if (!onJourneyChange || !journey || stardust < SHIELD_COST || activating) return
+
+    // 50 ✦ — заметная сумма (≈ 50 пройденных шагов). Без подтверждения
+    // случайный тап в плотной шапке стрика стоил юзеру дня прогресса.
+    const ok = await confirm({
+      title: 'Активировать защиту стрика?',
+      body: (
+        <>
+          Со счёта спишется <strong>{SHIELD_COST} ✦ звёздной пыли</strong>
+          {' '}(сейчас у тебя {stardust}). Защита даёт один пропуск в стрике —
+          если завтра ничего не сделаешь, серия не оборвётся.
+        </>
+      ),
+      confirmLabel: `Активировать (−${SHIELD_COST} ✦)`,
+      cancelLabel: 'Не сейчас',
+    })
+    if (!ok) return
+
     setActivating(true)
     setError(null)
     try {
@@ -882,6 +901,7 @@ function MyHabitsSection() {
   const [habits, setHabits] = useState<HabitItem[]>([])
   const [busy, setBusy] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const confirm = useConfirm()
 
   const reload = async () => {
     setBusy(true)
@@ -898,7 +918,20 @@ function MyHabitsSection() {
   useEffect(() => { reload() }, [])
 
   const handleClear = async (aspect: AspectKey | string) => {
-    if (!confirm(`Снять активную практику для ${aspect}?`)) return
+    const display = (ASPECT_DISPLAY_KEY as Record<string, string>)[aspect] ?? aspect
+    const habit = habits.find(h => h.aspect === aspect)
+    const ok = await confirm({
+      title: `Снять практику в ${display}?`,
+      body: habit ? (
+        <>
+          «<strong>{habit.title}</strong>» больше не будет ежедневной.
+          История тиков и стрик не пропадут.
+        </>
+      ) : 'Практика для этого аспекта будет снята.',
+      confirmLabel: 'Снять',
+      cancelLabel: 'Оставить',
+    })
+    if (!ok) return
     try {
       await clearHabit(aspect)
       reload()
