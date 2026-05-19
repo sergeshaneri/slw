@@ -73,6 +73,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         cancelLabel={opts?.cancelLabel}
         danger={opts?.danger}
         typedConfirmation={opts?.typedConfirmation}
+        infoOnly={opts?.infoOnly}
         onConfirm={handleConfirm}
         onCancel={handleCancel}
       />

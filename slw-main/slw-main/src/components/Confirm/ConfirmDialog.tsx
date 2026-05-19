@@ -29,6 +29,12 @@ export type ConfirmDialogProps = {
    * удаление аккаунта.
    */
   typedConfirmation?: string
+  /**
+   * Info-only режим: cancel-кнопка скрыта, остаётся только confirm
+   * (с лейблом «Понятно»). Используется когда диалог только информирует
+   * (например «фича заблокирована до уровня X»), а не запрашивает выбор.
+   */
+  infoOnly?: boolean
   onConfirm: () => void
   onCancel: () => void
 }
@@ -41,6 +47,7 @@ export default function ConfirmDialog({
   cancelLabel = 'Отмена',
   danger = false,
   typedConfirmation,
+  infoOnly = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -129,13 +136,15 @@ export default function ConfirmDialog({
         )}
 
         <div className={styles.actions}>
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnCancel}`}
-            onClick={onCancel}
-          >
-            {cancelLabel}
-          </button>
+          {!infoOnly && (
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnCancel}`}
+              onClick={onCancel}
+            >
+              {cancelLabel}
+            </button>
+          )}
           <button
             ref={confirmBtnRef}
             type="button"

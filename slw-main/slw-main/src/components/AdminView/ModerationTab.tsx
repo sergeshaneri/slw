@@ -4,6 +4,7 @@ import {
   adminListInsights,
   adminPatchInsight,
 } from '../../api/client'
+import { useConfirm } from '../Confirm/ConfirmProvider'
 import styles from './AdminView.module.css'
 
 // Backend stores aspect as Cyrillic code (e.g. 'БС'); admin-list returns it
@@ -52,6 +53,7 @@ export default function ModerationTab() {
   const [onlyPublic, setOnlyPublic] = useState<boolean>(false)
   const [busy, setBusy] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
+  const confirm = useConfirm()
 
   const load = useCallback(async () => {
     setBusy(true)
@@ -85,7 +87,27 @@ export default function ModerationTab() {
   }
 
   const deleteInsight = async (insight: AdminInsight) => {
-    if (!confirm(`Удалить инсайт #${insight.id} от ${insight.user_email || insight.user_id}? Действие необратимо.`)) return
+    const preview = (insight.text || '').slice(0, 120)
+    const ok = await confirm({
+      title: 'Удалить инсайт?',
+      body: (
+        <>
+          Инсайт #<strong>{insight.id}</strong> от{' '}
+          <strong>{insight.user_email || `#${insight.user_id}`}</strong>.
+          {preview && (
+            <em style={{ display: 'block', marginTop: 8, padding: 8, background: 'rgba(0,0,0,0.25)', borderRadius: 6 }}>
+              «{preview}{(insight.text?.length ?? 0) > 120 ? '…' : ''}»
+            </em>
+          )}
+          <br />
+          <strong>Действие необратимо.</strong> Лайки и закладки тоже пропадут.
+          Если хочешь просто скрыть от других — поставь is_public=false (кнопка «👁 скрыть»).
+        </>
+      ),
+      confirmLabel: 'Удалить',
+      danger: true,
+    })
+    if (!ok) return
     try {
       await adminDeleteInsight(insight.id)
       setInsights(prev => prev.filter(i => i.id !== insight.id))

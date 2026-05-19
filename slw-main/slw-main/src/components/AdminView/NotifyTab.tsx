@@ -9,6 +9,7 @@ import {
   adminNotifyTest,
 } from '../../api/client'
 import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
+import { useConfirm } from '../Confirm/ConfirmProvider'
 import styles from './AdminView.module.css'
 
 type BroadcastTarget = 'tg_linked' | 'recent_30d' | 'all'
@@ -102,6 +103,7 @@ export default function NotifyTab() {
   const pushAction = useCallback((msg: string) => {
     setActionLog(prev => [{ ts: Date.now(), msg }, ...prev].slice(0, 10))
   }, [])
+  const confirm = useConfirm()
 
   const loadConfig = useCallback(async () => {
     setConfigBusy(true)
@@ -144,7 +146,13 @@ export default function NotifyTab() {
   }
 
   const runNow = async () => {
-    if (!confirm('Запустить раунд рассылки сейчас? Будут отправлены уведомления всем подходящим юзерам.')) return
+    const ok = await confirm({
+      title: 'Запустить раунд рассылки сейчас?',
+      body: 'Запустит scheduler «как будто наступило время». Отправит уведомления ВСЕМ подходящим юзерам (по их типам — pending_task_reminder / practice_check / continue_journey), учитывая cooldown\'ы. Прервать после запуска нельзя.',
+      confirmLabel: 'Запустить',
+      danger: true,
+    })
+    if (!ok) return
     try {
       const r = await adminNotifyRunNow() as RunNowResp
       if (r.globally_disabled) {
@@ -175,7 +183,28 @@ export default function NotifyTab() {
       pushAction('Broadcast: введи текст')
       return
     }
-    if (!confirm(`Отправить ВСЕМ юзерам (target: ${broadcastTarget})?\n\nТекст:\n${text}`)) return
+    const ok = await confirm({
+      title: 'Broadcast всем юзерам?',
+      body: (
+        <>
+          Сегмент: <strong>{broadcastTarget}</strong>
+          {' '}({(TARGETS.find(t => t.id === broadcastTarget)?.label) || ''}).
+          <br /><br />
+          Текст:<br />
+          <em style={{ display: 'block', marginTop: 4, padding: 8, background: 'rgba(0,0,0,0.25)', borderRadius: 6, whiteSpace: 'pre-wrap' }}>
+            {text}
+          </em>
+          <br />
+          <strong>Прервать отправку после старта нельзя.</strong> Юзеры получат
+          сообщение в TG в течение ~1 минуты.
+        </>
+      ),
+      confirmLabel: 'Отправить всем',
+      cancelLabel: 'Стоп',
+      danger: true,
+      typedConfirmation: 'отправить',
+    })
+    if (!ok) return
     try {
       const r = await adminNotifyBroadcast({ text, target: broadcastTarget }) as BroadcastResp
       pushAction(`Broadcast: sent=${r.sent} errors=${r.errors}`)
@@ -187,7 +216,14 @@ export default function NotifyTab() {
   }
 
   const clearAllCooldowns = async () => {
-    if (!confirm('Сбросить cooldown\'ы у ВСЕХ юзеров? После этого каждый снова может получить любой тип уведомления сегодня.')) return
+    const ok = await confirm({
+      title: 'Сбросить cooldown\'ы у ВСЕХ юзеров?',
+      body: 'После сброса каждый юзер снова может получить любой тип уведомления сегодня (даже если уже получал). Если запустишь runNow следом — будет рассылка ВСЕМ. Используй только если уверен.',
+      confirmLabel: 'Сбросить cooldown',
+      danger: true,
+      typedConfirmation: 'сбросить',
+    })
+    if (!ok) return
     try {
       const r = await adminNotifyClearCooldowns({}) as ClearCooldownsResp
       pushAction(`Cooldowns сброшены: affected=${r.affected}`)

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { adminBulkRestore } from '../../api/client'
+import { useConfirm } from '../Confirm/ConfirmProvider'
 import styles from './AdminView.module.css'
 
 // Backend has no response_model for /api/admin/bulk-restore — shape mirrors
@@ -40,9 +41,30 @@ export default function BulkTab() {
   const [result, setResult] = useState<BulkResult | null>(null)
   const [busy, setBusy] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
+  const confirm = useConfirm()
 
   const run = async (dryRun: boolean) => {
-    if (!dryRun && !confirm(`Применить bulk-restore для всех юзеров с drift > ${threshold} (до ${limit} штук)?`)) return
+    if (!dryRun) {
+      const ok = await confirm({
+        title: 'Применить bulk-restore?',
+        body: (
+          <>
+            Затронет всех юзеров с drift &gt; <strong>{threshold}</strong>
+            {' '}(до <strong>{limit}</strong> штук).
+            {bumpLevels && ' Уровни будут бамплены по эвристике (R-2/R-3 в дневнике → следующий уровень).'}
+            <br /><br />
+            Каждому юзеру старый journey сохранится в{' '}
+            <code>_backup_before_restore</code>, можно откатить per-user через
+            UsersTab. Но <strong>массовый откат — только через psql</strong>.
+          </>
+        ),
+        confirmLabel: 'Применить ко всем',
+        cancelLabel: 'Сначала dry-run',
+        danger: true,
+        typedConfirmation: 'применить',
+      })
+      if (!ok) return
+    }
     setBusy(true)
     setError(null)
     try {

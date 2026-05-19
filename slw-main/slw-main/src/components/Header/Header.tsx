@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { ru } from '../../locales/ru'
 import NotificationsBell from '../Notifications/NotificationsBell'
+import { useConfirm } from '../Confirm/ConfirmProvider'
 import type { User } from '@/types/user'
 import type { ViewName } from '@/types/view'
 import styles from './Header.module.css'
@@ -74,6 +75,8 @@ export default function Header({
   const coachLocked = !user || totalStepsCompleted < COACH_UNLOCK_AT
   const coachLockedTitle =
     'ИИ-коуч доступен тем, кто начал путешествие по планетам и прошёл хотя бы 5 шагов'
+
+  const confirm = useConfirm()
 
   const navItems: NavItem[] = [
     // Главная: для залогиненных — Дашборд, гостям — сразу Аспекты (read-only).
@@ -169,12 +172,19 @@ export default function Header({
           if (item.id === 'journey' && journeyHighlight) highlightLabel = '👈 Тут начинается игра'
           else if (item.id === 'aspects' && aspectsHighlight) highlightLabel = '👆 Тут больше информации по сферам жизни'
           const isHighlight = !!highlightLabel
-          // Locked-кнопка остаётся кликабельной (alert через title) —
-          // визуально приглушена, не отключена hard (чтобы tooltip работал
-          // на мобиле через клик). Клик показывает alert с пояснением.
+          // Locked-кнопка остаётся кликабельной — визуально приглушена,
+          // не отключена hard (чтобы tooltip работал на мобиле через клик).
+          // Клик показывает info-модал с объяснением «почему заблокировано».
+          // Раньше был window.alert — нативный системный диалог, который
+          // выпадал из премиум-эстетики и плохо смотрелся в TMA.
           const handleClick = () => {
             if (item.locked) {
-              window.alert(item.lockedTitle || 'Функция заблокирована')
+              confirm({
+                title: item.label,
+                body: item.lockedTitle || 'Функция заблокирована',
+                confirmLabel: 'Понятно',
+                infoOnly: true,
+              })
               return
             }
             onViewChange(item.id)

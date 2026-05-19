@@ -20,6 +20,7 @@ import {
 import { ASPECT_KEYS, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { getJourney } from '../../data/journey/registry'
 import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
+import { useConfirm } from '../Confirm/ConfirmProvider'
 import type { AspectKey } from '@/types/aspect'
 import styles from './AdminView.module.css'
 
@@ -157,6 +158,7 @@ export default function UsersTab({ onImpersonateApply }: Props) {
   const [sort, setSort] = useState<SortOption>('recent')
   const [busy, setBusy] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
+  const confirm = useConfirm()
 
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
   const [diagnostic, setDiagnostic] = useState<Diagnostic | null>(null)
@@ -231,7 +233,19 @@ export default function UsersTab({ onImpersonateApply }: Props) {
 
   const applyRestore = async () => {
     if (!selectedUser) return
-    if (!confirm(`Применить restore для ${selectedUser.email || selectedUser.id}? Бэкап старого journey сохранится в _backup_before_restore.`)) return
+    const ok = await confirm({
+      title: 'Применить restore из дневника?',
+      body: (
+        <>
+          Юзер: <strong>{selectedUser.email || `#${selectedUser.id}`}</strong>.
+          Будет пересобран completedScripts из его дневника. Старый journey
+          сохранится в <code>_backup_before_restore</code> и можно откатить.
+        </>
+      ),
+      confirmLabel: 'Применить',
+      danger: true,
+    })
+    if (!ok) return
     try {
       const d = await adminRestoreFromDiary({
         user_id: selectedUser.id, dry_run: false, bump_levels: true,
@@ -247,7 +261,19 @@ export default function UsersTab({ onImpersonateApply }: Props) {
   const promote = async (makeAdmin: boolean) => {
     if (!selectedUser) return
     const verb = makeAdmin ? 'дать админа' : 'забрать админа'
-    if (!confirm(`${verb} у ${selectedUser.email || selectedUser.id}?`)) return
+    const ok = await confirm({
+      title: makeAdmin ? 'Выдать админа?' : 'Забрать админа?',
+      body: (
+        <>
+          {verb.charAt(0).toUpperCase() + verb.slice(1)} у{' '}
+          <strong>{selectedUser.email || `#${selectedUser.id}`}</strong>.
+          {makeAdmin ? ' Юзер получит доступ к dev-панели в Путешествии и ко всем admin-операциям.' : ' Юзер потеряет доступ к админ-функциям.'}
+        </>
+      ),
+      confirmLabel: makeAdmin ? 'Дать админа' : 'Забрать админа',
+      danger: !makeAdmin,
+    })
+    if (!ok) return
     try {
       const d = await adminPromote({ user_id: selectedUser.id, is_admin: makeAdmin }) as {
         is_admin_before: boolean
@@ -265,7 +291,22 @@ export default function UsersTab({ onImpersonateApply }: Props) {
 
   const impersonate = async () => {
     if (!selectedUser) return
-    if (!confirm(`Войти от имени ${selectedUser.email || selectedUser.id}? Текущий админский токен будет заменён. Чтобы вернуться, нужно будет перелогиниться.`)) return
+    const ok = await confirm({
+      title: 'Войти от имени юзера?',
+      body: (
+        <>
+          Сейчас твой админский токен <strong>будет заменён</strong> на токен{' '}
+          <strong>{selectedUser.email || `#${selectedUser.id}`}</strong>.
+          Чтобы вернуться к себе — нужно будет перелогиниться (через email/TG).
+          Не отправляй сообщения, не лайкай — действия атрибутируются юзеру.
+        </>
+      ),
+      confirmLabel: 'Заменить токен',
+      cancelLabel: 'Не сейчас',
+      danger: true,
+      typedConfirmation: 'войти',
+    })
+    if (!ok) return
     try {
       const d = await adminImpersonate({ user_id: selectedUser.id }) as {
         token: string
@@ -306,7 +347,19 @@ export default function UsersTab({ onImpersonateApply }: Props) {
 
   const rollbackRestore = async () => {
     if (!selectedUser) return
-    if (!confirm(`Откатить последний restore для ${selectedUser.email || selectedUser.id}?`)) return
+    const ok = await confirm({
+      title: 'Откатить последний restore?',
+      body: (
+        <>
+          Вернёт journey юзера <strong>{selectedUser.email || `#${selectedUser.id}`}</strong>
+          {' '}к состоянию из <code>_backup_before_restore</code>. Все изменения
+          от restore — потеряются.
+        </>
+      ),
+      confirmLabel: 'Откатить',
+      danger: true,
+    })
+    if (!ok) return
     try {
       const d = await adminRollbackRestore({ user_id: selectedUser.id }) as { rolled_back_to?: string }
       pushLog(`Rollback: до ${d.rolled_back_to}`)
@@ -358,7 +411,20 @@ export default function UsersTab({ onImpersonateApply }: Props) {
 
   const applyPositionEdit = async () => {
     if (!selectedUser || !positionEditor) return
-    if (!confirm(`Применить позицию для ${positionEditor.aspect}: L${positionEditor.currentLevel}, scriptId=${positionEditor.currentScriptId || '—'}?`)) return
+    const ok = await confirm({
+      title: 'Применить позицию аспекта?',
+      body: (
+        <>
+          Аспект: <strong>{positionEditor.aspect}</strong>, уровень{' '}
+          <strong>L{positionEditor.currentLevel}</strong>, scriptId{' '}
+          <strong>{positionEditor.currentScriptId || '—'}</strong>.
+          Старая позиция сохранится в <code>_backup_before_position_edit</code>.
+        </>
+      ),
+      confirmLabel: 'Применить',
+      danger: true,
+    })
+    if (!ok) return
     try {
       const r = await adminSetAspectPosition(selectedUser.id, {
         aspect: positionEditor.aspect,
@@ -379,7 +445,13 @@ export default function UsersTab({ onImpersonateApply }: Props) {
 
   const autoPositionFromDiary = async () => {
     if (!selectedUser) return
-    if (!confirm('Авто-проставить позицию по последним записям дневника для всех аспектов?')) return
+    const ok = await confirm({
+      title: 'Авто-проставить позицию?',
+      body: 'Для каждого аспекта currentScriptId возьмётся из последней записи дневника. Уровень бампается по эвристике (R-2/R-3 или ≥6 уникальных scriptId). Старый state сохранится в _backup_before_auto_position.',
+      confirmLabel: 'Применить',
+      danger: true,
+    })
+    if (!ok) return
     try {
       const r = await adminAutoPositionFromDiary(selectedUser.id) as {
         applied?: boolean
@@ -399,7 +471,19 @@ export default function UsersTab({ onImpersonateApply }: Props) {
 
   const resetAspectPosition = async (aspect: AspectKey | string) => {
     if (!selectedUser) return
-    if (!confirm(`Сбросить позицию ${aspect} на начало текущего уровня? Чат-история сотрётся, completedScripts и currentLevel остаются.`)) return
+    const ok = await confirm({
+      title: 'Сбросить позицию аспекта?',
+      body: (
+        <>
+          Аспект <strong>{aspect}</strong>: чат-история сотрётся, currentScriptId
+          обнулится. <strong>completedScripts и currentLevel останутся</strong> —
+          юзер будет на том же уровне, но без диалога.
+        </>
+      ),
+      confirmLabel: 'Сбросить',
+      danger: true,
+    })
+    if (!ok) return
     try {
       const r = await adminResetAspectPosition(selectedUser.id, aspect) as {
         before?: { messages_count?: number }
@@ -413,7 +497,12 @@ export default function UsersTab({ onImpersonateApply }: Props) {
 
   const normalizeCounters = async () => {
     if (!selectedUser) return
-    if (!confirm('Синхронизировать totalCompleted с фактической суммой completedScripts?')) return
+    const ok = await confirm({
+      title: 'Синхронизировать счётчики?',
+      body: 'totalCompleted станет = сумма completedScripts по всем аспектам. XP-баланс на UI обновится. Это безопасная операция (бэкап есть).',
+      confirmLabel: 'Синхронизировать',
+    })
+    if (!ok) return
     try {
       const r = await adminNormalizeCounters(selectedUser.id) as {
         totalCompleted_before?: number
@@ -440,7 +529,22 @@ export default function UsersTab({ onImpersonateApply }: Props) {
     if (!selectedUser || !tgMessage) return
     const text = (tgMessage.text || '').trim()
     if (!text) return
-    if (!confirm(`Отправить юзеру ${selectedUser.email || selectedUser.id} это сообщение в TG?\n\n${text}`)) return
+    const ok = await confirm({
+      title: 'Отправить TG-сообщение юзеру?',
+      body: (
+        <>
+          Кому: <strong>{selectedUser.email || `#${selectedUser.id}`}</strong>
+          {' '}(tg_id <code>{selectedUser.telegram_id || '—'}</code>).
+          <br /><br />
+          Текст:<br />
+          <em style={{ display: 'block', marginTop: 4, padding: 8, background: 'rgba(0,0,0,0.25)', borderRadius: 6 }}>
+            {text}
+          </em>
+        </>
+      ),
+      confirmLabel: 'Отправить',
+    })
+    if (!ok) return
     try {
       const r = await adminNotifySendToUser({ user_id: selectedUser.id, text }) as { ok?: boolean; error?: string }
       if (r.ok) {
@@ -473,7 +577,14 @@ export default function UsersTab({ onImpersonateApply }: Props) {
       setStateEditor(s => s ? ({ ...s, error: `Невалидный JSON: ${msg}` }) : s)
       return
     }
-    if (!confirm('Применить новый journey? Старый сохранится в _backup_before_state_edit.')) return
+    const ok = await confirm({
+      title: 'Применить новый journey?',
+      body: 'Это прямая правка JSONB — рискованная операция. Если JSON синтаксически невалидный, бэк отобьёт. Если валидный но не соответствует схеме — у юзера могут отвалиться экраны. Старый state сохранится в _backup_before_state_edit, можно откатить.',
+      confirmLabel: 'Применить',
+      danger: true,
+      typedConfirmation: 'применить',
+    })
+    if (!ok) return
     try {
       // На бэке мы получаем сжатый web_state из diagnostic, не полный journey.
       // Если юзер хочет редактировать полный journey — он должен предварительно
