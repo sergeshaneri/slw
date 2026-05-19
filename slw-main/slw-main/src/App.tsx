@@ -322,6 +322,39 @@ export default function App() {
 
   const canGoBack: boolean = viewHistory.length > 1
 
+  // Browser-back integration: mouse 4 (thumb-back), Alt+←, кнопка ← в
+  // браузере, swipe-back — все триггерят popstate. Чтобы перехватить
+  // их и выполнить in-app goBack, при монтировании пушим history-маркер.
+  // На popstate: если есть куда вернуться внутри SPA — делаем goBack
+  // и пушим новый маркер, иначе пропускаем (юзер выходит из приложения).
+  //
+  // viewHistory/goBack хранятся в ref — иначе useEffect пересоздавал бы
+  // listener на каждый render и могли бы быть гонки с history-стеком.
+  const viewHistoryRef = useRef<ViewSnapshot[]>(viewHistory)
+  viewHistoryRef.current = viewHistory
+  const goBackRef = useRef<() => void>(goBack)
+  goBackRef.current = goBack
+
+  useEffect(() => {
+    // Маркер-страж в истории. Если URL вернётся на этот маркер — popstate
+    // не сработает (мы ещё на нём). Поэтому ниже re-push после успешного
+    // back, чтобы следующая навигация тоже была перехвачена.
+    window.history.pushState({ slwBackMarker: true }, '')
+
+    const handlePopState = (): void => {
+      if (viewHistoryRef.current.length < 2) {
+        // SPA-стек пуст — позволяем браузеру навигировать обычным образом
+        // (выйти из приложения, например).
+        return
+      }
+      goBackRef.current()
+      window.history.pushState({ slwBackMarker: true }, '')
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
   // Optimistic locking. Хранит updated_at последнего успешно загруженного/
   // сохранённого state. При PUT отправляем как expected_updated_at — если
   // кто-то ещё изменил (admin restore, другая вкладка, impersonation) —
