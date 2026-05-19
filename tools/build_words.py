@@ -1,12 +1,28 @@
 """
 Парсер «упорядоченных» тезаурусов аспектов → JSON для бэка.
 
+ВНИМАНИЕ: с 2026-05 `backend/app/content/words.json` ведётся ВРУЧНУЮ.
+Парсер тянул всё подряд (172 слова по ЧЛ, включая «KPI», «SWOT-анализ»,
+«ERP-система» — листья и англицизмы, не для «слова дня»). Решение:
+~50 курированных слов на аспект (по принципу тиров из БС, см.
+`Si/Базовые слова БС.md`).
+
+Этот скрипт оставлен как утилита для будущего парсинга, но
+ПО УМОЛЧАНИЮ ПИШЕТ В `words_auto.json` (не в `words.json`),
+чтобы случайный запуск не затёр ручную курацию.
+
+Если когда-нибудь захочется автоматизировать снова — выставь
+`OUTPUT_FILENAME = "words.json"` ниже и убедись, что фильтр
+работает по принципу тиров (см. БС файл).
+
+---
+
 Источник: `тезаурус с определениями/{Имя аспекта} ... упорядочен{ная,ный}*.md`.
 Поддерживает два формата:
   • БЛ-стиль: `### Слово` → следующий параграф = определение.
   • ЧЛ-стиль: `* **Слово:**` буллеты → текст после двоеточия.
 
-Выход: `backend/app/content/words.json` со структурой:
+Выход: `backend/app/content/words_auto.json` со структурой:
   {
     "Si": [
       {
@@ -253,7 +269,10 @@ def main() -> int:
             deduped.append(e)
         by_aspect[asp] = deduped
 
-    output_path = root / "backend" / "app" / "content" / "words.json"
+    # См. шапку модуля: пишем в words_auto.json, а не в words.json
+    # (последний — ручная курация, не трогаем).
+    OUTPUT_FILENAME = "words_auto.json"
+    output_path = root / "backend" / "app" / "content" / OUTPUT_FILENAME
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         json.dumps(by_aspect, ensure_ascii=False, indent=2),
