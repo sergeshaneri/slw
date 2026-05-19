@@ -10,7 +10,7 @@ import styles from './Header.module.css'
 type Locale = typeof ru
 type HeaderLocale = {
   app: Pick<Locale['app'], 'title' | 'subtitle'>
-  nav: Pick<Locale['nav'], 'dashboard' | 'journey' | 'aspects' | 'diary' | 'leaderboard' | 'coach'>
+  nav: Pick<Locale['nav'], 'dashboard' | 'journey' | 'aspects' | 'diary' | 'community' | 'coach'>
 }
 
 type Props = {
@@ -81,8 +81,9 @@ export default function Header({
     { id: 'journey', label: t.nav.journey, badge: journeyPendingCount },
     { id: 'aspects', label: t.nav.aspects },
     { id: 'diary', label: t.nav.diary },
-    // Топ публичный (без auth) — виден всем.
-    { id: 'leaderboard', label: t.nav.leaderboard },
+    // Хаб «Общение»: халлы, чаты, топ, лента подписок.
+    // Виден всем; авторизация требуется только для чатов/ленты — гейтится внутри.
+    { id: 'community', label: t.nav.community },
     // Коуч гейтится: до 5 пройденных шагов — затемнён и показывает tooltip.
     {
       id: 'coach',
@@ -140,7 +141,7 @@ export default function Header({
   }, [activeHighlight, journeyHighlight, aspectsHighlight])
 
   return (
-    <header className={styles.header}>
+    <header className={`${styles.header} ${view === 'journey' ? styles.headerJourney : ''}`}>
       {/* Группируем логотип и back-кнопку, чтобы лого не "ездил" при появлении
           стрелки — позиция логотипа фиксирована, back возникает справа от него,
           поближе к nav-кнопкам (активной зоне). */}

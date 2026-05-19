@@ -427,6 +427,35 @@
   .mainTitle { font-size: 13px; }
 }
 
+/* ── Journey-mode на мобиле ─────────────────────────
+   На мобиле в Путешествии экран должен быть посвящён чату. Шапка с nav
+   занимает 2 ряда (~110px), плюс собственный топбар Chat'а ~74px — почти
+   половина iPhone SE. Поэтому на journey+mobile прячем nav, баннер-хинт
+   и подзаголовок, оставляя только логотип + auth/avatar одной строкой ~50px.
+   На десктопе ничего не меняем.
+   Выход из путешествия — браузерный back или тап по ◐ в шапке чата
+   → JourneyProfile. */
+@media (max-width: 768px) {
+  .headerJourney {
+    flex-wrap: nowrap;
+    padding:
+      calc(8px + env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      8px
+      max(12px, env(safe-area-inset-left));
+  }
+  .headerJourney .nav,
+  .headerJourney .navHighlightBanner,
+  .headerJourney .navHighlightLabel,
+  .headerJourney .subtitle {
+    display: none;
+  }
+  .headerJourney .mainTitle {
+    font-size: 13px;
+    letter-spacing: 0.5px;
+  }
+}
+
 /* ── Кликабельный аватар справа ─────────────── */
 .avatarBtn {
   display: inline-flex;

@@ -702,10 +702,15 @@
   padding: 12px 14px;
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  /* font-size: 16px против iOS focus-zoom (см. .inputField). */
+  font-size: 16px;
   resize: vertical;
   min-height: 80px;
   outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: none;
 }
 .stepInsightInput:focus {
   border-color: rgba(179,157,219,0.55);
@@ -725,13 +730,22 @@
   padding: 11px 16px;
   color: var(--text);
   font-family: inherit;
-  font-size: 15px;
+  /* font-size: 16px важно на iOS: при <16 Safari зумит viewport при фокусе
+     в textarea. 15px → 16px (визуально почти не отличается, фикс гарантирован). */
+  font-size: 16px;
   outline: none;
   resize: none;
   max-height: 110px;
   min-height: 44px;
-  line-height: 1.5;
+  line-height: 1.45;
   transition: border-color .2s;
+  /* iOS Safari убирает свой inner-shadow / rounded-rect стиль, чтобы рендер
+     совпадал с Android и десктопом. -webkit-tap-highlight-color подавляет
+     серое мерцание при тапе. */
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: none;
 }
 
 .inputField::placeholder { color: var(--text-dim); }
@@ -753,6 +767,11 @@
   flex-shrink: 0;
   box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--accent) 70%, transparent);
   transition: transform .1s, opacity .15s;
+  /* iOS Safari: убираем встроенный shading кнопки — без appearance:none на
+     iOS были тонкие отличия от Android (subtle inner gradient). */
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .sendBtn:disabled {
@@ -2673,3 +2692,79 @@
 }
 
 .treeSkillInfoBtn:active { transform: scale(0.95); }
+
+/* ── Mobile compactness for Chat topbar ─────────────────────────
+   На iPhone SE/12mini (360-375px) шапка с avatar + info + changePlanet +
+   stats съедала ~74px высоты и не помещалась в одну строку. Пользователь
+   видел «столько шапок» и крошечный кусок чата.
+
+   На мобиле:
+     • padding 16/20 → 10/14 (уже -12px высоты)
+     • avatar 42 → 36
+     • «Сменить» — только иконка 🪐 (текст спрятан)
+     • «Оценить навыки» — компактнее (иконка + цифра вместо лейбла)
+     • topbarStats — горизонтально, не вертикально (как было) */
+@media (max-width: 768px) {
+  .topbar {
+    padding: 10px 14px;
+    gap: 10px;
+  }
+
+  .avatar { width: 36px; height: 36px; }
+  .avatarGlyph { font-size: 18px; }
+
+  .topbarTitle { font-size: 14px; }
+  .topbarSub { font-size: 11px; }
+
+  /* Кнопка «Сменить»: оставляем только эмодзи 🪐. Слово «Сменить» убираем —
+     юзер видит планету в заголовке слева и кнопку с глобусом справа,
+     ассоциация очевидна. Сохраняем 44×44 как тач-таргет. */
+  .changePlanetBtn {
+    padding: 0;
+    width: 38px;
+    height: 38px;
+    justify-content: center;
+    gap: 0;
+  }
+  .changePlanetText { display: none; }
+  .changePlanetIcon { font-size: 18px; }
+
+  /* topbarStats: горизонтальный ряд, скомпонован справа. */
+  .topbarStats {
+    flex-direction: row;
+    gap: 6px;
+    align-items: center;
+  }
+
+  /* «Оценить навыки» на мобиле: только иконка + счётчик. */
+  .skillsBtn {
+    padding: 6px 8px;
+    gap: 4px;
+    font-size: 10px;
+  }
+  .skillsBtn > span:first-child {
+    /* Скрываем текстовый лейбл, оставляем счётчик. */
+    display: none;
+  }
+
+  .tasksToggle {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+
+  .xpBadge {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+}
+
+/* Очень узкие экраны (iPhone SE / 360px): ещё чуть жать. */
+@media (max-width: 380px) {
+  .topbar {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .topbarTitle { font-size: 13px; }
+  .changePlanetBtn { width: 36px; height: 36px; }
+  .xpBadge { padding: 3px 7px; }
+}
