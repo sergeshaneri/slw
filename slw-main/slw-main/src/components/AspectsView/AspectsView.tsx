@@ -583,7 +583,7 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
   return (
     <div
       ref={readerRootRef}
-      className={`${styles.readerLayout} ${styles.fadeIn}`}
+      className={styles.readerLayout}
       style={{ '--accent': color } as unknown as CSSProperties}
     >
       {/* Drawer backdrop (mobile only) */}
@@ -595,7 +595,11 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
         />
       )}
 
-      {/* Левая колонка: sidebar (на мобиле — drawer) */}
+      {/* Левая колонка: sidebar (на мобиле — выезжающий drawer).
+          ВАЖНО: у .readerLayout НЕТ .fadeIn, потому что та анимация
+          оставляет на родителе transform: translateY(0), который
+          превращает его в containing block для position:fixed и ломает
+          drawer (см. https://w3c.github.io/csswg-drafts/css-transforms/#containing-block-for-all-descendants). */}
       <aside className={`${styles.sidebar} ${drawerOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.sidebarHead}>
           <button type="button" className={styles.sidebarBack} onClick={onBack}>
