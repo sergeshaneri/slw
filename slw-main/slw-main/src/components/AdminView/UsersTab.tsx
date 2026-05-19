@@ -762,9 +762,7 @@ function UserDetail({
                     onSendTgMessage()
                   }
                 }}
-                placeholder={sendKeyMode === 'enter'
-                  ? 'Текст сообщения. Эмодзи и Shift+Enter для переноса. Макс 4000.'
-                  : 'Текст сообщения. Можно эмодзи и переносы строк. Макс 4000 символов.'}
+                placeholder="Текст сообщения. Можно эмодзи и переносы строк. Макс 4000 символов."
                 rows={5}
               />
               <div className={styles.actionGrid} style={{ marginTop: 10 }}>

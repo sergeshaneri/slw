@@ -212,9 +212,7 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
               else if (canBuyWithStardust) { e.preventDefault(); handleSubmit(true) }
             }
           }}
-          placeholder={sendKeyMode === 'enter'
-            ? 'Сформулируй запрос по шаблону Роль / Задача / Контекст… (Enter — позвать, Shift+Enter — перенос)'
-            : 'Сформулируй запрос по шаблону Роль / Задача / Контекст… (Ctrl+Enter — позвать)'}
+          placeholder="Сформулируй запрос по шаблону Роль / Задача / Контекст…"
           disabled={busy}
           maxLength={4000}
         />

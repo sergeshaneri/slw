@@ -238,9 +238,7 @@ export default function DMView({ initialPartnerId, onOpenProfile }: Props) {
                           handleSend()
                         }
                       }}
-                      placeholder={sendKeyMode === 'enter'
-                        ? 'Сообщение… (Enter — отправить, Shift+Enter — перенос)'
-                        : 'Сообщение… (Ctrl+Enter)'}
+                      placeholder="Сообщение…"
                       maxLength={4000}
                       rows={2}
                     />

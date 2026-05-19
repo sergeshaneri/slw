@@ -305,9 +305,7 @@ export default function NotifyTab() {
               sendBroadcast()
             }
           }}
-          placeholder={sendKeyMode === 'enter'
-            ? 'Текст сообщения... Эмодзи и Shift+Enter для переноса строк. Макс 4000.'
-            : 'Текст сообщения... Можно эмодзи и переносы строк. Макс 4000 символов.'}
+          placeholder="Текст сообщения... Можно эмодзи и переносы строк. Макс 4000 символов."
           rows={5}
         />
         <div className={styles.bulkForm} style={{ marginTop: 10 }}>

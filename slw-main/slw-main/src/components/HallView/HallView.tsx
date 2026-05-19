@@ -531,9 +531,7 @@ function ChatList({ aspect, onOpenProfile }: ChatListProps) {
               handleSend()
             }
           }}
-          placeholder={sendKeyMode === 'enter'
-            ? 'Напиши что-то в холл… (Enter — отправить, Shift+Enter — перенос)'
-            : 'Напиши что-то в холл… (Ctrl+Enter)'}
+          placeholder="Напиши что-то в холл…"
           maxLength={2000}
           rows={2}
         />
