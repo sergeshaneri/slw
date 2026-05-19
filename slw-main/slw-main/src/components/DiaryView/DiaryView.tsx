@@ -9,6 +9,7 @@ import TrainingsTab from './TrainingsTab'
 import AnalyticsTab from './AnalyticsTab'
 import VaultSyncTab from './VaultSyncTab'
 import { isTMA } from '../../tma'
+import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import type { AspectKey } from '@/types/aspect'
 import type { DiaryEntry, SurveyDetailsData } from '@/types/diary'
 import type { User } from '@/types/user'
@@ -41,6 +42,7 @@ const SOURCE_LABEL: Record<string, string> = {
 
 export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user }: Props) {
   const [text, setText] = useState<string>('')
+  const [sendKeyMode] = useSendKeyMode()
   const [aspect, setAspect] = useState<AspectKey | 'general'>('general')
   const [filter, setFilter] = useState<AspectKey | 'general' | 'all'>('all')
   // Сколько последних записей рендерим. У активного юзера дневник
@@ -171,6 +173,12 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (shouldSendOnKeyDown(e, sendKeyMode) && text.trim()) {
+              e.preventDefault()
+              handleAdd()
+            }
+          }}
           placeholder={t.diary.placeholder}
           className={styles.textarea}
         />

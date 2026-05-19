@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { Script, ScriptType } from '@/types/script'
 import type { PendingTask } from '@/types/journey'
+import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import styles from './JourneyView.module.css'
 import MarkdownLite from './MarkdownLite'
 
@@ -77,6 +78,7 @@ type ItemProps = {
 }
 
 function TaskItem({ task, script, accent, onCompleteWithNote, onDelete }: ItemProps) {
+  const [sendKeyMode] = useSendKeyMode()
   const [noteOpen, setNoteOpen] = useState<boolean>(false)
   const [noteText, setNoteText] = useState<string>('')
 
@@ -126,6 +128,12 @@ function TaskItem({ task, script, accent, onCompleteWithNote, onDelete }: ItemPr
             className={styles.taskNoteTextarea}
             value={noteText}
             onChange={e => setNoteText(e.target.value)}
+            onKeyDown={e => {
+              if (shouldSendOnKeyDown(e, sendKeyMode) && noteText.trim()) {
+                e.preventDefault()
+                handleSaveWithNote()
+              }
+            }}
             placeholder="Что заметил во время выполнения, какие ощущения, инсайты…"
             autoFocus
           />

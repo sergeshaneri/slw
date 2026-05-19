@@ -64,15 +64,21 @@ export default function PlanetMap({ state, user, onSwitch, onClose, onLockedTap 
           Переключайся между ними свободно: твой прогресс сохраняется в каждом.
         </p>
         <Hint id="planetmap-intro" user={user} position="top-right">
-          Тыкни любую планету. Порядок неважен — начинай с самой интересной.
-          Зелёный кружок на карточке = есть прогресс. Серый = ещё не начато.
+          Тыкни на любую планету и начни познавать свои сферы жизни.
         </Hint>
       </div>
 
       <div className={styles.grid}>
         {planets.map(p => {
           const folder = state.aspects?.[p.aspect]
-          const isActive = activeAspect === p.aspect
+          // «Сейчас здесь» появляется ТОЛЬКО когда на планете уже начат
+          // скрипт (или есть прогресс уровня) — иначе все 8 показывают
+          // зовущее «Начать путешествие», и БС не выглядит «занятой».
+          const hasRealProgress =
+            (folder?.completedScripts?.length ?? 0) > 0 ||
+            (folder?.currentLevel ?? 0) > 0 ||
+            !!folder?.currentScriptId
+          const isActive = activeAspect === p.aspect && hasRealProgress
           const status = computeStatus(p, folder)
           return (
             <PlanetCard
@@ -107,7 +113,7 @@ function computeStatus(planet: Planet, folder: AspectState | undefined): CardSta
   if (level > 0 || completed > 0) {
     return { kind: 'progress', label: `Уровень ${level}`, level }
   }
-  return { kind: 'idle', label: 'Не начато' }
+  return { kind: 'idle', label: 'Начать' }
 }
 
 type PlanetColorStyle = CSSProperties & { '--planet-color'?: string }

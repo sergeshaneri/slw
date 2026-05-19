@@ -20,6 +20,8 @@ type Props = {
   onSuccess: (data: unknown) => void
   onClose?: () => void
   user?: AuthUser | null
+  /** Стартовая вкладка для гостя: 'login' или 'register'. Дефолт — 'login'. */
+  initialMode?: 'login' | 'register'
 }
 
 // Telegram-Login-Widget posts back via `window.__slwTgLink(user)`. We type
@@ -43,11 +45,11 @@ declare global {
  *   !user.email && user.telegram_id     → "Добавить email и пароль"
  *                                         (только форма email+пароль, без виджета)
  */
-export default function AuthModal({ onSuccess, onClose, user = null }: Props) {
+export default function AuthModal({ onSuccess, onClose, user = null, initialMode = 'login' }: Props) {
   const isAddingEmail = !!(user && !user.email && user.telegram_id)
   const isLinkingTelegram = !!(user && user.email && !user.telegram_id)
 
-  const [tab, setTab] = useState<AuthMode>('login')      // 'login' | 'register' (только для гостя)
+  const [tab, setTab] = useState<AuthMode>(initialMode)  // 'login' | 'register' (только для гостя)
   const [email, setEmail] = useState<string>('')
   const [password, setPassword] = useState<string>('')
   const [name, setName] = useState<string>('')

@@ -20,6 +20,9 @@ export default function ScriptButtons({ script, onAction }: Props) {
       //   Триггерится либо followUp-блоками, либо явным `scale: 1-10`.
       // Формат B: open-ended (ни того, ни другого) → текстовый ввод.
       // См. SCRIPT_GUIDELINES §4.2.
+      // «Напомнить позже» убрано: вопрос либо отвечаешь сейчас (ответ
+      // уходит в дневник/skill), либо «взять в активные задания» — но
+      // тогда тоже остаётся след. Простого пропуска без записи нет.
       const hasScale = !!script.followUp || !!script.scale
       return (
         <div className={styles.btnRow}>
@@ -30,11 +33,13 @@ export default function ScriptButtons({ script, onAction }: Props) {
           >
             {hasScale ? 'Ответить (1–10)' : 'Ответить'}
           </button>
-          <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => act('next')}>Напомнить позже</button>
         </div>
       )
     }
     case 'exercise':
+      // «Позже» убрано — упражнение можно либо сделать сейчас (с инсайтом),
+      // либо взять в ежедневные практики (запись в habits + pendingTasks).
+      // Просто «пропустить без следа» больше нельзя.
       return (
         <div className={styles.btnRow}>
           {/* «Сделал, записать» — открывает обязательный insight о результате.
@@ -47,9 +52,6 @@ export default function ScriptButtons({ script, onAction }: Props) {
               (POST /api/habits/choose в handleScriptAction). */}
           <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => act('done')}>
             🪐 Взять в ежедневные практики
-          </button>
-          <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => act('next')}>
-            Позже
           </button>
         </div>
       )
@@ -68,10 +70,13 @@ export default function ScriptButtons({ script, onAction }: Props) {
         </div>
       )
     case 'reflection':
+      // «Пропустить» убрано: после каждого шага в путешествии должна
+      // оставаться запись — для reflection это инсайт в дневнике.
+      // Если юзеру совсем нечего сказать — короткого ответа («да», «потом»)
+      // достаточно (минимум 10 символов проверяется в SurveyScreen/insight UI).
       return (
         <div className={styles.btnRow}>
           <button type="button" className={`${styles.btn} ${styles.btnAccent}`} onClick={() => act('answer_text')}>Ответить</button>
-          <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => act('skip')}>Пропустить</button>
         </div>
       )
     case 'survey':

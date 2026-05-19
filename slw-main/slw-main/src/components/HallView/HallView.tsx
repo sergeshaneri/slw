@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from 'react'
 import { ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY, type AspectInfo } from '../../data/aspects'
-import { HALL_CONTENT, type HallContent, type HallQuote, type HallFigure, type HallArt, type HallArchetype } from '../../data/hallContent'
+import {
+  HALL_CONTENT,
+  type HallContent, type HallQuote, type HallFigure, type HallArt, type HallArchetype, type HallFact,
+} from '../../data/hallContent'
 import {
   fetchHallOverview,
   fetchHallMessages,
@@ -22,13 +25,22 @@ import {
   bookmarkInsight,
   unbookmarkInsight,
 } from '../../api/client'
+import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import type { AspectKey } from '@/types/aspect'
 import styles from './HallView.module.css'
 
 // Backend hall.py routes (no response_model). Local types mirror the fields
 // the UI reads.
 // NOTE(ts): pending backend response_model for /api/hall/*.
-type HallTab = 'overview' | 'chat' | 'questions' | 'insights' | 'community'
+
+// Одна страница холла без tab-split. Сверху видны: Суть → Чат → Канон →
+// Архетипы. Ниже свёрнуто в Collapse: Инсайты / Вопросы / Топ юзеров /
+// Уголок вдохновения / Моя статистика.
+//
+// До 2026-05 здесь было 5 вкладок (Обзор/Чат/Вопросы/Инсайты/Сообщество)
+// или 2 вкладки (Об аспекте / Лента общения) — оба варианта прятали чат и
+// курируемый канон за переключатели, что выглядело "скучно". Сейчас то и
+// другое — главное на странице.
 
 type HallPreviewInsight = {
   id: number
@@ -142,14 +154,6 @@ type HabitsTodayResp = {
   aspects: Array<AspectKey | string>
 }
 
-const TABS: ReadonlyArray<{ id: HallTab; label: string }> = [
-  { id: 'overview',  label: 'Обзор' },
-  { id: 'chat',      label: 'Чат' },
-  { id: 'questions', label: 'Вопросы' },
-  { id: 'insights',  label: 'Инсайты' },
-  { id: 'community', label: 'Сообщество' },
-]
-
 const REACTIONS: ReadonlyArray<{ type: ReactionType; emoji: string }> = [
   { type: 'heart',  emoji: '♥' },
   { type: 'thanks', emoji: '🙏' },
@@ -174,10 +178,16 @@ type HallViewProps = {
 type AccentCSS = CSSProperties & { '--accent'?: string }
 
 export default function HallView({ aspect, currentUserId, onBack, onOpenProfile }: HallViewProps) {
-  const [tab, setTab] = useState<HallTab>('overview')
   const accent = ASPECT_COLORS[aspect] || '#b39ddb'
   const meta: AspectInfo = ASPECT_DATA[aspect]
   const content: HallContent = HALL_CONTENT[aspect] ?? {}
+
+  const archetypes = content.archetypes ?? []
+  const hasCurated =
+    (content.quotes?.length ?? 0) > 0 ||
+    (content.figures?.length ?? 0) > 0 ||
+    (content.arts?.length ?? 0) > 0 ||
+    (content.interestingFacts?.length ?? 0) > 0
 
   const containerStyle: AccentCSS = { '--accent': accent }
 
@@ -194,162 +204,222 @@ export default function HallView({ aspect, currentUserId, onBack, onOpenProfile 
         <HabitTickButton aspect={aspect} />
       </div>
 
-      <div className={styles.tabs}>
-        {TABS.map(t => (
-          <button
-            key={t.id}
-            type="button"
-            className={`${styles.tab} ${tab === t.id ? styles.tabActive : ''}`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <div className={styles.tabBody}>
+        {/* Чат холла — главный живой блок, виден сразу.
+            «Суть аспекта» убрана из Холла 2026-05 — она дублирует то, что юзер
+            видел на странице аспекта; здесь только живая активность и
+            курируемые «интересности». */}
+        <Section label="💬 Чат холла">
+          <ChatList aspect={aspect} onOpenProfile={onOpenProfile} />
+        </Section>
 
-      {tab === 'overview' && (
-        <OverviewTab
-          aspect={aspect}
-          meta={meta}
-          content={content}
-          onOpenProfile={onOpenProfile}
-        />
-      )}
-      {tab === 'chat' && (
-        <ChatTab aspect={aspect} onOpenProfile={onOpenProfile} />
-      )}
-      {tab === 'questions' && (
-        <QuestionsTab aspect={aspect} currentUserId={currentUserId} onOpenProfile={onOpenProfile} />
-      )}
-      {tab === 'insights' && (
-        <InsightsTab aspect={aspect} currentUserId={currentUserId} onOpenProfile={onOpenProfile} />
-      )}
-      {tab === 'community' && (
-        <CommunityTab
-          aspect={aspect}
-          content={content}
-          onOpenProfile={onOpenProfile}
-        />
-      )}
+        {/* Интересности аспекта — курируемые цитаты / личности / произведения / факты.
+            Раньше называлось «Канон аспекта» — переименовано в «Интересности»
+            как более понятный термин для юзера. */}
+        {hasCurated && (
+          <Section label="📚 Интересности">
+            <CanonBlock aspect={aspect} content={content} />
+          </Section>
+        )}
+
+        {/* Архетипы аспекта — короткие плитки. */}
+        {archetypes.length > 0 && (
+          <Section label="🧠 Архетипы аспекта">
+            <div className={styles.archetypeGrid}>
+              {archetypes.map((a: HallArchetype) => (
+                <div key={a.id ?? a.title} className={styles.archetypeCard}>
+                  <div className={styles.archetypeIcon}>{a.emoji}</div>
+                  <div className={styles.archetypeTitle}>{a.title}</div>
+                  <div className={styles.archetypeDesc}>{a.desc}</div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* ─── Свёрнутое ниже ─────────────────────────────────── */}
+
+        <Collapse icon="💡" title="Инсайты по аспекту" hint="публиковать · читать · реагировать">
+          <InsightsList
+            aspect={aspect}
+            currentUserId={currentUserId}
+            onOpenProfile={onOpenProfile}
+          />
+        </Collapse>
+
+        <Collapse icon="❓" title="Вопросы холла" hint="задать · ответить">
+          <QuestionsList
+            aspect={aspect}
+            currentUserId={currentUserId}
+            onOpenProfile={onOpenProfile}
+          />
+        </Collapse>
+
+        <Collapse icon="🏆" title="Топ юзеров по аспекту">
+          <TopUsersList aspect={aspect} onOpenProfile={onOpenProfile} />
+        </Collapse>
+
+        <Collapse icon="✦" title="Уголок вдохновения">
+          <InspirationsList aspect={aspect} onOpenProfile={onOpenProfile} />
+        </Collapse>
+
+        <Collapse icon="📊" title="Моя статистика в холле">
+          <MyStats aspect={aspect} />
+        </Collapse>
+      </div>
     </div>
   )
 }
 
-// ── Overview ────────────────────────────────────────────────────────────────
+// ── CanonBlock: цитаты / личности / произведения / факты со случайной выборкой
 
-type OverviewProps = {
+type CanonBlockProps = {
   aspect: AspectKey
-  meta: AspectInfo
   content: HallContent
-  onOpenProfile?: (userId: number) => void
 }
 
-function OverviewTab({ aspect, meta, content, onOpenProfile }: OverviewProps) {
-  const [data, setData] = useState<HallOverview | null>(null)
-  const [error, setError] = useState<string | null>(null)
+function CanonBlock({ aspect, content }: CanonBlockProps) {
+  const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9))
+  const refresh = () => setSeed(Math.floor(Math.random() * 1e9))
 
-  useEffect(() => {
-    fetchHallOverview(aspect)
-      .then((d) => setData(d as HallOverview))
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Не удалось загрузить'))
-  }, [aspect])
+  const quotesSample = useMemo<HallQuote[]>(
+    () => pickRandom<HallQuote>(content.quotes, 3, seed),
+    [content.quotes, seed],
+  )
+  const figuresSample = useMemo<HallFigure[]>(() => {
+    const all = content.figures ?? []
+    const gifts   = all.filter(f => /^Дар\./i.test(f.name ?? ''))
+    const shadows = all.filter(f => /^Тень\./i.test(f.name ?? ''))
+    const giftPick   = pickRandom<HallFigure>(gifts, 1, seed)
+    const shadowPick = pickRandom<HallFigure>(shadows, 1, seed + 1)
+    if (giftPick.length + shadowPick.length === 0) return pickRandom<HallFigure>(all, 2, seed)
+    return [...giftPick, ...shadowPick]
+  }, [content.figures, seed])
+  const artsSample = useMemo<HallArt[]>(
+    () => pickRandom<HallArt>(content.arts, 3, seed),
+    [content.arts, seed],
+  )
+  const factsSample = useMemo<HallFact[]>(
+    () => pickRandom<HallFact>(content.interestingFacts, 3, seed),
+    [content.interestingFacts, seed],
+  )
 
   return (
-    <div className={styles.tabBody}>
-      {meta.essence && (
-        <Section label="Суть аспекта">
-          <p className={styles.bodyText}>{meta.essence}</p>
-        </Section>
+    <>
+      <div className={styles.curatedHead}>
+        <span className={styles.curatedHeadText}>
+          Случайные подборки. «🔀 Другая подборка» меняет набор.
+        </span>
+        <button type="button" className={styles.curatedShuffle} onClick={refresh}>
+          🔀 Другая подборка
+        </button>
+      </div>
+
+      {quotesSample.length > 0 && (
+        <section className={styles.section}>
+          <div className={styles.sectionLabel}>
+            Цитаты — {quotesSample.length} из {content.quotes?.length ?? 0}
+          </div>
+          <div className={styles.quoteList}>
+            {quotesSample.map((q, i) => (
+              <blockquote key={`${seed}-q-${i}`} className={styles.quote}>
+                «{q.text}»
+                <footer className={styles.quoteAuthor}>— {q.author}</footer>
+                {q.note && <div className={styles.curatedNote}>{q.note}</div>}
+                <DiscussCuratedItem
+                  aspect={aspect}
+                  quoteBlock={`📜 «${q.text}» — ${q.author}`}
+                  itemLabel="цитату"
+                />
+              </blockquote>
+            ))}
+          </div>
+        </section>
       )}
 
-      {meta.superpower && (
-        <Section label="Суперспособность">
-          <p className={styles.bodyText}>{meta.superpower}</p>
-        </Section>
+      {figuresSample.length > 0 && (
+        <section className={styles.section}>
+          <div className={styles.sectionLabel}>
+            Личности — {figuresSample.length} из {content.figures?.length ?? 0}
+          </div>
+          <ul className={styles.figureList}>
+            {figuresSample.map((f, i) => (
+              <li key={`${seed}-f-${i}`} className={styles.figureItem}>
+                <strong>{f.name}</strong>
+                {f.note && <span className={styles.muted}> — {f.note}</span>}
+                <DiscussCuratedItem
+                  aspect={aspect}
+                  quoteBlock={`👤 ${f.name}${f.note ? ` — ${f.note}` : ''}`}
+                  itemLabel="личность"
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
-      {error && <div className={styles.error}>{error}</div>}
-
-      {data && (
-        <>
-          <Section label="Твоя статистика в холле">
-            <div className={styles.statsGrid}>
-              <Stat label="Твоя оценка" value={data.my_score != null ? data.my_score.toFixed(1) : '—'} />
-              <Stat label="Твоих инсайтов" value={data.my_insights} />
-              <Stat label="Твоё место" value={data.my_rank ? `#${data.my_rank}` : '—'} />
-              <Stat label="Активны за сутки" value={data.active_24h} />
-            </div>
-          </Section>
-
-          {data.last_insights.length > 0 && (
-            <Section label="Свежие инсайты">
-              {data.last_insights.map(ins => (
-                <div key={ins.id} className={styles.previewRow}>
-                  <span className={styles.previewAvatar}>{ins.avatar || '🧑'}</span>
-                  <button
-                    type="button"
-                    className={styles.previewName}
-                    onClick={() => onOpenProfile?.(ins.user_id)}
-                  >
-                    {ins.display_name}
-                  </button>
-                  <span className={styles.previewText}>{trim(ins.text, 120)}</span>
-                </div>
-              ))}
-            </Section>
-          )}
-
-          {data.last_messages.length > 0 && (
-            <Section label="Последние сообщения">
-              {data.last_messages.map(m => (
-                <div key={m.id} className={styles.previewRow}>
-                  <span className={styles.previewAvatar}>{m.avatar || '🧑'}</span>
-                  <button
-                    type="button"
-                    className={styles.previewName}
-                    onClick={() => onOpenProfile?.(m.user_id)}
-                  >
-                    {m.display_name}
-                  </button>
-                  <span className={styles.previewText}>{trim(m.text, 120)}</span>
-                </div>
-              ))}
-            </Section>
-          )}
-        </>
-      )}
-
-      {(content.archetypes ?? []).length > 0 && (
-        <Section label="Архетипы аспекта">
-          <div className={styles.archetypeGrid}>
-            {(content.archetypes ?? []).map((a: HallArchetype) => (
-              <div key={a.id ?? a.title} className={styles.archetypeCard}>
-                <div className={styles.archetypeIcon}>{a.emoji}</div>
-                <div className={styles.archetypeTitle}>{a.title}</div>
-                <div className={styles.archetypeDesc}>{a.desc}</div>
+      {artsSample.length > 0 && (
+        <section className={styles.section}>
+          <div className={styles.sectionLabel}>
+            Произведения — {artsSample.length} из {content.arts?.length ?? 0}
+          </div>
+          <div className={styles.artList}>
+            {artsSample.map((a, i) => (
+              <div key={`${seed}-a-${i}`} className={styles.artItem}>
+                <span className={styles.inspirationIcon}>{INSPIRATION_ICON[a.type] ?? '✦'}</span>
+                <span><strong>{a.title}</strong>{a.note ? ` — ${a.note}` : ''}</span>
+                <DiscussCuratedItem
+                  aspect={aspect}
+                  quoteBlock={`🎨 ${a.title}${a.note ? ` — ${a.note}` : ''}`}
+                  itemLabel="произведение"
+                />
               </div>
             ))}
           </div>
-        </Section>
+        </section>
       )}
-    </div>
+
+      {/* Интересные факты — перенесены из карточки аспекта (был отдельный
+          блок `facts`, теперь живут только в Холле, как цитаты/личности/искусство). */}
+      {factsSample.length > 0 && (
+        <section className={styles.section}>
+          <div className={styles.sectionLabel}>
+            Факты — {factsSample.length} из {content.interestingFacts?.length ?? 0}
+          </div>
+          <ul className={styles.figureList}>
+            {factsSample.map((f, i) => (
+              <li key={`${seed}-fact-${i}`} className={styles.figureItem}>
+                <strong>{f.name}</strong>
+                {f.desc && <div className={styles.curatedNote} style={{ marginTop: 4 }}>{f.desc}</div>}
+                <DiscussCuratedItem
+                  aspect={aspect}
+                  quoteBlock={`💡 ${f.name}${f.desc ? `\n\n${f.desc}` : ''}`}
+                  itemLabel="факт"
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
   )
 }
 
-// ── Chat ────────────────────────────────────────────────────────────────────
+// ── ChatList ───────────────────────────────────────────────────────────────
 
-type ChatTabProps = {
+type ChatListProps = {
   aspect: AspectKey
-  onOpenProfile?: (userId: number) => void
+  onOpenProfile?: (userId: number | string) => void
 }
 
-function ChatTab({ aspect, onOpenProfile }: ChatTabProps) {
+function ChatList({ aspect, onOpenProfile }: ChatListProps) {
   const [messages, setMessages] = useState<HallMessage[]>([])
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastId, setLastId] = useState(0)
   const listRef = useRef<HTMLDivElement | null>(null)
+  const [sendKeyMode] = useSendKeyMode()
 
   // Initial load.
   useEffect(() => {
@@ -414,7 +484,7 @@ function ChatTab({ aspect, onOpenProfile }: ChatTabProps) {
   }
 
   return (
-    <div className={styles.tabBody}>
+    <>
       {error && <div className={styles.error}>{error}</div>}
       <div className={styles.chatList} ref={listRef}>
         {messages.length === 0 && (
@@ -456,12 +526,14 @@ function ChatTab({ aspect, onOpenProfile }: ChatTabProps) {
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={e => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            if (shouldSendOnKeyDown(e, sendKeyMode)) {
               e.preventDefault()
               handleSend()
             }
           }}
-          placeholder="Напиши что-то в холл… (Ctrl+Enter)"
+          placeholder={sendKeyMode === 'enter'
+            ? 'Напиши что-то в холл… (Enter — отправить, Shift+Enter — перенос)'
+            : 'Напиши что-то в холл… (Ctrl+Enter)'}
           maxLength={2000}
           rows={2}
         />
@@ -474,19 +546,19 @@ function ChatTab({ aspect, onOpenProfile }: ChatTabProps) {
           Отправить
         </button>
       </div>
-    </div>
+    </>
   )
 }
 
-// ── Insights feed ───────────────────────────────────────────────────────────
+// ── InsightsList — лента + inline-композер ────────────────────────────────
 
-type InsightsTabProps = {
+type InsightsListProps = {
   aspect: AspectKey
   currentUserId: number | string | null | undefined
   onOpenProfile?: (userId: number | string) => void
 }
 
-function InsightsTab({ aspect, currentUserId, onOpenProfile }: InsightsTabProps) {
+function InsightsList({ aspect, currentUserId, onOpenProfile }: InsightsListProps) {
   const [items, setItems] = useState<HallInsight[]>([])
   const [busy, setBusy] = useState(true)
   const [sort, setSort] = useState<'new' | 'popular'>('new')
@@ -494,6 +566,7 @@ function InsightsTab({ aspect, currentUserId, onOpenProfile }: InsightsTabProps)
   const [kind, setKind] = useState<'insight' | 'recommendation'>('insight')
   const [posting, setPosting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sendKeyMode] = useSendKeyMode()
 
   const reload = async () => {
     setBusy(true)
@@ -552,7 +625,7 @@ function InsightsTab({ aspect, currentUserId, onOpenProfile }: InsightsTabProps)
   }
 
   return (
-    <div className={styles.tabBody}>
+    <>
       <Section label="Опубликовать в холл">
         <div className={styles.composer}>
           <div className={styles.composerRow}>
@@ -570,6 +643,12 @@ function InsightsTab({ aspect, currentUserId, onOpenProfile }: InsightsTabProps)
             className={styles.textarea}
             value={text}
             onChange={e => setText(e.target.value)}
+            onKeyDown={e => {
+              if (shouldSendOnKeyDown(e, sendKeyMode) && text.trim() && !posting) {
+                e.preventDefault()
+                handlePost()
+              }
+            }}
             placeholder="Что заметил/понял по этому аспекту?"
             maxLength={2000}
           />
@@ -650,215 +729,19 @@ function InsightsTab({ aspect, currentUserId, onOpenProfile }: InsightsTabProps)
           <div className={styles.muted}>В этом холле пока нет публичных инсайтов. Опубликуй первый.</div>
         )}
       </div>
-    </div>
+    </>
   )
 }
 
-// ── Community ───────────────────────────────────────────────────────────────
+// ── QuestionsList — список + inline-композер + thread ──────────────────────
 
-// Утилита: вернуть n случайных уникальных элементов массива (или меньше, если
-// массив короче). Seed используется для детерминированности на одно «обновление».
-function pickRandom<T>(arr: ReadonlyArray<T> | undefined | null, n: number, seed: number): T[] {
-  if (!Array.isArray(arr) || arr.length === 0) return []
-  // Простой PRNG на seed (Mulberry32) — детерминированный для конкретного seed.
-  let s = seed | 0
-  const rand = () => {
-    s = (s + 0x6D2B79F5) | 0
-    let t = s
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-  const pool = arr.map((item, i) => ({ item, k: rand() + i * 1e-9 }))
-  pool.sort((a, b) => a.k - b.k)
-  return pool.slice(0, n).map(x => x.item)
-}
-
-type CommunityTabProps = {
-  aspect: AspectKey
-  content: HallContent
-  onOpenProfile?: (userId: number) => void
-}
-
-function CommunityTab({ aspect, content, onOpenProfile }: CommunityTabProps) {
-  const [top, setTop] = useState<LeaderboardEntry[]>([])
-  const [inspirations, setInspirations] = useState<Inspiration[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [seed, setSeed] = useState<number>(() => Math.floor(Math.random() * 1e9))
-  const refresh = () => setSeed(Math.floor(Math.random() * 1e9))
-
-  // Случайные подборки: 3 цитаты, 1 Дар + 1 Тень из figures, 3 произведения.
-  const quotesSample = useMemo<HallQuote[]>(
-    () => pickRandom<HallQuote>(content.quotes, 3, seed),
-    [content.quotes, seed],
-  )
-  const figuresSample = useMemo<HallFigure[]>(() => {
-    const all = content.figures ?? []
-    const gifts = all.filter(f => /^Дар\./i.test(f.name ?? ''))
-    const shadows = all.filter(f => /^Тень\./i.test(f.name ?? ''))
-    const giftPick = pickRandom<HallFigure>(gifts, 1, seed)
-    const shadowPick = pickRandom<HallFigure>(shadows, 1, seed + 1)
-    // Если разметка «Дар./Тень.» отсутствует — берём 2 случайных.
-    if (giftPick.length + shadowPick.length === 0) return pickRandom<HallFigure>(all, 2, seed)
-    return [...giftPick, ...shadowPick]
-  }, [content.figures, seed])
-  const artsSample = useMemo<HallArt[]>(
-    () => pickRandom<HallArt>(content.arts, 3, seed),
-    [content.arts, seed],
-  )
-
-  useEffect(() => {
-    Promise.all([fetchHallLeaderboard(aspect), fetchHallInspirations(aspect)])
-      .then(([t, i]) => {
-        setTop((t as LeaderboardEntry[]) ?? [])
-        setInspirations((i as Inspiration[]) ?? [])
-      })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Не удалось загрузить'))
-  }, [aspect])
-
-  const hasCurated =
-    (content.quotes?.length ?? 0) > 0 ||
-    (content.figures?.length ?? 0) > 0 ||
-    (content.arts?.length ?? 0) > 0
-
-  return (
-    <div className={styles.tabBody}>
-      {error && <div className={styles.error}>{error}</div>}
-
-      <Section label={`Топ юзеров по аспекту`}>
-        {top.length === 0 ? (
-          <div className={styles.muted}>Пока пусто. Опубликуй первый инсайт — попадёшь в топ.</div>
-        ) : (
-          <ol className={styles.topList}>
-            {top.map(row => {
-              const medal = row.rank === 1 ? '🥇' : row.rank === 2 ? '🥈' : row.rank === 3 ? '🥉' : `#${row.rank}`
-              return (
-                <li key={row.user_id} className={`${styles.topRow} ${row.is_me ? styles.topRowMe : ''}`}>
-                  <span className={styles.topRank}>{medal}</span>
-                  <span className={styles.previewAvatar}>{row.avatar || '🧑'}</span>
-                  <button
-                    type="button"
-                    className={styles.previewName}
-                    onClick={() => onOpenProfile?.(row.user_id)}
-                  >
-                    {row.display_name}
-                    {row.is_me && <span className={styles.youBadge}>ты</span>}
-                  </button>
-                  <span className={styles.topStats}>
-                    {row.insights_count} инсайтов · {row.likes_received} реакций
-                  </span>
-                </li>
-              )
-            })}
-          </ol>
-        )}
-      </Section>
-
-      <Section label="Уголок вдохновения">
-        {inspirations.length === 0 ? (
-          <div className={styles.muted}>
-            Пока пусто. Добавь карточку вдохновения с тегом «{ASPECT_DISPLAY_KEY[aspect] ?? aspect}» в свой профиль — появится здесь.
-          </div>
-        ) : (
-          <div className={styles.inspirationGrid}>
-            {inspirations.map((it, idx) => (
-              <div key={`${it.user_id}-${idx}`} className={styles.inspirationCard}>
-                <div className={styles.inspirationHead}>
-                  <span className={styles.inspirationIcon}>{INSPIRATION_ICON[it.type] ?? '✦'}</span>
-                  <button
-                    type="button"
-                    className={styles.previewName}
-                    onClick={() => onOpenProfile?.(it.user_id)}
-                  >
-                    {it.display_name}
-                  </button>
-                </div>
-                <div className={styles.inspirationTitle}>{it.title}</div>
-                {it.note && <div className={styles.inspirationNote}>{it.note}</div>}
-              </div>
-            ))}
-          </div>
-        )}
-      </Section>
-
-      {hasCurated && (
-        <div className={styles.curatedHead}>
-          <span className={styles.curatedHeadText}>
-            Случайные подборки для обсуждения. Нажми «🔀 Другая подборка», чтобы получить новый набор.
-          </span>
-          <button type="button" className={styles.curatedShuffle} onClick={refresh}>
-            🔀 Другая подборка
-          </button>
-        </div>
-      )}
-
-      {quotesSample.length > 0 && (
-        <Section label={`Цитаты дня — ${quotesSample.length} из ${content.quotes?.length ?? 0}`}>
-          <div className={styles.quoteList}>
-            {quotesSample.map((q, i) => (
-              <blockquote key={`${seed}-q-${i}`} className={styles.quote}>
-                «{q.text}»
-                <footer className={styles.quoteAuthor}>— {q.author}</footer>
-                {q.note && <div className={styles.curatedNote}>{q.note}</div>}
-                <DiscussCuratedItem
-                  aspect={aspect}
-                  quoteBlock={`📜 «${q.text}» — ${q.author}`}
-                  itemLabel="цитату"
-                />
-              </blockquote>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {figuresSample.length > 0 && (
-        <Section label={`Личности дня — ${figuresSample.length} из ${content.figures?.length ?? 0}`}>
-          <ul className={styles.figureList}>
-            {figuresSample.map((f, i) => (
-              <li key={`${seed}-f-${i}`} className={styles.figureItem}>
-                <strong>{f.name}</strong>
-                {f.note && <span className={styles.muted}> — {f.note}</span>}
-                <DiscussCuratedItem
-                  aspect={aspect}
-                  quoteBlock={`👤 ${f.name}${f.note ? ` — ${f.note}` : ''}`}
-                  itemLabel="личность"
-                />
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {artsSample.length > 0 && (
-        <Section label={`Произведения дня — ${artsSample.length} из ${content.arts?.length ?? 0}`}>
-          <div className={styles.artList}>
-            {artsSample.map((a, i) => (
-              <div key={`${seed}-a-${i}`} className={styles.artItem}>
-                <span className={styles.inspirationIcon}>{INSPIRATION_ICON[a.type] ?? '✦'}</span>
-                <span><strong>{a.title}</strong>{a.note ? ` — ${a.note}` : ''}</span>
-                <DiscussCuratedItem
-                  aspect={aspect}
-                  quoteBlock={`🎨 ${a.title}${a.note ? ` — ${a.note}` : ''}`}
-                  itemLabel="произведение"
-                />
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-    </div>
-  )
-}
-
-// ── Subcomponents ───────────────────────────────────────────────────────────
-
-type QuestionsTabProps = {
+type QuestionsListProps = {
   aspect: AspectKey
   currentUserId: number | string | null | undefined
   onOpenProfile?: (userId: number | string) => void
 }
 
-function QuestionsTab({ aspect, currentUserId, onOpenProfile }: QuestionsTabProps) {
+function QuestionsList({ aspect, currentUserId, onOpenProfile }: QuestionsListProps) {
   const [list, setList] = useState<HallQuestion[]>([])
   const [openId, setOpenId] = useState<number | null>(null)
   const [thread, setThread] = useState<HallThread | null>(null)
@@ -866,6 +749,7 @@ function QuestionsTab({ aspect, currentUserId, onOpenProfile }: QuestionsTabProp
   const [posting, setPosting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [askText, setAskText] = useState('')
+  const [sendKeyMode] = useSendKeyMode()
   const [answerText, setAnswerText] = useState('')
 
   const reloadList = async () => {
@@ -938,7 +822,7 @@ function QuestionsTab({ aspect, currentUserId, onOpenProfile }: QuestionsTabProp
   if (openId && thread) {
     const isQuestionAuthor = thread.question.user_id === currentUserId
     return (
-      <div className={styles.tabBody}>
+      <>
         <button
           type="button"
           className={styles.sortBtn}
@@ -1007,6 +891,12 @@ function QuestionsTab({ aspect, currentUserId, onOpenProfile }: QuestionsTabProp
             className={styles.textarea}
             value={answerText}
             onChange={e => setAnswerText(e.target.value)}
+            onKeyDown={e => {
+              if (shouldSendOnKeyDown(e, sendKeyMode) && answerText.trim() && !posting) {
+                e.preventDefault()
+                handleAnswer()
+              }
+            }}
             placeholder="Поделись опытом по этому вопросу…"
             maxLength={4000}
           />
@@ -1019,17 +909,23 @@ function QuestionsTab({ aspect, currentUserId, onOpenProfile }: QuestionsTabProp
             {posting ? 'Отправка…' : 'Ответить'}
           </button>
         </Section>
-      </div>
+      </>
     )
   }
 
   return (
-    <div className={styles.tabBody}>
+    <>
       <Section label="Задать вопрос холлу">
         <textarea
           className={styles.textarea}
           value={askText}
           onChange={e => setAskText(e.target.value)}
+          onKeyDown={e => {
+            if (shouldSendOnKeyDown(e, sendKeyMode) && askText.trim() && !posting) {
+              e.preventDefault()
+              handleAsk()
+            }
+          }}
           placeholder="Что хочешь спросить у тех, кто тоже работает с этим аспектом?"
           maxLength={2000}
         />
@@ -1074,17 +970,173 @@ function QuestionsTab({ aspect, currentUserId, onOpenProfile }: QuestionsTabProp
           </button>
         ))}
       </div>
+    </>
+  )
+}
+
+// ── TopUsersList — рейтинг участников холла ────────────────────────────────
+
+type TopUsersListProps = {
+  aspect: AspectKey
+  onOpenProfile?: (userId: number | string) => void
+}
+
+function TopUsersList({ aspect, onOpenProfile }: TopUsersListProps) {
+  const [top, setTop] = useState<LeaderboardEntry[]>([])
+  const [busy, setBusy] = useState(true)
+
+  useEffect(() => {
+    setBusy(true)
+    fetchHallLeaderboard(aspect)
+      .then(t => setTop((t as LeaderboardEntry[]) ?? []))
+      .catch(() => {})
+      .finally(() => setBusy(false))
+  }, [aspect])
+
+  if (busy) return <div className={styles.muted}>Загружаем…</div>
+  if (top.length === 0) {
+    return <div className={styles.muted}>Пока пусто. Опубликуй первый инсайт — попадёшь в топ.</div>
+  }
+
+  return (
+    <ol className={styles.topList}>
+      {top.map(row => {
+        const medal = row.rank === 1 ? '🥇' : row.rank === 2 ? '🥈' : row.rank === 3 ? '🥉' : `#${row.rank}`
+        return (
+          <li key={row.user_id} className={`${styles.topRow} ${row.is_me ? styles.topRowMe : ''}`}>
+            <span className={styles.topRank}>{medal}</span>
+            <span className={styles.previewAvatar}>{row.avatar || '🧑'}</span>
+            <button
+              type="button"
+              className={styles.previewName}
+              onClick={() => onOpenProfile?.(row.user_id)}
+            >
+              {row.display_name}
+              {row.is_me && <span className={styles.youBadge}>ты</span>}
+            </button>
+            <span className={styles.topStats}>
+              {row.insights_count} инсайтов · {row.likes_received} реакций
+            </span>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+// ── InspirationsList — UGC вдохновение ─────────────────────────────────────
+
+type InspirationsListProps = {
+  aspect: AspectKey
+  onOpenProfile?: (userId: number | string) => void
+}
+
+function InspirationsList({ aspect, onOpenProfile }: InspirationsListProps) {
+  const [items, setItems] = useState<Inspiration[]>([])
+  const [busy, setBusy] = useState(true)
+
+  useEffect(() => {
+    setBusy(true)
+    fetchHallInspirations(aspect)
+      .then(i => setItems((i as Inspiration[]) ?? []))
+      .catch(() => {})
+      .finally(() => setBusy(false))
+  }, [aspect])
+
+  if (busy) return <div className={styles.muted}>Загружаем…</div>
+  if (items.length === 0) {
+    return (
+      <div className={styles.muted}>
+        Пока пусто. Добавь карточку вдохновения с тегом «{ASPECT_DISPLAY_KEY[aspect] ?? aspect}»
+        в свой профиль — появится здесь.
+      </div>
+    )
+  }
+
+  return (
+    <div className={styles.inspirationGrid}>
+      {items.map((it, idx) => (
+        <div key={`${it.user_id}-${idx}`} className={styles.inspirationCard}>
+          <div className={styles.inspirationHead}>
+            <span className={styles.inspirationIcon}>{INSPIRATION_ICON[it.type] ?? '✦'}</span>
+            <button
+              type="button"
+              className={styles.previewName}
+              onClick={() => onOpenProfile?.(it.user_id)}
+            >
+              {it.display_name}
+            </button>
+          </div>
+          <div className={styles.inspirationTitle}>{it.title}</div>
+          {it.note && <div className={styles.inspirationNote}>{it.note}</div>}
+        </div>
+      ))}
     </div>
   )
 }
 
-// Inline-форма «Обсудить» для случайно выбранного объекта (цитата / личность /
-// произведение). При отправке делает 2 POST параллельно:
+// ── MyStats — личная статистика в холле ────────────────────────────────────
+
+function MyStats({ aspect }: { aspect: AspectKey }) {
+  const [data, setData] = useState<HallOverview | null>(null)
+  const [busy, setBusy] = useState(true)
+
+  useEffect(() => {
+    setBusy(true)
+    fetchHallOverview(aspect)
+      .then(d => setData(d as HallOverview))
+      .catch(() => {})
+      .finally(() => setBusy(false))
+  }, [aspect])
+
+  if (busy) return <div className={styles.muted}>Загружаем…</div>
+  if (!data) return <div className={styles.muted}>Нет данных.</div>
+
+  return (
+    <div className={styles.statsGrid}>
+      <Stat label="Твоя оценка" value={data.my_score != null ? data.my_score.toFixed(1) : '—'} />
+      <Stat label="Твоих инсайтов" value={data.my_insights} />
+      <Stat label="Твоё место" value={data.my_rank ? `#${data.my_rank}` : '—'} />
+      <Stat label="Активны за сутки" value={data.active_24h} />
+    </div>
+  )
+}
+
+// ── Collapse ───────────────────────────────────────────────────────────────
+
+type CollapseProps = {
+  icon: string
+  title: string
+  hint?: string
+  defaultOpen?: boolean
+  children: ReactNode
+}
+
+function Collapse({ icon, title, hint, defaultOpen = false, children }: CollapseProps) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className={styles.collapse}>
+      <button
+        type="button"
+        className={`${styles.collapseHeader} ${open ? styles.collapseHeaderOpen : ''}`}
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+      >
+        <span className={styles.collapseChevron} aria-hidden="true">▶</span>
+        <span className={styles.collapseIcon} aria-hidden="true">{icon}</span>
+        <span className={styles.collapseTitle}>{title}</span>
+        {hint && <span className={styles.collapseHint}>{hint}</span>}
+      </button>
+      {open && <div className={styles.collapseBody}>{children}</div>}
+    </div>
+  )
+}
+
+// ── DiscussCuratedItem ─────────────────────────────────────────────────────
+
+// При отправке делает 2 POST параллельно:
 //  - postInsight — попадает в ленту инсайтов аспекта и в ленту юзера
 //  - postHallMessage — попадает в чат по аспекту (для оживления процесса)
-// В тексте поста цитата идёт первой строкой (через markdown blockquote/префикс)
-// чтобы было ясно, какой именно объект обсуждается.
-
 type DiscussCuratedItemProps = {
   aspect: AspectKey
   quoteBlock: string
@@ -1097,6 +1149,7 @@ function DiscussCuratedItem({ aspect, quoteBlock, itemLabel }: DiscussCuratedIte
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sendKeyMode] = useSendKeyMode()
 
   const canSubmit = text.trim().length > 0 && !busy
 
@@ -1151,6 +1204,12 @@ function DiscussCuratedItem({ aspect, quoteBlock, itemLabel }: DiscussCuratedIte
         placeholder="Твой комментарий, наблюдение, вопрос…"
         value={text}
         onChange={e => setText(e.target.value)}
+        onKeyDown={e => {
+          if (shouldSendOnKeyDown(e, sendKeyMode) && canSubmit) {
+            e.preventDefault()
+            submit()
+          }
+        }}
         disabled={busy}
         autoFocus
       />
@@ -1253,10 +1312,22 @@ function Stat({ label, value }: StatProps) {
   )
 }
 
-function trim(text: string | null | undefined, n: number): string {
-  if (!text) return ''
-  const s = text.replace(/\n/g, ' ')
-  return s.length > n ? s.slice(0, n - 1) + '…' : s
+// Утилита: вернуть n случайных уникальных элементов массива (или меньше, если
+// массив короче). Seed используется для детерминированности на одно «обновление».
+function pickRandom<T>(arr: ReadonlyArray<T> | undefined | null, n: number, seed: number): T[] {
+  if (!Array.isArray(arr) || arr.length === 0) return []
+  // Простой PRNG на seed (Mulberry32) — детерминированный для конкретного seed.
+  let s = seed | 0
+  const rand = () => {
+    s = (s + 0x6D2B79F5) | 0
+    let t = s
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+  const pool = arr.map((item, i) => ({ item, k: rand() + i * 1e-9 }))
+  pool.sort((a, b) => a.k - b.k)
+  return pool.slice(0, n).map(x => x.item)
 }
 
 function formatTime(iso: string | null | undefined): string {

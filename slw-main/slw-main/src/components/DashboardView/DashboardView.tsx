@@ -11,6 +11,7 @@ import MiniWheel from './MiniWheel'
 import Heatmap from '../Heatmap/Heatmap'
 import Hint from '../Onboarding/Hint'
 import DiscoverMore from './DiscoverMore'
+import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import type { AspectKey, AspectScores } from '@/types/aspect'
 import type { JourneyState } from '@/types/journey'
 import styles from './DashboardView.module.css'
@@ -188,6 +189,7 @@ export default function DashboardView({
   const [busy, setBusy] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [diaryText, setDiaryText] = useState<string>('')
+  const [sendKeyMode] = useSendKeyMode()
   const [diaryAspect, setDiaryAspect] = useState<AspectKey | 'general'>('general')
   const [savingDiary, setSavingDiary] = useState<boolean>(false)
   const [diarySaved, setDiarySaved] = useState<boolean>(false)
@@ -490,6 +492,12 @@ export default function DashboardView({
               className={styles.diaryInput}
               value={diaryText}
               onChange={e => setDiaryText(e.target.value)}
+              onKeyDown={e => {
+                if (shouldSendOnKeyDown(e, sendKeyMode) && diaryText.trim() && !savingDiary) {
+                  e.preventDefault()
+                  handleDiarySave()
+                }
+              }}
               placeholder="Что заметил, понял или почувствовал?"
               rows={2}
               maxLength={1000}

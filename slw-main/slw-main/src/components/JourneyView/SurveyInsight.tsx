@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import { calcSurveyResult, SURVEY_BLOCKS } from '../../data/journey/skills'
 import { resolveSurvey } from '../../data/journey/skills/resolve'
 import { getSkillContent, getUnlockedSkillLevel } from '../../data/skills'
+import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import styles from './JourneyView.module.css'
 
 /**
@@ -47,6 +48,7 @@ type Props = {
 
 export default function SurveyInsight({ activeSurvey, accent, currentLevel, onSave, onCancel }: Props) {
   const [text, setText] = useState<string>('')
+  const [sendKeyMode] = useSendKeyMode()
   const survey = resolveSurvey(activeSurvey.skillId)
   const pass = activeSurvey.pass ?? 1
 
@@ -135,6 +137,12 @@ export default function SurveyInsight({ activeSurvey, accent, currentLevel, onSa
           placeholder="Любая мысль — что заметил, какие ассоциации, что хочешь поменять…"
           value={text}
           onChange={e => setText(e.target.value)}
+          onKeyDown={e => {
+            if (shouldSendOnKeyDown(e, sendKeyMode) && canSave) {
+              e.preventDefault()
+              onSave(text.trim())
+            }
+          }}
           autoFocus
         />
 

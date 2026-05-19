@@ -52,6 +52,7 @@ import {
 } from '../../data/journey/fe-skills'
 import Onboarding from './Onboarding'
 import Chat from './Chat'
+import GuestSaveNudge from './GuestSaveNudge'
 import LevelComplete from './LevelComplete'
 import JourneyProfile from './JourneyProfile'
 import TasksScreen from './TasksScreen'
@@ -450,13 +451,17 @@ type Props = {
   t?: unknown
   isAdmin?: boolean
   user?: unknown
+  // Открыть AuthModal — нужен GuestSaveNudge'у. App.tsx прокидывает
+  // callback с выбором стартовой вкладки ('login' / 'register').
+  // Гость может проигнорить плашку.
+  onRequestAuth?: (mode?: 'login' | 'register') => void
 }
 
 export default function JourneyView({
   journey: extJourney, onJourneyChange, scores, onScoresChange, diary, onDiaryChange,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   t: _t,
-  isAdmin = false, user
+  isAdmin = false, user, onRequestAuth
 }: Props) {
   // Локальный стейт — единственный source of truth.
   // Наружу синхронизируется через useEffect (ниже), чтобы persist-callback
@@ -685,6 +690,72 @@ export default function JourneyView({
 
   // ─── Действия в чате ─────────────────────────────────────────
   const handleScriptAction = useCallback(async (action: string, scriptId: string) => {
+    // ── intro-next: специальное действие, не привязано к script ──
+    // Появляется при первом заходе на планету. Раскрывает intro-сообщения
+    // по одному, потом инжектит первый скрипт уровня L0.
+    if (action === 'intro-next') {
+      // Читаем свежий state через identity-updater (state.aspects не в
+      // deps useCallback, прямое чтение из closure будет stale).
+      let decision:
+        | { kind: 'next-intro'; text: string; clickedLabel: string }
+        | { kind: 'first-script'; scriptId: string; clickedLabel: string }
+        | { kind: 'no-script'; clickedLabel: string }
+        | null = null
+      setState(s => {
+        const aspectKey = s.currentAspect as AspectKey
+        const folder = s.aspects?.[aspectKey]
+        const j = getJourney(aspectKey)
+        const intros = j?.intro ?? []
+        const introsShown = (folder?.messages ?? []).filter(
+          m => m.role === 'bot' && !m.kind
+        ).length
+        if (introsShown < intros.length) {
+          decision = {
+            kind: 'next-intro',
+            text: intros[introsShown].text,
+            clickedLabel: intros[introsShown - 1]?.button || 'Далее',
+          }
+        } else {
+          const level0 = j?.levels?.[0] as { core?: Script[]; scripts?: Script[] } | undefined
+          const firstScript = (level0?.core ?? level0?.scripts ?? [])[0]
+          const clickedLabel = intros[intros.length - 1]?.button || 'Далее'
+          decision = firstScript
+            ? { kind: 'first-script', scriptId: firstScript.id, clickedLabel }
+            : { kind: 'no-script', clickedLabel }
+        }
+        return s // identity — никаких записей в этом updater'е
+      })
+
+      const d = decision as null
+        | { kind: 'next-intro'; text: string; clickedLabel: string }
+        | { kind: 'first-script'; scriptId: string; clickedLabel: string }
+        | { kind: 'no-script'; clickedLabel: string }
+      if (!d) return
+
+      addUserMessage(d.clickedLabel)
+      if (d.kind === 'next-intro') {
+        await addBotMessage(d.text, 700)
+      } else if (d.kind === 'first-script') {
+        const sid = d.scriptId
+        setState(s => updateAspect(s, cur => ({
+          ...cur,
+          currentScriptId: sid,
+          currentScriptIndex: 0,
+          awaitingInput: null,
+          messages: [...cur.messages, {
+            id: Date.now() + Math.random(),
+            role: 'bot',
+            kind: 'script',
+            scriptId: sid,
+            level: 0,
+          }],
+        })))
+      } else {
+        setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: null })))
+      }
+      return
+    }
+
     const script = scripts.find(s => s.id === scriptId)
     if (!script) return
 
@@ -717,7 +788,12 @@ export default function JourneyView({
           addUserMessage('Взял задание')
           await addBotMessage('Задание добавлено в активные. Открой раздел «Активные задания», когда выполнишь.', 500)
         }
-      } else addUserMessage('Позже')
+      } else {
+        // action === 'next'
+        // На exercise/question (deferrable) «Далее» = отложить → пишем «Позже».
+        // На theory/word/reflection (non-deferrable) «Далее» = идём дальше → пишем «Далее».
+        addUserMessage(isDeferrable ? 'Позже' : 'Далее')
+      }
 
       if (isDeferrable && (action === 'done' || action === 'next')) {
         // Задание уехало в активные — XP даётся только при реальном выполнении
@@ -1496,47 +1572,36 @@ export default function JourneyView({
   }, [setState, dismissActiveSurveyToDraft])
 
   // Переключение на другой аспект.
-  const handleSwitchAspect = useCallback((aspectKey: AspectKey) => {
+  // При ПЕРВОМ заходе на планету показывается ТОЛЬКО первое intro-сообщение
+  // + кнопка «Далее» (awaitingInput='intro-next'). Остальные intro и первый
+  // скрипт инжектятся по клику в handleScriptAction → 'intro-next'.
+  // Раньше вся пачка валилась сразу, юзер не успевал прочитать.
+  const handleSwitchAspect = useCallback(async (aspectKey: AspectKey) => {
     if (!aspectKey) return
+
+    let isFresh = false
+    let firstIntroText: string | undefined
+
     setState(s => {
       const cleaned = dismissActiveSurveyToDraft(s)
       const existing = cleaned.aspects?.[aspectKey]
-      const isFresh = !existing || (
-        !existing.messages?.length && !existing.currentScriptId
+      // «Свежий» = планета ещё не начата (нет скрипта) И не идёт intro-цикл.
+      // messages может содержать сообщения общего онбординга (по умолчанию
+      // он пишет в aspects[Si].messages) — это НЕ настоящий прогресс,
+      // нужно затереть. Но если awaitingInput='intro-next' — юзер уже
+      // в середине intro, не сбрасываем.
+      isFresh = !existing || (
+        !existing.currentScriptId && existing.awaitingInput !== 'intro-next'
       )
 
-      let folder: AspectState = existing ?? { ...DEFAULT_ASPECT_STATE }
       if (isFresh) {
         const j = getJourney(aspectKey)
-        const intro = j?.intro ?? []
-        const firstScript = ((j?.levels?.[0] as { core?: Script[]; scripts?: Script[] } | undefined)?.core ?? (j?.levels?.[0] as { scripts?: Script[] } | undefined)?.scripts ?? [])[0]
-        const msgs: ChatMessage[] = []
-        let idCounter = Date.now()
-        for (let i = 0; i < intro.length; i++) {
-          const e = intro[i]
-          if (i > 0 && e.button) {
-            msgs.push({ id: idCounter++, role: 'user', text: e.button })
-          }
-          if (e.text) {
-            msgs.push({ id: idCounter++, role: 'bot', text: e.text })
-          }
-        }
-        if (firstScript) {
-          msgs.push({
-            id: idCounter++,
-            role: 'bot',
-            kind: 'script',
-            scriptId: firstScript.id,
-            level: 0,
-          })
-        }
-        folder = {
-          ...DEFAULT_ASPECT_STATE,
-          currentScriptId: firstScript?.id ?? null,
-          currentScriptIndex: 0,
-          messages: msgs,
-        }
+        firstIntroText = j?.intro?.[0]?.text
       }
+
+      const folder: AspectState = isFresh
+        ? { ...DEFAULT_ASPECT_STATE, messages: [], awaitingInput: 'intro-next' }
+        : (existing ?? { ...DEFAULT_ASPECT_STATE })
 
       return {
         ...cleaned,
@@ -1547,7 +1612,13 @@ export default function JourneyView({
         aspects: { ...(cleaned.aspects ?? {}), [aspectKey]: folder },
       }
     })
-  }, [setState, dismissActiveSurveyToDraft])
+
+    if (!isFresh || !firstIntroText) return
+
+    // Дать React применить state (currentAspect=aspectKey) до addBotMessage.
+    await new Promise(r => setTimeout(r, 50))
+    await addBotMessage(firstIntroText, 700)
+  }, [setState, dismissActiveSurveyToDraft, addBotMessage])
 
   // ─── Админ-действия (видимы только при isAdmin) ──────────────
 
@@ -1752,9 +1823,26 @@ export default function JourneyView({
   // обратной совместимости с .jsx-сигнатурой.
   void aspectIntro
 
+  // Soft-nudge для гостя: показываем после ≥2 пройденных шагов в любом
+  // аспекте. Не блокирует — закрывается × и прячется на неделю.
+  // Не показываем во время survey/level-complete (чтобы не перекрывать важный UX).
+  const showGuestNudge =
+    !user &&
+    !isAdmin &&
+    !!onRequestAuth &&
+    (state.totalCompleted ?? 0) >= 2 &&
+    state.screen !== 'survey' &&
+    state.screen !== 'survey-choice' &&
+    state.screen !== 'survey-insight' &&
+    state.screen !== 'levelcomplete'
+
   return (
     <div className={styles.shell} style={shellStyle}>
       <div className={styles.stars} />
+
+      {showGuestNudge && (
+        <GuestSaveNudge onSignUp={() => onRequestAuth?.('register')} />
+      )}
 
       {state.screen === 'onboarding' && (
         <Onboarding

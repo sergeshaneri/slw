@@ -63,8 +63,8 @@ export default function WelcomeScreen({ onAuthSuccess, onContinueAsGuest }: Prop
         ))}
       </div>
 
-      {/* Нижняя CTA уводит сразу в Путешествие. Если юзер не залогинен —
-          App покажет AuthModal на handleViewChange (путешествие гейтится). */}
+      {/* Нижняя CTA уводит сразу в Путешествие. С 2026-05 гостям открыто —
+          App.handleContinueAsGuest сам выставит view='journey'. */}
       <button className={styles.bottomCta} onClick={onContinueAsGuest}>
         Начать путешествие →
       </button>

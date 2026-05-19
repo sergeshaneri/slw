@@ -123,6 +123,43 @@
   transform: translateY(-1px);
 }
 
+/* Явная кнопка «Сменить планету» в шапке чата — справа от названия.
+   Раньше переключение пряталось в JourneyProfile, теперь у юзера
+   есть прямой быстрый CTA без лишних экранов. Подсвечена цветом
+   аспекта (var --accent уже прокинут в shell). */
+.changePlanetBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color .14s, color .14s, background .14s, transform .1s;
+  white-space: nowrap;
+}
+
+.changePlanetBtn:hover {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--line));
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.changePlanetBtn:active {
+  transform: scale(0.96);
+}
+
+.changePlanetIcon {
+  font-size: 14px;
+  line-height: 1;
+}
+
 .topbarTitle {
   font-weight: 600;
   font-size: 15px;
@@ -525,6 +562,59 @@
   width: 22px;
   background: var(--accent);
   box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+/* Пройденные точки (левее активной) — заполненные, чтобы было видно
+   прогресс, а не «5 точек подряд, можно свайпнуть». */
+.dotsItem.dotsItemDone {
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+/* ── onboarding progress (плашка + цифра шагов) ──────── */
+
+/* Лёгкая sticky-плашка между топбаром и чатом: чтобы юзер не путал
+   короткое введение с «настоящим» путешествием по планете. */
+.onbBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--text-muted, #8f929c);
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), transparent);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.onbBannerDot {
+  font-size: 8px;
+  color: var(--accent);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 60%, transparent));
+  line-height: 1;
+}
+
+.onbBannerText {
+  letter-spacing: 0.02em;
+  font-weight: 500;
+  color: var(--text, #f1f2f5);
+}
+
+/* Точки + numeric counter в одной строке. */
+.onbProgress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.onbProgressNum {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted, #8f929c);
+  letter-spacing: 0.04em;
+  min-width: 28px;
+  text-align: left;
 }
 
 /* ── input area ─────────────────────────────────────── */

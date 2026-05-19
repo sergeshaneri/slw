@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import { buildSurveyStatements, SURVEY_BLOCKS } from '../../data/journey/skills'
 import { resolveSurvey } from '../../data/journey/skills/resolve'
 import Slider from './Slider'
+import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import styles from './JourneyView.module.css'
 
 const INSIGHT_HINT_KEY = 'survey_insight_hint_dismissed'
@@ -71,6 +72,7 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
   // Инсайт по конкретному утверждению — сбрасывается на каждом новом вопросе.
   const [insightOpen, setInsightOpen] = useState<boolean>(false)
   const [insightText, setInsightText] = useState<string>('')
+  const [sendKeyMode] = useSendKeyMode()
   // Подсказка-тултип: показывается на стартовых вопросах, закрывается крестиком
   // (запоминается в localStorage), и поднимается на ховер через 3 сек.
   const [hintVisible, setHintVisible] = useState<boolean>(() =>
@@ -197,6 +199,12 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
             className={styles.surveyInsightInput}
             value={insightText}
             onChange={e => setInsightText(e.target.value)}
+            onKeyDown={e => {
+              if (shouldSendOnKeyDown(e, sendKeyMode)) {
+                e.preventDefault()
+                handleAnswer()
+              }
+            }}
             placeholder="Что приходит в голову по этому утверждению?"
             rows={3}
             maxLength={1000}

@@ -20,7 +20,7 @@ export type ScreenName =
   | 'fe-core-overview'
 
 // Awaiting-input values produced by JourneyView/Chat handlers.
-export type AwaitingInput = null | 'number' | 'text' | 'choice' | 'step-insight' | 'exercise_note'
+export type AwaitingInput = null | 'number' | 'text' | 'choice' | 'step-insight' | 'exercise_note' | 'intro-next'
 
 // Single chat bubble. `kind: 'script'` is used for bot messages that render
 // a script card (theory/word/exercise/etc.) by scriptId reference; plain

@@ -8,6 +8,7 @@ import {
   adminNotifyRunNow,
   adminNotifyTest,
 } from '../../api/client'
+import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import styles from './AdminView.module.css'
 
 type BroadcastTarget = 'tg_linked' | 'recent_30d' | 'all'
@@ -94,6 +95,7 @@ export default function NotifyTab() {
   const [logBusy, setLogBusy] = useState<boolean>(false)
 
   const [broadcastText, setBroadcastText] = useState<string>('')
+  const [sendKeyMode] = useSendKeyMode()
   const [broadcastTarget, setBroadcastTarget] = useState<BroadcastTarget>('tg_linked')
 
   const [actionLog, setActionLog] = useState<ActionLogEntry[]>([])
@@ -297,7 +299,15 @@ export default function NotifyTab() {
           className={styles.stateEditor}
           value={broadcastText}
           onChange={e => setBroadcastText(e.target.value)}
-          placeholder="Текст сообщения... Можно эмодзи и переносы строк. Макс 4000 символов."
+          onKeyDown={e => {
+            if (shouldSendOnKeyDown(e, sendKeyMode) && broadcastText.trim()) {
+              e.preventDefault()
+              sendBroadcast()
+            }
+          }}
+          placeholder={sendKeyMode === 'enter'
+            ? 'Текст сообщения... Эмодзи и Shift+Enter для переноса строк. Макс 4000.'
+            : 'Текст сообщения... Можно эмодзи и переносы строк. Макс 4000 символов.'}
           rows={5}
         />
         <div className={styles.bulkForm} style={{ marginTop: 10 }}>

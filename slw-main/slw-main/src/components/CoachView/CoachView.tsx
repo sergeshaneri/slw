@@ -5,6 +5,7 @@ import {
   summonCoach,
   fetchCoachHistory,
 } from '../../api/client'
+import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import type { AspectKey } from '@/types/aspect'
 import type { JourneyState } from '@/types/journey'
 import type { DiaryEntry } from '@/types/diary'
@@ -70,6 +71,7 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
   const [savedToDiary, setSavedToDiary] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sendKeyMode] = useSendKeyMode()
 
   const stardustCost = quota?.stardust_cost ?? 100
   const stardust = journey?.stardust ?? 0
@@ -200,7 +202,19 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
           className={styles.textarea}
           value={prompt}
           onChange={e => setPrompt(e.target.value)}
-          placeholder="Сформулируй запрос по шаблону Роль / Задача / Контекст…"
+          onKeyDown={e => {
+            if (shouldSendOnKeyDown(e, sendKeyMode)) {
+              // По дефолту жмём «Позвать» (бесплатно), если доступно.
+              // Если бесплатных нет, но есть стардаст — оплачиваем стардастом.
+              // Если ничего не доступно — Enter ничего не делает (кнопка тоже disabled).
+              if (busy || !prompt.trim()) return
+              if (canCallFree) { e.preventDefault(); handleSubmit(false) }
+              else if (canBuyWithStardust) { e.preventDefault(); handleSubmit(true) }
+            }
+          }}
+          placeholder={sendKeyMode === 'enter'
+            ? 'Сформулируй запрос по шаблону Роль / Задача / Контекст… (Enter — позвать, Shift+Enter — перенос)'
+            : 'Сформулируй запрос по шаблону Роль / Задача / Контекст… (Ctrl+Enter — позвать)'}
           disabled={busy}
           maxLength={4000}
         />

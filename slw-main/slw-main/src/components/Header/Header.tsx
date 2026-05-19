@@ -15,6 +15,10 @@ type HeaderLocale = {
 type Props = {
   view: ViewName
   onViewChange: (view: ViewName) => void
+  /** Доступна ли «Назад» — в стеке навигации есть более ранний экран. */
+  canGoBack?: boolean
+  /** Откатиться на предыдущий снимок навигации (view + aux-стейт). */
+  onGoBack?: () => void
   journeyPendingCount?: number
   journeyHighlight?: boolean
   aspectsHighlight?: boolean
@@ -46,6 +50,8 @@ const COACH_UNLOCK_AT = 5
 export default function Header({
   view,
   onViewChange,
+  canGoBack = false,
+  onGoBack,
   journeyPendingCount = 0,
   journeyHighlight = false,
   aspectsHighlight = false,
@@ -90,9 +96,25 @@ export default function Header({
 
   return (
     <header className={styles.header}>
-      <div className={styles.title}>
-        <div className={styles.subtitle}>{t.app.title}</div>
-        <div className={styles.mainTitle}>{t.app.subtitle}</div>
+      {/* Группируем логотип и back-кнопку, чтобы лого не "ездил" при появлении
+          стрелки — позиция логотипа фиксирована, back возникает справа от него,
+          поближе к nav-кнопкам (активной зоне). */}
+      <div className={styles.headerLeft}>
+        <div className={styles.title}>
+          <div className={styles.subtitle}>{t.app.title}</div>
+          <div className={styles.mainTitle}>{t.app.subtitle}</div>
+        </div>
+        {canGoBack && onGoBack && (
+          <button
+            type="button"
+            className={styles.backBtn}
+            onClick={onGoBack}
+            title="Назад"
+            aria-label="Назад"
+          >
+            ←
+          </button>
+        )}
       </div>
 
       <nav className={styles.nav}>

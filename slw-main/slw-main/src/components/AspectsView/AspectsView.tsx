@@ -15,6 +15,7 @@ import TiWheel from './TiWheel'
 import SeWheel from './SeWheel'
 import HabitSection from './HabitSection'
 import Hint from '../Onboarding/Hint'
+import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import type { AspectKey } from '@/types/aspect'
 import type { JourneyState, SkillState } from '@/types/journey'
 import type { DiaryEntry } from '@/types/diary'
@@ -507,6 +508,7 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [progress, setProgress] = useState(0)
   const readerRootRef = useRef<HTMLDivElement | null>(null)
+  const [sendKeyMode] = useSendKeyMode()
 
   const blockItems = useMemo<BlockItem[]>(() => getBlockItems(block, data), [block, data])
   const pickedItem = useMemo<BlockItem | null>(
@@ -781,6 +783,12 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
                   className={styles.noteTextarea}
                   value={noteText}
                   onChange={e => setNoteText(e.target.value)}
+                  onKeyDown={e => {
+                    if (shouldSendOnKeyDown(e, sendKeyMode) && noteText.trim()) {
+                      e.preventDefault()
+                      handleSaveNote()
+                    }
+                  }}
                   placeholder="Что отзывается, что хочется попробовать, какие ассоциации…"
                 />
                 <div className={styles.noteFormActions}>

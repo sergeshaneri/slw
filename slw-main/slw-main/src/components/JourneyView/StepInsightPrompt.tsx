@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import styles from './JourneyView.module.css'
 
 /**
@@ -33,6 +34,7 @@ type Props = {
 
 export default function StepInsightPrompt({ kind, onSubmit, minLength = 10, onFocus, onBlur }: Props) {
   const [text, setText] = useState<string>('')
+  const [sendKeyMode] = useSendKeyMode()
   const canSubmit = text.trim().length >= minLength
 
   // При появлении prompt'а сразу триггерим onFocus (как-будто фокус на textarea).
@@ -59,6 +61,12 @@ export default function StepInsightPrompt({ kind, onSubmit, minLength = 10, onFo
         onChange={e => setText(e.target.value)}
         onFocus={onFocus}
         onBlur={onBlur}
+        onKeyDown={e => {
+          if (shouldSendOnKeyDown(e, sendKeyMode) && canSubmit) {
+            e.preventDefault()
+            onSubmit(text.trim())
+          }
+        }}
         placeholder={kindHint}
         rows={3}
         autoFocus

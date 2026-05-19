@@ -35,6 +35,49 @@
   opacity: 0.55;
 }
 
+/* Левая группа: логотип + back-кнопка. Сгруппированы чтобы лого не "ездил"
+   при появлении back-стрелки. Сам lining flex-контейнер, действует как
+   один child для .header (justify-content: space-between сохраняется). */
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0; /* позволяет title-ellipsis работать на узких экранах */
+}
+
+/* Кнопка «Назад» — справа от логотипа, ближе к nav. Видима когда в стеке
+   навигации есть предыдущий экран (canGoBack). На мобиле остаётся в первой
+   строке flex-row, не перепрыгивает на свою строку. */
+.backBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text, #f1f2f5);
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background .15s, border-color .15s, transform .1s;
+}
+
+.backBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(199, 125, 255, 0.45);
+  color: #ffffff;
+}
+
+.backBtn:active { transform: scale(0.95); }
+
+@media (max-width: 540px) {
+  .backBtn { width: 32px; height: 32px; font-size: 16px; }
+}
+
 /* Заголовок слева. */
 .title {
   display: flex;

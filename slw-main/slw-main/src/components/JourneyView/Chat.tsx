@@ -6,6 +6,7 @@ import ScriptButtons from './ScriptButtons'
 import Slider from './Slider'
 import StepInsightPrompt from './StepInsightPrompt'
 import Hint from '../Onboarding/Hint'
+import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import styles from './JourneyView.module.css'
 
 // JourneyView передаёт «плоский» state — глобальный + поля активной папки
@@ -51,6 +52,8 @@ export default function Chat({
     if (resolveScript) return resolveScript(m.scriptId, m.level)
     return scripts?.find(s => s.id === m.scriptId) ?? null
   }
+
+  const [sendKeyMode] = useSendKeyMode()
 
   // Локальный стейт ползунка для awaitingInput='number'. Сбрасывается на 5
   // каждый раз, когда новый шаг просит число.
@@ -135,24 +138,21 @@ export default function Chat({
         <button type="button" className={styles.avatar} onClick={onOpenProfile} aria-label="Профиль">
           <span className={styles.avatarGlyph}>◐</span>
         </button>
-        {onOpenPlanetMap ? (
+        <div className={styles.topbarInfo}>
+          <div className={styles.topbarTitle}>{planet ?? 'Путешествие'}</div>
+          <div className={styles.topbarSub}>{aspectName}</div>
+        </div>
+        {onOpenPlanetMap && (
           <button
             type="button"
-            className={`${styles.topbarInfo} ${styles.topbarInfoBtn}`}
+            className={styles.changePlanetBtn}
             onClick={onOpenPlanetMap}
             aria-label="Сменить планету"
             title="Карта планет"
           >
-            <div className={styles.topbarTitle}>
-              {planet ?? 'Путешествие'} <span className={styles.topbarChevron} aria-hidden="true">▾</span>
-            </div>
-            <div className={styles.topbarSub}>{aspectName}</div>
+            <span className={styles.changePlanetIcon} aria-hidden="true">🪐</span>
+            <span className={styles.changePlanetText}>Сменить</span>
           </button>
-        ) : (
-          <div className={styles.topbarInfo}>
-            <div className={styles.topbarTitle}>{planet ?? 'Путешествие'}</div>
-            <div className={styles.topbarSub}>{aspectName}</div>
-          </div>
         )}
         <div className={styles.topbarStats}>
           {surveyRemaining > 0 && onGoToSurveys && (
@@ -233,6 +233,20 @@ export default function Chat({
           <ScriptButtons script={currentScript} onAction={onAction} />
         )}
 
+        {/* Intro-сообщения первого захода: одна кнопка «Далее» (без insight).
+            См. JourneyView.handleScriptAction → 'intro-next'. */}
+        {!isTyping && state.awaitingInput === 'intro-next' && (
+          <div className={styles.btnRow}>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`}
+              onClick={() => onAction('intro-next', '')}
+            >
+              Далее
+            </button>
+          </div>
+        )}
+
         {/* Хинт-бабл показываем только для слайдера (у него нет placeholder'а).
            Для text/exercise_note достаточно placeholder'а в textarea — иначе
            на мобиле получается «2 текста в одной зоне» (hint + placeholder). */}
@@ -276,7 +290,7 @@ export default function Chat({
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
             onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (shouldSendOnKeyDown(e, sendKeyMode)) {
                 e.preventDefault()
                 onSend()
               }

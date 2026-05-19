@@ -837,3 +837,79 @@
   font-size: 14px;
   color: var(--text);
 }
+
+/* ── Collapsible sections (static panel) ─────────────────────── */
+
+.collapse {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.collapseHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 18px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.collapseHeader:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+.collapseChevron {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--text-muted);
+  transition: transform .2s, color .15s;
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.collapseHeaderOpen .collapseChevron {
+  transform: rotate(90deg);
+  color: var(--accent);
+}
+
+.collapseIcon {
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.collapseTitle {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.collapseHint {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.collapseBody {
+  padding: 4px 18px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Внутренние .section, лежащие внутри .collapseBody — без второго бордера,
+   чтобы вложение не выглядело как "коробка в коробке". */
+.collapseBody .section {
+  background: var(--surface);
+  border-color: rgba(255,255,255,0.04);
+}

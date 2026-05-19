@@ -169,11 +169,20 @@ export default function App() {
   // as `User | null` (false → null, both mean "no logged-in user" for UI).
   const appUser: User | null = user ? (user as User) : null
 
-  // Дефолт: залогиненным — дашборд, гостям — колесо.
-  // Конкретный view выставится в useEffect после того как `user` определится.
-  // Дефолтный view. Для гостя — 'aspects' (read-only с teaser-механикой).
-  // Залогиненный сразу перекидывается на 'dashboard' (см. useEffect ниже).
-  const [view, setView] = useState<ViewName>('aspects')
+  // Дефолтный view (с 2026-05):
+  //   • залогиненный — 'aspects' → useEffect ниже перекинет на 'dashboard'
+  //   • вернувшийся гость (welcome_seen=1, нет токена) — сразу 'journey'
+  //   • новый гость — WelcomeScreen, после CTA → 'journey' (см. handleContinueAsGuest)
+  // Идея: первое знакомство всегда через Путешествие, дашборд/колесо —
+  // расширение кругозора уже после онбординга.
+  const [view, setView] = useState<ViewName>(() => {
+    try {
+      const hasToken = !!localStorage.getItem('slw_token')
+      const seenWelcome = localStorage.getItem('welcome_seen') === '1'
+      if (!hasToken && seenWelcome) return 'journey'
+    } catch { /* private mode / SSR */ }
+    return 'aspects'
+  })
   const [scores, setScores] = useState<AspectScores>(initScores())
   const [history, setHistory] = useState<unknown[]>([])
   const [diary, setDiary] = useState<DiaryEntry[]>([])
@@ -189,6 +198,9 @@ export default function App() {
   const [toasts, setToasts] = useState<Toast[]>([])
   const [dataLoading, setDataLoading] = useState<boolean>(false)
   const [showAuth, setShowAuth] = useState<boolean>(false)
+  // Стартовая вкладка AuthModal — 'register' для nudge'ов гостя ради
+  // сохранения прогресса, 'login' для обычного «Войти» из шапки.
+  const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login')
   // welcomeDismissed: гость нажал «Начать бесплатно» и вошёл в приложение
   // без аутентификации. Запоминаем в localStorage, чтобы при следующем
   // визите сразу попадал на колесо. Сбрасывается на logout (см. ниже).
@@ -247,6 +259,68 @@ export default function App() {
     if (view === 'journey') return
     if (mainRef.current) mainRef.current.scrollTop = 0
   }, [view, selectedAspect])
+
+  // ── View history (back button) ────────────────────────────────────────
+  // Стек последних N "снимков" навигации. Каждый снимок — это view + те
+  // aux-поля, которые определяют конкретный экран внутри view:
+  //   • aspects        → selectedAspect (детальная карточка)
+  //   • public-profile → viewingProfileId (чей профиль смотрим)
+  //   • hall           → hallAspect (какой холл)
+  //   • dm             → dmPartnerId (с кем тред)
+  // Без снимка aux-полей кнопка «Назад» возвращала бы только view, а
+  // detail-state терялся (юзер видел бы пустой Aspects вместо нужной
+  // карточки).
+  //
+  // Кнопка «Назад» доступна, пока в стеке > 1 снимка. Стек ограничен 30
+  // элементами — рост практически не виден, но защита от утечки есть.
+  type ViewSnapshot = {
+    view: ViewName
+    selectedAspect: AspectKey | null
+    viewingProfileId: number | string | null
+    hallAspect: AspectKey | null
+    dmPartnerId: number | string | null
+  }
+  const [viewHistory, setViewHistory] = useState<ViewSnapshot[]>([])
+  // Флаг "сейчас идёт goBack" — чтобы snapshot-effect не пушил
+  // восстановленное состояние обратно в стек.
+  const isGoingBackRef = useRef<boolean>(false)
+
+  useEffect(() => {
+    if (isGoingBackRef.current) {
+      isGoingBackRef.current = false
+      return
+    }
+    setViewHistory(prev => {
+      const snap: ViewSnapshot = { view, selectedAspect, viewingProfileId, hallAspect, dmPartnerId }
+      const last = prev[prev.length - 1]
+      if (last
+        && last.view === snap.view
+        && last.selectedAspect === snap.selectedAspect
+        && last.viewingProfileId === snap.viewingProfileId
+        && last.hallAspect === snap.hallAspect
+        && last.dmPartnerId === snap.dmPartnerId
+      ) return prev
+      const next = [...prev, snap]
+      return next.length > 30 ? next.slice(-30) : next
+    })
+  }, [view, selectedAspect, viewingProfileId, hallAspect, dmPartnerId])
+
+  const goBack = (): void => {
+    if (viewHistory.length < 2) return
+    const target = viewHistory[viewHistory.length - 2]
+    if (!target) return
+    isGoingBackRef.current = true
+    setView(target.view)
+    // Aux-поля восстанавливаем только если они уместны для целевого view.
+    // Иначе оставляем null — handleViewChange делает то же самое.
+    setSelectedAspect(target.view === 'aspects' ? target.selectedAspect : null)
+    setViewingProfileId(target.view === 'public-profile' ? target.viewingProfileId : null)
+    setHallAspect(target.view === 'hall' ? target.hallAspect : null)
+    setDmPartnerId(target.view === 'dm' ? target.dmPartnerId : null)
+    setViewHistory(prev => prev.slice(0, -1))
+  }
+
+  const canGoBack: boolean = viewHistory.length > 1
 
   // Optimistic locking. Хранит updated_at последнего успешно загруженного/
   // сохранённого state. При PUT отправляем как expected_updated_at — если
@@ -610,10 +684,9 @@ export default function App() {
   }
 
   const handleViewChange = (newView: ViewName): void => {
-    if (newView === 'journey' && !appUser && !devAdmin) {
-      setShowAuth(true)
-      return
-    }
+    // Journey доступен гостям с 2026-05: первое знакомство — сразу
+    // в путешествие, прогресс хранится в localStorage['whl_journey'].
+    // После пары шагов фронт показывает soft-nudge на регистрацию.
     // Коуч и Профиль требуют авторизации — бэк всё равно отобьёт без JWT,
     // но проверяем здесь чтобы не показывать пустой экран с ошибкой.
     if ((newView === 'coach' || newView === 'profile' || newView === 'search') && !appUser) {
@@ -720,13 +793,24 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appUser?.id])
 
-  // IntroTour: 2026-05 — автоматический показ отключён. Раньше открывался
-  // при первом контакте (5 полноэкранных шагов после короткого онбординга
-  // в чате — итого пользователь видел ~9 экранов знакомства). Теперь:
-  // вводный экран в чате (1 шаг) → Карта Планет → контекстные подсказки
-  // в интерфейсе. IntroTour превращён в опциональное «Обучение» — открыть
-  // можно через кнопку «🎓 Пройти обучение» в дашборде или «📖 Гид» в
-  // ProfileView. Сразу-после-логина авто-показ больше НЕ инициируется.
+  // IntroTour: 2026-05-19 — авто-показ снова включён, но ТОЛЬКО перед
+  // первым входом в Путешествие. Поток: WelcomeScreen → click → view='journey'
+  // → useEffect ниже ловит и открывает IntroTour (5 шагов). После закрытия
+  // тура юзер видит Journey-Onboarding (4 чат-сообщения). Открыть тур
+  // вручную можно через «🎓 Пройти обучение» в дашборде / «📖 Гид» в ProfileView.
+  // Гость: флаг localStorage['slw_intro_seen'].
+  // Залогиненный: server-флаг user.onboarding_done.
+  useEffect(() => {
+    if (view !== 'journey') return
+    if (showIntroTour) return // уже открыт
+    const seenForGuest = (() => {
+      try { return localStorage.getItem('slw_intro_seen') === '1' } catch { return false }
+    })()
+    const seenForUser = appUser?.onboarding_done === true
+    if (seenForGuest || seenForUser) return
+    setShowIntroTour(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, appUser?.onboarding_done])
 
   const handleTourClose = async (): Promise<void> => {
     setShowIntroTour(false)
@@ -742,10 +826,10 @@ export default function App() {
 
   const handleTourComplete = async (): Promise<void> => {
     await handleTourClose()
-    // Финальный CTA — переключаемся на journey (Карта Планет открывается
-    // по умолчанию для тех, кто ещё не входил в чат).
-    if (appUser || devAdmin) setView('journey')
-    else setView('aspects')
+    // Финальный CTA — переключаемся на путешествие. Если юзер уже в
+    // 'journey' (тур авто-открылся при входе) — setView no-op, ниже
+    // развернётся Journey-Onboarding.
+    setView('journey')
   }
 
   // ?u=<id> в URL → открываем публичный профиль (deeplink с шеринга).
@@ -779,6 +863,9 @@ export default function App() {
         onContinueAsGuest={() => {
           localStorage.setItem('welcome_seen', '1')
           setWelcomeDismissed(true)
+          // Гость попадает сразу в Путешествие (онбординг). Остальные view
+          // он откроет позже из меню — а в начале фокус один.
+          setView('journey')
         }}
       />
     )
@@ -810,6 +897,8 @@ export default function App() {
       {!hideHeader && <Header
         view={view}
         onViewChange={handleViewChange}
+        canGoBack={canGoBack}
+        onGoBack={goBack}
         journeyPendingCount={pendingCount}
         // Подсвечиваем «Путешествие» если юзер залогинен, на дашборде и
         // ни разу не начинал путешествие. Условие выключается само,
@@ -845,6 +934,7 @@ export default function App() {
           onSuccess={handleAuthSuccess}
           onClose={() => setShowAuth(false)}
           user={appUser || null}
+          initialMode={authInitialMode}
         />
       )}
 
@@ -886,6 +976,10 @@ export default function App() {
             t={t}
             isAdmin={isAdmin}
             user={appUser}
+            onRequestAuth={(mode = 'register') => {
+              setAuthInitialMode(mode)
+              setShowAuth(true)
+            }}
           />
         )}
 

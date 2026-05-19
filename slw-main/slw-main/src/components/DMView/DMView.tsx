@@ -5,6 +5,7 @@ import {
   sendDM,
   markDMThreadRead,
 } from '../../api/client'
+import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import styles from './DMView.module.css'
 
 const POLL_MS = 5_000
@@ -67,6 +68,7 @@ export default function DMView({ initialPartnerId, onOpenProfile }: Props) {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const messagesRef = useRef<HTMLDivElement | null>(null)
+  const [sendKeyMode] = useSendKeyMode()
 
   // Список тредов.
   const loadThreads = async () => {
@@ -231,12 +233,14 @@ export default function DMView({ initialPartnerId, onOpenProfile }: Props) {
                       value={text}
                       onChange={e => setText(e.target.value)}
                       onKeyDown={e => {
-                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                        if (shouldSendOnKeyDown(e, sendKeyMode)) {
                           e.preventDefault()
                           handleSend()
                         }
                       }}
-                      placeholder="Сообщение… (Ctrl+Enter)"
+                      placeholder={sendKeyMode === 'enter'
+                        ? 'Сообщение… (Enter — отправить, Shift+Enter — перенос)'
+                        : 'Сообщение… (Ctrl+Enter)'}
                       maxLength={4000}
                       rows={2}
                     />

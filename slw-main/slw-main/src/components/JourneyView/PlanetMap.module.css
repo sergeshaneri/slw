@@ -242,11 +242,48 @@
 }
 
 .statusTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12px;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   font-weight: 500;
 }
 
-.status_progress { color: var(--planet-color); }
-.status_idle     { color: #8f929c; }
+/* В прогрессе — мягкий вариант с цветом аспекта. */
+.status_progress {
+  color: var(--planet-color);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* «Начать путешествие» — яркое приглашение: pill в цвете планеты,
+   обводка + лёгкое свечение. Чтобы юзер видел: «эта планета зовёт». */
+.status_idle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--planet-color);
+  padding: 5px 11px;
+  background: color-mix(in srgb, var(--planet-color) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--planet-color) 50%, transparent);
+  border-radius: 999px;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--planet-color) 32%, transparent);
+  animation: planetCtaPulse 2.6s ease-in-out infinite;
+}
+
+@keyframes planetCtaPulse {
+  0%, 100% {
+    box-shadow: 0 0 8px color-mix(in srgb, var(--planet-color) 25%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 18px color-mix(in srgb, var(--planet-color) 45%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status_idle { animation: none; }
+}
+
 .status_locked   { color: #5f6169; font-style: italic; }

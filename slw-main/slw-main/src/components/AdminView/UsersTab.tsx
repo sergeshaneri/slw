@@ -18,6 +18,7 @@ import {
 } from '../../api/client'
 import { ASPECT_KEYS, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { getJourney } from '../../data/journey/registry'
+import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import type { AspectKey } from '@/types/aspect'
 import styles from './AdminView.module.css'
 
@@ -653,6 +654,7 @@ function UserDetail({
   onAutoPositionFromDiary, onResetAspectPosition, onNormalizeCounters,
   onOpenTgMessage, onChangeTgMessage, onSendTgMessage, onCloseTgMessage,
 }: UserDetailProps) {
+  const [sendKeyMode] = useSendKeyMode()
   return (
     <div>
       <div className={styles.detailHeader}>
@@ -754,7 +756,15 @@ function UserDetail({
                 className={styles.stateEditor}
                 value={tgMessage.text || ''}
                 onChange={e => onChangeTgMessage(e.target.value)}
-                placeholder="Текст сообщения. Можно эмодзи и переносы строк. Макс 4000 символов."
+                onKeyDown={e => {
+                  if (shouldSendOnKeyDown(e, sendKeyMode) && (tgMessage.text || '').trim()) {
+                    e.preventDefault()
+                    onSendTgMessage()
+                  }
+                }}
+                placeholder={sendKeyMode === 'enter'
+                  ? 'Текст сообщения. Эмодзи и Shift+Enter для переноса. Макс 4000.'
+                  : 'Текст сообщения. Можно эмодзи и переносы строк. Макс 4000 символов.'}
                 rows={5}
               />
               <div className={styles.actionGrid} style={{ marginTop: 10 }}>

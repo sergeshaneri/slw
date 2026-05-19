@@ -1,0 +1,83 @@
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 14%, transparent),
+    color-mix(in srgb, var(--accent) 5%, transparent)
+  );
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 6;
+}
+
+.icon {
+  font-size: 14px;
+  line-height: 1;
+  color: var(--accent);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 60%, transparent));
+  flex-shrink: 0;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.btnSignIn {
+  background: var(--accent);
+  color: #0c0d12;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: filter 0.12s, transform 0.1s;
+}
+
+.btnSignIn:hover { filter: brightness(1.08); }
+.btnSignIn:active { transform: translateY(1px); }
+
+.btnDismiss {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.12s, background 0.12s;
+}
+
+.btnDismiss:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 480px) {
+  .banner {
+    flex-wrap: wrap;
+    padding: 10px 12px;
+  }
+  .text {
+    flex: 1 1 100%;
+    order: 2;
+  }
+  .icon { order: 1; }
+  .btnSignIn { order: 3; margin-left: auto; }
+  .btnDismiss { order: 4; }
+}

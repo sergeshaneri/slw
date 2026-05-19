@@ -18,6 +18,7 @@ import {
 import ReactorsList from '../PublicProfileView/ReactorsList'
 import Heatmap from '../Heatmap/Heatmap'
 import { tmaNotify } from '../../tma/hooks'
+import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import type { AspectKey } from '@/types/aspect'
 import type { JourneyState } from '@/types/journey'
 import styles from './ProfileView.module.css'
@@ -146,6 +147,7 @@ export default function ProfileView({
   const [insightAspect, setInsightAspect] = useState<AspectKey>('Si')
   const [insightKind, setInsightKind] = useState<InsightKind>('insight')
   const [insightText, setInsightText] = useState<string>('')
+  const [sendKeyMode] = useSendKeyMode()
   const [insightPublic, setInsightPublic] = useState<boolean>(true)
 
   // Collapse-by-default для длинного списка своих инсайтов (у активного
@@ -435,6 +437,12 @@ export default function ProfileView({
           className={styles.textarea}
           value={bio}
           onChange={e => setBio(e.target.value)}
+          onKeyDown={e => {
+            if (shouldSendOnKeyDown(e, sendKeyMode)) {
+              e.preventDefault()
+              handleSave()
+            }
+          }}
           placeholder="Коротко о себе: что ищешь, что развиваешь, что для тебя важно…"
           maxLength={600}
         />
@@ -651,6 +659,12 @@ export default function ProfileView({
             className={styles.textarea}
             value={insightText}
             onChange={e => setInsightText(e.target.value)}
+            onKeyDown={e => {
+              if (shouldSendOnKeyDown(e, sendKeyMode) && insightText.trim()) {
+                e.preventDefault()
+                handlePostInsight()
+              }
+            }}
             placeholder="Поделись инсайтом или рекомендацией по аспекту…"
             maxLength={2000}
           />

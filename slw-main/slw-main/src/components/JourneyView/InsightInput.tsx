@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
+import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import styles from './JourneyView.module.css'
 
 /**
@@ -21,7 +22,15 @@ type AccentStyle = CSSProperties & { '--accent'?: string }
 export default function InsightInput({ onSave, placeholder = 'Что заметил, что хочешь сохранить?', accent }: Props) {
   const [expanded, setExpanded] = useState<boolean>(false)
   const [text, setText] = useState<string>('')
+  const [sendKeyMode] = useSendKeyMode()
   const canSave = text.trim().length > 0
+
+  const submit = (): void => {
+    if (!canSave) return
+    onSave(text.trim())
+    setText('')
+    setExpanded(false)
+  }
 
   const accentStyle: AccentStyle | undefined = accent ? { '--accent': accent } : undefined
 
@@ -45,6 +54,12 @@ export default function InsightInput({ onSave, placeholder = 'Что замет�
         placeholder={placeholder}
         value={text}
         onChange={e => setText(e.target.value)}
+        onKeyDown={e => {
+          if (shouldSendOnKeyDown(e, sendKeyMode)) {
+            e.preventDefault()
+            submit()
+          }
+        }}
         autoFocus
       />
       <div className={styles.insightInputActions}>
@@ -59,12 +74,7 @@ export default function InsightInput({ onSave, placeholder = 'Что замет�
           type="button"
           className={`${styles.btn} ${styles.btnPrimary}`}
           disabled={!canSave}
-          onClick={() => {
-            if (!canSave) return
-            onSave(text.trim())
-            setText('')
-            setExpanded(false)
-          }}
+          onClick={submit}
         >
           Сохранить
         </button>

@@ -4,7 +4,9 @@
 
 .wrap {
   position: absolute;
-  bottom: 16px;
+  /* Поднят выше .inputArea (≈68px) + 16px воздуха — иначе круглый
+     admin-FAB перекрывал send-кнопку чата в правом-нижнем углу. */
+  bottom: 88px;
   right: 16px;
   z-index: 200;
   display: flex;

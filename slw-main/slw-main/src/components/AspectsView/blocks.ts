@@ -660,15 +660,10 @@ export const BLOCKS: Block[] = [
     hallSection: 'quotes',
     has: (_d, aspect) => arrLen(asObj(aspect ? HALL_CONTENT?.[aspect] : undefined).quotes) > 0
   },
-  {
-    id: 'facts',
-    level: 2,
-    title: 'Интересные факты и исследования',
-    lead: 'Факты из нейробиологии, психологии, культуры и истории, расширяющие понимание аспекта.',
-    kind: 'titledList',
-    field: 'facts',
-    has: d => arrLen(asObj(d).facts) > 0
-  },
+  // Блок `facts` (titledList) удалён 2026-05 — интересные факты теперь живут
+  // только в Холле через `hallInterestingFacts` (hallStub) по аналогии с
+  // цитатами / личностями / произведениями искусства. Данные в
+  // HALL_CONTENT[aspect].interestingFacts.
 
   // ── Уровень 3 ─────────────────────────────────────────────
   {

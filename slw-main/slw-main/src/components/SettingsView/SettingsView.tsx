@@ -11,6 +11,7 @@ import {
   fetchMyProfile,
   updateMyProfile,
 } from '../../api/client'
+import { useSendKeyMode } from '../../hooks/useSendKeyMode'
 import styles from './SettingsView.module.css'
 
 // Backend has no response_model for /api/auth/me yet — the user shape we
@@ -63,6 +64,7 @@ export default function SettingsView({ user, onUserUpdate, onAccountDeleted, onL
       {user.telegram_id && (
         <NotificationsSection user={user} onUserUpdate={onUserUpdate} />
       )}
+      <SendKeySection />
       <SecuritySection user={user} onUserUpdate={onUserUpdate} />
       <DataSection />
       <DangerSection
@@ -253,6 +255,48 @@ function NotificationsSection({ user, onUserUpdate }: SectionProps) {
           Можно выключить — не будем беспокоить.
         </span>
         {err && <span className={styles.err}>{err}</span>}
+      </label>
+    </section>
+  )
+}
+
+// ─── Ввод в чатах: Enter vs Ctrl+Enter ────────────────────────────────────
+
+function SendKeySection() {
+  const [mode, setMode] = useSendKeyMode()
+  return (
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>Ввод в чатах</h2>
+      <label className={styles.field} style={{ cursor: 'pointer' }}>
+        <span className={styles.fieldLabel}>
+          <input
+            type="radio"
+            name="slw-send-key"
+            checked={mode === 'enter'}
+            onChange={() => setMode('enter')}
+            style={{ marginRight: 8 }}
+          />
+          Enter — отправить, Shift+Enter — перенос строки
+        </span>
+        <span className={styles.hint}>
+          Привычное поведение: как в Telegram, Discord, Slack.
+        </span>
+      </label>
+      <label className={styles.field} style={{ cursor: 'pointer' }}>
+        <span className={styles.fieldLabel}>
+          <input
+            type="radio"
+            name="slw-send-key"
+            checked={mode === 'ctrl+enter'}
+            onChange={() => setMode('ctrl+enter')}
+            style={{ marginRight: 8 }}
+          />
+          Ctrl+Enter — отправить, Enter — перенос строки
+        </span>
+        <span className={styles.hint}>
+          Безопаснее: меньше шанс случайно отправить недописанное сообщение.
+          На Mac работает также Cmd+Enter.
+        </span>
       </label>
     </section>
   )
