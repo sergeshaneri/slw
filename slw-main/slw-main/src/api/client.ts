@@ -936,6 +936,31 @@ export async function adminImpersonate(
   })
 }
 
+// Сгенерировать reset-password ссылку для ручной отправки юзеру.
+// Используется когда Resend не подключён и у юзера нет TG — он пишет в
+// поддержку, админ открывает его в AdminView и копирует ссылку отсюда.
+export type AdminResetLinkResp = {
+  user_id: number
+  email: string | null
+  telegram_id: number | string | null
+  display_name: string | null
+  link: string
+  expires_at: string
+  ttl_minutes: number
+}
+
+export async function adminPasswordResetLink(
+  { user_id, telegram_id, email }: {
+    user_id?: number | string | null
+    telegram_id?: number | string | null
+    email?: string | null
+  },
+): Promise<AdminResetLinkResp> {
+  return request('POST', '/api/admin/password-reset-link', {
+    user_id, telegram_id, email,
+  }) as Promise<AdminResetLinkResp>
+}
+
 export async function adminRollbackRestore(
   { user_id, telegram_id, email }: {
     user_id?: number | string | null

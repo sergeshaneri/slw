@@ -36,9 +36,11 @@ from app.db.models import (
     WebState,
     WebUser,
 )
+from app.config import settings
 from app.db.session import get_session
 from app.web.auth import create_token
 from app.web.deps import get_current_user
+from app.web.routes.auth import FRONTEND_URL
 
 log = logging.getLogger(__name__)
 
@@ -787,6 +789,77 @@ async def impersonate_user(
         },
         "token": token,
         "warning": "Этот токен действует как полноценный логин юзера. Не пиши от его имени.",
+    }
+
+
+# ── Сгенерировать reset-password ссылку (ручная поддержка) ──────────────────
+#
+# Зачем: пока Resend не подключён, юзеры без привязанного TG не могут сами
+# восстановить пароль через self-service. Они пишут в /api/support/contact —
+# админ получает уведомление, открывает их в AdminView и здесь генерит
+# ссылку для ручной отправки в любой канал (email/TG/DM).
+#
+# Эндпоинт идентичен self-service /password-reset/request по контракту,
+# но без email-доставки: возвращает ссылку напрямую в ответе.
+
+@router.post("/password-reset-link")
+async def admin_password_reset_link(
+    payload: dict = Body(...),
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Сгенерить reset-ссылку и вернуть её админу для ручной отправки.
+
+    Тело: { "user_id" | "email" | "telegram_id" | "tg_username" }
+    Ответ: { user_id, email, telegram_id, link, expires_at }
+    """
+    import secrets
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import text as sql_text
+
+    _require_admin(current_user)
+
+    target = await _find_target(
+        session,
+        email=payload.get("email"),
+        tg_username=payload.get("tg_username"),
+        display_name=None,
+        user_id=payload.get("user_id"),
+        telegram_id=payload.get("telegram_id"),
+    )
+    if not target:
+        raise HTTPException(status_code=404, detail="Юзер не найден")
+
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.password_reset_ttl_min)
+
+    try:
+        await session.execute(
+            sql_text(
+                "INSERT INTO password_reset_tokens (token, user_id, expires_at) "
+                "VALUES (:t, :u, :e)"
+            ),
+            {"t": token, "u": target.id, "e": expires_at},
+        )
+        await session.commit()
+    except Exception as e:
+        log.exception("admin password-reset-link: insert failed: %s", e)
+        raise HTTPException(status_code=500, detail="Не удалось создать токен")
+
+    link = f"{FRONTEND_URL}?reset_token={token}"
+
+    log.info(
+        "admin password-reset-link: %s generated token for user_id=%s (email=%s, tg=%s)",
+        current_user.email or current_user.id, target.id, target.email, target.telegram_id,
+    )
+    return {
+        "user_id": target.id,
+        "email": target.email,
+        "telegram_id": target.telegram_id,
+        "display_name": target.display_name,
+        "link": link,
+        "expires_at": expires_at.isoformat(),
+        "ttl_minutes": settings.password_reset_ttl_min,
     }
 
 

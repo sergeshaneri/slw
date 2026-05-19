@@ -6,6 +6,7 @@ import {
   adminListUsers,
   adminNormalizeCounters,
   adminNotifySendToUser,
+  adminPasswordResetLink,
   adminPatchUserState,
   adminPromote,
   adminResetAspectPosition,
@@ -279,6 +280,30 @@ export default function UsersTab({ onImpersonateApply }: Props) {
     }
   }
 
+  // Сгенерить reset-password ссылку для текущего юзера и вывести её в лог +
+  // скопировать в clipboard. Используется когда Resend не настроен и у юзера
+  // нет TG — юзер пишет в поддержку, админ заходит сюда, копирует ссылку,
+  // вставляет в свой ответ в support-DM/email/TG.
+  const generateResetLink = async () => {
+    if (!selectedUser) return
+    try {
+      const d = await adminPasswordResetLink({ user_id: selectedUser.id })
+      const expiry = new Date(d.expires_at).toLocaleString('ru-RU', {
+        hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit',
+      })
+      try {
+        await navigator.clipboard.writeText(d.link)
+        pushLog(`🔗 Reset-ссылка скопирована (до ${expiry}, ${d.ttl_minutes} мин):\n${d.link}`)
+      } catch {
+        // Без HTTPS clipboard может быть недоступен — просто покажем ссылку
+        // в логе, юзер скопирует руками.
+        pushLog(`🔗 Reset-ссылка (до ${expiry}, ${d.ttl_minutes} мин). Скопируй вручную:\n${d.link}`)
+      }
+    } catch (e) {
+      pushLog(`Reset-link error: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
   const rollbackRestore = async () => {
     if (!selectedUser) return
     if (!confirm(`Откатить последний restore для ${selectedUser.email || selectedUser.id}?`)) return
@@ -521,6 +546,7 @@ export default function UsersTab({ onImpersonateApply }: Props) {
               onApplyRestore={applyRestore}
               onPromote={promote}
               onImpersonate={impersonate}
+              onGenerateResetLink={generateResetLink}
               onRollbackRestore={rollbackRestore}
               onOpenFullDiary={openFullDiary}
               onOpenStateEditor={openStateEditor}
@@ -625,6 +651,7 @@ type UserDetailProps = {
   onApplyRestore: () => void
   onPromote: (makeAdmin: boolean) => void
   onImpersonate: () => void
+  onGenerateResetLink: () => void
   onRollbackRestore: () => void
   onOpenFullDiary: () => void
   onOpenStateEditor: () => void
@@ -647,7 +674,7 @@ type UserDetailProps = {
 function UserDetail({
   user, diagnostic, restorePreview, fullDiary, stateEditor, positionEditor, tgMessage,
   onClose, onPreviewRestore, onApplyRestore,
-  onPromote, onImpersonate, onRollbackRestore,
+  onPromote, onImpersonate, onGenerateResetLink, onRollbackRestore,
   onOpenFullDiary, onOpenStateEditor,
   onChangeStateEditor, onApplyStateEditor, onCloseStateEditor,
   onOpenPositionEditor, onChangePositionEditor, onApplyPositionEditor, onClosePositionEditor,
@@ -718,6 +745,14 @@ function UserDetail({
               </button>
               <button type="button" className={styles.actionWarn} onClick={onImpersonate}>
                 👤 Impersonate
+              </button>
+              <button
+                type="button"
+                className={styles.action}
+                onClick={onGenerateResetLink}
+                title="Сгенерировать ссылку для смены пароля. Копируется в clipboard, вставь юзеру в ответ (DM/email/TG). TTL 30 минут."
+              >
+                🔗 Reset-ссылка
               </button>
               <button type="button" className={styles.action} onClick={onRollbackRestore}>
                 ↶ Rollback last restore
