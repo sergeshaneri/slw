@@ -227,6 +227,36 @@
   background: #b39ddb;
 }
 
+/* Мобильный hint-баннер — full-width плашка под nav-полосой. На десктопе
+   скрыт (там работает .navHighlightLabel тултип под кнопкой). На мобиле
+   .nav имеет overflow-x:auto, который клипает абсолютный тултип, так что
+   показываем баннер. */
+.navHighlightBanner {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  /* На мобиле прячем тултип под кнопкой (он клипается overflow-y у .nav). */
+  .navHighlightLabel { display: none; }
+
+  .navHighlightBanner {
+    display: block;
+    order: 4; /* После nav (которая order:3 на мобиле). */
+    width: 100%;
+    text-align: center;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, rgba(157, 78, 221, 0.20) 0%, rgba(179, 157, 219, 0.16) 100%);
+    border: 1px solid rgba(179, 157, 219, 0.45);
+    color: #f1f2f5;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    border-radius: 10px;
+    box-shadow: 0 4px 14px -4px rgba(179, 157, 219, 0.35);
+    animation: ctaPulse 2.2s infinite ease-in-out;
+  }
+}
+
 @keyframes ctaPulse {
   0%, 100% {
     box-shadow: 0 0 0 0 rgba(179,157,219,0.45), 0 0 14px rgba(179,157,219,0.3);

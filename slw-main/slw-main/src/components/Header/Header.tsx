@@ -94,6 +94,15 @@ export default function Header({
     // Сообщения и Профиль на дашборде + аватар справа.
   ]
 
+  // Активный hint-label — для мобильного баннера (на десктопе тултип под
+  // кнопкой работает, на мобиле его клипает overflow-x:auto у .nav).
+  // Оба highlight'а не пересекаются по условиям (journey: 0 шагов,
+  // aspects: ≥3 шагов), так что один баннер за раз.
+  const activeHighlight: string | null =
+    journeyHighlight ? '👈 Тут начинается игра' :
+    aspectsHighlight ? '👆 Тут больше информации по сферам жизни' :
+    null
+
   return (
     <header className={styles.header}>
       {/* Группируем логотип и back-кнопку, чтобы лого не "ездил" при появлении
@@ -154,6 +163,12 @@ export default function Header({
           )
         })}
       </nav>
+
+      {/* Мобильный hint-баннер — виден на ≤1024px вместо тултипа под кнопкой
+          (тот клипается overflow-x:auto у .nav). На десктопе скрыт через CSS. */}
+      {activeHighlight && (
+        <div className={styles.navHighlightBanner}>{activeHighlight}</div>
+      )}
 
       <div className={styles.authBlock}>
         {user && (
