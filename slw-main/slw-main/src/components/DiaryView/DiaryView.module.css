@@ -57,6 +57,22 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  /* Fade на правом крае — визуальный намёк «есть куда свайпать». 24px
+     прозрачности справа: контент «уходит» под градиент → юзер видит что
+     контент продолжается. На устройствах без overflow контент не клипается
+     (mask-image срезает только альфу). */
+  mask-image: linear-gradient(
+    to right,
+    black 0,
+    black calc(100% - 28px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    black 0,
+    black calc(100% - 28px),
+    transparent 100%
+  );
 }
 
 .tabRow::-webkit-scrollbar { display: none; }

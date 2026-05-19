@@ -101,7 +101,24 @@
   border-bottom: 1px solid var(--line);
   margin-bottom: 16px;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* Fade-справа: намёк что табы продолжаются за край. */
+  mask-image: linear-gradient(
+    to right,
+    black 0,
+    black calc(100% - 28px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    black 0,
+    black calc(100% - 28px),
+    transparent 100%
+  );
 }
+
+.tabs::-webkit-scrollbar { display: none; }
 
 .tab {
   background: transparent;

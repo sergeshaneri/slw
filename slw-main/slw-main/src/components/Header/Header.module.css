@@ -381,6 +381,19 @@
     scrollbar-width: none;
     padding: 4px;
     border-radius: 14px;
+    /* Fade-справа: видно что табы продолжаются, можно свайпать. */
+    mask-image: linear-gradient(
+      to right,
+      black 0,
+      black calc(100% - 32px),
+      transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      black 0,
+      black calc(100% - 32px),
+      transparent 100%
+    );
   }
   .nav::-webkit-scrollbar { display: none; }
 
