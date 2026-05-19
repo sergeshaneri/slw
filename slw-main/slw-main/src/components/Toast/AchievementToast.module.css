@@ -1,7 +1,9 @@
 .toastWrap {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  /* safe-area-inset-top: чтобы тост не падал под dynamic island/notch.
+     На устройствах без выреза env() = 0 — остаётся 20px. */
+  top: calc(20px + env(safe-area-inset-top));
+  right: calc(20px + env(safe-area-inset-right));
   z-index: 1000;
   pointer-events: none;
 }
@@ -73,9 +75,9 @@
 
 @media (max-width: 600px) {
   .toastWrap {
-    left: 12px;
-    right: 12px;
-    top: 12px;
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    top: calc(12px + env(safe-area-inset-top));
   }
   .toast {
     max-width: none;

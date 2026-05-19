@@ -6,7 +6,16 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 1rem;
+  /* safe-area: на iPhone модалка не должна заходить под dynamic island
+     и под home-индикатор, особенно крестик «×» и нижняя «Войти через Telegram». */
+  padding:
+    max(1rem, env(safe-area-inset-top))
+    max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
+  /* На случай если модалка выше вьюпорта (длинная форма + клавиатура) —
+     даём свернуть содержимое скроллом, иначе кнопки уезжают за край. */
+  overflow-y: auto;
 }
 
 .modal {
@@ -166,8 +175,9 @@
   position: absolute;
   top: 12px;
   right: 12px;
-  width: 32px;
-  height: 32px;
+  /* 44×44 — минимальный тач-таргет. Был 32×32, палец промахивался. */
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 1px solid rgba(255,255,255,0.08);
   background: transparent;

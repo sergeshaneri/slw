@@ -11,18 +11,32 @@
 .main {
   flex: 1;
   overflow-y: auto;
-  padding: 32px 24px 64px;
+  /* padding-bottom: 64px + safe-area, чтобы последний айтем не уезжал под
+     home-индикатор iPhone. На устройствах без выреза env(...) = 0. */
+  padding:
+    32px
+    max(24px, env(safe-area-inset-right))
+    calc(64px + env(safe-area-inset-bottom))
+    max(24px, env(safe-area-inset-left));
   max-width: 1120px;
   margin: 0 auto;
   width: 100%;
 }
 
 @media (min-width: 1024px) {
-  .main { padding: 40px 40px 80px; }
+  .main {
+    padding:
+      40px
+      max(40px, env(safe-area-inset-right))
+      calc(80px + env(safe-area-inset-bottom))
+      max(40px, env(safe-area-inset-left));
+  }
 }
 
 /* В режиме «Путешествие» убираем внешний скролл и паддинги —
-   journey-shell сам распоряжается высотой и центрируется. */
+   journey-shell сам распоряжается высотой и центрируется.
+   Safe-area для journey применяется внутри Chat (.inputArea / .stepInsightArea)
+   и в шапке Header — здесь оставляем чистый 0. */
 .mainJourney {
   flex: 1;
   min-height: 0;

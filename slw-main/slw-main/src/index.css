@@ -6,6 +6,9 @@
 
 html {
   font-size: 16px;
+  /* iOS: блок rubber-band/overscroll, который ломает viewport на конце страницы. */
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -18,6 +21,17 @@ body {
   text-rendering: optimizeLegibility;
   background: #0e1014;
   color: #e9eaee;
+  overscroll-behavior: none;
+  /* iOS Safari зумит инпут при фокусе если font-size < 16. Дублируем правило
+     на все form-элементы как страховку, чтобы один забытый CSS-Module не
+     возвращал баг даже при включённом maximum-scale в viewport. */
+  touch-action: manipulation;
+}
+
+input,
+textarea,
+select {
+  font-size: 16px;
 }
 
 #root {

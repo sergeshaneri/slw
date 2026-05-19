@@ -274,6 +274,7 @@
 .chatScroll {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 18px 16px 16px;
   position: relative;
   z-index: 1;
@@ -635,7 +636,13 @@
 /* ── input area ─────────────────────────────────────── */
 
 .inputArea {
-  padding: 12px 14px;
+  /* safe-area-inset-bottom: чтобы инпут не уезжал под home-индикатор iPhone.
+     На устройствах без выреза env() = 0 — остаётся исходные 12px. */
+  padding:
+    12px
+    max(14px, env(safe-area-inset-right))
+    calc(12px + env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
   background: rgba(13,15,22,.75);
   border-top: 1px solid var(--line);
   display: flex;
@@ -648,7 +655,11 @@
 
 /* Ввод числа на слайдере (вместо textarea). */
 .numberInputArea {
-  padding: 18px 16px 16px;
+  padding:
+    18px
+    max(16px, env(safe-area-inset-right))
+    calc(16px + env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
   background: rgba(13,15,22,.75);
   border-top: 1px solid var(--line);
   display: flex;
@@ -661,7 +672,11 @@
 
 /* Обязательный insight после T/S/R (или U-«сделал»). */
 .stepInsightArea {
-  padding: 16px 16px 18px;
+  padding:
+    16px
+    max(16px, env(safe-area-inset-right))
+    calc(18px + env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
   background: rgba(13,15,22,.78);
   border-top: 1px solid var(--line);
   display: flex;
@@ -834,6 +849,7 @@
 .profileScroll {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 22px 18px;
   position: relative;
   z-index: 1;
@@ -1263,6 +1279,7 @@
 .surveyBody {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 32px 20px;
   display: flex;
   flex-direction: column;
@@ -1548,6 +1565,7 @@
 .choiceBody {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 28px 20px;
   display: flex;
   flex-direction: column;
@@ -1628,6 +1646,7 @@
 .insightBody {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 24px 20px 28px;
   display: flex;
   flex-direction: column;
@@ -1926,6 +1945,7 @@
 .coreOverviewBody {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 18px 18px 28px;
   display: flex;
   flex-direction: column;
@@ -2122,6 +2142,7 @@
 .treeBody {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 18px 14px 28px;
   display: flex;
   flex-direction: column;

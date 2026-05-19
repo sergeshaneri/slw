@@ -8,7 +8,14 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: 48px 24px 28px;
+  /* safe-area: 48px сверху уже учитывал место под крестик, но на iPhone
+     с dynamic island этого мало — добавляем env(...). Снизу 28px + bottom
+     inset, чтобы кнопка «Дальше» не уезжала под home-индикатор. */
+  padding:
+    calc(48px + env(safe-area-inset-top))
+    max(24px, env(safe-area-inset-right))
+    calc(28px + env(safe-area-inset-bottom))
+    max(24px, env(safe-area-inset-left));
   background:
     radial-gradient(circle at 50% 30%, rgba(123, 44, 191, 0.25), transparent 55%),
     radial-gradient(circle at 50% 80%, rgba(76, 201, 240, 0.10), transparent 60%),
@@ -40,10 +47,13 @@
 
 .closeBtn {
   position: absolute;
-  top: 18px;
-  right: 18px;
-  width: 36px;
-  height: 36px;
+  /* safe-area-inset-top сдвигает крестик ниже dynamic island/notch.
+     На устройствах без выреза env() = 0, остаётся исходные 18px. */
+  top: calc(18px + env(safe-area-inset-top));
+  right: calc(18px + env(safe-area-inset-right));
+  /* 44×44 — минимальный тач-таргет. Был 36×36. */
+  width: 44px;
+  height: 44px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
@@ -301,13 +311,25 @@
 }
 
 @media (max-width: 480px) {
-  .overlay { padding: 32px 16px 20px; }
+  .overlay {
+    padding:
+      calc(32px + env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right))
+      calc(20px + env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
+  }
   .visualBox { width: 160px; height: 160px; margin-bottom: 22px; }
   .title { font-size: 22px; }
   .body { font-size: 14px; line-height: 1.55; }
   .emoji { font-size: 64px; }
   .bubble { font-size: 28px; }
-  .closeBtn { top: 12px; right: 12px; width: 32px; height: 32px; font-size: 18px; }
+  .closeBtn {
+    top: calc(12px + env(safe-area-inset-top));
+    right: calc(12px + env(safe-area-inset-right));
+    /* Оставляем 44×44 как и в десктоп-варианте — на мобиле тач-таргет
+       только важнее. Шрифт можем оставить меньше. */
+    width: 44px; height: 44px; font-size: 18px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -5,7 +5,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 3rem 1.25rem 2rem;
+  /* safe-area: hero и нижняя CTA «Начать бесплатно» не должны заходить
+     под dynamic island и home-индикатор iPhone. */
+  padding:
+    calc(3rem + env(safe-area-inset-top))
+    max(1.25rem, env(safe-area-inset-right))
+    calc(2rem + env(safe-area-inset-bottom))
+    max(1.25rem, env(safe-area-inset-left));
   gap: 2.5rem;
 }
 
