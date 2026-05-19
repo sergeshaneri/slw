@@ -801,6 +801,13 @@ async def post_insight(
     await bump_streak(session, current_user.id)
     await session.commit()
     await session.refresh(insight)
+
+    # XP: 8 за инсайт, 5 за рекомендацию. Кап 5/день (для каждого kind свой
+    # action_code, считаются независимо).
+    from app.web.xp import award_xp
+    xp_action = "hall_insight_post" if body.kind == "insight" else "hall_recommendation_post"
+    xp = await award_xp(session, current_user.id, xp_action)
+
     return {
         "id": insight.id,
         "aspect": insight.aspect,
@@ -812,6 +819,7 @@ async def post_insight(
         "my_reaction": None,
         "liked_by_me": False,
         "created_at": insight.created_at.isoformat(),
+        "xp": xp,
     }
 
 
@@ -922,11 +930,20 @@ async def react_to_insight(
         )
     ).all()
     reactions = {(r or "heart"): int(c) for r, c in rows}
+
+    # XP: 1 реактору (кап 20/день), 1 автору инсайта (кап 30/день).
+    # Награждаем только при первой реакции (notify_owner=True), не при toggle/swap.
+    from app.web.xp import award_xp
+    xp_reactor = await award_xp(session, current_user.id, "react_to_insight") if notify_owner else None
+    if notify_owner and insight.web_user_id != current_user.id:
+        await award_xp(session, insight.web_user_id, "received_reaction")
+
     return {
         "my_reaction": my_reaction,
         "my_comment": my_comment,
         "reactions": reactions,
         "total": sum(reactions.values()),
+        "xp": xp_reactor,
     }
 
 
@@ -1017,6 +1034,18 @@ async def follow_user(
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Проверяем, существовала ли подписка — нужно для XP-награждения только
+    # при НОВОЙ подписке (повторный POST после refollow не должен начислять).
+    existing = (
+        await session.execute(
+            select(Subscription).where(
+                Subscription.follower_id == current_user.id,
+                Subscription.target_id == user_id,
+            ).limit(1)
+        )
+    ).scalar_one_or_none()
+    was_new = existing is None
+
     stmt = pg_insert(Subscription).values(
         follower_id=current_user.id, target_id=user_id,
     ).on_conflict_do_nothing(index_elements=["follower_id", "target_id"])
@@ -1034,6 +1063,12 @@ async def follow_user(
         skip_if_self=current_user.id,
     )
     await session.commit()
+
+    # XP: 2 target'у за нового подписчика (кап 10/день).
+    # Награждаем только реально новые подписки, чтобы refollow не накручивал.
+    if was_new:
+        from app.web.xp import award_xp
+        await award_xp(session, user_id, "new_follower")
 
     followers_count = int((
         await session.execute(
@@ -1221,3 +1256,124 @@ async def get_heatmap(
         "to": datetime.utcnow().strftime("%Y-%m-%d"),
         "data": [{"date": d, "count": c} for d, c in sorted(counts.items())],
     }
+
+
+# ── Insight comments ─────────────────────────────────────────────────────────
+# Полноценные комменты под инсайтом (отличаются от insight_likes.comment —
+# тот опц. строка в реакции). DESC by created_at, без вложенности (одноуровневые).
+# Notify тип 'insight_comment' — отправляется автору инсайта при чужом комменте.
+
+from app.db.models import InsightComment  # noqa: E402  (рядом с роутами комментов)
+
+
+class CommentBody(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+@router.get("/insights/{insight_id}/comments")
+async def list_insight_comments(
+    insight_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
+    """Публичный (без auth) — кто угодно может посмотреть тред под публичным инсайтом.
+    Под приватным или удалённым инсайтом возвращаем 404.
+    """
+    insight = await session.get(AspectInsight, insight_id)
+    if not insight or insight.is_public is False:
+        raise HTTPException(status_code=404, detail="Insight not found")
+
+    rows = (
+        await session.execute(
+            select(InsightComment, WebUser, PublicProfile)
+            .join(WebUser, WebUser.id == InsightComment.web_user_id)
+            .outerjoin(PublicProfile, PublicProfile.web_user_id == WebUser.id)
+            .where(InsightComment.insight_id == insight_id)
+            .order_by(InsightComment.created_at.asc())
+        )
+    ).all()
+    out = []
+    for c, u, pp in rows:
+        out.append({
+            "id": c.id,
+            "insight_id": c.insight_id,
+            "user_id": u.id,
+            "display_name": _display_name(u),
+            "avatar": pp.avatar if pp else None,
+            "text": c.text,
+            "created_at": c.created_at.isoformat(),
+        })
+    return out
+
+
+@router.post("/insights/{insight_id}/comments")
+async def post_insight_comment(
+    insight_id: int,
+    body: CommentBody,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    insight = await session.get(AspectInsight, insight_id)
+    if not insight or insight.is_public is False:
+        raise HTTPException(status_code=404, detail="Insight not found")
+
+    cleaned = body.text.strip()
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="Empty text")
+
+    new_comment = InsightComment(
+        insight_id=insight_id,
+        web_user_id=current_user.id,
+        text=cleaned,
+    )
+    session.add(new_comment)
+    await session.flush()  # получаем id
+
+    # Уведомление автору инсайта (если коммент не от самого автора).
+    await notify(
+        session,
+        user_id=insight.web_user_id,
+        type_="insight_comment",
+        payload={
+            "insight_id": insight_id,
+            "comment_id": new_comment.id,
+            "actor_id": current_user.id,
+            "actor_name": _display_name(current_user),
+            "preview": cleaned[:120],
+            "insight_preview": (insight.text or "")[:120],
+        },
+        skip_if_self=current_user.id,
+    )
+    await bump_streak(session, current_user.id)
+    await session.commit()
+
+    return {
+        "id": new_comment.id,
+        "insight_id": insight_id,
+        "user_id": current_user.id,
+        "display_name": _display_name(current_user),
+        "text": cleaned,
+        "created_at": new_comment.created_at.isoformat() if new_comment.created_at else datetime.utcnow().isoformat(),
+    }
+
+
+@router.delete("/insights/{insight_id}/comments/{comment_id}")
+async def delete_insight_comment(
+    insight_id: int,
+    comment_id: int,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Удалить свой комментарий. Автор инсайта тоже может — модерация треда."""
+    comment = await session.get(InsightComment, comment_id)
+    if not comment or comment.insight_id != insight_id:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    if comment.web_user_id != current_user.id:
+        # Автор инсайта может тоже удалять (модерация под своим инсайтом).
+        insight = await session.get(AspectInsight, insight_id)
+        if not insight or insight.web_user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not allowed")
+
+    await session.delete(comment)
+    await session.commit()
+    return {"deleted": True, "id": comment_id}

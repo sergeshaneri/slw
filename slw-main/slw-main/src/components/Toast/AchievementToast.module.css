@@ -28,6 +28,34 @@
   border-color: rgba(179,157,219,0.6);
 }
 
+/* XP-тост — компактнее и с золотистым акцентом, чтобы отличался от
+   ачивок (которые в фиолетовом семействе) и не выглядел «громко». */
+.toastXp {
+  border-color: rgba(230, 193, 88, 0.5);
+  box-shadow: 0 6px 22px rgba(0,0,0,0.35), 0 0 0 1px rgba(230, 193, 88, 0.18);
+  padding: 10px 14px;
+  gap: 10px;
+}
+
+.toastXp .title {
+  color: #e6c158;
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 700;
+}
+
+.toastXp .subtitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: #c8cad1;
+  margin-bottom: 0;
+}
+
+.toastXp .icon {
+  font-size: 24px;
+}
+
 .icon {
   font-size: 32px;
   line-height: 1;

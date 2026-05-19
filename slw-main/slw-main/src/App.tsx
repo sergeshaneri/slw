@@ -6,7 +6,7 @@ import JourneyView, { DEFAULT_JOURNEY, DEFAULT_ASPECT_STATE } from './components
 import CoachView from './components/CoachView/CoachView'
 import ProfileView from './components/ProfileView/ProfileView'
 import PublicProfileView from './components/PublicProfileView/PublicProfileView'
-import LeaderboardView from './components/LeaderboardView/LeaderboardView'
+import CommunityView, { type CommunityTab } from './components/CommunityView/CommunityView'
 import HallView from './components/HallView/HallView'
 import DMView from './components/DMView/DMView'
 import DashboardView from './components/DashboardView/DashboardView'
@@ -195,6 +195,10 @@ export default function App() {
   const [hallAspect, setHallAspect] = useState<AspectKey | null>(null)
   // С каким юзером открыт DM-тред. null — список тредов.
   const [dmPartnerId, setDmPartnerId] = useState<number | string | null>(null)
+  // Какой таб активен в CommunityView. По умолчанию — 'halls'. Точки входа
+  // могут переключать (например, dashboard.onOpenLeaderboard → 'top',
+  // public-profile.onBack из ленты → 'feed').
+  const [communityTab, setCommunityTab] = useState<CommunityTab>('halls')
   // Очередь тостов (новые ачивки и т.п.). Каждый { id, icon, title, desc, kind, stardust }.
   const [toasts, setToasts] = useState<Toast[]>([])
   const [dataLoading, setDataLoading] = useState<boolean>(false)
@@ -645,9 +649,11 @@ export default function App() {
     setDiary(newDiary)
     if (appUser) {
       const newEntries = newDiary.filter(e => !prev.find(p => p.id === e.id))
+      // Lazy import чтобы не зависеть от utils/xp на top-level App.tsx.
+      const { emitXpEarned } = await import('./utils/xp')
       for (const entry of newEntries) {
         try {
-          await postDiaryEntry({
+          const resp = await postDiaryEntry({
             text: entry.text,
             aspect: entry.aspect,
             source: entry.source ?? 'web',
@@ -657,7 +663,8 @@ export default function App() {
               prompt: entry.prompt ?? null,
               survey: entry.survey ?? null,
             },
-          })
+          }) as { xp?: { xp_delta?: number; action_code?: string; label?: string } }
+          emitXpEarned(resp.xp)
         } catch (e) { console.error(e) }
       }
     } else {
@@ -768,6 +775,38 @@ export default function App() {
   const dismissToast = (id: string): void => {
     setToasts(prev => prev.filter(t => t.id !== id))
   }
+
+  // XP-events: компоненты после mutation эмитят `slw:xp-earned` через
+  // emitXpEarned(response.xp). Здесь слушаем и:
+  //   1) пушим toast «+N XP за …»
+  //   2) увеличиваем journey.xp в локальном state — чтобы цифра в шапке
+  //      обновилась без отдельного фетча. Опционально сохраняем на бэк
+  //      через saveStateGuarded, но это уже сделано на бэке (web_state.xp
+  //      обновился при award_xp), так что фронт может просто прочитать
+  //      delta и применить.
+  useEffect(() => {
+    // Динамический импорт, чтобы не плодить top-level import-ов выше.
+    let unsubscribe = () => {}
+    import('./utils/xp').then(({ onXpEarned }) => {
+      unsubscribe = onXpEarned((xp) => {
+        const delta = xp.xp_delta ?? 0
+        if (delta <= 0) return
+        // Toast.
+        setToasts(prev => [...prev, {
+          id: `xp-${xp.action_code}-${Date.now()}`,
+          kind: 'xp',
+          icon: '✨',
+          title: xp.label ?? `+${delta} XP`,
+          xpAmount: delta,
+        }])
+        // Локальный journey.xp += delta. Не пушим через saveStateGuarded —
+        // бэк уже обновил web_state.journey.xp атомарно, при следующем
+        // GET /api/state или 409-fall-through всё синхронизируется.
+        setJourney(j => ({ ...j, xp: (j?.xp ?? 0) + delta }))
+      })
+    })
+    return () => unsubscribe()
+  }, [])
 
   // BackButton от Telegram: показываем стрелку «назад» в шапке TG на всех
   // экранах кроме «домашних» (dashboard, aspects). Клик возвращает на
@@ -995,7 +1034,10 @@ export default function App() {
             onOpenMyProfile={() => handleViewChange('profile')}
             onOpenDM={openDM}
             onOpenDMList={() => openDM(null)}
-            onOpenLeaderboard={() => handleViewChange('leaderboard')}
+            onOpenLeaderboard={() => {
+              setCommunityTab('top')
+              handleViewChange('community')
+            }}
             onOpenTour={() => setShowIntroTour(true)}
           />
         )}
@@ -1085,17 +1127,22 @@ export default function App() {
             currentUserId={appUser?.id}
             onBack={() => {
               setViewingProfileId(null)
-              setView('leaderboard')
+              setView('community')
             }}
             onOpenProfile={openPublicProfile}
             onOpenDM={openDM}
           />
         )}
 
-        {view === 'leaderboard' && (
-          <LeaderboardView
-            currentUserId={appUser?.id}
-            onOpenPublicProfile={openPublicProfile}
+        {view === 'community' && (
+          <CommunityView
+            user={appUser}
+            currentUserId={appUser?.id ?? null}
+            initialTab={communityTab}
+            onEnterHall={enterHall}
+            onOpenProfile={openPublicProfile}
+            onOpenDM={openDM}
+            onRequestAuth={() => setShowAuth(true)}
           />
         )}
 

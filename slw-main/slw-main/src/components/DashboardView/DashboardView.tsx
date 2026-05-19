@@ -12,6 +12,7 @@ import Heatmap from '../Heatmap/Heatmap'
 import Hint from '../Onboarding/Hint'
 import DiscoverMore from './DiscoverMore'
 import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
+import { emitXpEarned, type XpAward } from '../../utils/xp'
 import type { AspectKey, AspectScores } from '@/types/aspect'
 import type { JourneyState } from '@/types/journey'
 import styles from './DashboardView.module.css'
@@ -63,6 +64,12 @@ const STREAK_STATUS_LABEL: Record<string, string> = {
   shielded:     '🛡 Защита покрыла пропуск',
   broken:       'Стрик сорвался — начни новый',
 }
+
+// Гейт ИИ-коуча. Дублирует Header.tsx:COACH_UNLOCK_AT — оба места должны
+// быть синхронны. Если меняешь порог — правь и там.
+const COACH_UNLOCK_AT = 5
+const COACH_LOCKED_HINT =
+  'ИИ-коуч доступен тем, кто начал путешествие по планетам и прошёл хотя бы 5 шагов'
 
 // Shape ответа /api/dashboard. У бэка нет response_model, поэтому
 // локальный тип покрывает только load-bearing поля, остальное —
@@ -231,7 +238,10 @@ export default function DashboardView({
   const handleHabitToggle = async (h: DashboardHabit): Promise<void> => {
     try {
       if (h.ticked_today) await untickHabit(h.aspect)
-      else await tickHabit(h.aspect)
+      else {
+        const tResp = await tickHabit(h.aspect) as { xp?: XpAward }
+        emitXpEarned(tResp.xp)
+      }
       reload()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Не удалось')
@@ -243,11 +253,12 @@ export default function DashboardView({
     if (!t || savingDiary) return
     setSavingDiary(true)
     try {
-      await postDiaryEntry({
+      const dResp = await postDiaryEntry({
         text: t,
         aspect: diaryAspect === 'general' ? null : diaryAspect,
         source: 'web',
-      })
+      }) as { xp?: XpAward }
+      emitXpEarned(dResp.xp)
       setDiaryText('')
       setDiarySaved(true)
       setTimeout(() => setDiarySaved(false), 2000)
@@ -270,6 +281,7 @@ export default function DashboardView({
 
   const lvl = data.level_progress
   const active = data.active_aspect
+  const coachLocked = (journey?.totalCompleted ?? 0) < COACH_UNLOCK_AT
 
   return (
     <div className={styles.container}>
@@ -467,20 +479,32 @@ export default function DashboardView({
           <div className={styles.coachCard}>
             <div className={styles.coachStats}>
               <div className={styles.coachBig}>
-                {data.coach.remaining_today}/{data.coach.daily_limit}
+                {coachLocked ? '🔒' : `${data.coach.remaining_today}/${data.coach.daily_limit}`}
               </div>
               <div className={styles.muted}>
-                осталось сегодня
-                {(data.coach.streak_bonus ?? 0) > 0 && ` · бонус +${data.coach.streak_bonus}`}
+                {coachLocked
+                  ? COACH_LOCKED_HINT
+                  : (
+                    <>
+                      осталось сегодня
+                      {(data.coach.streak_bonus ?? 0) > 0 && ` · бонус +${data.coach.streak_bonus}`}
+                    </>
+                  )}
               </div>
             </div>
             <button
               type="button"
               className={styles.btnPrimary}
-              onClick={onOpenCoach}
-              disabled={data.coach.remaining_today === 0}
+              onClick={() => {
+                if (coachLocked) { onOpenJourney?.(); return }
+                onOpenCoach?.()
+              }}
+              disabled={!coachLocked && data.coach.remaining_today === 0}
+              title={coachLocked ? COACH_LOCKED_HINT : undefined}
             >
-              {data.coach.remaining_today === 0 ? 'Вернётся завтра' : 'Позвать'}
+              {coachLocked
+                ? '🚀 К путешествию'
+                : data.coach.remaining_today === 0 ? 'Вернётся завтра' : 'Позвать'}
             </button>
           </div>
         </Section>

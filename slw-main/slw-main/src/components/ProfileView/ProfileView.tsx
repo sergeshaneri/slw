@@ -20,6 +20,7 @@ import Heatmap from '../Heatmap/Heatmap'
 import { useConfirm } from '../Confirm/ConfirmProvider'
 import { tmaNotify } from '../../tma/hooks'
 import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
+import { emitXpEarned, type XpAward } from '../../utils/xp'
 import type { AspectKey } from '@/types/aspect'
 import type { JourneyState } from '@/types/journey'
 import styles from './ProfileView.module.css'
@@ -278,7 +279,8 @@ export default function ProfileView({
         kind: insightKind,
         text,
         isPublic: insightPublic,
-      }) as Insight
+      }) as Insight & { xp?: XpAward }
+      emitXpEarned(created.xp)
       setProfile(p => p ? ({
         ...p,
         insights: [created, ...(p.insights ?? [])],

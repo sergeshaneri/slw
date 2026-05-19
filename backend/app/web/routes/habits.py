@@ -149,6 +149,19 @@ async def tick(
     if aspect not in ASPECT_KEYS:
         raise HTTPException(status_code=404, detail=f"Unknown aspect: {aspect}")
     today = _today()
+    # Проверяем, был ли уже tick сегодня — чтобы не давать XP за повторный клик
+    # (on_conflict_do_nothing глотает дубль, но не сообщает нам).
+    existing = (
+        await session.execute(
+            select(HabitTick.aspect).where(
+                HabitTick.web_user_id == current_user.id,
+                HabitTick.aspect == aspect,
+                HabitTick.date == today,
+            ).limit(1)
+        )
+    ).first()
+    was_new = existing is None
+
     stmt = pg_insert(HabitTick).values(
         web_user_id=current_user.id,
         aspect=aspect,
@@ -157,7 +170,15 @@ async def tick(
     await session.execute(stmt)
     await bump_streak(session, current_user.id)
     await session.commit()
-    return {"aspect": aspect, "date": today, "ticked": True}
+
+    # XP: 1 за тик (кап 8/день = по одному на каждый из 8 аспектов).
+    # Только при НОВОМ тике — повторный (или после untick→tick) не считается.
+    xp = None
+    if was_new:
+        from app.web.xp import award_xp
+        xp = await award_xp(session, current_user.id, "habit_tick")
+
+    return {"aspect": aspect, "date": today, "ticked": True, "xp": xp}
 
 
 @router.delete("/habits/{aspect}/tick")

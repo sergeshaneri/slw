@@ -17,6 +17,13 @@ import {
   fetchHabitsToday,
   tickHabit,
   untickHabit,
+  fetchSubscribedAspects,
+  subscribeToAspect,
+  unsubscribeFromAspect,
+  fetchInsightComments,
+  postInsightComment,
+  deleteInsightComment,
+  fetchHallTrending,
   fetchHallQuestions,
   fetchHallQuestion,
   postHallQuestion,
@@ -27,6 +34,7 @@ import {
 } from '../../api/client'
 import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import { useConfirm } from '../Confirm/ConfirmProvider'
+import { emitXpEarned, type XpAward } from '../../utils/xp'
 import type { AspectKey } from '@/types/aspect'
 import styles from './HallView.module.css'
 
@@ -202,7 +210,10 @@ export default function HallView({ aspect, currentUserId, onBack, onOpenProfile 
           {ASPECT_DISPLAY_KEY[aspect] ?? aspect} · {meta.name ?? 'Аспект'}
         </h1>
         {meta.metaphor && <div className={styles.subline}>{meta.metaphor}</div>}
-        <HabitTickButton aspect={aspect} />
+        <div className={styles.heroActions}>
+          <HabitTickButton aspect={aspect} />
+          <AspectSubscribeButton aspect={aspect} />
+        </div>
       </div>
 
       <div className={styles.tabBody}>
@@ -213,6 +224,11 @@ export default function HallView({ aspect, currentUserId, onBack, onOpenProfile 
         <Section label="💬 Чат холла">
           <ChatList aspect={aspect} onOpenProfile={onOpenProfile} />
         </Section>
+
+        {/* Trending за неделю — лучшие инсайты и Q&A в этом холле за 7 дней.
+            Появляется только если есть хотя бы 1 запись — иначе блок свернут
+            и скрыт, чтобы не зашумлять пустой холл (внутри TrendingBlock). */}
+        <TrendingBlock aspect={aspect} onOpenProfile={onOpenProfile} />
 
         {/* Интересности аспекта — курируемые цитаты / личности / произведения / факты.
             Раньше называлось «Канон аспекта» — переименовано в «Интересности»
@@ -603,7 +619,8 @@ function InsightsList({ aspect, currentUserId, onOpenProfile }: InsightsListProp
     setPosting(true)
     setError(null)
     try {
-      await postInsight({ aspect, kind, text: t, isPublic: true })
+      const resp = await postInsight({ aspect, kind, text: t, isPublic: true }) as { xp?: XpAward }
+      emitXpEarned(resp.xp)
       setText('')
       await reload()
     } catch (e: unknown) {
@@ -615,8 +632,9 @@ function InsightsList({ aspect, currentUserId, onOpenProfile }: InsightsListProp
 
   const handleReact = async (insightId: number, reaction: ReactionType) => {
     try {
-      const { my_reaction, reactions, total } =
-        (await reactToInsightWithComment(insightId, reaction)) as ReactionResp
+      const reactResp = (await reactToInsightWithComment(insightId, reaction)) as ReactionResp & { xp?: XpAward }
+      emitXpEarned(reactResp.xp)
+      const { my_reaction, reactions, total } = reactResp
       setItems(prev => prev.map(i =>
         i.id === insightId
           ? { ...i, my_reaction, reactions, likes: total }
@@ -738,6 +756,12 @@ function InsightsList({ aspect, currentUserId, onOpenProfile }: InsightsListProp
                 {ins.bookmarked_by_me ? '🔖' : '☆'}
               </button>
             </div>
+            <InsightComments
+              insightId={ins.id}
+              insightAuthorId={ins.user_id}
+              currentUserId={currentUserId}
+              onOpenProfile={onOpenProfile}
+            />
           </div>
         ))}
         {!busy && items.length === 0 && (
@@ -794,7 +818,8 @@ function QuestionsList({ aspect, currentUserId, onOpenProfile }: QuestionsListPr
     setPosting(true)
     setError(null)
     try {
-      await postHallQuestion(aspect, t)
+      const qResp = await postHallQuestion(aspect, t) as { xp?: XpAward }
+      emitXpEarned(qResp.xp)
       setAskText('')
       reloadList()
     } catch (e: unknown) {
@@ -810,7 +835,8 @@ function QuestionsList({ aspect, currentUserId, onOpenProfile }: QuestionsListPr
     setPosting(true)
     setError(null)
     try {
-      await postHallAnswer(aspect, openId, t)
+      const aResp = await postHallAnswer(aspect, openId, t) as { xp?: XpAward }
+      emitXpEarned(aResp.xp)
       setAnswerText('')
       const fresh = (await fetchHallQuestion(aspect, openId)) as HallThread
       setThread(fresh)
@@ -1255,6 +1281,209 @@ function DiscussCuratedItem({ aspect, quoteBlock, itemLabel }: DiscussCuratedIte
   )
 }
 
+// ── InsightComments — раскрываемая ветка комментов под одним инсайтом ────────
+
+type InsightCommentRow = {
+  id: number
+  insight_id: number
+  user_id: number
+  display_name: string
+  avatar?: string | null
+  text: string
+  created_at: string
+}
+
+function InsightComments({
+  insightId,
+  insightAuthorId,
+  currentUserId,
+  onOpenProfile,
+}: {
+  insightId: number
+  insightAuthorId: number
+  currentUserId: number | string | null | undefined
+  onOpenProfile?: (userId: number | string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [items, setItems] = useState<InsightCommentRow[] | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [text, setText] = useState('')
+  const [posting, setPosting] = useState(false)
+  const [sendKeyMode] = useSendKeyMode()
+
+  const load = async () => {
+    setBusy(true)
+    try {
+      const list = (await fetchInsightComments(insightId)) as InsightCommentRow[]
+      setItems(list)
+    } catch {
+      setItems([])
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const toggle = async () => {
+    const next = !open
+    setOpen(next)
+    if (next && items === null) await load()
+  }
+
+  const handlePost = async () => {
+    const t = text.trim()
+    if (!t || posting) return
+    setPosting(true)
+    try {
+      const created = (await postInsightComment(insightId, t)) as InsightCommentRow
+      setItems(prev => [...(prev ?? []), created])
+      setText('')
+    } catch {
+      // silent — UI остаётся раскрытым, юзер может попробовать ещё раз
+    } finally {
+      setPosting(false)
+    }
+  }
+
+  const handleDelete = async (commentId: number) => {
+    try {
+      await deleteInsightComment(insightId, commentId)
+      setItems(prev => (prev ?? []).filter(c => c.id !== commentId))
+    } catch {
+      // silent
+    }
+  }
+
+  const count = items?.length ?? null
+  return (
+    <div className={styles.commentsBlock}>
+      <button
+        type="button"
+        className={styles.commentsToggle}
+        onClick={toggle}
+        aria-expanded={open}
+      >
+        💬 {open ? 'Скрыть' : 'Комментарии'}{count !== null ? ` · ${count}` : ''}
+      </button>
+
+      {open && (
+        <div className={styles.commentsBody}>
+          {busy && <div className={styles.muted}>Загружаем…</div>}
+          {!busy && items && items.length === 0 && (
+            <div className={styles.muted}>Комментариев пока нет — будь первым.</div>
+          )}
+          {items && items.map(c => {
+            const canDelete = c.user_id === currentUserId || insightAuthorId === currentUserId
+            return (
+              <div key={c.id} className={styles.commentRow}>
+                <span className={styles.commentAvatar}>{c.avatar || '🧑'}</span>
+                <div className={styles.commentMain}>
+                  <button
+                    type="button"
+                    className={styles.previewName}
+                    onClick={() => onOpenProfile?.(c.user_id)}
+                  >
+                    {c.display_name}
+                  </button>
+                  <span className={styles.muted}> · {formatDate(c.created_at)}</span>
+                  <div className={styles.commentText}>{c.text}</div>
+                </div>
+                {canDelete && (
+                  <button
+                    type="button"
+                    className={styles.commentDelete}
+                    onClick={() => handleDelete(c.id)}
+                    title="Удалить"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            )
+          })}
+
+          {currentUserId && (
+            <div className={styles.commentComposer}>
+              <textarea
+                className={styles.commentTextarea}
+                value={text}
+                onChange={e => setText(e.target.value)}
+                onKeyDown={e => {
+                  if (shouldSendOnKeyDown(e, sendKeyMode) && text.trim() && !posting) {
+                    e.preventDefault()
+                    handlePost()
+                  }
+                }}
+                placeholder="Ответить…"
+                maxLength={2000}
+                rows={2}
+              />
+              <button
+                type="button"
+                className={styles.commentSubmit}
+                onClick={handlePost}
+                disabled={posting || !text.trim()}
+              >
+                {posting ? '…' : 'Отправить'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AspectSubscribeButton({ aspect }: { aspect: AspectKey }) {
+  const [busy, setBusy] = useState(false)
+  const [subbed, setSubbed] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchSubscribedAspects()
+      .then((list) => {
+        if (cancelled) return
+        setSubbed(list.includes(aspect))
+      })
+      .catch(() => { if (!cancelled) setSubbed(false) })
+    return () => { cancelled = true }
+  }, [aspect])
+
+  const handle = async () => {
+    if (subbed === null) return
+    setBusy(true)
+    try {
+      if (subbed) {
+        await unsubscribeFromAspect(aspect)
+        setSubbed(false)
+      } else {
+        await subscribeToAspect(aspect)
+        setSubbed(true)
+      }
+    } catch {
+      // молча — не ломаем UX, ничего критичного
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (subbed === null) return null
+  return (
+    <button
+      type="button"
+      className={`${styles.habitBtn} ${subbed ? styles.habitBtnDone : ''}`}
+      onClick={handle}
+      disabled={busy}
+      title={
+        subbed
+          ? 'Отписаться от активности в этом холле'
+          : 'Получать новые инсайты и лучшие ответы из этого холла в Ленту'
+      }
+    >
+      {subbed ? '🔔 Подписан' : '🔔 Подписаться'}
+    </button>
+  )
+}
+
 function HabitTickButton({ aspect }: { aspect: AspectKey }) {
   const [busy, setBusy] = useState(false)
   const [ticked, setTicked] = useState(false)
@@ -1278,7 +1507,8 @@ function HabitTickButton({ aspect }: { aspect: AspectKey }) {
         await untickHabit(aspect)
         setTicked(false)
       } else {
-        await tickHabit(aspect)
+        const tResp = await tickHabit(aspect) as { xp?: XpAward }
+        emitXpEarned(tResp.xp)
         setTicked(true)
       }
     } catch {} finally {

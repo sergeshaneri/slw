@@ -706,10 +706,16 @@ async def post_question(
     await bump_streak(session, current_user.id)
     await session.commit()
     await session.refresh(msg)
+
+    # XP: 3 за вопрос (кап 5/день).
+    from app.web.xp import award_xp
+    xp = await award_xp(session, current_user.id, "hall_question_post")
+
     pp = await session.get(PublicProfile, current_user.id)
     return _msg_to_dict(msg, current_user, pp, current_user.id) | {
         "answers_count": 0,
         "has_best_answer": False,
+        "xp": xp,
     }
 
 
@@ -756,8 +762,13 @@ async def post_answer(
     await bump_streak(session, current_user.id)
     await session.commit()
     await session.refresh(msg)
+
+    # XP: 5 за ответ (кап 10/день).
+    from app.web.xp import award_xp
+    xp = await award_xp(session, current_user.id, "hall_answer_post")
+
     pp = await session.get(PublicProfile, current_user.id)
-    return _msg_to_dict(msg, current_user, pp, current_user.id)
+    return _msg_to_dict(msg, current_user, pp, current_user.id) | {"xp": xp}
 
 
 @router.post("/hall/{aspect}/questions/{question_id}/answers/{answer_id}/best")
@@ -806,4 +817,11 @@ async def mark_best_answer(
         ))
 
     await session.commit()
+
+    # XP: +10 автору ответа (без капа — это редкое одобрение от автора вопроса).
+    # Не даём XP если кто-то пометил свой же ответ (защита от self-grant).
+    from app.web.xp import award_xp
+    if answer.web_user_id != current_user.id:
+        await award_xp(session, answer.web_user_id, "hall_answer_marked_best")
+
     return {"answer_id": answer_id, "is_best": True}

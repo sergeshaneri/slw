@@ -9,6 +9,7 @@ import {
   fetchHabitsHistory,
 } from '../../api/client'
 import { useConfirm } from '../Confirm/ConfirmProvider'
+import { emitXpEarned, type XpAward } from '../../utils/xp'
 import type { AspectKey } from '@/types/aspect'
 import styles from './HabitSection.module.css'
 
@@ -110,7 +111,8 @@ export default function HabitSection({ aspect, color }: Props) {
       if (habit.ticked_today) {
         await untickHabit(aspect)
       } else {
-        await tickHabit(aspect)
+        const tResp = await tickHabit(aspect) as { xp?: XpAward }
+        emitXpEarned(tResp.xp)
       }
       reload()
     } catch (e) {

@@ -113,7 +113,15 @@ async def post_diary(
     await bump_streak(session, current_user.id)
     await session.commit()
     await session.refresh(entry)
-    return {"id": f"w{entry.id}"}
+
+    # XP: 2 за обычную запись (кап 5/день), либо 5 за «полный обзор дня»
+    # (source='daily-review', кап 1/день — бонус выдаётся только один раз
+    # в сутки даже если в DailyReview юзер заполнил несколько аспектов).
+    from app.web.xp import award_xp
+    xp_action = "daily_review" if body.source == "daily-review" else "diary_entry"
+    xp = await award_xp(session, current_user.id, xp_action)
+
+    return {"id": f"w{entry.id}", "xp": xp}
 
 
 # ── Структурированные данные из vault-импорта ──────────────────────────────
