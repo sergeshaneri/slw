@@ -274,7 +274,7 @@ export default function TeWheel({ skills, color, onContinueSurveys, isLocked = f
   const showGlow        = globalStageIdx >= STAGE_ORDER.indexOf('strong')
 
   const stageLabel = isLocked
-    ? 'Пройди уровень 0, чтобы открыть колесо навыков'
+    ? 'Пройди первый уровень в Путешествии — колесо откроется'
     : 'Оценивай навыки ремесла, чтобы колесо росло'
 
   return (

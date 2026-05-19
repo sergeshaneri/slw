@@ -508,7 +508,8 @@ function DangerSection({ user, onAccountDeleted }: DangerProps) {
       {!open && (
         <Field label="Удалить аккаунт">
           <div className={styles.hint}>
-            Удалит scores, journey, дневник и сам аккаунт. Бот-данные (если ты пользовался ботом) останутся.
+            Удалит scores, journey, дневник и сам аккаунт. <strong>Восстановить нельзя.</strong>
+            {' '}Бот-данные в TG (если ты пользовался ботом) останутся отдельно.
           </div>
           <div className={styles.actionsRow}>
             <button className={styles.btnDanger} onClick={() => setOpen(true)}>

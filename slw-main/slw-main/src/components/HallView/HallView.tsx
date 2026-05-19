@@ -174,7 +174,11 @@ const INSPIRATION_ICON: Record<string, string> = {
   film: '🎬', book: '📚', music: '🎵', activity: '🏃', person: '👤', other: '✦',
 }
 
-const POLL_INTERVAL_MS = 5000
+// Polling backoff: стартуем с 5с, удваиваем каждый пустой round (до 60с).
+// На приход новых сообщений сбрасываем обратно к 5с. Идея — на активном
+// чате частота нормальная, на тихом — мы не сжигаем батарею юзера.
+const POLL_INTERVAL_MIN_MS = 5_000
+const POLL_INTERVAL_MAX_MS = 60_000
 
 type HallViewProps = {
   aspect: AspectKey
@@ -453,21 +457,44 @@ function ChatList({ aspect, onOpenProfile }: ChatListProps) {
     return () => { cancelled = true }
   }, [aspect])
 
-  // Polling.
+  // Polling с экспоненциальным backoff. Использует setTimeout (не
+  // setInterval) чтобы менять интервал на лету — после пустого round'а
+  // удваиваем delay, после успешного fetch с новыми сообщениями
+  // сбрасываем к минимуму. Плюс пауза при скрытой вкладке.
   useEffect(() => {
     if (lastId === 0) return
-    const id = setInterval(async () => {
+    let cancelled = false
+    let delay = POLL_INTERVAL_MIN_MS
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+    const tick = async () => {
+      if (cancelled) return
+      // Если вкладка скрыта — пропускаем round, чтобы не дёргать сеть.
+      if (typeof document !== 'undefined' && document.hidden) {
+        timeoutId = setTimeout(tick, delay)
+        return
+      }
       try {
         const { messages: fresh, last_id } =
           (await fetchHallMessages(aspect, lastId, 100)) as HallMessagesResp
-        if (fresh.length === 0) return
-        setMessages(prev => [...prev, ...fresh])
-        setLastId(last_id)
+        if (fresh.length > 0) {
+          setMessages(prev => [...prev, ...fresh])
+          setLastId(last_id)
+          delay = POLL_INTERVAL_MIN_MS  // активный чат — обратно к 5с
+        } else {
+          delay = Math.min(delay * 2, POLL_INTERVAL_MAX_MS)  // тихо — удваиваем
+        }
       } catch {
-        // Молча, polling не должен ломать UX.
+        // Молча — на сетевой ошибке тоже backoff, чтобы не спамить сервер.
+        delay = Math.min(delay * 2, POLL_INTERVAL_MAX_MS)
       }
-    }, POLL_INTERVAL_MS)
-    return () => clearInterval(id)
+      if (!cancelled) timeoutId = setTimeout(tick, delay)
+    }
+    timeoutId = setTimeout(tick, delay)
+    return () => {
+      cancelled = true
+      if (timeoutId) clearTimeout(timeoutId)
+    }
   }, [aspect, lastId])
 
   // Автоскролл вниз при новых сообщениях.
@@ -1199,19 +1226,36 @@ function DiscussCuratedItem({ aspect, quoteBlock, itemLabel }: DiscussCuratedIte
     setBusy(true)
     setError(null)
     const composed = `${quoteBlock}\n\n${text.trim()}`
-    try {
-      await Promise.all([
-        postInsight({ aspect, kind: 'insight', text: composed, isPublic: true }),
-        postHallMessage(aspect, composed)
-      ])
+    // Раньше Promise.all — если одна из операций падала, юзер не знал
+    // что вторая прошла успешно (или нет). Теперь allSettled + явный
+    // отчёт: «опубликовано в профиль / чат / оба».
+    const [insightR, chatR] = await Promise.allSettled([
+      postInsight({ aspect, kind: 'insight', text: composed, isPublic: true }),
+      postHallMessage(aspect, composed),
+    ])
+    setBusy(false)
+    const insightOk = insightR.status === 'fulfilled'
+    const chatOk = chatR.status === 'fulfilled'
+    if (insightOk && chatOk) {
       setDone(true)
       setText('')
       setOpen(false)
       setTimeout(() => setDone(false), 4000)
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Не удалось опубликовать')
-    } finally {
-      setBusy(false)
+      return
+    }
+    if (!insightOk && !chatOk) {
+      // Оба упали — типично сетевая проблема или auth.
+      const reason = insightR.status === 'rejected' ? insightR.reason : chatR.reason
+      const msg = reason instanceof Error ? reason.message : String(reason)
+      setError(`Не удалось опубликовать: ${msg}. Попробуй ещё раз.`)
+      return
+    }
+    // Частичный успех — сообщаем что прошло, что нет. text не чистим,
+    // чтобы юзер мог retry на упавшем плече.
+    if (insightOk && !chatOk) {
+      setError('Инсайт сохранён в твой профиль, но в чат холла не отправился. Попробуй ещё раз — отправится только чат.')
+    } else if (chatOk && !insightOk) {
+      setError('Сообщение в чат опубликовано, но в профиль-инсайты не сохранилось. Попробуй ещё раз.')
     }
   }
 

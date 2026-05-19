@@ -100,20 +100,41 @@ export default function AuthModal({ onSuccess, onClose, user = null, initialMode
   // synchronous, режется в начале handler'а.
   const submitingRef = useRef<boolean>(false)
 
-  // ESC закрывает модал (стандарт UX). onClose дополнительно вызывается
-  // кликом по backdrop'у и крестику ×. Listener живёт только пока модал
-  // открыт (компонент примонтирован), на unmount cleanup.
+  // Dirty-флаг: есть ли несохранённый ввод. Если есть и юзер пытается
+  // закрыть модал (ESC, клик-вне) — показываем confirm перед closeOnClick.
+  // Без этого случайный тап рядом с модалом стирал введённые email/пароль/
+  // сообщение поддержки. На крестик × confirm не показываем (юзер явно
+  // выбирает закрыть).
+  const isDirty = (
+    email.trim().length > 0 ||
+    password.length > 0 ||
+    name.trim().length > 0 ||
+    newPassword.length > 0 ||
+    supportMessage.trim().length > 0 ||
+    supportContact.trim().length > 0
+  )
+
+  const handleCloseRequest = () => {
+    if (!onClose) return
+    if (!isDirty) { onClose(); return }
+    // eslint-disable-next-line no-alert
+    const ok = window.confirm('Закрыть? Введённый текст не сохранится.')
+    if (ok) onClose()
+  }
+
+  // ESC закрывает модал (стандарт UX). Если есть ввод — спрашиваем подтверждение.
   useEffect(() => {
     if (!onClose) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation()
-        onClose()
+        handleCloseRequest()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onClose, isDirty])
 
   // TG-виджет нужен только для линка email→TG (пользователь уже залогинен).
   useEffect(() => {
@@ -290,7 +311,7 @@ export default function AuthModal({ onSuccess, onClose, user = null, initialMode
   // фокусированный диалог (NVDA/VoiceOver объявят «Диалог: Вход» вместо
   // молчания). aria-labelledby связывает с h1.title для прочтения заголовка.
   return (
-    <div className={styles.overlay} onClick={onClose} role="presentation">
+    <div className={styles.overlay} onClick={handleCloseRequest} role="presentation">
       <div
         className={styles.modal}
         onClick={e => e.stopPropagation()}

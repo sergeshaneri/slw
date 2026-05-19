@@ -217,14 +217,35 @@ export default function ProfileView({
   const toggleFocus = (aspect: AspectKey) => {
     setFocusAspects(prev => {
       if (prev.includes(aspect)) return prev.filter(a => a !== aspect)
-      if (prev.length >= 3) return prev
+      if (prev.length >= 3) {
+        // Раньше тихо игнорировали 4-й тап — юзер не понимал почему ничего
+        // не происходит. Теперь короткое сообщение через error-плашку (которая
+        // уже видна на форме).
+        setError('Можно выбрать максимум 3 фокус-аспекта. Сначала сними один.')
+        setTimeout(() => setError(prev => prev === 'Можно выбрать максимум 3 фокус-аспекта. Сначала сними один.' ? null : prev), 3000)
+        return prev
+      }
+      // При успешном выборе чистим прошлое сообщение лимита.
+      setError(prev => prev && prev.startsWith('Можно выбрать максимум') ? null : prev)
       return [...prev, aspect]
     })
   }
 
   const addInterest = () => {
     const tag = interestInput.trim()
-    if (!tag || interests.includes(tag) || interests.length >= 12) return
+    if (!tag) return
+    if (interests.includes(tag)) {
+      setError(`«${tag}» уже в списке`)
+      setTimeout(() => setError(prev => prev?.includes('уже в списке') ? null : prev), 2500)
+      return
+    }
+    if (interests.length >= 12) {
+      // Раньше тихо игнорировали 13+ — кнопка просто disabled, юзер не
+      // понимал лимит. Теперь короткое сообщение.
+      setError('Максимум 12 тегов. Удали один чтобы добавить новый.')
+      setTimeout(() => setError(prev => prev?.startsWith('Максимум 12') ? null : prev), 3000)
+      return
+    }
     setInterests([...interests, tag])
     setInterestInput('')
   }
