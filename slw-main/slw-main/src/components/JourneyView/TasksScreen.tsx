@@ -91,12 +91,21 @@ function TaskItem({ task, script, accent, onCompleteWithNote, onDelete }: ItemPr
 
   const accentStyle: AccentStyle | undefined = accent ? { '--accent': accent } : undefined
 
+  const isTaken = task.status === 'taken'
   return (
-    <li className={styles.taskItem}>
+    <li className={`${styles.taskItem} ${isTaken ? styles.taskItemTaken : ''}`}>
       <div className={styles.taskHead}>
+        {/* Quest-маркер: активный квест («взято») — accent-цвет аспекта с
+            лёгким свечением; отложенное — приглушённый бейдж. */}
+        <span
+          className={`${styles.taskQuest} ${isTaken ? styles.taskQuestTaken : styles.taskQuestDeferred}`}
+          aria-hidden="true"
+        >
+          !
+        </span>
         <span className={styles.taskKind}>{TYPE_LABEL[script.type] ?? 'Шаг'}</span>
-        <span className={`${styles.taskStatus} ${task.status === 'taken' ? styles.taskStatusTaken : styles.taskStatusDeferred}`}>
-          {task.status === 'taken' ? 'взято' : 'отложено'}
+        <span className={`${styles.taskStatus} ${isTaken ? styles.taskStatusTaken : styles.taskStatusDeferred}`}>
+          {isTaken ? 'взято' : 'отложено'}
         </span>
       </div>
       <div className={styles.taskTitle}>{script.title}</div>

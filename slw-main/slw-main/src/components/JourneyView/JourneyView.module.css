@@ -235,13 +235,28 @@
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
+/* Quest-style icon в шапке чата — круглый бейдж с «!» внутри, как маркер
+   активного квеста. Унаследует accent-цвет от родителя .tasksToggle, так
+   что согласован с цветом аспекта. */
 .tasksBulb {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
   font-size: 9px;
+  font-weight: 800;
   line-height: 1;
+  /* «!» с точкой визуально off-center — слегка опускаем для оптического
+     выравнивания. */
+  padding-bottom: 1px;
 }
 
 .tasksToggleActive .tasksBulb {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
   filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 75%, transparent));
 }
 
@@ -994,13 +1009,65 @@
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Активный квест («взято») — лёгкая accent-полоса слева, как у quest-карточек
+   в играх. Через ::before, чтобы не ломать существующий padding. */
+.taskItemTaken::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 80%, transparent),
+    color-mix(in srgb, var(--accent) 30%, transparent));
 }
 
 .taskHead {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
+  justify-content: flex-start;
   margin-bottom: 10px;
+}
+
+.taskHead .taskStatus {
+  margin-left: auto;
+}
+
+/* Quest-бейдж в карточке задания: крупнее, чем в шапке чата. Для «взято»
+   — accent-цвет аспекта + лёгкое свечение (это активный квест). Для
+   «отложено» — приглушённый, без свечения (поставлено на паузу). */
+.taskQuest {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  padding-bottom: 1px;
+  flex-shrink: 0;
+}
+
+.taskQuestTaken {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.taskQuestDeferred {
+  color: var(--text-dim);
+  background: transparent;
+  border-color: var(--line);
 }
 
 .taskKind {

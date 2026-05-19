@@ -172,9 +172,9 @@ export default function Chat({
             className={`${styles.tasksToggle} ${pendingCount > 0 ? styles.tasksToggleActive : ''}`}
             onClick={onOpenTasks}
             aria-label="Активные задания"
-            title={pendingCount > 0 ? `Активных: ${pendingCount}` : 'Активные задания'}
+            title={pendingCount > 0 ? `Активных квестов: ${pendingCount}` : 'Активные задания'}
           >
-            <span className={styles.tasksBulb} aria-hidden="true">●</span>
+            <span className={styles.tasksBulb} aria-hidden="true">!</span>
             {pendingCount > 0 && <span className={styles.tasksCount}>{pendingCount}</span>}
           </button>
           <span className={styles.xpBadge}>{state.xp} XP</span>
