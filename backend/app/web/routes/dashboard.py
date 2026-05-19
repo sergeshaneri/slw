@@ -11,13 +11,15 @@ ticked_today, scores, прогресс уровня для актуальног�
 слово дня, текущий "active aspect" (для приветственного блока).
 """
 import logging
+import secrets
 from collections import Counter
 from datetime import date, datetime, timedelta
 from random import Random
 
 log = logging.getLogger(__name__)
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -682,4 +684,118 @@ async def get_dashboard(
         "word_of_day": word,
         "published_insights_count": pub_insights_count,
         "diary_today_count_by_source": diary_today_count_by_source,
+    }
+
+
+# ── Refresh «слова дня» за запись в дневник (+1 ⭐) ───────────────────────────
+#
+# Юзер может раз в день обновить «слово дня», если оставит запись в дневнике
+# про текущее слово (или про что угодно, минимум 10 символов). За это
+# начисляется +1 стардаст. Один раз в день — иначе превращается в фарм
+# стардастов через короткие записи.
+
+
+class WordRefreshBody(BaseModel):
+    diary_entry: str = Field(..., min_length=10, max_length=4000)
+    current_word: str | None = None  # чтобы новое слово гарантированно отличалось
+
+
+def _pick_random_word(
+    focus_aspects: list[str], current_word: str | None
+) -> dict:
+    """Случайное слово (не привязанное к дате — каждый вызов разный)."""
+    from app.web.routes.words import get_words_for_aspect
+
+    rng = Random(secrets.token_bytes(8))
+    pool_aspects = focus_aspects or list(_QUOTES_BY_ASPECT.keys())
+    aspect = rng.choice(pool_aspects)
+    aspect_latin = _CYR_TO_LAT_LOCAL.get(aspect, aspect)
+    words = get_words_for_aspect(aspect_latin)
+
+    if words:
+        choices = [w for w in words if w.get("word") != current_word] or words
+        w = rng.choice(choices)
+        return {
+            "aspect": aspect,
+            "kind": "word",
+            "word": w.get("word"),
+            "short_def": w.get("short_def"),
+            "long_def": w.get("long_def"),
+            "group": w.get("group"),
+            "text": w.get("short_def"),
+            "author": "",
+        }
+
+    quotes = _QUOTES_BY_ASPECT.get(aspect) or _QUOTES_BY_ASPECT["ЧИ"]
+    text, author = rng.choice(quotes)
+    return {"aspect": aspect, "kind": "quote", "text": text, "author": author}
+
+
+@router.post("/dashboard/word-of-day/refresh")
+async def refresh_word_of_day(
+    body: WordRefreshBody,
+    current_user: WebUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    from app.db.models import WebDiaryEntry as _Diary  # local re-import for clarity
+
+    text_clean = body.diary_entry.strip()
+    if len(text_clean) < 10:
+        raise HTTPException(400, "Запись в дневник должна быть минимум 10 символов")
+
+    # web_state — единственное место, где хранится stardust и lastWordRefreshDate.
+    ws = await session.get(WebState, current_user.id)
+    if ws is None:
+        # У свежего юзера WebState мог ещё не быть создан — создаём пустой.
+        ws = WebState(web_user_id=current_user.id, journey={}, history=[])
+        session.add(ws)
+        await session.flush()
+
+    journey = dict(ws.journey or {})
+    today = _today()
+    if journey.get("lastWordRefreshDate") == today:
+        raise HTTPException(
+            400, "Сегодня уже обновляли слово дня. Возвращайся завтра ✦"
+        )
+
+    # Берём focus_aspects из публичного профиля.
+    pp = await session.get(PublicProfile, current_user.id)
+    focus_aspects = (
+        pp.focus_aspects if pp and isinstance(pp.focus_aspects, list) else None
+    ) or []
+
+    new_word = _pick_random_word(focus_aspects, body.current_word)
+
+    # Сохраняем запись в дневник. extra хранит контекст «к какому слову
+    # это написано» (важно для последующего просмотра).
+    aspect_for_diary = new_word.get("aspect") or "ЧИ"
+    word_label = body.current_word or new_word.get("word") or new_word.get("text") or ""
+    session.add(
+        _Diary(
+            web_user_id=current_user.id,
+            text=text_clean,
+            aspect=aspect_for_diary,
+            source="word-of-day-refresh",
+            extra={
+                "word": word_label,
+                "new_word": new_word.get("word") or new_word.get("text"),
+                "new_aspect": new_word.get("aspect"),
+            },
+        )
+    )
+
+    # Стардаст и метка даты.
+    current_stardust = int(journey.get("stardust", 0) or 0)
+    new_stardust = current_stardust + 1
+    journey["stardust"] = new_stardust
+    journey["lastWordRefreshDate"] = today
+    ws.journey = journey
+    ws.updated_at = datetime.utcnow()
+
+    await session.commit()
+
+    return {
+        "word": new_word,
+        "stardust_earned": 1,
+        "stardust": new_stardust,
     }

@@ -680,6 +680,20 @@ export async function fetchDashboard(): Promise<unknown> {
   return translateAspectsInResponse(data)
 }
 
+// Refresh «слово дня» за запись в дневник (+1 ⭐, раз в день).
+// Бэк ждёт current_word на КИРИЛЛИЦЕ аспекта (для diary.aspect), но в
+// ответе аспект уже летит через translateAspectsInResponse → латиница.
+export async function refreshWordOfDay(
+  diaryEntry: string,
+  currentWord: string,
+): Promise<unknown> {
+  const data = await request('POST', '/api/dashboard/word-of-day/refresh', {
+    diary_entry: diaryEntry,
+    current_word: currentWord,
+  })
+  return translateAspectsInResponse(data)
+}
+
 // ── Импортированные структуры дневника ──────────────────────────────────
 
 export async function fetchEmotions(minIntensity: number | null = null): Promise<unknown> {

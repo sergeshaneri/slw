@@ -904,6 +904,28 @@ export default function App() {
     return () => unsubscribe()
   }, [])
 
+  // Стардаст-events: аналогично XP — компоненты эмитят `slw:stardust-earned`,
+  // мы показываем toast и инкрементируем journey.stardust локально (бэк уже
+  // увеличил web_state.journey.stardust атомарно).
+  useEffect(() => {
+    let unsubscribe = () => {}
+    import('./utils/xp').then(({ onStardustEarned }) => {
+      unsubscribe = onStardustEarned((award) => {
+        const amount = award.amount ?? 0
+        if (amount <= 0) return
+        setToasts(prev => [...prev, {
+          id: `stardust-${award.source ?? 'reward'}-${Date.now()}`,
+          kind: 'achievement',
+          icon: '✦',
+          title: award.label ?? `+${amount} стардаст`,
+          stardust: amount,
+        }])
+        setJourney(j => ({ ...j, stardust: (j?.stardust ?? 0) + amount }))
+      })
+    })
+    return () => unsubscribe()
+  }, [])
+
   // BackButton от Telegram: показываем стрелку «назад» в шапке TG на всех
   // экранах кроме «домашних» (dashboard, aspects). Клик возвращает на
   // дашборд для залогиненных или aspects для гостей.
@@ -934,14 +956,28 @@ export default function App() {
         const newCodes = profile.newly_unlocked ?? []
         if (newCodes.length === 0) return
         const catalog = new Map((profile.achievements_catalog ?? []).map(a => [a.code, a]))
-        const newToasts: Toast[] = newCodes.map(code => {
+        // Первый раз когда юзер видит ачивку И стардаст — даём пояснение
+        // что это и зачем. Дальше уже не повторяем. Флаг в localStorage
+        // (slw_stardust_explained=1) — переживает logout/login.
+        let stardustExplained = false
+        try { stardustExplained = localStorage.getItem('slw_stardust_explained') === '1' } catch { /* ignore */ }
+        const newToasts: Toast[] = newCodes.map((code, idx) => {
           const meta = catalog.get(code) ?? { code, title: code, icon: '✨', desc: '' }
+          // К первой ачивке (idx=0) добавляем пояснение про стардаст, если
+          // юзер раньше не видел. desc — это короткий текст под заголовком,
+          // позволяет вписать значение валюты.
+          let desc = meta.desc ?? ''
+          if (idx === 0 && !stardustExplained) {
+            const explainer = '✦ Стардаст — внутренняя валюта. Тратится на ИИ-коуча и защиту стрика.'
+            desc = desc ? `${desc}\n\n${explainer}` : explainer
+            try { localStorage.setItem('slw_stardust_explained', '1') } catch { /* ignore */ }
+          }
           return {
             id: `ach-${code}-${Date.now()}`,
             kind: 'achievement',
             icon: meta.icon ?? '✨',
             title: meta.title ?? code,
-            desc: meta.desc,
+            desc,
             stardust: 1,
           }
         })

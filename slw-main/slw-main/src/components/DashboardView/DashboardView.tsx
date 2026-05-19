@@ -6,13 +6,14 @@ import {
   untickHabit,
   postDiaryEntry,
   followUser,
+  refreshWordOfDay,
 } from '../../api/client'
 import MiniWheel from './MiniWheel'
 import Heatmap from '../Heatmap/Heatmap'
 import Hint from '../Onboarding/Hint'
 import DiscoverMore from './DiscoverMore'
 import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
-import { emitXpEarned, type XpAward } from '../../utils/xp'
+import { emitXpEarned, emitStardustEarned, type XpAward } from '../../utils/xp'
 import type { AspectKey, AspectScores } from '@/types/aspect'
 import type { JourneyState } from '@/types/journey'
 import styles from './DashboardView.module.css'
@@ -748,17 +749,70 @@ function reactEmoji(r: string | undefined): string {
 
 function WordOfDayBlock({ wod }: { wod: DashboardWordOfDay }) {
   const [open, setOpen] = useState<boolean>(false)
-  const isWord = wod.kind === 'word' && wod.word
-  const accent = ASPECT_COLORS[wod.aspect] || '#b39ddb'
-  const aspKey = ASPECT_DISPLAY_KEY[wod.aspect] ?? wod.aspect
+  // Локальная подмена слова после refresh — чтобы не дёргать весь dashboard.
+  const [replaced, setReplaced] = useState<DashboardWordOfDay | null>(null)
+  // Состояния формы refresh.
+  const [showRefresh, setShowRefresh] = useState<boolean>(false)
+  const [diaryText, setDiaryText] = useState<string>('')
+  const [submitting, setSubmitting] = useState<boolean>(false)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [refreshedToday, setRefreshedToday] = useState<boolean>(false)
+
+  const current = replaced ?? wod
+  const isWord = current.kind === 'word' && current.word
+  const accent = ASPECT_COLORS[current.aspect] || '#b39ddb'
+  const aspKey = ASPECT_DISPLAY_KEY[current.aspect] ?? current.aspect
+
+  const closeModal = (): void => {
+    setOpen(false)
+    setShowRefresh(false)
+    setRefreshError(null)
+  }
+
+  const handleSubmitRefresh = async (): Promise<void> => {
+    if (submitting) return
+    const text = diaryText.trim()
+    if (text.length < 10) {
+      setRefreshError('Минимум 10 символов в записи')
+      return
+    }
+    setSubmitting(true)
+    setRefreshError(null)
+    try {
+      const resp = (await refreshWordOfDay(text, current.word ?? '')) as {
+        word: DashboardWordOfDay
+        stardust_earned?: number
+      }
+      // Заменяем отображаемое слово на новое.
+      setReplaced(resp.word)
+      setDiaryText('')
+      setShowRefresh(false)
+      // Не закрываем модалку — пусть юзер увидит новое слово сразу.
+      // Toast «+1 стардаст» через event-bus.
+      emitStardustEarned({
+        amount: resp.stardust_earned ?? 1,
+        label: '+1 ⭐ за запись в дневник',
+        source: 'word-of-day-refresh',
+      })
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Не удалось обновить слово'
+      // Бэк возвращает 400 «Сегодня уже обновляли…» — определяем по тексту.
+      if (msg.toLowerCase().includes('сегодня уже')) {
+        setRefreshedToday(true)
+      }
+      setRefreshError(msg)
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   if (!isWord) {
     // Legacy quote format.
     return (
       <blockquote className={styles.quote} style={{ borderLeftColor: accent }}>
-        «{wod.text}»
+        «{current.text}»
         <footer className={styles.quoteFooter}>
-          — {wod.author} ·{' '}
+          — {current.author} ·{' '}
           <span style={{ color: accent }}>{aspKey}</span>
         </footer>
       </blockquote>
@@ -772,20 +826,20 @@ function WordOfDayBlock({ wod }: { wod: DashboardWordOfDay }) {
         className={styles.wordOfDayBtn}
         onClick={() => setOpen(true)}
         style={{ borderLeftColor: accent } as React.CSSProperties}
-        aria-label={`Подробнее про слово «${wod.word}»`}
+        aria-label={`Подробнее про слово «${current.word}»`}
       >
         <div className={styles.wordOfDayHead}>
-          <span className={styles.wordOfDayWord} style={{ color: accent }}>{wod.word}</span>
+          <span className={styles.wordOfDayWord} style={{ color: accent }}>{current.word}</span>
           <span className={styles.wordOfDayAspect} style={{ color: accent }}>· {aspKey}</span>
         </div>
-        <div className={styles.wordOfDayShort}>{wod.short_def}</div>
+        <div className={styles.wordOfDayShort}>{current.short_def}</div>
         <div className={styles.wordOfDayHint}>Тап — полное определение →</div>
       </button>
 
       {open && (
         <div
           className={styles.wordOfDayModal}
-          onClick={() => setOpen(false)}
+          onClick={closeModal}
           role="dialog"
           aria-modal="true"
         >
@@ -793,19 +847,88 @@ function WordOfDayBlock({ wod }: { wod: DashboardWordOfDay }) {
             <button
               type="button"
               className={styles.wordOfDayClose}
-              onClick={() => setOpen(false)}
+              onClick={closeModal}
               aria-label="Закрыть"
             >
               ×
             </button>
             <div className={styles.wordOfDayCardHead} style={{ color: accent }}>
-              {wod.word}
+              {current.word}
             </div>
             <div className={styles.wordOfDayCardMeta}>
               <span style={{ color: accent }}>{aspKey}</span>
-              {wod.group && <span className={styles.muted}> · {wod.group}</span>}
+              {current.group && <span className={styles.muted}> · {current.group}</span>}
             </div>
-            <div className={styles.wordOfDayCardBody}>{wod.long_def}</div>
+            <div className={styles.wordOfDayCardBody}>{current.long_def}</div>
+
+            {/* Refresh-секция: либо кнопка-CTA, либо разворачиваемая форма.
+                После успешного refresh оба скрыты (replaced уже подменён) и
+                юзер видит новое слово; повторный refresh сегодня — 400. */}
+            {!showRefresh && !replaced && !refreshedToday && (
+              <button
+                type="button"
+                className={styles.wordOfDayRefreshCta}
+                onClick={() => setShowRefresh(true)}
+                style={{ color: accent, borderColor: accent } as React.CSSProperties}
+              >
+                ✎ Записать инсайт и сменить слово · +1 ⭐
+              </button>
+            )}
+
+            {refreshedToday && (
+              <div className={styles.wordOfDayRefreshDone}>
+                Сегодня уже сменили слово. Возвращайся завтра ✦
+              </div>
+            )}
+
+            {replaced && (
+              <div className={styles.wordOfDayRefreshDone}>
+                Новое слово на сегодня выше · +1 ⭐ начислен ✦
+              </div>
+            )}
+
+            {showRefresh && !replaced && (
+              <div className={styles.wordOfDayRefreshForm}>
+                <div className={styles.wordOfDayRefreshHint}>
+                  Запиши, что значит «{current.word}» для тебя — или любую
+                  мысль по этому слову. Минимум 10 символов.
+                </div>
+                <textarea
+                  className={styles.wordOfDayRefreshInput}
+                  value={diaryText}
+                  onChange={(e) => setDiaryText(e.target.value)}
+                  placeholder="Твоя запись в дневник…"
+                  maxLength={4000}
+                  rows={4}
+                  autoFocus
+                />
+                {refreshError && (
+                  <div className={styles.wordOfDayRefreshError}>{refreshError}</div>
+                )}
+                <div className={styles.wordOfDayRefreshActions}>
+                  <button
+                    type="button"
+                    className={styles.wordOfDayRefreshCancel}
+                    onClick={() => {
+                      setShowRefresh(false)
+                      setRefreshError(null)
+                    }}
+                    disabled={submitting}
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.wordOfDayRefreshSubmit}
+                    onClick={handleSubmitRefresh}
+                    disabled={submitting || diaryText.trim().length < 10}
+                    style={{ background: accent } as React.CSSProperties}
+                  >
+                    {submitting ? 'Отправляем…' : 'Сохранить и сменить'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

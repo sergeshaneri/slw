@@ -49,3 +49,36 @@ export function onXpEarned(handler: (xp: XpAward) => void): () => void {
   window.addEventListener(EVENT_NAME, wrapped)
   return () => window.removeEventListener(EVENT_NAME, wrapped)
 }
+
+// ── Стардаст-события ────────────────────────────────────────────────────────
+// Аналог XP для стардаста. Используется, когда бэк начислил стардаст
+// (refresh word-of-day, future rewards) — фронт эмитит, App.tsx ловит и:
+//   1) пушит toast «+N ⭐ за …»
+//   2) обновляет journey.stardust локально (чтобы цифра в шапке/кошельке
+//      освежилась без отдельного фетча)
+
+export type StardustAward = {
+  amount: number
+  label?: string
+  source?: string
+}
+
+const STARDUST_EVENT_NAME = 'slw:stardust-earned'
+
+export function emitStardustEarned(award: StardustAward | null | undefined): void {
+  if (!award || !award.amount || award.amount <= 0) return
+  try {
+    window.dispatchEvent(new CustomEvent<StardustAward>(STARDUST_EVENT_NAME, { detail: award }))
+  } catch {
+    // SSR / private-mode — игнорируем.
+  }
+}
+
+export function onStardustEarned(handler: (award: StardustAward) => void): () => void {
+  const wrapped = (e: Event): void => {
+    const ce = e as CustomEvent<StardustAward>
+    if (ce.detail) handler(ce.detail)
+  }
+  window.addEventListener(STARDUST_EVENT_NAME, wrapped)
+  return () => window.removeEventListener(STARDUST_EVENT_NAME, wrapped)
+}
