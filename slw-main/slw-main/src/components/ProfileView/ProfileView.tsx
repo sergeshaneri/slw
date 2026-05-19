@@ -270,6 +270,9 @@ export default function ProfileView({
       }) as MyProfile
       setProfile(updated)
       setSavedAt(Date.now())
+      // Авто-сброс лейбла «Сохранено ✓» через 2.5с. Раньше висел до
+      // следующего сейва — выглядел постоянно «вот-вот сохранил».
+      setTimeout(() => setSavedAt(null), 2500)
       tmaNotify('success')
       // Обновляем аватарку в шапке App-уровня — иначе там остаётся старая
       // (Header читает из App.myAvatar, а не из локального ProfileView state).
@@ -879,6 +882,14 @@ function Section({ label, children }: SectionProps) {
 
 const SHIELD_COST = 50
 
+// «2026-05-23» → «до 23 мая». Если дата невалидная — возвращаем как есть.
+function formatShieldDate(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+}
+
 const STATUS_DESC: Record<string, string> = {
   none:         'Стрик ещё не начался — сделай хоть что-то сегодня (тик практики, запись в дневник, инсайт).',
   ticked_today: 'Стрик сегодня уже подтверждён.',
@@ -979,7 +990,7 @@ function StreakSection({ journey, onJourneyChange }: StreakSectionProps) {
             <div className={styles.muted}>Последняя активность: {data.last_active_date}</div>
           )}
           {shielded && (
-            <div style={{ color: 'var(--accent)' }}>🛡 защита до {data.shield_until}</div>
+            <div style={{ color: 'var(--accent)' }}>🛡 защита до {formatShieldDate(data.shield_until)}</div>
           )}
         </div>
       </div>

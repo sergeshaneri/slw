@@ -106,6 +106,36 @@
   word-wrap: break-word;
 }
 
+/* ─── MdLite (минимальный markdown) ─────────────────────────────
+   Стили для рендеренного отчёта. Header'ы / списки / параграфы.
+   Не претендуем на полноценный typography — только что нужно для
+   чтения weekly/monthly reports. */
+
+.mdRoot {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.mdRoot > * { margin: 0 0 12px; }
+.mdRoot > *:last-child { margin-bottom: 0; }
+
+.mdH1 { font-size: 18px; font-weight: 700; color: var(--text); margin-top: 4px; }
+.mdH2 { font-size: 16px; font-weight: 600; color: var(--text); margin-top: 14px; }
+.mdH3 { font-size: 14px; font-weight: 600; color: var(--accent); margin-top: 10px; }
+
+.mdP { font-size: 13px; color: var(--text-soft); }
+
+.mdList {
+  padding-left: 22px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+.mdList li { margin-bottom: 4px; }
+
+.mdRoot strong { color: var(--text); font-weight: 600; }
+.mdRoot em { color: var(--text); font-style: italic; }
+
 @media (max-width: 600px) {
   .head { grid-template-columns: 1fr auto; gap: 6px; padding: 10px 12px; }
   .period { grid-column: 1 / -1; }

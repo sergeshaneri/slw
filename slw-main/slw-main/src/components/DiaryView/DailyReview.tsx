@@ -318,7 +318,22 @@ export default function DailyReview({ diary, onDiaryChange }: Props) {
               <div className={styles.daySectionBody}>
                 <div className={styles.dayPrompts}>
                   {ASPECT_PROMPTS[aspect].map((p, i) => (
-                    <span key={i} className={styles.dayPromptChip}>{p}</span>
+                    <button
+                      key={i}
+                      type="button"
+                      className={styles.dayPromptChip}
+                      onClick={() => {
+                        // Раньше chips были <span> — юзер ожидал клик и
+                        // не получал реакции. Теперь клик вставляет вопрос
+                        // в textarea (со «»: ») и добавляет двойной перенос
+                        // чтобы юзер сразу писал ответ.
+                        const prefix = text.trim() ? text.trimEnd() + '\n\n' : ''
+                        setAspectText(aspect, `${prefix}«${p}»\n`)
+                      }}
+                      aria-label={`Вставить вопрос: ${p}`}
+                    >
+                      {p}
+                    </button>
                   ))}
                 </div>
                 <textarea

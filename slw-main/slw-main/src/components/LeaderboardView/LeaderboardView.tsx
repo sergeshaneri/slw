@@ -38,7 +38,7 @@ export default function LeaderboardView({ currentUserId, onOpenPublicProfile }: 
         <span className={styles.eyebrow}>Сообщество</span>
         <h1 className={styles.title}>Топ игроков</h1>
         <div className={styles.subline}>
-          XP считается по завершённым шагам путешествия и заданиям.
+          XP начисляется за шаги, пройденные в путешествии.
         </div>
       </div>
 
@@ -47,7 +47,7 @@ export default function LeaderboardView({ currentUserId, onOpenPublicProfile }: 
 
       {!busy && rows.length === 0 && (
         <div className={styles.empty}>
-          Пока никто не закончил ни одного шага. Будь первым в топе!
+          Пока никто не прошёл ни одного шага. Пройди первый — появишься здесь.
         </div>
       )}
 

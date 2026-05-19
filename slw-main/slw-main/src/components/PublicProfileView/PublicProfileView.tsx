@@ -487,10 +487,22 @@ function Section({ label, children }: SectionProps) {
 }
 
 function BackBtn({ onBack }: { onBack?: () => void }) {
-  if (!onBack) return null
+  // Если onBack не передан (deeplink ?u=X — нет «откуда возвращаться»),
+  // даём fallback на главную через перезагрузку без query-параметров.
+  // Юзер не остаётся в тупике на 404-странице.
+  const handleFallback = () => {
+    if (onBack) return onBack()
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('u')
+      window.location.href = url.toString()
+    } catch {
+      window.location.href = '/'
+    }
+  }
   return (
-    <button type="button" className={styles.backBtn} onClick={onBack}>
-      ← Назад
+    <button type="button" className={styles.backBtn} onClick={handleFallback}>
+      ← {onBack ? 'Назад' : 'На главную'}
     </button>
   )
 }

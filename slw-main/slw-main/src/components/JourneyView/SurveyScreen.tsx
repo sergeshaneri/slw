@@ -69,9 +69,21 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
     : null
   const initialValue: number = typeof prevAnswer === 'number' && Number.isFinite(prevAnswer) ? prevAnswer : 5
   const [value, setValue] = useState<number>(initialValue)
-  // Инсайт по конкретному утверждению — сбрасывается на каждом новом вопросе.
+  // Инсайт по конкретному утверждению. Раньше сбрасывался на каждом
+  // переключении idx — юзер написал инсайт, нажал «← Назад» свериться,
+  // вернулся → пусто. Сейчас храним per-statementIndex в Map, восстанавливаем
+  // при возврате. (Persistence только in-memory: на reload теряется, но при
+  // активной сессии анкеты — сохраняется.)
+  const [insightsByIdx, setInsightsByIdx] = useState<Map<number, string>>(() => new Map())
   const [insightOpen, setInsightOpen] = useState<boolean>(false)
-  const [insightText, setInsightText] = useState<string>('')
+  const insightText = insightsByIdx.get(idx) ?? ''
+  const setInsightText = (next: string) => {
+    setInsightsByIdx(prev => {
+      const m = new Map(prev)
+      m.set(idx, next)
+      return m
+    })
+  }
   const [sendKeyMode] = useSendKeyMode()
   // Подсказка-тултип: показывается на стартовых вопросах, закрывается крестиком
   // (запоминается в localStorage), и поднимается на ховер через 3 сек.
@@ -83,8 +95,9 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
 
   useEffect(() => {
     setValue(initialValue)
-    setInsightOpen(false)
-    setInsightText('')
+    // insightOpen: если для этого idx уже есть сохранённый инсайт — открываем
+    // textarea заново (он не пустой). Иначе закрыто, ждём явного клика.
+    setInsightOpen((insightsByIdx.get(idx) ?? '').length > 0)
     setHintHover(false)
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -223,6 +223,43 @@
   padding: 0 4px;
 }
 
+/* Password row — input с toggle 👁 справа. Кнопка не отдельная строкой,
+   а сидит абсолютно справа поверх input'а — поэтому .passwordRow position:relative. */
+.passwordRow {
+  position: relative;
+  width: 100%;
+}
+
+.passwordRow .input {
+  /* Отступ справа под кнопку-глаз. */
+  padding-right: 48px;
+}
+
+.passwordToggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  font-size: 17px;
+  cursor: pointer;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, color .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.passwordToggle:hover {
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.85);
+}
+
 /* Support-textarea: переопределяем стандартный .input на multi-line.
    resize:none — расти будет за счёт rows/максимальной высоты. */
 .supportTextarea {

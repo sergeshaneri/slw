@@ -252,18 +252,33 @@
 
 /* ── Wheel + scores ─────────────────────────── */
 
+/* На мобиле 8 чипов в flex-wrap расходились на 2-3 ряда с разной шириной,
+   длинные значения «БС 10.0» обрезались. Grid 4×2 даёт ровные колонки и
+   фиксированную ширину каждого чипа. */
 .scoresLine {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
   margin-top: 12px;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+  min-width: 0;
 }
 
 .scoreChip {
   font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (min-width: 720px) {
+  /* На широком экране возвращаем горизонтальный ряд — там места хватает. */
+  .scoresLine {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+  }
 }
 
 .activeAspectRow {

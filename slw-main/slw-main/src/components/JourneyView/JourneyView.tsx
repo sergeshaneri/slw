@@ -660,12 +660,16 @@ export default function JourneyView({
       await addBotMessage(ONBOARDING[step + 1].text, 700)
       setState(s => ({ ...s, onboardingStep: step + 1 }))
     } else if (step === 3) {
-      await addBotMessage(
-        'Готово. Сейчас покажу Карту Планет — выбери, с какого аспекта хочешь начать.',
-        900
-      )
-      setState(s => ({ ...s, onboardingStep: 4 }))
+      // Раньше тут был extra-шаг 4 с промежуточным сообщением «Готово.
+      // Сейчас покажу Карту Планет...» + ещё один клик. Получалось 5 экранов
+      // на 4-step онбординг. Теперь — прямой переход на Карту Планет сразу
+      // после клика на 4-м сообщении. Жанровый bot-говорит-«сейчас покажу»
+      // не нужен: planet map сама себя представит.
+      setState(s => ({ ...s, onboardingStep: 4, screen: 'planets' }))
     } else if (step === 4) {
+      // Этот случай теоретически не достижим (step=4 → screen='planets'
+      // → Onboarding не рендерится). Оставлен как safety-net на случай
+      // ручного state-эдита.
       setState(s => ({ ...s, screen: 'planets' }))
     }
   }, [state.onboardingStep, addBotMessage, addUserMessage, setState])

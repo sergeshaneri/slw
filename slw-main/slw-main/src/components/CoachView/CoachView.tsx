@@ -69,6 +69,13 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
   const [historyOpen, setHistoryOpen] = useState(false)
   const [response, setResponse] = useState<CoachResponseState | null>(null)
   const [savedToDiary, setSavedToDiary] = useState(false)
+  // Длинный ответ LLM (>600 симв) сворачиваем до первых ~6 строк по умолчанию.
+  // Раньше юзер получал 3000-5000 символов простыней — приходилось скроллить
+  // полстраницы. Тут collapse-by-default + «Развернуть» CTA.
+  const [responseExpanded, setResponseExpanded] = useState<boolean>(false)
+  // Когда приходит новый ответ — сбрасываем expanded, чтобы новый длинный
+  // ответ снова показался свёрнутым (а не из-за residual флага из прошлого).
+  useEffect(() => { setResponseExpanded(false) }, [response?.text])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sendKeyMode] = useSendKeyMode()
@@ -272,7 +279,38 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
               {savedToDiary ? 'Сохранено ✓' : 'Сохранить в дневник'}
             </button>
           </div>
-          <div className={styles.responseText}>{response.text}</div>
+          {(() => {
+            const text = response.text ?? ''
+            const COLLAPSE_THRESHOLD = 600
+            const isLong = text.length > COLLAPSE_THRESHOLD
+            if (!isLong || responseExpanded) {
+              return <div className={styles.responseText}>{text}</div>
+            }
+            // Свёрнуто: показываем первые ~6 строк через line-clamp фолбэк +
+            // hard truncate для текстов без переносов.
+            const shortened = text.slice(0, COLLAPSE_THRESHOLD).trimEnd() + '…'
+            return (
+              <>
+                <div className={styles.responseText}>{shortened}</div>
+                <button
+                  type="button"
+                  onClick={() => setResponseExpanded(true)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--accent, #b39ddb)',
+                    cursor: 'pointer',
+                    padding: '8px 0 0',
+                    font: 'inherit',
+                    fontSize: 13,
+                    textDecoration: 'underline',
+                  }}
+                >
+                  Развернуть полностью ({text.length.toLocaleString('ru-RU')} символов)
+                </button>
+              </>
+            )
+          })()}
         </div>
       )}
 

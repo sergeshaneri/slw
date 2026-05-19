@@ -299,7 +299,10 @@ export default function DashboardView({
       {/* ── Шапка ──────────────────────────────── */}
       <div className={styles.greetRow}>
         <div>
-          <div className={styles.greet}>{greet}, {data.user.display_name}</div>
+          <div className={styles.greet}>
+            {/* Если display_name пуст — без висящей запятой. */}
+            {data.user.display_name ? `${greet}, ${data.user.display_name}` : greet}
+          </div>
           <div className={styles.muted}>{prettyDate(data.today)}</div>
         </div>
         <div className={styles.streakBlock} style={{ color: streakColor }}>

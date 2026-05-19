@@ -80,6 +80,11 @@ export default function AuthModal({ onSuccess, onClose, user = null, initialMode
   // Reset-confirm
   const [newPassword, setNewPassword] = useState<string>('')
 
+  // Toggle «показать пароль» — стандарт UX, особенно на мобиле где
+  // клавиатура не предлагает повторный ввод. Один toggle на все
+  // password-поля в модале (в одной сессии всё либо видимое либо нет).
+  const [showPassword, setShowPassword] = useState<boolean>(false)
+
   // Support
   const [supportMessage, setSupportMessage] = useState<string>('')
   const [supportContact, setSupportContact] = useState<string>('')
@@ -370,15 +375,26 @@ export default function AuthModal({ onSuccess, onClose, user = null, initialMode
               required
               autoComplete="email"
             />
-            <input
-              className={styles.input}
-              type="password"
-              placeholder="Пароль"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              autoComplete={mode === 'login' && !isAddingEmail ? 'current-password' : 'new-password'}
-            />
+            <div className={styles.passwordRow}>
+              <input
+                className={styles.input}
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Пароль"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                autoComplete={mode === 'login' && !isAddingEmail ? 'current-password' : 'new-password'}
+              />
+              <button
+                type="button"
+                className={styles.passwordToggle}
+                onClick={() => setShowPassword(v => !v)}
+                aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                title={showPassword ? 'Скрыть' : 'Показать'}
+              >
+                {showPassword ? '🙈' : '👁'}
+              </button>
+            </div>
             <button className={styles.btn} type="submit" disabled={loading}>
               {loading ? '...' : title}
             </button>
@@ -407,17 +423,28 @@ export default function AuthModal({ onSuccess, onClose, user = null, initialMode
         {/* Reset-confirm form (new password) */}
         {mode === 'reset-confirm' && (
           <form onSubmit={handleResetConfirm} className={styles.form}>
-            <input
-              className={styles.input}
-              type="password"
-              placeholder="Новый пароль (от 6 символов)"
-              value={newPassword}
-              onChange={e => setNewPassword(e.target.value)}
-              required
-              autoComplete="new-password"
-              autoFocus
-              minLength={6}
-            />
+            <div className={styles.passwordRow}>
+              <input
+                className={styles.input}
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Новый пароль (от 6 символов)"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+                autoFocus
+                minLength={6}
+              />
+              <button
+                type="button"
+                className={styles.passwordToggle}
+                onClick={() => setShowPassword(v => !v)}
+                aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                title={showPassword ? 'Скрыть' : 'Показать'}
+              >
+                {showPassword ? '🙈' : '👁'}
+              </button>
+            </div>
             <button className={styles.btn} type="submit" disabled={loading || newPassword.length < 6}>
               {loading ? '...' : 'Сменить пароль'}
             </button>
