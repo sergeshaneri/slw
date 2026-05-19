@@ -353,6 +353,36 @@ class AspectMessage(Base):
     created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
 
 
+class AspectSubscription(Base):
+    """Подписка юзера на аспект — даёт активность из холла в Ленту.
+    Отдельная сущность от public_profiles.focus_aspects (тот — display-тег,
+    эта — реальный source активности в /api/community/feed).
+    PK по (web_user_id, aspect), один follow на пару.
+    aspect — кириллица (как в остальной aspect-storage на бэке).
+    """
+    __tablename__ = "aspect_subscriptions"
+
+    web_user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("web_users.id"), primary_key=True
+    )
+    aspect: Mapped[str] = mapped_column(Text, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
+class InsightComment(Base):
+    """Комментарий под опубликованным инсайтом. В отличие от insight_likes.comment
+    (опц. строка внутри реакции), это полноценная ветка обсуждения: несколько
+    комментов от разных юзеров под одним инсайтом, DESC by created_at.
+    """
+    __tablename__ = "insight_comments"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    insight_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("aspect_insights.id"))
+    web_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("web_users.id"))
+    text: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
+
+
 class Bookmark(Base):
     """Закладка юзера на сущность («сохранить себе»).
     kind = 'insight' | 'message' (пока только insight).

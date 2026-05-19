@@ -13,6 +13,6 @@ export type ViewName =
   | 'public-profile'
   | 'settings'
   | 'admin'
-  | 'leaderboard'
+  | 'community'
   | 'dm'
   | 'search'

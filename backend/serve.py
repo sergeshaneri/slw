@@ -568,6 +568,41 @@ async def apply_ddl() -> None:
     except Exception as e:
         log.warning("user_aspect_state DDL failed: %s", e)
 
+    # Community: подписки на аспект + комментарии под инсайтами.
+    # Отдельная транзакция + timeout, чтобы один из CREATE TABLE не валил
+    # старт всего сервиса (паттерн по проекту).
+    try:
+        async with asyncio.timeout(15):
+            async with engine.connect() as conn:
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS aspect_subscriptions (
+                        web_user_id  INTEGER NOT NULL,
+                        aspect       TEXT NOT NULL,
+                        created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (web_user_id, aspect)
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS aspect_subscriptions_aspect_idx "
+                    "ON aspect_subscriptions (aspect)"
+                ))
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS insight_comments (
+                        id           BIGSERIAL PRIMARY KEY,
+                        insight_id   BIGINT NOT NULL,
+                        web_user_id  INTEGER NOT NULL,
+                        text         TEXT NOT NULL,
+                        created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS insight_comments_insight_idx "
+                    "ON insight_comments (insight_id, created_at)"
+                ))
+                await conn.commit()
+    except Exception as e:
+        log.warning("community DDL (aspect_subscriptions/insight_comments) failed: %s", e)
+
     await engine.dispose()
 
 

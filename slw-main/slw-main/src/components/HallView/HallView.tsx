@@ -1281,6 +1281,107 @@ function DiscussCuratedItem({ aspect, quoteBlock, itemLabel }: DiscussCuratedIte
   )
 }
 
+// ── TrendingBlock — топ-3 инсайта + топ-3 best Q&A за 7 дней ────────────────
+
+type TrendingInsight = {
+  id: number
+  text: string
+  user_id: number
+  display_name: string
+  avatar?: string | null
+  likes: number
+  created_at: string
+}
+
+type TrendingQA = {
+  id: number
+  text: string
+  user_id: number
+  display_name: string
+  avatar?: string | null
+  created_at: string
+}
+
+function TrendingBlock({
+  aspect,
+  onOpenProfile,
+}: {
+  aspect: AspectKey
+  onOpenProfile?: (userId: number | string) => void
+}) {
+  const [insights, setInsights] = useState<TrendingInsight[]>([])
+  const [qa, setQa] = useState<TrendingQA[]>([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchHallTrending(aspect)
+      .then((data) => {
+        if (cancelled) return
+        setInsights((data.insights ?? []) as TrendingInsight[])
+        setQa((data.qa ?? []) as TrendingQA[])
+        setLoaded(true)
+      })
+      .catch(() => { if (!cancelled) setLoaded(true) })
+    return () => { cancelled = true }
+  }, [aspect])
+
+  // Скрываем блок если за неделю в холле ничего не происходило — иначе
+  // юзер видел бы пустую плашку «Trending» под чатом, что выглядит мёртво.
+  if (!loaded) return null
+  if (insights.length === 0 && qa.length === 0) return null
+
+  return (
+    <Section label="✦ Trending за неделю">
+      {insights.length > 0 && (
+        <div className={styles.trendingGroup}>
+          <div className={styles.trendingGroupLabel}>Топ инсайтов</div>
+          {insights.map(it => (
+            <div key={`ins-${it.id}`} className={styles.trendingCard}>
+              <div className={styles.trendingHead}>
+                <span className={styles.commentAvatar}>{it.avatar || '🧑'}</span>
+                <button
+                  type="button"
+                  className={styles.previewName}
+                  onClick={() => onOpenProfile?.(it.user_id)}
+                >
+                  {it.display_name}
+                </button>
+                {it.likes > 0 && (
+                  <span className={styles.trendingLikes}>♥ {it.likes}</span>
+                )}
+              </div>
+              <div className={styles.trendingText}>{it.text}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {qa.length > 0 && (
+        <div className={styles.trendingGroup}>
+          <div className={styles.trendingGroupLabel}>Лучшие ответы</div>
+          {qa.map(it => (
+            <div key={`qa-${it.id}`} className={styles.trendingCard}>
+              <div className={styles.trendingHead}>
+                <span className={styles.commentAvatar}>{it.avatar || '🧑'}</span>
+                <button
+                  type="button"
+                  className={styles.previewName}
+                  onClick={() => onOpenProfile?.(it.user_id)}
+                >
+                  {it.display_name}
+                </button>
+                <span className={styles.trendingLikes}>✦ best</span>
+              </div>
+              <div className={styles.trendingText}>{it.text}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Section>
+  )
+}
+
 // ── InsightComments — раскрываемая ветка комментов под одним инсайтом ────────
 
 type InsightCommentRow = {

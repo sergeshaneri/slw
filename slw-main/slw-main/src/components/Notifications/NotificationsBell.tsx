@@ -14,7 +14,7 @@ const POLL_MS = 30_000
 // payload разное для каждого type — внутри describe() мы разбираем его как
 // частичный object с известными ключами.
 // NOTE(ts): pending backend response_model for /api/notifications.
-type NotificationType = 'reaction' | 'follow' | 'dm' | 'hall_reply' | 'achievement'
+type NotificationType = 'reaction' | 'follow' | 'dm' | 'hall_reply' | 'achievement' | 'insight_comment'
 
 type NotificationPayload = {
   actor_id?: number
@@ -44,6 +44,7 @@ const TYPE_LABEL: Record<string, string> = {
   dm:       '💬 сообщение',
   hall_reply: '✦ в холле',
   achievement: '🏆 достижение',
+  insight_comment: '✎ комментарий',
 }
 
 type Props = {
@@ -178,6 +179,8 @@ function describe(n: NotificationItem): string {
     }
     case 'achievement':
       return `Разблокировано: ${p.title ?? p.code ?? '—'}`
+    case 'insight_comment':
+      return `${p.actor_name ?? 'Кто-то'} прокомментировал твой инсайт${p.preview ? `: «${trim(p.preview, 60)}»` : ''}`
     default:
       return JSON.stringify(p).slice(0, 100)
   }

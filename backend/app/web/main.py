@@ -10,6 +10,7 @@ from app.web.routes.admin import router as admin_router
 from app.web.routes.auth import router as auth_router
 from app.web.routes.bookmarks import router as bookmarks_router
 from app.web.routes.coach import router as coach_router
+from app.web.routes.community import router as community_router
 from app.web.routes.dashboard import router as dashboard_router
 from app.web.routes.diary import router as diary_router
 from app.web.routes.dm import router as dm_router
@@ -74,6 +75,7 @@ app.include_router(dashboard_router, prefix="/api")
 app.include_router(sync_vault_router, prefix="/api")
 app.include_router(onboarding_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
+app.include_router(community_router, prefix="/api")
 
 
 @app.get("/healthz")

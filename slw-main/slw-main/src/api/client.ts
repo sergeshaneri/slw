@@ -676,6 +676,92 @@ export async function fetchLeaderboard(limit: number = 20): Promise<unknown> {
   return translateAspectsInResponse(data)
 }
 
+// ── Community: подписка на аспект ─────────────────────────────────────────────
+// Бэк хранит aspect-ключи кириллицей (см. CLAUDE.md), фронт работает в латинице.
+// translateAspectsInResponse возвращает массив строк уже на латинице.
+// 404 на старом бэке — graceful empty (фронт работает без новых эндпоинтов).
+
+export async function fetchSubscribedAspects(): Promise<AspectKey[]> {
+  try {
+    const data = await request('GET', '/api/community/aspects-subscribed')
+    const translated = translateAspectsInResponse(data) as
+      | { aspects?: string[] }
+      | string[]
+      | null
+      | undefined
+    const list = Array.isArray(translated) ? translated : translated?.aspects ?? []
+    return list as AspectKey[]
+  } catch {
+    return []
+  }
+}
+
+export async function subscribeToAspect(aspect: AspectKey | string): Promise<unknown> {
+  return request('POST', '/api/community/aspect-sub', { aspect: latToCyr(aspect) })
+}
+
+export async function unsubscribeFromAspect(aspect: AspectKey | string): Promise<unknown> {
+  return request('DELETE', `/api/community/aspect-sub/${encodeURIComponent(latToCyr(aspect))}`)
+}
+
+// ── Community: лента подписок ────────────────────────────────────────────────
+
+export async function fetchCommunityFeed(offset: number = 0, limit: number = 30): Promise<unknown[]> {
+  try {
+    const data = await request('GET', `/api/community/feed?offset=${offset}&limit=${limit}`)
+    const translated = translateAspectsInResponse(data) as
+      | { items?: unknown[] }
+      | unknown[]
+      | null
+      | undefined
+    const items = Array.isArray(translated) ? translated : translated?.items ?? []
+    return items as unknown[]
+  } catch {
+    return []
+  }
+}
+
+// ── Community: trending в холле (Фаза 5) ─────────────────────────────────────
+
+export async function fetchHallTrending(aspect: AspectKey | string): Promise<{
+  insights: unknown[]
+  qa: unknown[]
+}> {
+  try {
+    const data = await request('GET', `/api/community/trending/${encodeURIComponent(latToCyr(aspect))}`)
+    const obj = (data ?? {}) as { insights?: unknown[]; qa?: unknown[] }
+    return { insights: obj.insights ?? [], qa: obj.qa ?? [] }
+  } catch {
+    return { insights: [], qa: [] }
+  }
+}
+
+// ── Community: комментарии под инсайтами (Фаза 4) ────────────────────────────
+
+export async function fetchInsightComments(insightId: number | string): Promise<unknown[]> {
+  try {
+    const data = await request('GET', `/api/insights/${insightId}/comments`)
+    const arr = Array.isArray(data) ? data : (data as { items?: unknown[] } | null)?.items ?? []
+    return arr as unknown[]
+  } catch {
+    return []
+  }
+}
+
+export async function postInsightComment(
+  insightId: number | string,
+  text: string,
+): Promise<unknown> {
+  return request('POST', `/api/insights/${insightId}/comments`, { text })
+}
+
+export async function deleteInsightComment(
+  insightId: number | string,
+  commentId: number | string,
+): Promise<unknown> {
+  return request('DELETE', `/api/insights/${insightId}/comments/${commentId}`)
+}
+
 // ── Coach (AI summon) ─────────────────────────────────────────────────────────
 
 export async function fetchCoachQuota(): Promise<unknown> {

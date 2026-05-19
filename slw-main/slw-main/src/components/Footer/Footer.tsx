@@ -1,9 +1,10 @@
 import styles from './Footer.module.css'
 
 const LINKS = [
-  { href: 'https://t.me/SergeyShaneri',                      label: 'Обсудить с автором' },
-  { href: 'https://sergeshaneri.github.io/Socionics/',       label: 'Узнать свой тип' },
-  { href: 'https://sergeshaneri.github.io/socionics-wiki/',  label: 'Соционика-вики' },
+  { href: 'https://sergeshaneri.github.io/socionics-wiki/thanks/', label: 'Поблагодарить' },
+  { href: 'https://sergeshaneri.github.io/Socionics/',             label: 'Узнать свой тип' },
+  { href: 'https://sergeshaneri.github.io/socionics-wiki/',        label: 'Соционика-вики' },
+  { href: 'https://t.me/SergeyShaneri',                            label: 'Обсудить с автором' },
 ]
 
 export default function Footer() {

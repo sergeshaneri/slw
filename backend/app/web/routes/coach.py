@@ -187,14 +187,16 @@ async def _build_user_context(session: AsyncSession, user: WebUser, focus_aspect
     if progress_lines:
         parts.append("## Прогресс\n" + "\n".join(progress_lines))
 
-    # Последние 5 записей дневника (web + bot, объединённо).
+    # Последние записи дневника (web + bot, объединённо). Пока юзеров мало,
+    # подаём щедро (25) — контекст коуча сильно выигрывает от длинной ленты.
+    DIARY_LIMIT = 25
     diary_items: list[tuple[datetime, str, str | None]] = []
     web_diary = (
         await session.execute(
             select(WebDiaryEntry)
             .where(WebDiaryEntry.web_user_id == user.id)
             .order_by(WebDiaryEntry.created_at.desc())
-            .limit(5)
+            .limit(DIARY_LIMIT)
         )
     ).scalars().all()
     for r in web_diary:
@@ -205,13 +207,13 @@ async def _build_user_context(session: AsyncSession, user: WebUser, focus_aspect
                 select(DiaryEntry)
                 .where(DiaryEntry.user_id == user.telegram_id)
                 .order_by(DiaryEntry.created_at.desc())
-                .limit(5)
+                .limit(DIARY_LIMIT)
             )
         ).scalars().all()
         for r in bot_diary:
             diary_items.append((r.created_at, r.text, r.aspect))
     diary_items.sort(key=lambda x: x[0], reverse=True)
-    diary_items = diary_items[:5]
+    diary_items = diary_items[:DIARY_LIMIT]
     if diary_items:
         diary_block = "\n".join(
             f"— [{ts:%Y-%m-%d}] " + (f"({asp}) " if asp else "") + _trim(text, 250)

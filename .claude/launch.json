@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fe-mobile",
+      "runtimeExecutable": "cmd.exe",
+      "runtimeArgs": ["/d", "/c", "cd /d slw-main\\slw-main && npx vite --port 5174 --strictPort --host 127.0.0.1"],
+      "port": 5174
+    }
+  ]
+}

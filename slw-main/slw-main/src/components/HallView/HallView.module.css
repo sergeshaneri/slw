@@ -71,6 +71,14 @@
   font-style: italic;
 }
 
+.heroActions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.heroActions .habitBtn { margin-top: 0; }
+
 .habitBtn {
   margin-top: 10px;
   background: transparent;
@@ -929,4 +937,136 @@
 .collapseBody .section {
   background: var(--surface);
   border-color: rgba(255,255,255,0.04);
+}
+
+/* ── Insight comments ─────────────────────────────────── */
+
+.commentsBlock {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+
+.commentsToggle {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.commentsToggle:hover { color: var(--accent); }
+
+.commentsBody {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.commentRow {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.commentAvatar { font-size: 18px; line-height: 1.2; }
+.commentMain { flex: 1; min-width: 0; }
+.commentText {
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: var(--text);
+}
+.commentDelete {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 6px;
+}
+.commentDelete:hover { color: var(--danger); }
+
+.commentComposer {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin-top: 4px;
+}
+.commentTextarea {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  resize: vertical;
+  min-height: 38px;
+}
+.commentTextarea:focus { border-color: var(--accent); outline: none; }
+.commentSubmit {
+  background: var(--accent);
+  border: none;
+  color: #1a1622;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.commentSubmit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Trending ─────────────────────────────────────────── */
+
+.trendingGroup {
+  margin-bottom: 14px;
+}
+.trendingGroup:last-child { margin-bottom: 0; }
+
+.trendingGroupLabel {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.trendingCard {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.trendingCard:last-child { margin-bottom: 0; }
+
+.trendingHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.trendingLikes {
+  margin-left: auto;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.trendingText {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }

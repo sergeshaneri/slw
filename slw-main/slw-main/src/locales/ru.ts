@@ -10,7 +10,7 @@ export const ru = {
     diary: '✎ Дневник',
     coach: '✦ Коуч',
     profile: '☆ Профиль',
-    leaderboard: '⚜ Топ',
+    community: '✌ Общение',
     dm: '✉ Сообщения',
     search: '🔍 Поиск',
     settings: '⚙ Настройки',

@@ -1,0 +1,214 @@
+.container {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 0 4px;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-bottom: 16px;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  background: transparent;
+  border: none;
+  color: rgba(233, 234, 238, 0.6);
+  padding: 10px 14px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.tab:hover { color: #e9eaee; }
+.tabActive {
+  color: #e9eaee;
+  border-bottom-color: var(--accent, #9d4edd);
+}
+
+.body { padding: 4px 0 32px; }
+
+.sectionTitle {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 4px 0 6px;
+  color: #e9eaee;
+}
+.sectionSub {
+  color: rgba(233, 234, 238, 0.6);
+  font-size: 14px;
+  margin: 0 0 18px;
+}
+
+/* ── Halls grid ───────────────────────────────────────── */
+
+.hallGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.hallCard {
+  background: var(--surface, #15161c);
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+  border-radius: 14px;
+  padding: 16px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.hallCard:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--surface, #15161c) 92%, white 8%);
+}
+
+.hallCode {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.hallName {
+  font-size: 17px;
+  font-weight: 600;
+  color: #e9eaee;
+  margin-top: 2px;
+}
+.hallSub {
+  font-size: 13px;
+  color: rgba(233, 234, 238, 0.55);
+}
+
+/* ── Auth gate ────────────────────────────────────────── */
+
+.authGate {
+  background: var(--surface, #15161c);
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+  border-radius: 14px;
+  padding: 28px;
+  text-align: center;
+  margin-top: 12px;
+}
+.authTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #e9eaee;
+  margin-bottom: 6px;
+}
+.authText {
+  color: rgba(233, 234, 238, 0.65);
+  font-size: 14px;
+  margin-bottom: 18px;
+}
+.authBtn {
+  background: var(--accent, #9d4edd);
+  border: none;
+  color: #1a1622;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.authBtn:hover { filter: brightness(1.06); }
+
+/* ── Feed ─────────────────────────────────────────────── */
+
+.feedList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feedCard {
+  background: var(--surface, #15161c);
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.feedHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.feedAuthor {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.feedAvatar { font-size: 22px; line-height: 1; }
+.feedName {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e9eaee;
+}
+
+.feedAspect {
+  background: transparent;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.feedText {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #e9eaee;
+  white-space: pre-wrap;
+}
+
+.feedMeta {
+  margin-top: 10px;
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(233, 234, 238, 0.45);
+}
+
+/* ── Empty / busy ─────────────────────────────────────── */
+
+.empty {
+  background: var(--surface, #15161c);
+  border: 1px dashed var(--line, rgba(255, 255, 255, 0.08));
+  border-radius: 14px;
+  padding: 32px;
+  text-align: center;
+  color: rgba(233, 234, 238, 0.7);
+}
+.emptyTitle {
+  font-size: 17px;
+  font-weight: 600;
+  color: #e9eaee;
+  margin-bottom: 6px;
+}
+.emptyText {
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(233, 234, 238, 0.6);
+}
