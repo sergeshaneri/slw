@@ -50,7 +50,16 @@
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid rgba(255, 255, 255, 0.06);
+  /* На узких экранах табов (Записи/Сегодня/Поиск/Эмоции/Тренировки/Отчёты/Sync)
+     не помещается — позволяем горизонтальный скролл с iOS momentum.
+     Скроллбар прячем (на мобиле он не нужен — есть свайп). */
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+
+.tabRow::-webkit-scrollbar { display: none; }
 
 .tabBtn {
   background: transparent;
@@ -64,6 +73,10 @@
   border-radius: 999px;
   cursor: pointer;
   transition: color .15s, background .15s;
+  /* Не даём кнопкам сжиматься при overflow-x — каждая остаётся читаемой
+     по своему контенту, а ряд скроллится. */
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .tabBtn:hover:not(.tabBtnActive) {
