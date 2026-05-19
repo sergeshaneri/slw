@@ -149,10 +149,18 @@ export default function Header({
           стрелки — позиция логотипа фиксирована, back возникает справа от него,
           поближе к nav-кнопкам (активной зоне). */}
       <div className={styles.headerLeft}>
-        <div className={styles.title}>
+        {/* Логотип — кнопка «на главную». Для залогиненных это дашборд,
+            для гостей — Аспекты (их «дом», т.к. дашборд гейтится). */}
+        <button
+          type="button"
+          className={styles.title}
+          onClick={() => onViewChange(user ? 'dashboard' : 'aspects')}
+          aria-label="На главную"
+          title="На главную"
+        >
           <div className={styles.subtitle}>{t.app.title}</div>
           <div className={styles.mainTitle}>{t.app.subtitle}</div>
-        </div>
+        </button>
         {canGoBack && onGoBack && (
           <button
             type="button"

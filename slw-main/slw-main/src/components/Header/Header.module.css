@@ -90,11 +90,39 @@
 }
 
 /* Заголовок слева. */
+/* Логотип — кнопка «на главную». Визуально остаётся текстовой колонкой,
+   но имеет cursor:pointer и лёгкий hover-фон. Button-default reset нужен,
+   иначе браузер добавит border/background/padding. */
 .title {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  /* Reset native button styling */
+  background: transparent;
+  border: none;
+  padding: 6px 8px;
+  margin: -6px -8px; /* компенсируем padding, чтобы layout не сместился */
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.title:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.title:active {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.title:focus-visible {
+  outline: 2px solid rgba(199, 125, 255, 0.5);
+  outline-offset: 2px;
 }
 
 .subtitle {
