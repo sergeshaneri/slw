@@ -23,6 +23,10 @@ import AuthModal from './components/Auth/AuthModal'
 import WelcomeScreen from './components/Welcome/WelcomeScreen'
 import Footer from './components/Footer/Footer'
 import { ConfirmProvider } from './components/Confirm/ConfirmProvider'
+import {
+  readGuestProgress, hasMeaningfulGuestProgress,
+  mergeJourneys, mergeScores, clearGuestProgress,
+} from './utils/guestProgressMigration'
 import { isTMA } from './tma'
 import { useBackButton } from './tma/hooks'
 import { ASPECT_KEYS } from './data/aspects'
@@ -558,12 +562,90 @@ export default function App() {
         }
       }
 
-      if (journeyOverride) {
-        setJourney(j => ({ ...j, ...(journeyOverride as JourneyState) }))
+      // Гостевой прогресс из localStorage — мерджим в свежий API-state и
+      // пушим обратно. Max-стратегия не разрушает данные: если на аккаунте
+      // уже было прогрессировано — guest добавляет только то, чего не было
+      // (см. utils/guestProgressMigration.ts). После успешного push'а
+      // localStorage стирается.
+      const guest = readGuestProgress()
+      const willMigrate = hasMeaningfulGuestProgress(guest)
+      let journeyForState: JourneyState | null =
+        journeyOverride ? (journeyOverride as JourneyState) : null
+      let scoresForState: AspectScores | null =
+        Object.keys(scoresRes).length > 0 ? (scoresRes as AspectScores) : null
+
+      if (willMigrate && guest) {
+        const merged = mergeJourneys(journeyForState, guest.journey)
+        const mergedScores = mergeScores(scoresForState, guest.scores)
+        journeyForState = merged
+        scoresForState = mergedScores
+
+        // Пушим merged-state на бэк. Дебаунс/queue в saveStateGuarded.
+        try {
+          await saveStateGuarded({ journey: merged })
+          await apiSaveScores(mergedScores as Record<string, number>)
+        } catch (e) {
+          console.error('guest migration: save state/scores failed', e)
+        }
+
+        // Пушим гостевые записи дневника. Они уже могут быть в diaryRes
+        // (если юзер раньше логинился и писал на бэк), но обычно нет —
+        // гость не имел токена. Без дедупа: bek сам выдаёт новые id,
+        // юзер увидит свои записи (плюс возможные пары если уже были
+        // одинаковые тексты — пусть лучше дубли чем потеря).
+        for (const entry of guest.diary) {
+          try {
+            await postDiaryEntry({
+              text: entry.text,
+              aspect: entry.aspect,
+              source: entry.source ?? 'guest-migration',
+              extra: {
+                scriptId: entry.scriptId ?? null,
+                promptTitle: entry.promptTitle ?? null,
+                prompt: entry.prompt ?? null,
+                survey: entry.survey ?? null,
+              },
+            })
+          } catch (e) {
+            console.error('guest migration: diary entry failed', e)
+          }
+        }
+
+        // Свежий пересчёт diary с бэка (получим новые id для UI).
+        try {
+          const fresh = await fetchDiary() as DiaryRow[]
+          diaryRes.length = 0
+          diaryRes.push(...fresh)
+        } catch (e) {
+          console.error('guest migration: refetch diary failed', e)
+        }
+
+        // Стираем гостевые ключи. Если юзер выйдет — начнёт с чистого
+        // листа, не получит дубль миграции при следующем логине.
+        clearGuestProgress()
+
+        // Toast — даём знать что произошло. Тост короткий, не показываем
+        // числа (juzer и так это видит на дашборде).
+        const { xp, totalCompleted, diaryCount } = guest.summary
+        const parts: string[] = []
+        if (xp > 0) parts.push(`${xp} XP`)
+        if (totalCompleted > 0) parts.push(`${totalCompleted} ${totalCompleted === 1 ? 'шаг' : 'шагов'}`)
+        if (diaryCount > 0) parts.push(`${diaryCount} ${diaryCount === 1 ? 'запись' : 'записей'}`)
+        setToasts(prev => [...prev, {
+          id: `migrate-${Date.now()}`,
+          kind: 'info',
+          icon: '🎁',
+          title: 'Прогресс перенесён в аккаунт',
+          desc: parts.length > 0 ? parts.join(' · ') : 'Твои данные сохранены.',
+        }])
+      }
+
+      if (journeyForState) {
+        setJourney(j => ({ ...j, ...journeyForState! }))
       }
       if (stateRes.history) setHistory(stateRes.history as unknown[])
-      if (Object.keys(scoresRes).length > 0) {
-        setScores(scoresRes as AspectScores)
+      if (scoresForState) {
+        setScores(scoresForState)
       }
 
       if (diaryRes.length > 0) {
