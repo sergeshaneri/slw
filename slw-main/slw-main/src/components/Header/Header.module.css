@@ -1,9 +1,15 @@
-/* Шапка: лёгкое стекло, узкая градиентная полоска снизу. */
+/* Шапка: лёгкое стекло, узкая градиентная полоска снизу.
+   safe-area-inset-top — отступ под dynamic island / notch у iPhone.
+   На устройствах без выреза env() = 0, паддинг становится исходным 14px. */
 .header {
   position: sticky;
   top: 0;
   z-index: 100;
-  padding: 14px 24px;
+  padding:
+    calc(14px + env(safe-area-inset-top))
+    max(24px, env(safe-area-inset-right))
+    14px
+    max(24px, env(safe-area-inset-left));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -239,21 +245,46 @@
   /* На мобиле прячем тултип под кнопкой (он клипается overflow-y у .nav). */
   .navHighlightLabel { display: none; }
 
+  /* Баннер позиционируется ПОД конкретной подсвеченной кнопкой.
+     --hint-x — X-центр кнопки относительно header'а (выставляется inline
+     из JS через getBoundingClientRect).
+     Если var не задан (например, ref ещё не привязался) — fallback на 50%
+     (центр header'а). */
   .navHighlightBanner {
     display: block;
-    order: 4; /* После nav (которая order:3 на мобиле). */
-    width: 100%;
+    order: 4; /* Собственная строка после nav (order:3) в flex-wrap. */
+    /* width:auto + margin-left + transform = «прыгает» под нужную X-координату.
+       Не full-width — иначе стрелка не может указывать на конкретную кнопку. */
+    width: max-content;
+    max-width: min(calc(100% - 16px), 280px);
+    margin-left: var(--hint-x, 50%);
+    transform: translateX(-50%);
     text-align: center;
-    padding: 8px 12px;
-    background: linear-gradient(135deg, rgba(157, 78, 221, 0.20) 0%, rgba(179, 157, 219, 0.16) 100%);
-    border: 1px solid rgba(179, 157, 219, 0.45);
+    padding: 8px 14px;
+    background: linear-gradient(135deg, rgba(157, 78, 221, 0.22) 0%, rgba(179, 157, 219, 0.18) 100%);
+    border: 1px solid rgba(179, 157, 219, 0.5);
     color: #f1f2f5;
     font-size: 12px;
     font-weight: 600;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.2px;
     border-radius: 10px;
-    box-shadow: 0 4px 14px -4px rgba(179, 157, 219, 0.35);
+    box-shadow: 0 4px 14px -4px rgba(179, 157, 219, 0.4);
     animation: ctaPulse 2.2s infinite ease-in-out;
+    position: relative;
+  }
+
+  /* Стрелка-треугольник наверху баннера, указывает на кнопку выше. */
+  .navHighlightBanner::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 10px;
+    height: 10px;
+    background: rgba(157, 78, 221, 0.65);
+    border-left: 1px solid rgba(179, 157, 219, 0.5);
+    border-top: 1px solid rgba(179, 157, 219, 0.5);
   }
 }
 
@@ -317,7 +348,11 @@
 @media (max-width: 1024px) {
   .header {
     flex-wrap: wrap;
-    padding: 12px 16px;
+    padding:
+      calc(12px + env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right))
+      12px
+      max(16px, env(safe-area-inset-left));
     gap: 10px;
   }
 

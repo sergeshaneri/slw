@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { ru } from '../../locales/ru'
 import NotificationsBell from '../Notifications/NotificationsBell'
 import type { User } from '@/types/user'
@@ -98,10 +99,45 @@ export default function Header({
   // кнопкой работает, на мобиле его клипает overflow-x:auto у .nav).
   // Оба highlight'а не пересекаются по условиям (journey: 0 шагов,
   // aspects: ≥3 шагов), так что один баннер за раз.
+  // Используем 👆 (вверх) — баннер ниже nav, стрелка должна указывать НА кнопку
+  // которая выше.
   const activeHighlight: string | null =
-    journeyHighlight ? '👈 Тут начинается игра' :
+    journeyHighlight ? '👆 Тут начинается игра' :
     aspectsHighlight ? '👆 Тут больше информации по сферам жизни' :
     null
+
+  // Refs на подсвеченные кнопки — нужны чтобы вычислить X-координату центра
+  // кнопки и спозиционировать баннер ПОД ней (а не растягивать на всю
+  // ширину header). На мобиле .nav scroll'ится, position обновляется на
+  // resize/scroll/смену highlight'а.
+  const journeyBtnRef = useRef<HTMLButtonElement | null>(null)
+  const aspectsBtnRef = useRef<HTMLButtonElement | null>(null)
+  const navRef = useRef<HTMLElement | null>(null)
+  const [hintX, setHintX] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!activeHighlight) { setHintX(null); return }
+    const update = (): void => {
+      const target = journeyHighlight ? journeyBtnRef.current
+                   : aspectsHighlight ? aspectsBtnRef.current
+                   : null
+      const header = navRef.current?.closest('header') as HTMLElement | null
+      if (!target || !header) { setHintX(null); return }
+      const r = target.getBoundingClientRect()
+      const headerR = header.getBoundingClientRect()
+      // Центр X кнопки относительно левого края header'а.
+      setHintX(r.left + r.width / 2 - headerR.left)
+    }
+    update()
+    window.addEventListener('resize', update)
+    // Скролл внутри .nav (overflow-x:auto) тоже сдвигает кнопку — слушаем.
+    const nav = navRef.current
+    nav?.addEventListener('scroll', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      nav?.removeEventListener('scroll', update)
+    }
+  }, [activeHighlight, journeyHighlight, aspectsHighlight])
 
   return (
     <header className={styles.header}>
@@ -126,7 +162,7 @@ export default function Header({
         )}
       </div>
 
-      <nav className={styles.nav}>
+      <nav className={styles.nav} ref={navRef}>
         {navItems.map(item => {
           let highlightLabel: string | null = null
           if (item.id === 'journey' && journeyHighlight) highlightLabel = '👈 Тут начинается игра'
@@ -142,9 +178,16 @@ export default function Header({
             }
             onViewChange(item.id)
           }
+          // Ref только на подсвеченную кнопку — её координаты нужны для
+          // позиционирования hint-баннера ниже на мобиле.
+          const refForButton =
+            item.id === 'journey' && journeyHighlight ? journeyBtnRef :
+            item.id === 'aspects' && aspectsHighlight ? aspectsBtnRef :
+            undefined
           return (
             <button
               key={item.id}
+              ref={refForButton}
               type="button"
               onClick={handleClick}
               title={item.locked ? item.lockedTitle : undefined}
@@ -165,9 +208,16 @@ export default function Header({
       </nav>
 
       {/* Мобильный hint-баннер — виден на ≤1024px вместо тултипа под кнопкой
-          (тот клипается overflow-x:auto у .nav). На десктопе скрыт через CSS. */}
+          (тот клипается overflow-x:auto у .nav). Позиционируется по
+          --hint-x (X-центр подсвеченной кнопки относительно header'а),
+          стрелочка ::before указывает вверх НА кнопку. На десктопе скрыт. */}
       {activeHighlight && (
-        <div className={styles.navHighlightBanner}>{activeHighlight}</div>
+        <div
+          className={styles.navHighlightBanner}
+          style={hintX != null ? ({ '--hint-x': `${hintX}px` } as CSSProperties) : undefined}
+        >
+          {activeHighlight}
+        </div>
       )}
 
       <div className={styles.authBlock}>

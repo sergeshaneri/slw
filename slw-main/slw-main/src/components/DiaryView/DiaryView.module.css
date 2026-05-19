@@ -307,7 +307,9 @@
   border: 1px solid rgba(157, 78, 221, 0.18);
   border-radius: 14px;
   position: sticky;
-  bottom: 12px;
+  /* safe-area-inset-bottom: чтобы sticky-bar не уезжал под home-индикатор
+     на iPhone. На устройствах без выреза env() = 0, остаётся 12px. */
+  bottom: max(12px, env(safe-area-inset-bottom));
   backdrop-filter: blur(8px);
 }
 
