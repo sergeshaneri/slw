@@ -92,6 +92,11 @@ async def _resolve_streak(session: AsyncSession, user: WebUser) -> int:
     return 0
 
 
+# Стардаст-цена одного вызова ИИ. Снижена с 100 до 25 одновременно с
+# запуском реферальной системы — чтобы +25 за вехи = ровно один вызов.
+STARDUST_COST_PER_CALL = 25
+
+
 async def _used_today(session: AsyncSession, user_id: int) -> int:
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     count = (
@@ -126,7 +131,7 @@ async def get_quota(
         "base_limit": base,
         "streak_bonus": bonus,
         "streak_days": streak,
-        "stardust_cost": 100,
+        "stardust_cost": STARDUST_COST_PER_CALL,
     }
 
 

@@ -181,4 +181,13 @@ async def post_step_completed(
         await session.rollback()
         return {"ok": False, "error": str(e)}
 
+    # Реферальная веха: если это ПЕРВЫЙ шаг этого юзера → referrer +25.
+    # Best-effort, dedupe внутри award_milestone.
+    try:
+        from app.web.referral import award_milestone, is_first_step_completed
+        if await is_first_step_completed(session, current_user.id):
+            await award_milestone(session, current_user.id, "referee_first_step")
+    except Exception as e:
+        log.warning("referral award on first step failed: %s", e)
+
     return {"ok": True, "deduped": False, "event_id": event.id}

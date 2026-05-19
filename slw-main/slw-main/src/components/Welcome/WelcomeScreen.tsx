@@ -1,6 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AuthModal from '../Auth/AuthModal'
+import { getPendingReferralCode } from '../../utils/referral'
+import { trackReferralCode } from '../../api/client'
 import styles from './WelcomeScreen.module.css'
+
+type ReferrerPreview = {
+  name: string
+  avatar: string | null
+}
 
 const FEATURES = [
   {
@@ -31,9 +38,36 @@ type Props = {
 
 export default function WelcomeScreen({ onAuthSuccess, onContinueAsGuest }: Props) {
   const [showAuth, setShowAuth] = useState(false)
+  const [referrer, setReferrer] = useState<ReferrerPreview | null>(null)
+
+  // Если в localStorage сохранён ?ref=код — спрашиваем у бэка имя приглашающего
+  // и показываем баннер «Тебя пригласил X». Валидный код = есть имя.
+  useEffect(() => {
+    const code = getPendingReferralCode()
+    if (!code) return
+    trackReferralCode(code)
+      .then(r => {
+        if (r.valid && r.referrer_name) {
+          setReferrer({ name: r.referrer_name, avatar: r.referrer_avatar ?? null })
+        }
+      })
+      .catch(() => {/* невалидный код — молча игнорируем */})
+  }, [])
 
   return (
     <div className={styles.root}>
+      {referrer && (
+        <div className={styles.referrerBanner}>
+          <span className={styles.referrerAvatar}>{referrer.avatar || '🧑'}</span>
+          <div className={styles.referrerText}>
+            <strong>{referrer.name}</strong> пригласил{' '}тебя в Колесо Баланса
+            <div className={styles.referrerBonus}>
+              При регистрации получишь <strong>+50&nbsp;⚡&nbsp;стардаст</strong> — это 2 бесплатных вызова ИИ-коуча
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={styles.hero}>
         <div className={styles.logo}>🌀</div>
         <h1 className={styles.title}>Соционика</h1>

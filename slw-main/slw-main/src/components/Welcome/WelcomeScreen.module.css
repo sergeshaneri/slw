@@ -145,3 +145,48 @@
 .bottomCta:hover {
   background: rgba(76, 201, 240, 0.2);
 }
+
+/* ── Реферальный баннер «Тебя пригласил X» ── */
+.referrerBanner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto 18px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, rgba(230, 193, 88, 0.14) 0%, rgba(179, 157, 219, 0.10) 100%);
+  border: 1px solid rgba(230, 193, 88, 0.45);
+  border-radius: 14px;
+  color: #f1f2f5;
+  font-size: 14px;
+  line-height: 1.45;
+  box-shadow: 0 6px 22px -10px rgba(230, 193, 88, 0.35);
+}
+
+.referrerAvatar {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 50%;
+  font-size: 22px;
+}
+
+.referrerText { flex: 1; min-width: 0; }
+
+.referrerText strong { color: #e6c158; }
+
+.referrerBonus {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: #c8cad1;
+}
+
+.referrerBonus strong {
+  color: #e6c158;
+  font-weight: 700;
+}

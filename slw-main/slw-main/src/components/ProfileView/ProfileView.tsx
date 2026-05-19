@@ -98,6 +98,18 @@ type MyProfile = {
   insights?: Insight[]
   achievements?: Achievement[]
   achievements_catalog?: CatalogEntry[]
+  // Реферальная инфа — только в собственном профиле (GET /api/profile/me).
+  referral?: {
+    code: string
+    referrals_count: number
+    stardust_earned: number
+    referrals: Array<{
+      user_id: number
+      display_name: string
+      joined_at: string | null
+      milestones_completed: string[]
+    }>
+  } | null
 }
 
 type SubscriptionUser = {
@@ -749,7 +761,108 @@ export default function ProfileView({
           )}
         </div>
       </Section>
+
+      {/* Реферальная секция — приватная, видна только в своём профиле.
+          referral-блок приходит из GET /api/profile/me. */}
+      {profile.referral && (
+        <ReferralSection referral={profile.referral} />
+      )}
     </div>
+  )
+}
+
+type ReferralData = {
+  code: string
+  referrals_count: number
+  stardust_earned: number
+  referrals: Array<{
+    user_id: number
+    display_name: string
+    joined_at: string | null
+    milestones_completed: string[]
+  }>
+}
+
+const REFERRAL_MILESTONE_LABEL: Record<string, string> = {
+  referee_registered:     'зарегистрировался',
+  referee_first_step:     'прошёл первый шаг',
+  referee_diary_10:       '10 записей в дневнике',
+  referee_linked_tg:      'привязал Telegram',
+  referee_first_insight:  'опубликовал инсайт',
+}
+
+function ReferralSection({ referral }: { referral: ReferralData }) {
+  const [copied, setCopied] = useState(false)
+
+  // Lazy-импорт чтобы не загружать утилиту на каждый профиль.
+  const url = (() => {
+    try {
+      const base = `${window.location.origin}${window.location.pathname}`
+      const u = new URL(base)
+      u.searchParams.set('ref', referral.code)
+      return u.toString()
+    } catch { return `?ref=${referral.code}` }
+  })()
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      window.prompt('Скопируй ссылку:', url)
+    }
+  }
+
+  return (
+    <Section label={`🎁 Пригласить друзей · ${referral.referrals_count} приглашено · ${referral.stardust_earned}⚡ заработано`}>
+      <div className={styles.hint} style={{ marginBottom: 10 }}>
+        Приглашай друзей по ссылке. За каждую веху в их прогрессе ты получишь стардаст
+        (1 вызов ИИ-коуча = 25⚡): регистрация +25, первый шаг +25, 10 записей в дневнике +50,
+        TG +25, первый инсайт +25 — итого до <strong>150⚡</strong> за одного друга.
+        Сам друг получит <strong>+50⚡</strong> стартового пакета.
+      </div>
+      <div className={styles.referralLinkRow}>
+        <input
+          className={styles.input}
+          value={url}
+          readOnly
+          onClick={(e) => (e.target as HTMLInputElement).select()}
+          style={{ fontSize: 12, fontFamily: 'monospace' }}
+        />
+        <button
+          type="button"
+          className={`${styles.btn} ${styles.btnPrimary}`}
+          onClick={copy}
+        >
+          {copied ? '✓ Скопировано' : 'Скопировать'}
+        </button>
+      </div>
+      {referral.referrals.length > 0 && (
+        <details style={{ marginTop: 14 }}>
+          <summary className={styles.hint} style={{ cursor: 'pointer' }}>
+            Мои приглашённые ({referral.referrals.length})
+          </summary>
+          <ul className={styles.referralList}>
+            {referral.referrals.map(r => (
+              <li key={r.user_id} className={styles.referralItem}>
+                <strong>{r.display_name}</strong>
+                {r.milestones_completed.length === 0 ? (
+                  <span className={styles.muted}> · только зарегистрировался</span>
+                ) : (
+                  <span className={styles.muted}>
+                    {' · '}
+                    {r.milestones_completed
+                      .map(c => REFERRAL_MILESTONE_LABEL[c] ?? c)
+                      .join(', ')}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </Section>
   )
 }
 

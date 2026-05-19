@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { captureReferralFromURL } from './utils/referral'
 import Header from './components/Header/Header'
 import AspectsView from './components/AspectsView/AspectsView'
 import DiaryView from './components/DiaryView/DiaryView'
@@ -160,6 +161,12 @@ function normalizeDiaryRow(row: DiaryRow): DiaryEntry {
 }
 
 // ── App root ────────────────────────────────────────────────────────────────
+
+// Реферальный код из URL: ловим до первого render'а (модуль-level, не
+// component) — иначе React-роутинг или auth-flow могут переключить URL и
+// потерять `?ref=`. Идемпотентно: проверяет, есть ли уже токен, и пишет
+// в localStorage. См. utils/referral.ts.
+captureReferralFromURL()
 
 const HOME_VIEWS: ReadonlyArray<ViewName> = ['dashboard', 'aspects']
 

@@ -173,9 +173,32 @@ async function request(method: RequestMethod, path: string, body?: unknown): Pro
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 export async function register(email: string, password: string, name: string = ''): Promise<RegisterResp> {
-  const data = await request('POST', '/api/auth/register', { email, password, name }) as RegisterResp & { token?: string }
+  // Реферальный код из localStorage (сохраняется при первом входе по
+  // ссылке `?ref=XXX`, см. utils/referral.ts).
+  let referral_code: string | null = null
+  try { referral_code = localStorage.getItem('slw_pending_ref') } catch { /* ignore */ }
+  const data = await request('POST', '/api/auth/register', { email, password, name, referral_code }) as RegisterResp & { token?: string }
   setToken(data.token ?? null)
+  // После успешной регистрации очищаем pending — иначе при повторном logout
+  // и регистрации того же юзера код применится ещё раз.
+  try { localStorage.removeItem('slw_pending_ref') } catch { /* ignore */ }
   return data
+}
+
+/** Проверить реферальный код — без auth. Возвращает имя приглашающего
+ *  или {valid: false}. Используется WelcomeScreen для приветствия. */
+export async function trackReferralCode(code: string): Promise<{
+  valid: boolean
+  referrer_id?: number
+  referrer_name?: string
+  referrer_avatar?: string | null
+}> {
+  return request('POST', '/api/auth/referral-track', { code }) as Promise<{
+    valid: boolean
+    referrer_id?: number
+    referrer_name?: string
+    referrer_avatar?: string | null
+  }>
 }
 
 export async function login(email: string, password: string): Promise<LoginResp> {

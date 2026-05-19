@@ -60,6 +60,9 @@ class RegisterIn(BaseModel):
     email: str
     password: str
     name: str = ""
+    # Реферальный код приглашающего (из ?ref=XXX в URL, фронт сохраняет
+    # в localStorage и пересылает при register).
+    referral_code: str | None = None
 
 
 class LoginIn(BaseModel):
@@ -111,6 +114,12 @@ class TelegramAuthIn(BaseModel):
 class TelegramWebAppIn(BaseModel):
     # initData как есть, из window.Telegram.WebApp.initData (query-string).
     init_data: str
+    # Реферальный код, если юзер пришёл по ссылке `?ref=XXX`.
+    referral_code: str | None = None
+
+
+class ReferralTrackIn(BaseModel):
+    code: str
 
 
 def _user_out(user: WebUser, token: str | None = None) -> dict:
@@ -145,15 +154,41 @@ async def register(body: RegisterIn, session: AsyncSession = Depends(get_session
     if existing:
         raise HTTPException(400, "Email already registered")
 
+    # Реферальный код: если передан, ищем referrer'а. Если нашёлся и это
+    # не self-referral (но self-referral здесь невозможен — юзер ещё не
+    # создан), привязываем referrer_id.
+    referrer_id: int | None = None
+    if body.referral_code:
+        from app.web.referral import lookup_by_code
+        referrer = await lookup_by_code(session, body.referral_code)
+        if referrer:
+            referrer_id = referrer.id
+
     user = WebUser(
         email=body.email,
         password_hash=hash_password(body.password),
         telegram_first_name=body.name or None,
+        referrer_id=referrer_id,
         created_at=datetime.utcnow(),
     )
     session.add(user)
     await session.commit()
     await session.refresh(user)
+
+    # Награды за реферальную регистрацию (best-effort, после создания state).
+    # WebState создаётся при первом PUT /state, но welcome-бонус ждать не
+    # будет — поэтому создаём пустой WebState прямо тут если у юзера ещё нет.
+    if referrer_id:
+        from app.db.models import WebState
+        ws = await session.get(WebState, user.id)
+        if not ws:
+            ws = WebState(web_user_id=user.id, journey={}, history=[])
+            session.add(ws)
+            await session.commit()
+        from app.web.referral import grant_welcome_bonus, award_milestone
+        await grant_welcome_bonus(session, user.id)
+        await award_milestone(session, user.id, "referee_registered")
+
     return _user_out(user, create_token(user.id))
 
 
@@ -233,15 +268,35 @@ async def telegram_webapp(body: TelegramWebAppIn, session: AsyncSession = Depend
     ).scalar_one_or_none()
 
     if not user:
+        # Реферальный код: если передан, привязываем referrer_id (только для
+        # НОВОГО юзера — для существующего ничего не меняем).
+        referrer_id: int | None = None
+        if body.referral_code:
+            from app.web.referral import lookup_by_code
+            referrer = await lookup_by_code(session, body.referral_code)
+            if referrer:
+                referrer_id = referrer.id
         user = WebUser(
             telegram_id=tg_id,
             telegram_username=username,
             telegram_first_name=first_name or None,
+            referrer_id=referrer_id,
             created_at=datetime.utcnow(),
         )
         session.add(user)
         await session.commit()
         await session.refresh(user)
+        # Награды за реф-регистрацию.
+        if referrer_id:
+            from app.db.models import WebState
+            ws = await session.get(WebState, user.id)
+            if not ws:
+                ws = WebState(web_user_id=user.id, journey={}, history=[])
+                session.add(ws)
+                await session.commit()
+            from app.web.referral import grant_welcome_bonus, award_milestone
+            await grant_welcome_bonus(session, user.id)
+            await award_milestone(session, user.id, "referee_registered")
     else:
         # Подтягиваем актуальные данные при каждом входе.
         user.telegram_username = username
@@ -250,6 +305,35 @@ async def telegram_webapp(body: TelegramWebAppIn, session: AsyncSession = Depend
         await session.commit()
 
     return _user_out(user, create_token(user.id))
+
+
+# ── Referral lookup (без auth) ────────────────────────────────────────────────
+# Фронт дёргает при первом входе с ?ref=XXX — получаем имя/аватар referrer'а
+# для приветственного баннера на WelcomeScreen. Не записываем ничего —
+# реальная привязка происходит при регистрации.
+
+@router.post("/referral-track")
+async def referral_track(
+    body: ReferralTrackIn,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    from app.web.referral import lookup_by_code
+    from app.db.models import PublicProfile
+    referrer = await lookup_by_code(session, body.code)
+    if not referrer:
+        return {"valid": False}
+    pp = await session.get(PublicProfile, referrer.id)
+    name = (
+        referrer.display_name
+        or referrer.telegram_first_name
+        or (referrer.email.split("@")[0] if referrer.email else f"#{referrer.id}")
+    )
+    return {
+        "valid": True,
+        "referrer_id": referrer.id,
+        "referrer_name": name,
+        "referrer_avatar": (pp.avatar if pp else None) or None,
+    }
 
 
 # ── Link Telegram to email account ───────────────────────────────────────────
@@ -298,6 +382,15 @@ async def link_telegram(
 
     await session.commit()
     await session.refresh(current_user)
+
+    # Реферальная веха: реферал залинковал TG → referrer +25 стардаст.
+    # Best-effort, dedupe в award_milestone.
+    try:
+        from app.web.referral import award_milestone
+        await award_milestone(session, current_user.id, "referee_linked_tg")
+    except Exception as e:
+        log.warning("referral award on link_telegram failed: %s", e)
+
     return _user_out(current_user)
 
 

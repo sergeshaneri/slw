@@ -16,6 +16,7 @@ Public profile + insights + achievements:
 Ачивки начисляются автоматически на каждом GET /me — это просто
 (не требует event-handlers по всему коду) и идемпотентно (INSERT IGNORE).
 """
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -42,6 +43,7 @@ from app.web.deps import get_current_user, get_current_user_optional
 from app.web.notify import notify
 from app.web.streak import bump_streak
 
+log = logging.getLogger(__name__)
 router = APIRouter()
 
 ASPECT_KEYS = ["БС", "БЭ", "БЛ", "БИ", "ЧС", "ЧЭ", "ЧЛ", "ЧИ"]
@@ -632,6 +634,23 @@ async def _profile_payload(
         ).scalar_one_or_none()
         is_followed_by_me = existing is not None
 
+    # Реферальная инфа — только для собственного профиля (приватный список).
+    # Lazy-генерируем код если ещё нет (на первой загрузке own profile).
+    referral_block: dict | None = None
+    if include_private:
+        try:
+            from app.web.referral import ensure_referral_code, get_my_referrals
+            code = await ensure_referral_code(session, target_user)
+            refs = await get_my_referrals(session, target_user.id)
+            referral_block = {
+                "code": code,
+                "referrals_count": refs["referrals_count"],
+                "stardust_earned": refs["stardust_earned"],
+                "referrals": refs["referrals"],
+            }
+        except Exception as e:
+            log.warning("referral block build failed: %s", e)
+
     return {
         "user_id": target_user.id,
         "display_name": _display_name(target_user),
@@ -650,6 +669,7 @@ async def _profile_payload(
         "followers_count": followers_count,
         "following_count": following_count,
         "is_followed_by_me": is_followed_by_me,
+        "referral": referral_block,
         # Полный каталог — чтобы фронт мог показать «запертые» ачивки.
         "achievements_catalog": [
             {
@@ -807,6 +827,14 @@ async def post_insight(
     from app.web.xp import award_xp
     xp_action = "hall_insight_post" if body.kind == "insight" else "hall_recommendation_post"
     xp = await award_xp(session, current_user.id, xp_action)
+
+    # Реферальная веха: если это ПЕРВЫЙ инсайт юзера → referrer +25.
+    try:
+        from app.web.referral import award_milestone, is_first_insight
+        if await is_first_insight(session, current_user.id):
+            await award_milestone(session, current_user.id, "referee_first_insight")
+    except Exception:
+        pass
 
     return {
         "id": insight.id,

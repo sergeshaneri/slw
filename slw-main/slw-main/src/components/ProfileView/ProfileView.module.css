@@ -718,3 +718,39 @@
   color: var(--text);
   white-space: pre-wrap;
 }
+
+/* ── Реферальная секция ───────────────────────────────────────── */
+.referralLinkRow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.referralLinkRow .input {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 540px) {
+  .referralLinkRow {
+    flex-direction: column;
+  }
+}
+
+.referralList {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.referralItem {
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-soft);
+}

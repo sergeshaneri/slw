@@ -121,6 +121,15 @@ async def post_diary(
     xp_action = "daily_review" if body.source == "daily-review" else "diary_entry"
     xp = await award_xp(session, current_user.id, xp_action)
 
+    # Реферальная веха: если у юзера стало РОВНО 10 записей в дневнике →
+    # referrer +50 стардаст. Best-effort, dedupe внутри award_milestone.
+    try:
+        from app.web.referral import award_milestone, is_first_diary_count
+        if await is_first_diary_count(session, current_user.id, 10):
+            await award_milestone(session, current_user.id, "referee_diary_10")
+    except Exception:
+        pass  # best-effort
+
     return {"id": f"w{entry.id}", "xp": xp}
 
 
