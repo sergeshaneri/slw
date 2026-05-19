@@ -570,3 +570,136 @@
   .newbieText { font-size: 13px; }
   .newbieCta { font-size: 14px; padding: 12px 22px; }
 }
+
+/* ── Слово дня (тезаурус) ────────────────────────────────────────────────── */
+.wordOfDayBtn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 4px solid var(--accent, #b39ddb);
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  transition: background .15s, border-color .15s;
+}
+
+.wordOfDayBtn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.wordOfDayHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.wordOfDayWord {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.wordOfDayAspect {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.wordOfDayShort {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #c8cad1;
+  margin-bottom: 6px;
+}
+
+.wordOfDayHint {
+  font-size: 11px;
+  color: #5f6169;
+  font-style: italic;
+}
+
+/* Модалка с полным определением */
+.wordOfDayModal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: modalFade .15s ease-out;
+}
+
+@keyframes modalFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.wordOfDayCard {
+  position: relative;
+  background: linear-gradient(180deg, #1c1d25, #15161c);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 560px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.wordOfDayClose {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #c8cad1;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wordOfDayClose:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.wordOfDayCardHead {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin-bottom: 6px;
+  padding-right: 40px;
+}
+
+.wordOfDayCardMeta {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.wordOfDayCardBody {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #d8dadf;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}

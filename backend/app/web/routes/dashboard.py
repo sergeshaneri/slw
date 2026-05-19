@@ -95,18 +95,52 @@ _QUOTES_BY_ASPECT = {
 }
 
 
+_CYR_TO_LAT_LOCAL = {
+    "БС": "Si", "ЧС": "Se",
+    "БЛ": "Ti", "ЧЛ": "Te",
+    "БЭ": "Fi", "ЧЭ": "Fe",
+    "БИ": "Ni", "ЧИ": "Ne",
+}
+
+
 def _word_of_day(focus_aspects: list[str]) -> dict:
-    """Цитата дня. Если есть фокус-аспекты — берём из них; иначе random
-    из любого. Привязано к дате (YYYY-MM-DD) — за один день не меняется.
+    """Слово дня. Сначала пытаемся взять из тезаурус-словаря (words.json,
+    сгенерирован парсером из «упорядоченных» .md). Если для выбранного
+    аспекта слов нет — fallback на курируемые цитаты (_QUOTES_BY_ASPECT).
+
+    Привязано к дате (YYYY-MM-DD) — за один день не меняется, все юзеры
+    видят одно слово (хорошо для шеринга и обсуждений в холле).
     """
+    from app.web.routes.words import get_words_for_aspect
+
     today = _today()
     seed = sum(ord(c) for c in today)
     rng = Random(seed)
     pool_aspects = focus_aspects or list(_QUOTES_BY_ASPECT.keys())
     aspect = rng.choice(pool_aspects)
+
+    # Берём список «упорядоченных» слов для аспекта (latin-ключ).
+    aspect_latin = _CYR_TO_LAT_LOCAL.get(aspect, aspect)
+    words = get_words_for_aspect(aspect_latin)
+    if words:
+        w = rng.choice(words)
+        return {
+            "aspect": aspect,
+            "kind": "word",
+            "word": w.get("word"),
+            "short_def": w.get("short_def"),
+            "long_def": w.get("long_def"),
+            "group": w.get("group"),
+            # Сохраняем text/author для back-compat — фронт сначала смотрит
+            # на kind='word', потом fallback на text/author.
+            "text": w.get("short_def"),
+            "author": "",
+        }
+
+    # Fallback на цитаты, если words.json пуст для этого аспекта.
     quotes = _QUOTES_BY_ASPECT.get(aspect) or _QUOTES_BY_ASPECT["ЧИ"]
     text, author = rng.choice(quotes)
-    return {"aspect": aspect, "text": text, "author": author}
+    return {"aspect": aspect, "kind": "quote", "text": text, "author": author}
 
 
 # ── Подбор актуального аспекта ──────────────────────────────────────────────

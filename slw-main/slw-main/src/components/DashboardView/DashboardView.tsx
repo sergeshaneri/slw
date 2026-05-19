@@ -129,9 +129,16 @@ type DashboardSuggestedAuthor = {
 }
 
 type DashboardWordOfDay = {
+  aspect: AspectKey
+  // Новый формат (kind='word'): слово из тезауруса + короткое и полное опр.
+  kind?: 'word' | 'quote'
+  word?: string
+  short_def?: string
+  long_def?: string
+  group?: string
+  // Legacy формат (kind='quote'): цитата + автор.
   text: string
   author: string
-  aspect: AspectKey
 }
 
 type DashboardData = {
@@ -623,18 +630,7 @@ export default function DashboardView({
         {/* ── Слово дня ──────────────────────── */}
         {data.word_of_day && (
           <Section label="💭 Слово дня">
-            <blockquote
-              className={styles.quote}
-              style={{ borderLeftColor: ASPECT_COLORS[data.word_of_day.aspect] }}
-            >
-              «{data.word_of_day.text}»
-              <footer className={styles.quoteFooter}>
-                — {data.word_of_day.author} ·{' '}
-                <span style={{ color: ASPECT_COLORS[data.word_of_day.aspect] }}>
-                  {ASPECT_DISPLAY_KEY[data.word_of_day.aspect] ?? data.word_of_day.aspect}
-                </span>
-              </footer>
-            </blockquote>
+            <WordOfDayBlock wod={data.word_of_day} />
           </Section>
         )}
 
@@ -740,4 +736,76 @@ function describeNotif(n: DashboardNotification): string {
 function reactEmoji(r: string | undefined): string {
   const map: Record<string, string> = { heart: '♥', thanks: '🙏', aha: '💡', fire: '🔥' }
   return r != null ? (map[r] ?? '♥') : '♥'
+}
+
+// ── Word of Day ──────────────────────────────────────────────────────────────
+// Если бэк прислал kind='word' (слово из тезауруса) — показываем word + short_def
+// и при тапе раскрываем модалку с long_def + group. Иначе fallback на формат
+// цитаты (legacy: kind='quote' или отсутствующий kind → text + author).
+
+function WordOfDayBlock({ wod }: { wod: DashboardWordOfDay }) {
+  const [open, setOpen] = useState<boolean>(false)
+  const isWord = wod.kind === 'word' && wod.word
+  const accent = ASPECT_COLORS[wod.aspect] || '#b39ddb'
+  const aspKey = ASPECT_DISPLAY_KEY[wod.aspect] ?? wod.aspect
+
+  if (!isWord) {
+    // Legacy quote format.
+    return (
+      <blockquote className={styles.quote} style={{ borderLeftColor: accent }}>
+        «{wod.text}»
+        <footer className={styles.quoteFooter}>
+          — {wod.author} ·{' '}
+          <span style={{ color: accent }}>{aspKey}</span>
+        </footer>
+      </blockquote>
+    )
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className={styles.wordOfDayBtn}
+        onClick={() => setOpen(true)}
+        style={{ borderLeftColor: accent } as React.CSSProperties}
+        aria-label={`Подробнее про слово «${wod.word}»`}
+      >
+        <div className={styles.wordOfDayHead}>
+          <span className={styles.wordOfDayWord} style={{ color: accent }}>{wod.word}</span>
+          <span className={styles.wordOfDayAspect} style={{ color: accent }}>· {aspKey}</span>
+        </div>
+        <div className={styles.wordOfDayShort}>{wod.short_def}</div>
+        <div className={styles.wordOfDayHint}>Тап — полное определение →</div>
+      </button>
+
+      {open && (
+        <div
+          className={styles.wordOfDayModal}
+          onClick={() => setOpen(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className={styles.wordOfDayCard} onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className={styles.wordOfDayClose}
+              onClick={() => setOpen(false)}
+              aria-label="Закрыть"
+            >
+              ×
+            </button>
+            <div className={styles.wordOfDayCardHead} style={{ color: accent }}>
+              {wod.word}
+            </div>
+            <div className={styles.wordOfDayCardMeta}>
+              <span style={{ color: accent }}>{aspKey}</span>
+              {wod.group && <span className={styles.muted}> · {wod.group}</span>}
+            </div>
+            <div className={styles.wordOfDayCardBody}>{wod.long_def}</div>
+          </div>
+        </div>
+      )}
+    </>
+  )
 }
