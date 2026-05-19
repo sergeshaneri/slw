@@ -57,25 +57,37 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  /* Fade на правом крае — визуальный намёк «есть куда свайпать». 24px
-     прозрачности справа: контент «уходит» под градиент → юзер видит что
-     контент продолжается. На устройствах без overflow контент не клипается
-     (mask-image срезает только альфу). */
-  mask-image: linear-gradient(
-    to right,
-    black 0,
-    black calc(100% - 28px),
-    transparent 100%
-  );
-  -webkit-mask-image: linear-gradient(
-    to right,
-    black 0,
-    black calc(100% - 28px),
-    transparent 100%
-  );
 }
 
 .tabRow::-webkit-scrollbar { display: none; }
+
+/* На мобиле tabRow перевожу в block-level flex с width:100%, чтобы правый
+   край ряда совпадал с правым краем viewport — иначе inline-flex сайзится
+   по контенту, элемент шире viewport, и fade-mask оказывается за экраном
+   (юзер не видит намёка о скролле). Также добавляем mask-image только на
+   мобиле — там вкладок 7 и обычно есть overflow. На десктопе они помещаются
+   капсулой по ширине контента, fade не нужен. */
+@media (max-width: 1024px) {
+  .tabRow {
+    display: flex;
+    width: 100%;
+    /* Fade на правом крае — визуальный намёк «есть куда свайпать».
+       Последние 32px плавно уходят в прозрачность → видно, что контент
+       продолжается за пределами viewport. */
+    mask-image: linear-gradient(
+      to right,
+      black 0,
+      black calc(100% - 32px),
+      transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      black 0,
+      black calc(100% - 32px),
+      transparent 100%
+    );
+  }
+}
 
 .tabBtn {
   background: transparent;
