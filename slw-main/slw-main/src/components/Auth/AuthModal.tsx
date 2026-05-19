@@ -88,6 +88,12 @@ export default function AuthModal({ onSuccess, onClose, user = null, initialMode
   const [info, setInfo] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
   const tgRef = useRef<HTMLDivElement | null>(null)
+  // Race-guard для всех submit-handler'ов (login/register/reset/support).
+  // setLoading(true) ниже асинхронен, в окне между click и render с disabled
+  // юзер может тыкнуть «Войти» дважды → дубль логина, дубль register'а на
+  // бэке с unique-email constraint, или просто двойной запрос. Ref-проверка
+  // synchronous, режется в начале handler'а.
+  const submitingRef = useRef<boolean>(false)
 
   // TG-виджет нужен только для линка email→TG (пользователь уже залогинен).
   useEffect(() => {
@@ -136,7 +142,9 @@ export default function AuthModal({ onSuccess, onClose, user = null, initialMode
 
   async function handleAuthSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (submitingRef.current) return
     setError(''); setInfo('')
+    submitingRef.current = true
     setLoading(true)
     try {
       let data: unknown
@@ -151,12 +159,15 @@ export default function AuthModal({ onSuccess, onClose, user = null, initialMode
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
+      submitingRef.current = false
     }
   }
 
   async function handleResetRequest(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (submitingRef.current) return
     setError(''); setInfo('')
+    submitingRef.current = true
     setLoading(true)
     try {
       const resp = await requestPasswordReset(email)
@@ -173,11 +184,13 @@ export default function AuthModal({ onSuccess, onClose, user = null, initialMode
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
+      submitingRef.current = false
     }
   }
 
   async function handleResetConfirm(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (submitingRef.current) return
     setError(''); setInfo('')
     if (newPassword.length < 6) {
       setError('Пароль должен быть не короче 6 символов')
@@ -187,6 +200,7 @@ export default function AuthModal({ onSuccess, onClose, user = null, initialMode
       setError('Токен не передан. Открой ссылку из письма заново.')
       return
     }
+    submitingRef.current = true
     setLoading(true)
     try {
       await confirmPasswordReset(resetToken, newPassword)
@@ -197,11 +211,13 @@ export default function AuthModal({ onSuccess, onClose, user = null, initialMode
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
+      submitingRef.current = false
     }
   }
 
   async function handleSupportSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (submitingRef.current) return
     setError(''); setInfo('')
     if (supportMessage.trim().length < 10) {
       setError('Сообщение должно быть не короче 10 символов')
@@ -211,6 +227,7 @@ export default function AuthModal({ onSuccess, onClose, user = null, initialMode
       setError('Укажи как с тобой связаться (email или @telegram)')
       return
     }
+    submitingRef.current = true
     setLoading(true)
     try {
       await sendSupportMessage(supportMessage.trim(), supportContact.trim())
@@ -221,6 +238,7 @@ export default function AuthModal({ onSuccess, onClose, user = null, initialMode
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
+      submitingRef.current = false
     }
   }
 

@@ -122,9 +122,15 @@ export default function DMView({ initialPartnerId, onOpenProfile }: Props) {
     }
   }, [thread?.messages?.length])
 
+  // Race-guard ref: setSending(true) ниже асинхронен, юзер может тыкнуть
+  // ещё раз в окне между click и render с disabled. ref-проверка
+  // synchronous, защищает от дубля сообщений.
+  const sendingRef = useRef<boolean>(false)
   const handleSend = async () => {
+    if (sendingRef.current) return
     const t = text.trim()
     if (!t || !activeId || sending) return
+    sendingRef.current = true
     setSending(true)
     setError(null)
     try {
@@ -136,6 +142,7 @@ export default function DMView({ initialPartnerId, onOpenProfile }: Props) {
       setError(e instanceof Error ? e.message : 'Не удалось отправить')
     } finally {
       setSending(false)
+      sendingRef.current = false
     }
   }
 

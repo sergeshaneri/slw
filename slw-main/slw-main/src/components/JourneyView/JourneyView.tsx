@@ -489,6 +489,12 @@ export default function JourneyView({
   const [toast, setToast] = useState<string | null>(null)
   const chatRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  // Guard от double-click race condition. handleScriptAction и handleSend
+  // делают await addBotMessage (700ms typing анимация) — пока бот «печатает»,
+  // юзер может тыкнуть «Далее» ещё раз. Без этого guard'а: +2 XP, прогресс
+  // уезжает на 2 шага, инсайт записывается дважды. ref (не state) чтобы не
+  // вызывать re-render, и checked synchronously в самом начале handler'а.
+  const isProcessingRef = useRef<boolean>(false)
 
   // Активная per-aspect папка. Все per-aspect чтения идут через `a`,
   // все per-aspect записи — через updateAspect(s, ...).
@@ -690,6 +696,14 @@ export default function JourneyView({
 
   // ─── Действия в чате ─────────────────────────────────────────
   const handleScriptAction = useCallback(async (action: string, scriptId: string) => {
+    // Race-guard: если предыдущий клик ещё обрабатывается (await
+    // addBotMessage идёт, или setState только что отправлен) — игнорируем
+    // повторный клик. Без этого спам по «Далее» = +2 XP, +2 шага, дубль
+    // инсайта. isTyping CSS-disable'ит кнопку, но event-handler всё равно
+    // срабатывает в окне между click и render.
+    if (isProcessingRef.current) return
+    isProcessingRef.current = true
+    try {
     // ── intro-next: специальное действие, не привязано к script ──
     // Появляется при первом заходе на планету. Раскрывает intro-сообщения
     // по одному, потом инжектит первый скрипт уровня L0.
@@ -839,12 +853,25 @@ export default function JourneyView({
           : { scriptId: script.id, skillId: skillKey, blockIndex: 0, statementIndex: 0, answers: {} }
       }))
     }
+    } finally {
+      // Освобождаем guard. Даже если внутри был return-early (например
+      // null script), мы пришли сюда и можем принять следующий клик.
+      isProcessingRef.current = false
+    }
   }, [scripts, a.currentScriptIndex, state.skills, state.currentAspect, addBotMessage, addUserMessage, deliverScript, enqueueTask, setState])
 
   // ─── Ввод текста / числа ─────────────────────────────────────
   // override — опциональный аргумент с уже известным значением (используется
   // в Chat для слайдера, чтобы обойти race condition с setInputVal).
   const handleSend = useCallback(async (override?: string) => {
+    // Тот же guard что в handleScriptAction — спам по «Ответить · X/10» или
+    // «Сохранить и продолжить» создавал гонку: первый клик начинал
+    // await addBotMessage, второй кликал по «той же» (ещё не размонти-
+    // рованной) кнопке и снова шёл по handleSend → дубль diary entry
+    // + XP + advance.
+    if (isProcessingRef.current) return
+    isProcessingRef.current = true
+    try {
     const raw = typeof override === 'string' ? override : inputVal
     const val = raw.trim()
     if (!val) return
@@ -982,6 +1009,9 @@ export default function JourneyView({
       const stardust = script?.type === 'word' ? (script?.stardust ?? 0) : (script?.stardust ?? 0)
       awardXP(script?.xp ?? 10, stardust, script?.id ?? null)
       setTimeout(() => deliverScript(a.currentScriptIndex + 1), 600)
+    }
+    } finally {
+      isProcessingRef.current = false
     }
   }, [inputVal, a.awaitingInput, a.currentScriptIndex, state.currentAspect, state.skills, scripts, scores, diary, addBotMessage, addUserMessage, awardXP, deliverScript, onDiaryChange, onScoresChange, removePending])
 
