@@ -637,11 +637,14 @@
 
 .inputArea {
   /* safe-area-inset-bottom: чтобы инпут не уезжал под home-индикатор iPhone.
-     На устройствах без выреза env() = 0 — остаётся исходные 12px. */
+     На устройствах без выреза env() = 0 — остаётся исходные 8px.
+     Padding 12→8 чтобы суммарная высота инпут-зоны не отъедала драгоценное
+     место на мобиле: 44px textarea + 16px chrome = 60px вместо 68 (без
+     учёта safe-area). */
   padding:
-    12px
+    8px
     max(14px, env(safe-area-inset-right))
-    calc(12px + env(safe-area-inset-bottom))
+    calc(8px + env(safe-area-inset-bottom))
     max(14px, env(safe-area-inset-left));
   background: rgba(13,15,22,.75);
   border-top: 1px solid var(--line);
@@ -656,28 +659,11 @@
 /* Ввод числа на слайдере (вместо textarea). */
 .numberInputArea {
   padding:
-    18px
-    max(16px, env(safe-area-inset-right))
-    calc(16px + env(safe-area-inset-bottom))
-    max(16px, env(safe-area-inset-left));
+    12px
+    max(14px, env(safe-area-inset-right))
+    calc(10px + env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
   background: rgba(13,15,22,.75);
-  border-top: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  z-index: 5;
-  flex-shrink: 0;
-  backdrop-filter: blur(14px);
-}
-
-/* Обязательный insight после T/S/R (или U-«сделал»). */
-.stepInsightArea {
-  padding:
-    16px
-    max(16px, env(safe-area-inset-right))
-    calc(18px + env(safe-area-inset-bottom))
-    max(16px, env(safe-area-inset-left));
-  background: rgba(13,15,22,.78);
   border-top: 1px solid var(--line);
   display: flex;
   flex-direction: column;
@@ -687,39 +673,86 @@
   backdrop-filter: blur(14px);
 }
 
-.stepInsightLabel {
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted, #8f929c);
-  font-weight: 600;
+/* Обязательный insight после T/S/R (или U-«сделал»).
+   Redesign 2026-05: вместо громоздкого «лейбл + textarea h=80 + counter +
+   full-width кнопка» (~180px) — компактный layout под обычный чат-инпут
+   (~60px idle). Сохранение через круглую кнопку ↑ справа, eyebrow сверху
+   сообщает что запись попадёт в дневник. */
+.stepInsightArea {
+  padding:
+    8px
+    max(14px, env(safe-area-inset-right))
+    calc(10px + env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
+  background: rgba(13,15,22,.78);
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 5;
+  flex-shrink: 0;
+  backdrop-filter: blur(14px);
 }
 
+/* Eyebrow — тонкая строка контекста сверху. Заменяет старую UPPERCASE-
+   подпись «✎ Запиши свой инсайт» (была ~30px). 11px muted, единственная
+   плашка с context-инфой; placeholder textarea даёт сам hint что писать. */
+.stepInsightEyebrow {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #8f929c);
+  font-weight: 500;
+  padding-left: 4px;
+}
+
+.stepInsightRow {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+/* Textarea — ровно как обычный .inputField. Auto-grow управляется JS
+   (см. StepInsightPrompt.tsx → adjustHeight). min-height: 44px = тач-таргет
+   + одна строка, max-height: 110px = ~4 строки. */
 .stepInsightInput {
+  flex: 1;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 12px 14px;
+  border-radius: 22px;
+  padding: 11px 16px;
   color: var(--text);
-  font: inherit;
-  /* font-size: 16px против iOS focus-zoom (см. .inputField). */
+  font-family: inherit;
+  /* font-size: 16px против iOS focus-zoom. */
   font-size: 16px;
-  resize: vertical;
-  min-height: 80px;
   outline: none;
+  resize: none;
+  max-height: 110px;
+  min-height: 44px;
+  line-height: 1.45;
+  transition: border-color .2s;
   -webkit-appearance: none;
   appearance: none;
   -webkit-tap-highlight-color: transparent;
   box-shadow: none;
 }
-.stepInsightInput:focus {
-  border-color: rgba(179,157,219,0.55);
+
+.stepInsightInput::placeholder { color: var(--text-dim); }
+.stepInsightInput:focus { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+
+/* Когда введён минимум — рамка подсвечивается accent-цветом аспекта,
+   синхронно с активацией кнопки ↑. Тонкий визуальный сигнал «теперь можно». */
+.stepInsightInputValid {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
 }
 
-.stepInsightHint {
+/* Counter показывается ТОЛЬКО когда text есть, но < minLength.
+   Раньше всегда висел «Минимум 10 · сейчас N» — занимал место без пользы
+   в idle (юзер не пишет) и в valid (хватает символов). */
+.stepInsightCounter {
   font-size: 11px;
   color: var(--text-dim, #5f6169);
-  text-align: right;
+  padding-left: 16px;
+  font-variant-numeric: tabular-nums;
 }
 
 .inputField {
