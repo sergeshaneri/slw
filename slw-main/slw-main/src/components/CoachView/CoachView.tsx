@@ -259,7 +259,7 @@ export default function CoachView({ diary, onDiaryChange, journey, onJourneyChan
                   className={styles.responseAspect}
                   style={{ color: ASPECT_COLORS[response.focus_aspect] }}
                 >
-                  {' '}· {response.focus_aspect}
+                  {' '}· {ASPECT_DISPLAY_KEY[response.focus_aspect] ?? response.focus_aspect}
                 </span>
               )}
             </span>
@@ -319,7 +319,7 @@ function HistoryItem({ call }: { call: CoachCall }) {
             className={styles.historyAspect}
             style={{ color: ASPECT_COLORS[aspectKey] }}
           >
-            {call.focus_aspect}
+            {ASPECT_DISPLAY_KEY[aspectKey] ?? aspectKey}
           </span>
         )}
         {call.paid_with_stardust && <span className={styles.historyPaid}>⚡</span>}

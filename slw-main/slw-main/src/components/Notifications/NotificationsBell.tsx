@@ -4,6 +4,7 @@ import {
   fetchUnreadCount,
   markNotificationsRead,
 } from '../../api/client'
+import { ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import type { AspectKey } from '@/types/aspect'
 import styles from './NotificationsBell.module.css'
 
@@ -170,8 +171,11 @@ function describe(n: NotificationItem): string {
       return `${p.actor_name ?? 'Кто-то'} подписался на тебя`
     case 'dm':
       return `${p.sender_name ?? 'Кто-то'}: «${trim(p.preview ?? '', 80)}»`
-    case 'hall_reply':
-      return `${p.actor_name ?? 'Кто-то'} в холле ${p.aspect ?? ''}: «${trim(p.preview ?? '', 80)}»`
+    case 'hall_reply': {
+      const aspKey = p.aspect as keyof typeof ASPECT_DISPLAY_KEY | undefined
+      const aspLabel = aspKey ? (ASPECT_DISPLAY_KEY[aspKey] ?? String(aspKey)) : ''
+      return `${p.actor_name ?? 'Кто-то'} в холле ${aspLabel}: «${trim(p.preview ?? '', 80)}»`
+    }
     case 'achievement':
       return `Разблокировано: ${p.title ?? p.code ?? '—'}`
     default:

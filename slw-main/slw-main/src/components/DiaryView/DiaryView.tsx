@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
+import { ASPECT_KEYS, ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { SURVEY_BLOCKS } from '../../data/journey/skills'
 import SearchView from '../SearchView/SearchView'
 import DailyReview from './DailyReview'
@@ -164,7 +164,7 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
           >
             <option value="general">{t.diary.general}</option>
             {ASPECT_KEYS.map(key => (
-              <option key={key} value={key}>{key} · {ASPECT_DATA[key].name}</option>
+              <option key={key} value={key}>{ASPECT_DISPLAY_KEY[key]} · {ASPECT_DATA[key].name}</option>
             ))}
           </select>
           <div className={styles.date}>{new Date().toLocaleDateString('ru-RU')}</div>
@@ -195,7 +195,7 @@ export default function DiaryView({ diary, onDiaryChange, t, onOpenProfile, user
           [
             ['all', t.diary.filterAll],
             ['general', t.diary.general],
-            ...ASPECT_KEYS.map<[AspectKey, string]>(k => [k, k]),
+            ...ASPECT_KEYS.map<[AspectKey, string]>(k => [k, ASPECT_DISPLAY_KEY[k]]),
           ] as Array<[AspectKey | 'general' | 'all', string]>
         ).map(([value, label]) => (
           <button
@@ -261,7 +261,7 @@ function DiaryEntry({ entry, onDelete }: DiaryEntryProps) {
               className={styles.entryAspect}
               style={{ color: ASPECT_COLORS[entry.aspect] }}
             >
-              {entry.aspect}
+              {ASPECT_DISPLAY_KEY[entry.aspect] ?? entry.aspect}
             </span>
           )}
           {entry.source && entry.source !== 'manual' && (

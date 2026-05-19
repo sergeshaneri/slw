@@ -351,7 +351,7 @@ export default function DashboardView({
                       style={{ '--accent': ASPECT_COLORS[h.aspect] } as React.CSSProperties}
                     >
                       <span className={styles.habitAspect} style={{ color: ASPECT_COLORS[h.aspect] }}>
-                        {h.aspect}
+                        {ASPECT_DISPLAY_KEY[h.aspect] ?? h.aspect}
                       </span>
                       <span className={styles.habitTitle}>{h.title}</span>
                       <span className={styles.habitTick}>
@@ -550,7 +550,7 @@ export default function DashboardView({
                     {it.avatar || '🧑'} {it.display_name}
                   </button>
                   <span style={{ color: ASPECT_COLORS[it.aspect] }} className={styles.feedAspect}>
-                    {it.aspect}
+                    {ASPECT_DISPLAY_KEY[it.aspect] ?? it.aspect}
                   </span>
                   <div className={styles.feedText}>{trim(it.text, 160)}</div>
                 </div>
@@ -607,7 +607,7 @@ export default function DashboardView({
               <footer className={styles.quoteFooter}>
                 — {data.word_of_day.author} ·{' '}
                 <span style={{ color: ASPECT_COLORS[data.word_of_day.aspect] }}>
-                  {data.word_of_day.aspect}
+                  {ASPECT_DISPLAY_KEY[data.word_of_day.aspect] ?? data.word_of_day.aspect}
                 </span>
               </footer>
             </blockquote>
@@ -701,8 +701,11 @@ function describeNotif(n: DashboardNotification): string {
       return `+ ${(p.actor_name as string | undefined) ?? 'Кто-то'} подписался на тебя`
     case 'dm':
       return `💬 ${(p.sender_name as string | undefined) ?? 'Кто-то'}: «${trim((p.preview as string | undefined) ?? '', 80)}»`
-    case 'hall_reply':
-      return `✦ ${(p.actor_name as string | undefined) ?? 'Кто-то'} в холле ${p.aspect}: «${trim((p.preview as string | undefined) ?? '', 80)}»`
+    case 'hall_reply': {
+      const aspKey = p.aspect as keyof typeof ASPECT_DISPLAY_KEY | undefined
+      const aspLabel = aspKey ? (ASPECT_DISPLAY_KEY[aspKey] ?? String(aspKey)) : ''
+      return `✦ ${(p.actor_name as string | undefined) ?? 'Кто-то'} в холле ${aspLabel}: «${trim((p.preview as string | undefined) ?? '', 80)}»`
+    }
     case 'achievement':
       return `🏆 Разблокировано: ${(p.title as string | undefined) ?? (p.code as string | undefined) ?? '—'}`
     default:

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ASPECT_COLORS } from '../../data/aspects'
+import { ASPECT_COLORS, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { fetchInsightReactions } from '../../api/client'
 import type { AspectKey } from '@/types/aspect'
 import styles from './PublicProfileView.module.css'
@@ -83,13 +83,14 @@ export default function ReactorsList({ insightId, open, onOpenProfile }: Props) 
                 </button>
                 {(r.focus_aspects ?? []).slice(0, 2).map(a => {
                   const color = (ASPECT_COLORS as Record<string, string>)[a as string]
+                  const label = (ASPECT_DISPLAY_KEY as Record<string, string>)[a as string] ?? String(a)
                   return (
                     <span
                       key={a}
                       className={styles.reactorAspect}
                       style={{ color, borderColor: `${color}55` }}
                     >
-                      {a}
+                      {label}
                     </span>
                   )
                 })}
