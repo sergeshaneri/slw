@@ -15,13 +15,15 @@ Auth routes:
   GET  /api/auth/export           — JSON export of all user data
 """
 import json
+import logging
+import secrets
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select
+from sqlalchemy import select, text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -35,6 +37,7 @@ from app.db.models import (
     WebUser,
 )
 from app.db.session import get_session
+from app.email.resend import send_email
 from app.web.auth import (
     create_token,
     hash_password,
@@ -43,6 +46,8 @@ from app.web.auth import (
     verify_webapp_init_data,
 )
 from app.web.deps import get_current_user
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth")
 
@@ -78,6 +83,15 @@ class ChangePasswordIn(BaseModel):
 
 class DeleteAccountIn(BaseModel):
     confirm: str  # Юзер вводит "удалить" (или email) для подтверждения.
+
+
+class PasswordResetRequestIn(BaseModel):
+    email: str
+
+
+class PasswordResetConfirmIn(BaseModel):
+    token: str
+    new_password: str
 
 
 class TelegramAuthIn(BaseModel):
@@ -368,6 +382,176 @@ async def change_password(
     if not body.new_password or len(body.new_password) < 1:
         raise HTTPException(400, "Новый пароль не может быть пустым")
     current_user.password_hash = hash_password(body.new_password)
+    await session.commit()
+    return {"ok": True}
+
+
+# ── Password reset (email/TG fallback) ──────────────────────────────────────
+#
+# Flow:
+#   1. POST /auth/password-reset/request {email} → 200 (всегда generic
+#      ответ — не палим существование email'а). Если юзер найден:
+#      генерируем токен, пишем в password_reset_tokens, пробуем отправить
+#      ссылку через Resend (если ключ настроен) → fallback в TG-бота
+#      (если telegram_id привязан) → иначе тихо ничего (только в лог).
+#   2. Юзер открывает ссылку https://.../slw?reset_token=XXX → фронт
+#      детектит токен в URL → показывает форму нового пароля.
+#   3. POST /auth/password-reset/confirm {token, new_password} → меняем
+#      password_hash, помечаем токен used_at.
+#
+# Channel в ответе на /request говорит фронту, что ему сказать юзеру:
+# 'email' / 'telegram' / 'none' (последнее — юзера нет либо отправка
+# целиком провалилась; UI всё равно показывает успех чтобы не палить
+# существование email).
+
+@router.post("/password-reset/request")
+async def password_reset_request(
+    body: PasswordResetRequestIn,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    email = (body.email or "").strip().lower()
+    if not email or "@" not in email:
+        # На клиенте валидация формата email; на бэке — стандартный generic
+        # ответ чтобы не реагировать иначе на пустой/невалидный ввод.
+        return {"ok": True, "channel": "none"}
+
+    user = (
+        await session.execute(select(WebUser).where(WebUser.email == email))
+    ).scalar_one_or_none()
+    if not user:
+        # Не палим существование email'а — generic 200 как если бы отправили.
+        log.info("password-reset: email %s not found, returning generic 200", email)
+        return {"ok": True, "channel": "none"}
+
+    # Генерируем токен и сохраняем. token_urlsafe(32) даёт ~43 base64-символа,
+    # энтропия 256 бит — достаточно даже без rate-limit'а.
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.password_reset_ttl_min)
+    try:
+        await session.execute(
+            sql_text(
+                "INSERT INTO password_reset_tokens (token, user_id, expires_at) "
+                "VALUES (:t, :u, :e)"
+            ),
+            {"t": token, "u": user.id, "e": expires_at},
+        )
+        await session.commit()
+    except Exception as e:
+        log.warning("password-reset: insert token failed for user=%s: %s", user.id, e)
+        return {"ok": True, "channel": "none"}
+
+    reset_link = f"{FRONTEND_URL}?reset_token={token}"
+
+    # Сначала пробуем email через Resend. Если ключ не настроен или
+    # отправка не удалась — fallback на TG.
+    channel: str = "none"
+    if user.email:
+        subject = "Восстановление пароля · SLW"
+        body_html = (
+            f"<p>Привет!</p>"
+            f"<p>Кто-то (надеемся, ты) запросил сброс пароля для аккаунта SLW.</p>"
+            f"<p><a href=\"{reset_link}\" style=\"display:inline-block;padding:10px 18px;"
+            f"background:#9d4edd;color:#fff;text-decoration:none;border-radius:8px;\">"
+            f"Сменить пароль</a></p>"
+            f"<p>Или скопируй ссылку: <br><code>{reset_link}</code></p>"
+            f"<p>Ссылка живёт {settings.password_reset_ttl_min} минут. "
+            f"Если ты не запрашивал — просто удали это письмо, пароль останется прежним.</p>"
+            f"<p style=\"color:#888;font-size:12px;\">Соционика · Колесо Баланса</p>"
+        )
+        body_text = (
+            f"Восстановление пароля SLW\n\n"
+            f"Открой ссылку чтобы сменить пароль:\n{reset_link}\n\n"
+            f"Ссылка живёт {settings.password_reset_ttl_min} минут. "
+            f"Если не запрашивал — игнорируй это письмо."
+        )
+        ok = await send_email(
+            to=user.email,
+            subject=subject,
+            html=body_html,
+            text=body_text,
+        )
+        if ok:
+            channel = "email"
+
+    # Fallback на TG если email не ушёл и есть привязка.
+    if channel == "none" and user.telegram_id:
+        try:
+            from app.bot.main import get_app as _get_bot
+            bot_app = _get_bot()
+            if bot_app:
+                await bot_app.bot.send_message(
+                    chat_id=user.telegram_id,
+                    text=(
+                        "🔐 *Восстановление пароля SLW*\n\n"
+                        f"Открой ссылку чтобы сменить пароль (живёт {settings.password_reset_ttl_min} мин):\n"
+                        f"{reset_link}\n\n"
+                        "Если ты не запрашивал — игнорируй сообщение, пароль останется прежним."
+                    ),
+                    parse_mode="Markdown",
+                    disable_web_page_preview=True,
+                )
+                channel = "telegram"
+        except Exception as e:
+            log.warning("password-reset: TG fallback failed user=%s: %s", user.id, e)
+
+    if channel == "none":
+        log.warning(
+            "password-reset: no channel delivered for user=%s (resend=%s, tg=%s)",
+            user.id, bool(settings.resend_api_key), bool(user.telegram_id),
+        )
+
+    return {"ok": True, "channel": channel}
+
+
+@router.post("/password-reset/confirm")
+async def password_reset_confirm(
+    body: PasswordResetConfirmIn,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    token = (body.token or "").strip()
+    new_password = body.new_password or ""
+    if not token:
+        raise HTTPException(400, "Токен не передан")
+    if len(new_password) < 6:
+        raise HTTPException(400, "Пароль должен быть не короче 6 символов")
+
+    # Один запрос: проверка живой ли токен и получение user_id.
+    row = (
+        await session.execute(
+            sql_text(
+                "SELECT user_id, expires_at, used_at FROM password_reset_tokens "
+                "WHERE token = :t"
+            ),
+            {"t": token},
+        )
+    ).first()
+
+    if not row:
+        raise HTTPException(400, "Ссылка недействительна. Запроси новую через «Восстановить пароль».")
+
+    user_id, expires_at, used_at = row
+    if used_at is not None:
+        raise HTTPException(400, "Эта ссылка уже была использована. Запроси новую.")
+
+    # expires_at TIMESTAMPTZ — приходит как aware datetime. Сравниваем с aware now.
+    now = datetime.now(timezone.utc)
+    # Если в БД хранилось naive (старая схема) — приведём.
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < now:
+        raise HTTPException(400, "Срок действия ссылки истёк. Запроси новую.")
+
+    user = (
+        await session.execute(select(WebUser).where(WebUser.id == int(user_id)))
+    ).scalar_one_or_none()
+    if not user:
+        raise HTTPException(400, "Пользователь не найден")
+
+    user.password_hash = hash_password(new_password)
+    await session.execute(
+        sql_text("UPDATE password_reset_tokens SET used_at = NOW() WHERE token = :t"),
+        {"t": token},
+    )
     await session.commit()
     return {"ok": True}
 

@@ -213,6 +213,40 @@ export async function changePassword(oldPassword: string, newPassword: string): 
   })
 }
 
+// ── Password reset ────────────────────────────────────────────────────────────
+//
+// Запросить ссылку для смены пароля. Бэк всегда возвращает 200 (не палит
+// существование email'а). Поле channel говорит куда улетела ссылка:
+//   'email'    — отправлено через Resend на user.email
+//   'telegram' — отправлено через бота (fallback если нет email-сервиса)
+//   'none'     — email не найден ЛИБО все каналы недоступны (UI всё равно
+//                показывает успех, иначе по реакции можно проверять email'ы)
+export type PasswordResetChannel = 'email' | 'telegram' | 'none'
+
+export async function requestPasswordReset(email: string): Promise<{ ok: true; channel: PasswordResetChannel }> {
+  return request('POST', '/api/auth/password-reset/request', { email }) as Promise<{ ok: true; channel: PasswordResetChannel }>
+}
+
+// Установить новый пароль по токену из ссылки. На 4xx бросит ApiError
+// с явным сообщением (просрочен, использован, юзер не найден).
+export async function confirmPasswordReset(token: string, newPassword: string): Promise<{ ok: true }> {
+  return request('POST', '/api/auth/password-reset/confirm', {
+    token,
+    new_password: newPassword,
+  }) as Promise<{ ok: true }>
+}
+
+// ── Support ───────────────────────────────────────────────────────────────────
+//
+// Написать в поддержку. Работает и для гостей (без токена) — backend сам
+// разберётся. reply_contact — обязательное поле «как ответить» (email или TG).
+export async function sendSupportMessage(message: string, replyContact: string): Promise<{ ok: true }> {
+  return request('POST', '/api/support/contact', {
+    message,
+    reply_contact: replyContact,
+  }) as Promise<{ ok: true }>
+}
+
 export async function removeEmail(): Promise<unknown> {
   return request('POST', '/api/auth/remove-email')
 }

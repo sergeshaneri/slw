@@ -1,16 +1,27 @@
+/* По дефолту корневой контейнер растёт по контенту и НЕ имеет своего скролла —
+   страница скроллится самим документом. Это нужно, чтобы iOS Safari прятал
+   свою chrome-полоску (URL/таб-бар) при скролле вниз: коллапс срабатывает
+   только на root-scroll, не на inner overflow. Journey-режим этот режим
+   выключает через .appLocked — там чат внутри сам управляет высотой. */
 .app {
   background: #0e1014;
-  height: 100dvh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   font-family: inherit;
   color: #e9eaee;
+}
+
+/* Журнал-режим: фиксированная высота и блок внешнего скролла. Включается на
+   `view === 'journey'`. Без него Chat.tsx не сможет растянуть свой шелл на
+   100dvh и input-bar уедет вниз страницы. */
+.appLocked {
+  height: 100dvh;
   overflow: hidden;
 }
 
 .main {
   flex: 1;
-  overflow-y: auto;
   /* padding-bottom: 64px + safe-area, чтобы последний айтем не уезжал под
      home-индикатор iPhone. На устройствах без выреза env(...) = 0. */
   padding:

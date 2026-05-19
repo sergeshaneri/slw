@@ -26,6 +26,7 @@ from app.web.routes.scores import router as scores_router
 from app.web.routes.search import router as search_router
 from app.web.routes.state import router as state_router
 from app.web.routes.streak import router as streak_router
+from app.web.routes.support import router as support_router
 from app.web.routes.sync import router as sync_router
 from app.web.routes.sync_vault import router as sync_vault_router
 
@@ -76,6 +77,7 @@ app.include_router(sync_vault_router, prefix="/api")
 app.include_router(onboarding_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(community_router, prefix="/api")
+app.include_router(support_router, prefix="/api")
 
 
 @app.get("/healthz")

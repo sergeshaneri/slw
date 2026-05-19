@@ -283,6 +283,17 @@ async def apply_ddl() -> None:
                     "CREATE INDEX IF NOT EXISTS dm_recipient_idx "
                     "ON direct_messages (recipient_id, id DESC)"
                 ))
+                # Support-сообщения: sender_id может быть NULL (гость, не
+                # залогинен — но указал reply_contact в тексте). kind='support'
+                # помечает такие сообщения, чтобы DMView/обычные правила
+                # mutual-follow к ним не применялись.
+                await conn.execute(text(
+                    "ALTER TABLE direct_messages ALTER COLUMN sender_id DROP NOT NULL"
+                ))
+                await conn.execute(text(
+                    "ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS "
+                    "kind TEXT NOT NULL DEFAULT 'message'"
+                ))
                 await conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS habit_ticks (
                         web_user_id  INTEGER NOT NULL,
@@ -296,10 +307,27 @@ async def apply_ddl() -> None:
                     "CREATE INDEX IF NOT EXISTS habit_ticks_user_idx "
                     "ON habit_ticks (web_user_id, date DESC)"
                 ))
+                # Password reset tokens — короткоживущие токены для смены
+                # пароля через email/TG. Очистка протухших не критична
+                # (тщательно проверяем expires_at в роуте), но в будущем
+                # можно завести cron-job.
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                        token        TEXT PRIMARY KEY,
+                        user_id      INTEGER NOT NULL,
+                        created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        expires_at   TIMESTAMPTZ NOT NULL,
+                        used_at      TIMESTAMPTZ
+                    )
+                """))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS prt_user_idx "
+                    "ON password_reset_tokens (user_id, created_at DESC)"
+                ))
                 await conn.commit()
     except Exception as e:
         log.warning(
-            "notifications/dm/habits DDL failed: %s", e
+            "notifications/dm/habits/reset DDL failed: %s", e
         )
 
     # Серверный стрик + выбранные привычки.
@@ -493,6 +521,30 @@ async def apply_ddl() -> None:
                 await conn.commit()
     except Exception as e:
         log.warning("notifications DDL failed: %s", e)
+
+    # Реферальная система (2026-05): referral_code (короткий уникальный код
+    # для ?ref=XXX в URL) + referrer_id (id того, кто пригласил). Оба
+    # nullable: legacy-юзеры без кода — код генерится lazy при первом
+    # запросе; referrer_id NULL означает «пришёл сам».
+    # Unique-индекс на referral_code защищает от коллизий генерации.
+    try:
+        async with asyncio.timeout(15):
+            async with engine.connect() as conn:
+                await conn.execute(text(
+                    "ALTER TABLE web_users "
+                    "ADD COLUMN IF NOT EXISTS referral_code TEXT"
+                ))
+                await conn.execute(text(
+                    "ALTER TABLE web_users "
+                    "ADD COLUMN IF NOT EXISTS referrer_id INTEGER"
+                ))
+                await conn.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS web_users_referral_code_idx "
+                    "ON web_users (referral_code) WHERE referral_code IS NOT NULL"
+                ))
+                await conn.commit()
+    except Exception as e:
+        log.warning("referral DDL failed: %s", e)
 
     # Admin-настройки TG-нотификаций: singleton-таблица (одна строка id=1).
     # Глобальный enable, час отправки, какие типы включены, бэклог.

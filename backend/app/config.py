@@ -24,6 +24,18 @@ class Settings(BaseSettings):
     # OpenRouter требует HTTP-Referer от приложений; ставим домен фронта.
     app_url: str = "https://sergeshaneri.github.io/slw"
 
+    # ── Email (password reset) ────────────────────────────────────────────────
+    # Resend.com HTTP API key для отправки reset-ссылок на email.
+    # Если пусто — backend пробует fallback через TG-бота (если у юзера
+    # привязан telegram_id), иначе возвращает «напиши в поддержку».
+    # Получить ключ: resend.com → API Keys → создать. Free tier: 3000/мес.
+    resend_api_key: str = ""
+    # Отправитель. На своих доменах надо verify в Resend; без verify
+    # работает sandbox onboarding@resend.dev (только для одного receiver — owner).
+    resend_from: str = "SLW <onboarding@resend.dev>"
+    # TTL reset-токена в минутах. Короче — безопаснее.
+    password_reset_ttl_min: int = 30
+
     @field_validator("database_url", mode="before")
     @classmethod
     def fix_db_url(cls, v: str) -> str:

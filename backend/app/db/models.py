@@ -147,6 +147,15 @@ class WebUser(Base):
     notification_cooldowns: Mapped[dict] = mapped_column(
         JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
     )
+    # ── Реферальная система (2026-05) ────────────────────────────────────
+    # referral_code — короткий уникальный код юзера для ссылки `?ref=XXX`.
+    # Генерируется при первом обращении (lazy). Уникальность защищена
+    # constraint'ом.
+    # referrer_id — кто пригласил этого юзера. Закрепляется при регистрации
+    # (если пришёл по реф-ссылке) и больше не меняется. NULL = пришёл сам
+    # или зарегистрирован до того как фича появилась.
+    referral_code: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
+    referrer_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(TZ, default=datetime.utcnow)
 
 

@@ -206,6 +206,10 @@ export default function App() {
   // Стартовая вкладка AuthModal — 'register' для nudge'ов гостя ради
   // сохранения прогресса, 'login' для обычного «Войти» из шапки.
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login')
+  // Токен из URL ?reset_token=... — если есть, при следующем открытии
+  // AuthModal сразу покажется форма смены пароля. Сбрасывается на null
+  // после первого использования (см. handleAuthSuccess).
+  const [resetToken, setResetToken] = useState<string | null>(null)
   // welcomeDismissed: гость нажал «Начать бесплатно» и вошёл в приложение
   // без аутентификации. Запоминаем в localStorage, чтобы при следующем
   // визите сразу попадал на колесо. Сбрасывается на logout (см. ниже).
@@ -256,13 +260,16 @@ export default function App() {
     return () => { cancelled = true }
   }, [appUser?.id])
 
-  // Скроллим `.main` наверх при смене view или selectedAspect.
-  // Без этого позиция сохраняется и страница может оказаться на середине/внизу.
-  // Чат (journey) сам управляет скроллом — его не трогаем.
+  // Скроллим страницу наверх при смене view или selectedAspect. В обычном
+  // режиме (не journey) скролл живёт на window — поэтому скроллим именно его.
+  // Inner-`.main`.scrollTop оставляем на всякий случай (если когда-то снова
+  // окажемся в overflow-режиме на этом узле). Чат journey сам управляет
+  // скроллом — его не трогаем.
   const mainRef = useRef<HTMLElement | null>(null)
   useEffect(() => {
     if (view === 'journey') return
     if (mainRef.current) mainRef.current.scrollTop = 0
+    window.scrollTo(0, 0)
   }, [view, selectedAspect])
 
   // ── View history (back button) ────────────────────────────────────────
@@ -907,6 +914,8 @@ export default function App() {
 
   // ?u=<id> в URL → открываем публичный профиль (deeplink с шеринга).
   // Один раз при маунте: если параметр есть, переключаемся на view.
+  // ?reset_token=XXX в URL → открываем AuthModal в режиме смены пароля
+  // (см. backend/.../auth.py:password_reset_request — ссылка из email/TG).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const u = params.get('u')
@@ -916,6 +925,16 @@ export default function App() {
       // Убираем из URL чтобы reload не зацикливал.
       const url = new URL(window.location.href)
       url.searchParams.delete('u')
+      window.history.replaceState({}, '', url.toString())
+    }
+    const rt = params.get('reset_token')
+    if (rt && rt.length >= 16) {
+      setResetToken(rt)
+      setShowAuth(true)
+      // Убираем токен из URL — иначе reload снова откроет модалку и
+      // создаст ощущение «зациклилось», плюс токен висит в истории браузера.
+      const url = new URL(window.location.href)
+      url.searchParams.delete('reset_token')
       window.history.replaceState({}, '', url.toString())
     }
   }, [])
@@ -959,7 +978,7 @@ export default function App() {
 
   return (
     <ConfirmProvider>
-    <div className={styles.app}>
+    <div className={`${styles.app} ${view === 'journey' ? styles.appLocked : ''}`}>
       <AchievementToast items={toasts} onDismiss={dismissToast} />
       {showIntroTour && (
         <IntroTour
@@ -1006,9 +1025,10 @@ export default function App() {
       {showAuth && (
         <AuthModal
           onSuccess={handleAuthSuccess}
-          onClose={() => setShowAuth(false)}
+          onClose={() => { setShowAuth(false); setResetToken(null) }}
           user={appUser || null}
           initialMode={authInitialMode}
+          resetToken={resetToken}
         />
       )}
 
