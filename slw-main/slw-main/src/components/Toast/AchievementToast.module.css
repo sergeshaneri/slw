@@ -5,6 +5,10 @@
   top: calc(20px + env(safe-area-inset-top));
   right: calc(20px + env(safe-area-inset-right));
   z-index: 1000;
+  /* pointer-events: none — клики проходят сквозь wrapper. Без этого на
+     мобиле тост занимал всю ширину сверху и перекрывал sticky-шапку,
+     юзер 4.5 сек не мог тапнуть навигацию. Сам пузырь .toast получает
+     pointer-events: auto (см. ниже) — клик ПО тосту срабатывает на dismiss. */
   pointer-events: none;
 }
 

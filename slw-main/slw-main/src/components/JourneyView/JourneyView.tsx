@@ -9,7 +9,7 @@ import type { Script } from '@/types/script'
 import type { DiaryEntry } from '@/types/diary'
 import { postStepCompleted, chooseHabit } from '../../api/client'
 import { tmaHaptic } from '../../tma/hooks'
-import { ASPECT_COLORS, ASPECT_DATA } from '../../data/aspects'
+import { ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
 import { ONBOARDING } from '../../data/journey/onboarding'
 import { getJourney } from '../../data/journey/registry'
 import {
@@ -1930,7 +1930,11 @@ export default function JourneyView({
       )}
 
       {state.screen === 'levelcomplete' && (() => {
-        // На L0 после прохождения core — primary CTA «Открыть Колесо аспекта»
+        // На L0 после прохождения core — primary CTA «Открыть Колесо аспекта».
+        // wheelLabel строим из ASPECT_DISPLAY_KEY[currentAspect] чтобы не плодить
+        // условия per аспект — каждый получает свою корректную кириллицу
+        // (Si→БС, Te→ЧЛ, Ti→БЛ, и т.д.). Раньше fallback был хардкоден «БС»
+        // и Ti/Se юзеры видели «Открыть Колесо БС» на своём аспекте.
         const isNe = state.currentAspect === 'Ne'
         const isNi = state.currentAspect === 'Ni'
         const isTe = state.currentAspect === 'Te'
@@ -1938,17 +1942,8 @@ export default function JourneyView({
         const isFe = state.currentAspect === 'Fe'
         const hasSurveys = (currentLevel?.surveys?.length ?? 0) > 0
         const showWheel = a.currentLevel === 0 && (hasSurveys || isNe || isNi || isTe || isFi || isFe)
-        const wheelLabel = isNe
-          ? 'Открыть Колесо ЧИ'
-          : isNi
-            ? 'Открыть Колесо БИ'
-            : isTe
-              ? 'Открыть Колесо ЧЛ'
-              : isFi
-                ? 'Открыть Колесо БЭ'
-                : isFe
-                  ? 'Открыть Колесо ЧЭ'
-                  : 'Открыть Колесо БС'
+        const displayCode = ASPECT_DISPLAY_KEY[state.currentAspect] ?? state.currentAspect
+        const wheelLabel = `Открыть Колесо ${displayCode}`
         const showCoreOverview = isFe && a.currentLevel === 0
         return (
           <LevelComplete

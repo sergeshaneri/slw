@@ -8,11 +8,19 @@
   border: 1px solid rgba(255,255,255,0.12);
   color: #f1f2f5;
   font: inherit;
-  font-size: 16px;
-  padding: 6px 10px;
+  font-size: 18px;
+  /* 44×44 — минимальный тач-таргет. Раньше было ~32×28 (через padding 6/10),
+     палец пром��хивался по соседним кнопкам. */
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
   border-radius: 999px;
   cursor: pointer;
   transition: border-color .15s, background .15s;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .bell:hover {
@@ -52,6 +60,10 @@
 }
 
 .dropdownHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 12px 16px;
   font-size: 12px;
   letter-spacing: 0.16em;
@@ -59,6 +71,26 @@
   color: #5f6169;
   font-weight: 600;
   border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+/* «Прочитать всё» — компактная ссылка справа в шапке dropdown'а. */
+.markAllBtn {
+  background: transparent;
+  border: none;
+  color: #b39ddb;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background .12s, color .12s;
+}
+
+.markAllBtn:hover {
+  background: rgba(179,157,219,0.10);
+  color: #d6c5f5;
 }
 
 .muted {
@@ -105,8 +137,10 @@
 }
 
 .itemTime {
+  /* contrast bump: было #5f6169 на #15161c ≈ 3:1 (failing WCAG AA для small text).
+     #8f929c даёт ~4.7:1 — passing. */
   font-size: 11px;
-  color: #5f6169;
+  color: #8f929c;
 }
 
 /* На узких экранах колокольчик стоит не у правого края вьюпорта (рядом

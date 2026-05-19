@@ -95,6 +95,21 @@ export default function AuthModal({ onSuccess, onClose, user = null, initialMode
   // synchronous, режется в начале handler'а.
   const submitingRef = useRef<boolean>(false)
 
+  // ESC закрывает модал (стандарт UX). onClose дополнительно вызывается
+  // кликом по backdrop'у и крестику ×. Listener живёт только пока модал
+  // открыт (компонент примонтирован), на unmount cleanup.
+  useEffect(() => {
+    if (!onClose) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   // TG-виджет нужен только для линка email→TG (пользователь уже залогинен).
   useEffect(() => {
     if (!tgRef.current) return
@@ -266,9 +281,18 @@ export default function AuthModal({ onSuccess, onClose, user = null, initialMode
   // Tabs (Войти/Регистрация) — только для гостевого login/register
   const showTabs = !user && (mode === 'login' || mode === 'register')
 
+  // ARIA: role="dialog" + aria-modal сообщает скринридерам что открылся
+  // фокусированный диалог (NVDA/VoiceOver объявят «Диалог: Вход» вместо
+  // молчания). aria-labelledby связывает с h1.title для прочтения заголовка.
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+    <div className={styles.overlay} onClick={onClose} role="presentation">
+      <div
+        className={styles.modal}
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="auth-modal-title"
+      >
         {onClose && (
           <button
             type="button"
@@ -279,8 +303,8 @@ export default function AuthModal({ onSuccess, onClose, user = null, initialMode
             ×
           </button>
         )}
-        <div className={styles.logo}>🌀</div>
-        <h1 className={styles.title}>{title}</h1>
+        <div className={styles.logo} aria-hidden="true">🌀</div>
+        <h1 id="auth-modal-title" className={styles.title}>{title}</h1>
         {!user && (mode === 'login' || mode === 'register') && (
           <p className={styles.subtitle}>Соционика · Колесо Баланса</p>
         )}

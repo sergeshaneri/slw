@@ -55,8 +55,10 @@
    навигации есть предыдущий экран (canGoBack). На мобиле остаётся в первой
    строке flex-row, не перепрыгивает на свою строку. */
 .backBtn {
-  width: 36px;
-  height: 36px;
+  /* 44×44 — минимальный тач-таргет на мобиле. Раньше 36×36, на узких
+     даже 32×32 — палец промахивался. */
+  width: 44px;
+  height: 44px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -70,6 +72,7 @@
   justify-content: center;
   flex-shrink: 0;
   transition: background .15s, border-color .15s, transform .1s;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .backBtn:hover {
@@ -81,7 +84,9 @@
 .backBtn:active { transform: scale(0.95); }
 
 @media (max-width: 540px) {
-  .backBtn { width: 32px; height: 32px; font-size: 16px; }
+  /* Сохраняем 44×44 даже на узких — тач-таргет важнее. Меньше шрифт ок,
+     меньше hit-area — нет. */
+  .backBtn { width: 44px; height: 44px; font-size: 16px; }
 }
 
 /* Заголовок слева. */

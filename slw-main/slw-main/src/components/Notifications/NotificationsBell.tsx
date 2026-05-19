@@ -55,8 +55,15 @@ type Props = {
 
 /**
  * Колокольчик уведомлений в Header.
- * Раз в 30 секунд пуллит unread_count; клик — открывает выпадающую ленту,
- * автоматически помечает все прочитанными.
+ * Раз в 30 секунд пуллит unread_count; клик — открывает выпадающую ленту.
+ *
+ * Mark-as-read (с 2026-05): пометка прочитанным происходит ТОЛЬКО когда юзер:
+ *   • кликнул на конкретное уведомление (handleClick — закрывает дропдаун
+ *     и помечает только этот item, бэйдж декрементируется)
+ *   • кликнул «Прочитать всё» внизу списка
+ *
+ * Раньше открытие дропдауна авто-помечало все. Юзер случайно тапнул мимо →
+ * дропдаун открылся-закрылся → потерял возможность вернуться к unread.
  *
  * onOpenProfile / onOpenDM — callbacks из App.jsx для перехода по клику
  * на конкретное уведомление.
@@ -100,11 +107,8 @@ export default function NotificationsBell({ onOpenProfile, onOpenDM, onOpenHall 
     try {
       const list = ((await fetchNotifications(30)) as NotificationItem[]) ?? []
       setItems(list)
-      // Помечаем как прочитанные.
-      if (list.some(n => !n.is_read)) {
-        await markNotificationsRead(null).catch(() => {})
-      }
-      setUnread(0)
+      // НЕ помечаем автоматически. Юзер решает: либо тапает конкретное
+      // уведомление (handleClick), либо «Прочитать всё» (markAllRead).
     } catch {
       // молча
     } finally {
@@ -112,8 +116,22 @@ export default function NotificationsBell({ onOpenProfile, onOpenDM, onOpenHall 
     }
   }
 
+  // Локально помечаем item как прочитанный (visually) и декрементируем бэйдж.
+  // Бэк-пометка происходит на конкретный id (markNotificationsRead([id]))
+  // через тот же endpoint, что и markAll.
+  const markOneLocal = (id: number) => {
+    setItems(prev => prev.map(it => it.id === id ? { ...it, is_read: true } : it))
+    setUnread(u => Math.max(0, u - 1))
+  }
+
   const handleClick = (n: NotificationItem) => {
     setOpen(false)
+    // Если был unread — помечаем как прочитанное (и локально, и на бэке).
+    if (!n.is_read) {
+      markOneLocal(n.id)
+      // markNotificationsRead принимает массив id или null=все. Шлём конкретный.
+      markNotificationsRead([n.id]).catch(() => {})
+    }
     const p = n.payload || {}
     if (n.type === 'reaction' && p.actor_id && onOpenProfile) {
       onOpenProfile(p.actor_id)
@@ -126,6 +144,13 @@ export default function NotificationsBell({ onOpenProfile, onOpenDM, onOpenHall 
     }
   }
 
+  const markAllRead = async () => {
+    // Локальное обновление UI до сетевого запроса — мгновенный отклик.
+    setItems(prev => prev.map(it => ({ ...it, is_read: true })))
+    setUnread(0)
+    try { await markNotificationsRead(null) } catch { /* молча */ }
+  }
+
   return (
     <div className={styles.wrap} ref={wrapRef}>
       <button
@@ -133,14 +158,32 @@ export default function NotificationsBell({ onOpenProfile, onOpenDM, onOpenHall 
         className={styles.bell}
         onClick={handleToggle}
         title="Уведомления"
+        aria-label={unread > 0 ? `Уведомления (${unread} непрочитанных)` : 'Уведомления'}
+        aria-haspopup="true"
+        aria-expanded={open}
       >
         🔔
-        {unread > 0 && <span className={styles.badge}>{unread > 99 ? '99+' : unread}</span>}
+        {unread > 0 && (
+          <span className={styles.badge} aria-hidden="true">
+            {unread > 99 ? '99+' : unread}
+          </span>
+        )}
       </button>
 
       {open && (
-        <div className={styles.dropdown}>
-          <div className={styles.dropdownHead}>Уведомления</div>
+        <div className={styles.dropdown} role="dialog" aria-label="Уведомления">
+          <div className={styles.dropdownHead}>
+            <span>Уведомления</span>
+            {items.some(n => !n.is_read) && (
+              <button
+                type="button"
+                className={styles.markAllBtn}
+                onClick={markAllRead}
+              >
+                Прочитать всё
+              </button>
+            )}
+          </div>
           {busy && <div className={styles.muted}>Загружаем…</div>}
           {!busy && items.length === 0 && (
             <div className={styles.muted}>Пока пусто.</div>

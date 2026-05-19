@@ -45,13 +45,19 @@
 
 .closeBtn {
   flex-shrink: 0;
-  width: 22px;
-  height: 22px;
+  /* 32×32 visual size, но через padding hit-area становится ~44×44.
+     Раньше было 22×22 — слишком мелко для тапа на мобиле, юзер
+     промахивался и попадал в содержимое hint'а (которое не интерактивно). */
+  width: 44px;
+  height: 44px;
+  /* Margin negative компенсирует увеличенный hit-area: визуально хинт
+     остаётся компактным, но клик-зона полноценная. */
+  margin: -6px -6px -6px 0;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  background: transparent;
   color: rgba(214, 216, 226, 0.8);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1;
   cursor: pointer;
   display: inline-flex;
@@ -59,6 +65,7 @@
   justify-content: center;
   transition: background .15s, color .15s, border-color .15s;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .closeBtn:hover {

@@ -40,7 +40,10 @@ export default function LevelComplete({
 }: Props) {
   const levelNum = state.currentLevel ?? 0
   const planet = planetName ?? 'Terra Harmonia'
-  const wheelBtnLabel = wheelLabel ?? 'Открыть Колесо БС'
+  // Fallback БС больше не хардкоден — если родитель не передал wheelLabel,
+  // показываем нейтральное «Открыть Колесо аспекта». Сейчас JourneyView
+  // ВСЕГДА передаёт корректный label через ASPECT_DISPLAY_KEY.
+  const wheelBtnLabel = wheelLabel ?? 'Открыть Колесо аспекта'
 
   return (
     <>
