@@ -7,8 +7,8 @@
 | GIT-REMOTE | PASS | Fetch/ls-remote, main и slw-instruct сверены с GitHub |
 | GIT-BASE | PASS | codex/lite-local создана от c7f2b3c; tracked diff пуст |
 | TS-BASE | PASS | npm.cmd run typecheck, exit 0, в созданной ветке |
-| HARNESS | PASS | RUN-003: verify.ps1 -Mode Preparation -Typecheck, exit 0 |
-| LITE-UNIT | NOT_RUN | Тесты ещё не добавлены |
+| HARNESS | PASS | RUN-006: verify.ps1 -Mode Docs, exit 0; baseline Preparation/Typecheck также PASS |
+| LITE-UNIT | PASS (P1 state) | RUN-006: 5/5; storage/content ещё не реализованы |
 | LITE-BUILD | NOT_RUN | Реализация ещё не начата |
 | LITE-NETWORK | NOT_RUN | Нулевая сеть пока является требованием |
 | LITE-BROWSER | NOT_RUN | Сценарии будущей версии не выполнялись |

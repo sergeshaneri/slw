@@ -1,0 +1,14 @@
+{
+  "screen": "skill-detail", "onboardingStep": 1, "currentAspect": "Ni",
+  "aspects": { "Ni": {
+    "currentLevel": 2, "currentScriptIndex": 4, "currentScriptId": "ni-old", "awaitingInput": "exercise_note",
+    "messages": [{ "id": "ni-history", "role": "bot", "text": "История старой версии" }],
+    "completedScripts": ["ni-old"],
+    "pendingTasks": [{ "id": "ni-task", "scriptId": "U-old", "aspect": "Ni", "status": "taken" }]
+  }},
+  "skills": { "forecast": { "id": "forecast", "passes": 1, "result": 2.75, "insights": [{ "text": "Прогноз" }] } },
+  "activeSurvey": { "skillId": "forecast", "mode": "short", "startPass": 0, "stepIndex": 2, "answers": {} },
+  "skillDetailId": "forecast", "xp": 99, "stardust": 8, "streak": 3, "totalCompleted": 7,
+  "lastActiveDate": "2026-09-08", "contentVersion": 7,
+  "history": [{ "kind": "old-version", "value": 7 }]
+}

@@ -60,3 +60,30 @@ RUN-NNN — дата, этап:
 - Первая проверка staged whitespace остановила команду до коммита: ERR-007. Исправлены только завершающие пустые строки.
 - Перед коммитом повторно выполняется git diff --cached --check; успешный SHA доступен в Git log.
 - Push и deploy не выполняются. P1–P7 остаются TODO.
+
+<a id="run-005"></a>
+
+## RUN-005 — 2026-09-11, начало P1 и возобновление после лимита
+
+- Родительский HEAD: 1639516d7a7cb1cd2a109dacb42b837470953e07; ветка codex/lite-local.
+- Cwd: D:\Сережа\CODING\ot Esyi\slw-slw-instruct\slw-slw-instruct.
+- Прочитаны AGENTS.md, планы 001/002 и обязательные документы harness. Авторизация реализации и коммитов зафиксирована DEC-010.
+- git status --short, git branch --show-current, git rev-parse HEAD: exit 0; tracked-правок нет, два защищённых untracked сохранены. После возобновления состояние повторно подтверждено.
+- & ./plans/harness/verify.ps1 -Mode Preparation -Typecheck: exit 0, HARNESS PASS, TypeScript PASS. Unit/build/e2e ещё NOT_RUN.
+- Повторился ERR-001: PowerShell и Node kernel не запускались из-за apply deny-read ACLs. Штатный require_escalated позволил чтение и baseline; причина среды не установлена.
+- Первая попытка записи этой записи и запуска P1 остановлена usage limit (ERR-008), изменений не было. Пользователь попросил продолжить; read-only проверка снова завершилась exit 0.
+- P1 IN_PROGRESS: один исполнитель gpt-5.6-sol medium; тесты исходной миграции до механического выделения чистого state. Коммиты и центральные статусы исполнителю запрещены.
+- Следующий шаг: независимая проверка diff, typecheck и state unit оркестратором перед приёмкой P1.
+
+<a id="run-006"></a>
+
+## RUN-006 — 2026-09-11, приёмка P1
+
+- Задача P1; родительский HEAD 1639516d7a7cb1cd2a109dacb42b837470953e07; codex/lite-local.
+- Исполнитель gpt-5.6-sol medium. Отчёт получен: до переноса npm.cmd run test:lite:unit -- state, exit 0, 5/5; после переноса те же 5/5 и typecheck exit 0. Прерывание Selected model is at capacity устранено повторным запуском того же исполнителя без замены модели.
+- Scope: frontend package/lock, vitest/playwright configs, state.test.ts и три синтетических fixtures, domain/journey/state.ts, JourneyView.tsx и import defaults в App.tsx.
+- Оркестратор прочитал фактический diff, state tests/fixtures и конфиги. Сравнение блока с git show HEAD: совпадение точное после нормализации EOL и добавленных export. Алгоритмы не изменены; domain импортирует только типы и чистую константу SURVEY_BLOCK_KEYS из tree.ts.
+- Cwd проверок frontend: slw-main/slw-main. Оркестратор: npm.cmd run typecheck exit 0; npm.cmd run test:lite:unit -- state exit 0, 5/5; npm.cmd run test:lite:list exit 1, No tests found, 0 specs. Последнее ожидаемо на P1 и не считается PASS e2e.
+- Cwd остальных проверок: Git-root. git diff --exit-code -- backend slw-main/slw-main/src/data exit 0; git diff --check exit 0; verify.ps1 -Mode Docs exit 0 HARNESS PASS, защищённые SHA256 совпали.
+- Исправлено при ревью: отдельный Playwright порт 4174, /slw/, strictPort, reuseExistingServer:false; удалён --pass-with-no-tests (ERR-010).
+- P1 DONE. P2–P7 TODO; build/browser/network не выполнялись. Следующий этап P2: раздельный bootstrap и запрет транспорта.

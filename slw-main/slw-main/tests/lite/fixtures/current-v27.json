@@ -1,0 +1,16 @@
+{
+  "screen": "survey",
+  "onboardingStep": 4,
+  "currentAspect": "Fe",
+  "aspects": { "Fe": {
+    "currentLevel": 2, "currentScriptIndex": 5, "currentScriptId": "T-2", "awaitingInput": "text",
+    "messages": [{ "id": 71, "role": "bot", "text": "Сохранённая история" }, { "id": 72, "role": "user", "text": "Ответ" }],
+    "completedScripts": ["T-1", "W-1"],
+    "pendingTasks": [{ "id": "task-fe-1", "scriptId": "U-2", "aspect": "Fe", "addedAt": 1700000000000, "status": "deferred" }]
+  }},
+  "skills": { "fe-empathy": { "id": "fe-empathy", "passes": 2, "result": 3.5, "answers": { "body": [3, 4] }, "insights": [{ "text": "Наблюдение", "source": "manual" }] } },
+  "activeSurvey": { "scriptId": "survey-fe-empathy", "skillId": "fe-empathy", "mode": "full", "startPass": 1, "stepIndex": 3, "answers": { "body": [3, 4] } },
+  "skillDetailId": "fe-empathy", "xp": 540, "stardust": 37, "streak": 9, "totalCompleted": 18,
+  "lastActiveDate": "2026-09-10", "contentVersion": 27,
+  "history": [{ "kind": "level", "aspect": "Fe", "value": 2 }]
+}

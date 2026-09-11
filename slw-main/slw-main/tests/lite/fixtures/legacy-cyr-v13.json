@@ -1,0 +1,21 @@
+{
+  "screen": "chat", "onboardingStep": 2, "currentAspect": "ЧЭ",
+  "aspects": { "БС": {
+    "currentLevel": 1, "currentScriptIndex": 2, "currentScriptId": "legacy-si", "awaitingInput": null,
+    "messages": [{ "id": "si-1", "role": "bot", "text": "История БС" }],
+    "completedScripts": ["legacy-si"],
+    "pendingTasks": [{ "id": "si-task", "scriptId": "U-1", "status": "taken" }]
+  }},
+  "currentLevel": 3, "currentScriptIndex": 8, "currentScriptId": "legacy-fe", "awaitingInput": "number",
+  "messages": [{ "id": "fe-1", "role": "user", "text": "История ЧЭ" }],
+  "completedScripts": ["legacy-fe"],
+  "pendingTasks": [{ "id": "fe-task", "scriptId": "U-3", "status": "deferred" }],
+  "skills": {
+    "che-empathy": { "id": "che-empathy", "answers": { "knowledge": [4, null, 5], "practice": [3, 2] }, "result": 3.5, "insights": [{ "text": "Старый инсайт" }] },
+    "scan": { "id": "scan", "result": 4, "insights": [] }
+  },
+  "activeSurvey": { "scriptId": "legacy-survey", "skillId": "che-empathy", "blockIndex": 1, "statementIndex": 4, "answers": { "body": [4, 5] } },
+  "skillDetailId": "che-empathy", "xp": 321, "stardust": 12, "streak": 6, "totalCompleted": 11,
+  "lastActiveDate": "2026-09-09", "contentVersion": 13,
+  "history": [{ "kind": "legacy", "value": "сохранить" }]
+}

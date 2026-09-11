@@ -28,8 +28,10 @@
       "dependsOn": [
         "P0"
       ],
-      "status": "TODO",
-      "evidence": [],
+      "status": "DONE",
+      "evidence": [
+        "RUN_LOG.md#run-006"
+      ],
       "blocker": null
     },
     {
