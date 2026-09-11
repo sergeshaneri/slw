@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "branch": "codex/lite-local",
+  "baseCommit": "c7f2b3cd354cc6c92bb3b470a1164f0ddc6cb87f",
+  "activePlan": "plans/002-lite-restructure.md",
+  "allowedStatuses": [
+    "TODO",
+    "IN_PROGRESS",
+    "DONE",
+    "BLOCKED"
+  ],
+  "tasks": [
+    {
+      "id": "P0",
+      "title": "Проверить main, создать ветку и harness",
+      "dependsOn": [],
+      "status": "DONE",
+      "evidence": [
+        "RUN_LOG.md#run-001",
+        "RUN_LOG.md#run-002",
+        "RUN_LOG.md#run-003"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "P1",
+      "title": "Тесты исходного поведения и чистое journey state",
+      "dependsOn": [
+        "P0"
+      ],
+      "status": "TODO",
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "P2",
+      "title": "Разделить запуск и закрыть серверный транспорт",
+      "dependsOn": [
+        "P1"
+      ],
+      "status": "TODO",
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "P3",
+      "title": "Snapshot, transfer и локальная сессия",
+      "dependsOn": [
+        "P2"
+      ],
+      "status": "TODO",
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "P4",
+      "title": "Локальный игровой цикл",
+      "dependsOn": [
+        "P3"
+      ],
+      "status": "TODO",
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "P5",
+      "title": "Полный доступ и каталог",
+      "dependsOn": [
+        "P4"
+      ],
+      "status": "TODO",
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "P6",
+      "title": "Локальная оболочка и заглушки",
+      "dependsOn": [
+        "P5"
+      ],
+      "status": "TODO",
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "P7",
+      "title": "Приёмка и сборка",
+      "dependsOn": [
+        "P6"
+      ],
+      "status": "TODO",
+      "evidence": [],
+      "blocker": null
+    }
+  ]
+}

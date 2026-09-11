@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-09-11",
+  "branch": "codex/lite-local",
+  "baseCommit": "c7f2b3cd354cc6c92bb3b470a1164f0ddc6cb87f",
+  "baseTree": "2db87369d36051c9ed15d8f352a3ef47bf45dc00",
+  "frontend": "slw-main/slw-main",
+  "sourceBranch": "slw-instruct",
+  "remoteMain": "267eb5226bcdd842dc9d35d6caea5aec5dec35bd",
+  "remoteSource": "c7f2b3cd354cc6c92bb3b470a1164f0ddc6cb87f",
+  "remotePages": "03c6193a71cc8baaa717e1c481620e94a5b23798",
+  "remoteDefaultBranch": "gh-pages",
+  "shallow": false,
+  "historiesRelated": false,
+  "protectedFiles": [
+    {
+      "path": "план развития уведомлений в приложении.md",
+      "sha256": "13078806CE5C77CE31E2495DC4A608A1177394783D42D1BB5150B87DAD962D26"
+    },
+    {
+      "path": "план улучшения геймификации.md",
+      "sha256": "28893BBA395665AB81B231A9744307B33733EFD356D773F325DD74DB3D4464CC"
+    }
+  ]
+}
