@@ -16,6 +16,9 @@
 
 import type { paths } from '@/types/api'
 import type { AspectKey, CyrillicAspectKey } from '@/types/aspect'
+import { assertBackendAvailable, BackendUnavailableError } from '@/config/runtime'
+
+export { BackendUnavailableError }
 
 // Helper aliases for the per-endpoint response/body extraction. Most SLW
 // backend routes ship without an explicit response_model, so OpenAPI gives
@@ -123,10 +126,12 @@ function translateAspectsInResponse<T>(node: T, opts: TranslateOpts = {}): T {
 const BASE: string = import.meta.env.VITE_API_URL ?? ''
 
 function getToken(): string | null {
+  assertBackendAvailable()
   return localStorage.getItem('slw_token')
 }
 
 function setToken(token: string | null): void {
+  assertBackendAvailable()
   if (token) localStorage.setItem('slw_token', token)
   else localStorage.removeItem('slw_token')
 }
@@ -142,6 +147,7 @@ export type ApiError = Error & {
 }
 
 async function request(method: RequestMethod, path: string, body?: unknown): Promise<unknown> {
+  assertBackendAvailable()
   const token = getToken()
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) headers['Authorization'] = `Bearer ${token}`
@@ -173,6 +179,7 @@ async function request(method: RequestMethod, path: string, body?: unknown): Pro
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 export async function register(email: string, password: string, name: string = ''): Promise<RegisterResp> {
+  assertBackendAvailable()
   // Реферальный код из localStorage (сохраняется при первом входе по
   // ссылке `?ref=XXX`, см. utils/referral.ts).
   let referral_code: string | null = null
@@ -720,6 +727,7 @@ export async function fetchDiaryTemplate(): Promise<unknown> {
 // URL для скачивания vault-архива (пользуется JWT через ?token=fragment).
 // На самом деле для StreamingResponse используем fetch+blob — отдельная функция:
 export async function downloadVaultZip(): Promise<void> {
+  assertBackendAvailable()
   const token = getToken()
   if (!token) throw new Error('Не авторизован')
   const res = await fetch(`${BASE}/api/sync/vault/export`, {

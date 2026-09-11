@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { markHintSeen } from '../../api/client'
 import type { User } from '@/types/user'
 import styles from './Hint.module.css'
+import { backendEnabled } from '@/config/runtime'
 
 type HintPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left'
 
@@ -43,7 +44,7 @@ export default function Hint({
 }: Props) {
   const hintsSeen = user && typeof user === 'object' ? (user as { hints_seen?: Record<string, boolean | undefined> }).hints_seen : undefined
   const seenServer = !!hintsSeen?.[id]
-  const seenLocal = typeof window !== 'undefined' &&
+  const seenLocal = backendEnabled && typeof window !== 'undefined' &&
     localStorage.getItem(`hint_${id}`) === '1'
   const [dismissed, setDismissed] = useState(false)
 
@@ -51,6 +52,10 @@ export default function Hint({
 
   const handleClose = async () => {
     setDismissed(true)
+    if (!backendEnabled) {
+      onDismiss?.(id)
+      return
+    }
     if (user) {
       try { await markHintSeen(id) } catch { /* best-effort */ }
       onDismiss?.(id)

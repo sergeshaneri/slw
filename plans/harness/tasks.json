@@ -40,8 +40,10 @@
       "dependsOn": [
         "P1"
       ],
-      "status": "TODO",
-      "evidence": [],
+      "status": "DONE",
+      "evidence": [
+        "RUN_LOG.md#run-008"
+      ],
       "blocker": null
     },
     {

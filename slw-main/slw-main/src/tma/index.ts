@@ -16,6 +16,7 @@
  */
 
 import type { TelegramWebApp } from '@/types/telegram'
+import { backendEnabled } from '@/config/runtime'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -36,7 +37,7 @@ export const tma: TelegramWebApp | null =
 //
 // Для bootstrapTMA (где НУЖЕН initData чтобы получить JWT) отдельная
 // проверка initData.length > 0 — см. ниже.
-export const isTMA: boolean = !!(
+export const isTMA: boolean = backendEnabled && !!(
   tma &&
   tma.platform &&
   tma.platform !== 'unknown'
@@ -44,13 +45,14 @@ export const isTMA: boolean = !!(
 
 // Есть ли валидный initData для бэкенд-авторизации. Отдельно от isTMA, потому
 // что хуки MainButton/BackButton не зависят от initData, а bootstrap зависит.
-export const hasInitData: boolean = !!(tma && tma.initData && tma.initData.length > 0)
+export const hasInitData: boolean = backendEnabled && !!(tma && tma.initData && tma.initData.length > 0)
 
 /**
  * Стартовый параметр из t.me/<bot>/<app>?startapp=XYZ.
  * Используется как замена web-deeplink ?u=<id>.
  */
 export function getStartParam(): string | null {
+  if (!backendEnabled) return null
   return tma?.initDataUnsafe?.start_param || null
 }
 
@@ -62,6 +64,7 @@ export function getStartParam(): string | null {
  * Это важно для UX — открыл, закрыл, снова открыл → не ждём сетевой round-trip.
  */
 export async function bootstrapTMA(): Promise<string | null> {
+  if (!backendEnabled) return null
   if (!isTMA || !tma) return null
 
   // SDK-стандартные сигналы Telegram: «UI готов» + «развернуть на весь экран».

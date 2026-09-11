@@ -87,3 +87,30 @@ RUN-NNN — дата, этап:
 - Cwd остальных проверок: Git-root. git diff --exit-code -- backend slw-main/slw-main/src/data exit 0; git diff --check exit 0; verify.ps1 -Mode Docs exit 0 HARNESS PASS, защищённые SHA256 совпали.
 - Исправлено при ревью: отдельный Playwright порт 4174, /slw/, strictPort, reuseExistingServer:false; удалён --pass-with-no-tests (ERR-010).
 - P1 DONE. P2–P7 TODO; build/browser/network не выполнялись. Следующий этап P2: раздельный bootstrap и запрет транспорта.
+
+<a id="run-007"></a>
+
+## RUN-007 — 2026-09-11, начало P2
+
+- P1 принят и закоммичен 7908e4d; git show --stat и status exit 0, только два защищённых untracked.
+- P2 IN_PROGRESS; родительский HEAD 7908e4d; ветка codex/lite-local; cwd Git-root.
+- Scope: runtime, main/online bootstrap, базовый LiteApp, защиты api/auth/TMA/Hint, конфигурация entry и runtime/network tests.
+- Наблюдаемые исходные transport: client request, ZIP export, Telegram bootstrap. Polling DM 5/10 секунд, notifications 30 секунд, Hall backoff до 60 секунд. Network interception до goto; любая попытка FAIL.
+- Следующий шаг: отчёт исполнителя, независимое ревью и typecheck/unit/network с чистым storage, старыми токенами/URL/TMA и непустым API URL.
+
+<a id="run-008"></a>
+
+## RUN-008 — 2026-09-11, независимая проверка P2
+
+- P2; parent HEAD 7908e4d8ed3726f5f202bc93bc43f5bb5b00802d; codex/lite-local. Пользователь прервал ожидание и попросил продолжить; состояние Git сохранено, оба исполнителя возобновлены без смены модели.
+- Оркестратор прочитал diff API/TMA/auth/Hint и main/runtime/online/LiteApp, runtime/network tests и network audit fixture.
+- В online сохранены прежние mount/storage bridge/TMA операции. Ревью потребовало продолжать online mount при ошибке загрузки SDK; добавлен catch до импорта online. Live backend не использовался.
+- Cwd frontend slw-main/slw-main: npm.cmd run typecheck exit 0; npm.cmd run test:lite:unit exit 0, 8/8 (state 5, runtime 3).
+- Оркестратор npm.cmd run test:lite:e2e: exit 0, 2/2. Повтор с VITE_API_URL=https://backend.invalid: exit 0, 2/2. Перед обоими 4174 свободен, после второго NO_LISTENER_4174.
+- Network audit установлен до goto; API на любом /api и тестовом backend origin учитывается до abort. Проверены чистый storage, старые whl/token/admin/referral keys, URL token/reset_token/ref/tgAuthResult, fake TMA. API/SDK/backend WebSocket attempts = 0; legacy bytes совпали; storage bridge отсутствует.
+- В каждом сценарии браузерные часы продвинуты на 61000 ms, затем 250 ms реального ожидания. Это проверка таймеров стартового каркаса; P4–P7 добавят взаимодействия и cleanup. Тесты сейчас идут через dev; HMR не классифицируется как backend socket. P7 требует preview production bundle.
+- Cwd Git-root: git diff --check exit 0; verify.ps1 -Mode Docs exit 0, protected hashes совпали; git diff --exit-code -- backend slw-main/slw-main/src/data slw-main/slw-main/src/App.tsx exit 0.
+- READ-ONLY аудит P3 выполнен отдельным gpt-5.6-sol medium: уточнены nullable survey payload, diary extra fields и persist-before-replace; файлов не менял. Реализация P3 ещё не начата.
+
+- Финальный отчёт P2 получен: typecheck/unit/e2e совпадают с независимыми результатами. Исполнитель также выполнил default build и online build --mode online --outDir dist-online, exit 0; оркестратор build на P2 не повторял (полная независимая приёмка сборок запланирована P7).
+- P2 DONE после проверок обязательных gate. P3 следующий; runtime исходники после независимых tests не изменялись, нормализованы только EOF новых файлов.

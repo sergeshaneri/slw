@@ -11,6 +11,7 @@
 import { useEffect, useRef } from 'react'
 import { tma, isTMA } from './index'
 import type { TelegramHapticImpact, TelegramHapticNotify } from '@/types/telegram'
+import { backendEnabled } from '@/config/runtime'
 
 // ── Координация владения BackButton между компонентами ─────────────────────
 // Аналогично MainButton (теперь удалён): при unmount шедулим hide через 50мс,
@@ -38,7 +39,7 @@ export function useBackButton(onClick: (() => void) | null | undefined): void {
 
   // Регистрация click handler — один раз.
   useEffect(() => {
-    if (!isTMA || !tma) return
+    if (!backendEnabled || !isTMA || !tma) return
     const btn = tma.BackButton
     if (!btn) return
     const trampoline = () => handlerRef.current?.()
@@ -48,7 +49,7 @@ export function useBackButton(onClick: (() => void) | null | undefined): void {
 
   // Управление видимостью — на смену onClick (null/функция).
   useEffect(() => {
-    if (!isTMA || !tma) return
+    if (!backendEnabled || !isTMA || !tma) return
     const btn = tma.BackButton
     if (!btn) return
     if (onClick) {
@@ -62,7 +63,7 @@ export function useBackButton(onClick: (() => void) | null | undefined): void {
 
   // Hide on unmount — с задержкой.
   useEffect(() => {
-    if (!isTMA) return
+    if (!backendEnabled || !isTMA) return
     return () => { scheduleBackHide() }
   }, [])
 }
@@ -73,6 +74,7 @@ export function useBackButton(onClick: (() => void) | null | undefined): void {
  * @param {('light'|'medium'|'heavy'|'rigid'|'soft')} [kind='light'] — для impactOccurred
  */
 export function tmaHaptic(kind: TelegramHapticImpact = 'light'): void {
+  if (!backendEnabled) return
   try {
     tma?.HapticFeedback?.impactOccurred?.(kind)
   } catch { /* старый клиент без HapticFeedback */ }
@@ -84,6 +86,7 @@ export function tmaHaptic(kind: TelegramHapticImpact = 'light'): void {
  * @param {('success'|'error'|'warning')} kind
  */
 export function tmaNotify(kind: TelegramHapticNotify): void {
+  if (!backendEnabled) return
   try {
     tma?.HapticFeedback?.notificationOccurred?.(kind)
   } catch { /* старый клиент */ }
@@ -97,7 +100,7 @@ export function tmaNotify(kind: TelegramHapticNotify): void {
  * Аспект-цвета (ASPECT_COLORS) не трогаем — у них своя семантика.
  */
 export function applyTmaTheme(): void {
-  if (!isTMA || !tma) return
+  if (!backendEnabled || !isTMA || !tma) return
   const t = tma.themeParams
   if (!t) return
   const root = document.documentElement
@@ -120,7 +123,7 @@ export function applyTmaTheme(): void {
  * Возвращает unsubscribe (если потребуется).
  */
 export function listenTmaTheme(): () => void {
-  if (!isTMA || !tma) return () => {}
+  if (!backendEnabled || !isTMA || !tma) return () => {}
   const tg = tma // capture narrowed reference for closure
   const handler = () => applyTmaTheme()
   tg.onEvent?.('themeChanged', handler)

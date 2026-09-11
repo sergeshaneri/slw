@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchMe, logout as apiLogout, getToken, setToken, telegramAuth } from '../api/client'
 import type { paths } from '@/types/api'
+import { backendEnabled } from '@/config/runtime'
 
 // /api/auth/me — response shape is currently { [key: string]: unknown } in
 // OpenAPI (backend has no response_model). The path-helper carries that as
@@ -33,6 +34,12 @@ export function useAuth(): UseAuthReturn {
   const [loading, setLoading] = useState<boolean>(true)
 
   useEffect(() => {
+    if (!backendEnabled) {
+      setUser(false)
+      setLoading(false)
+      return
+    }
+
     // Fallback for Telegram widget-mode callback: result arrives as
     // #tgAuthResult=base64(JSON) in the hash. Decode and exchange for a JWT
     // via /api/auth/telegram. Normal flow uses ?token= (handled below).
@@ -83,6 +90,10 @@ export function useAuth(): UseAuthReturn {
   }, [])
 
   const logout = useCallback(() => {
+    if (!backendEnabled) {
+      setUser(false)
+      return
+    }
     apiLogout()
     setUser(false)
   }, [])

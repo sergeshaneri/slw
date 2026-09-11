@@ -119,3 +119,11 @@ ERR-NNN — краткий симптом
 ### ERR-007 повтор при P1
 
 RUN-006: git diff --cached --check обнаружил new blank line at EOF в новом domain/journey/state.ts, exit 2. Коммит не запускался. Оркестратор нормализовал только окончание файла до одного перевода строки; алгоритм не изменён. Повтор staged check обязателен.
+
+## ERR-012 — браузерная среда и диагностическая команда P2
+
+- RUN-008; environment/process; RESOLVED для Chromium tests.
+- По отчёту исполнителя первый e2e exit 1 до теста: Chromium headless shell отсутствовал. npm.cmd exec playwright install chromium exit 0; установлен Chromium 140.0.7339.16 build 1187, Playwright 1.55.0.
+- Ошибочная команда npm.cmd exec playwright install --dry-run не передала флаг и начала дополнительную загрузку Firefox/WebKit. Процесс завершился; cache не удалялся. Для будущей передачи flags использовать прямой node_modules/.bin/playwright.cmd или разделитель npm exec --.
+- Прямой chrome --version дал Windows sandbox access errors; версия основана на installer output. Повторные e2e исполнителя и оркестратора 2/2 default + 2/2 backend.invalid, exit 0; listener освобождён.
+- Исправление SDK failure fallback найдено ревью до приёмки. Ошибка CRLF-якоря при записи api/client не сохранила файл; повторная узкая правка подтверждена diff.
