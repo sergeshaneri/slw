@@ -1,10 +1,14 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { LiteSettings } from './LiteSettings'
+import { useLiteSession } from './useLiteSession'
 
 export function LiteApp() {
+  const session = useLiteSession()
   return (
     <main
       data-runtime="lite"
+      data-session-epoch={session.sessionEpoch}
       style={{
         boxSizing: 'border-box',
         minHeight: '100vh',
@@ -17,8 +21,9 @@ export function LiteApp() {
       <p style={{ color: '#9aa3b2', margin: 0 }}>Локальная временная версия</p>
       <h1 style={{ marginBlock: '0.5rem 1rem' }}>Соционика — Колесо Баланса</h1>
       <p style={{ maxWidth: '42rem', lineHeight: 1.6 }}>
-        Локальная оболочка подготовлена. Путешествие, материалы и сохранение будут подключены на следующих этапах.
+        Данные хранятся локально в одном snapshot. Путешествие и материалы подключаются на следующих этапах.
       </p>
+      <LiteSettings session={session} />
     </main>
   )
 }

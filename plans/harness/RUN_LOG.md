@@ -148,3 +148,24 @@ RUN-NNN — дата, этап:
 - Непустая history отклоняется: в текущем frontend producer не подключён, строгая форма её элементов не определена. Формат lite не импортирует legacy account snapshots. SendKeyMode взят type-only из существующего hook, прежний LocalStorageKey сохранён.
 - Cwd root: git diff --check exit 0; verify.ps1 -Mode Docs exit 0, protected hashes совпали; git diff --exit-code -- backend slw-main/slw-main/src/data slw-main/slw-main/src/domain/journey/state.ts exit 0.
 - P3.1 DONE; P3.2 и родитель P3 TODO. Browser/session/импорт при смонтированном UI ещё NOT_RUN. Следующий шаг P3.2, session/settings/browser.
+
+<a id="run-012"></a>
+
+## RUN-012 — 2026-09-12, начало P3.2
+
+- Parent HEAD 8662c00; codex/lite-local. P3.1 отдельный commit, show/status exit 0; только защищённые untracked.
+- P3.2 IN_PROGRESS: useLiteSession, settings и минимальная интеграция в LiteApp; browser проверки reload/import/export/reset/error/conflict. Игровой движок подключается следующим P4.
+- Ожидаемый результат: persist-before-replace, epoch только accepted replacement, видимый volatile/conflict, raw recovery, preferences в snapshot; старые ключи нетронуты. Даже getter window.localStorage может бросить SecurityError.
+- Приёмка: typecheck/unit и browser/network на реальном UI настроек, импорт synthetic fixtures без фиктивных игровых начислений. Родитель P3 DONE только после завершения обеих подзадач и общих gate.
+
+<a id="run-013"></a>
+
+## RUN-013 — 2026-09-12, приёмка P3.2 и P3
+
+- Parent HEAD 8662c00864606a1c44a64dd359d87aff3c520c30; codex/lite-local. Возобновлён один исполнитель gpt-5.6-sol medium; независимый read-only аудит готовит P4.
+- Прочитан фактический hook/settings/CSS/LiteApp, storage/network browser tests. Приняты epoch-bound callbacks, persist-before-replace, visible volatile/conflict, raw recovery включая пустую строку, единые preferences. Игровой компонент пока не смонтирован: проверка его замены остаётся P4.
+- Root cwd frontend: npm.cmd run typecheck exit 0; npm.cmd run test:lite:unit exit 0, 25/25; npm.cmd run test:lite:e2e exit 0, 13/13 (11.4s). После unit/typecheck product source не менялся; изменено только точное название serialization-теста.
+- Browser: clean snapshot/reload, preview/cancel/import/full export roundtrip, invalid/quota/security import preserving memory and disk, getter SecurityError, corrupt raw download/reset, two-tab conflict/accept, read-before-save, serialization failure, external clear, byte-identical legacy keys. Audit до goto во всех сценариях, API/SDK/backend WebSocket attempts 0. Dev-server gate; production preview остаётся P7.
+- Исполнитель также test:lite:list exit 0, 13 tests/2 files. Root до e2e проверил свободный порт 4174.
+- Root cwd Git-root: git diff --check exit 0; verify.ps1 -Mode Docs exit 0; protected hashes совпали; backend/data/domain state не менялись.
+- P3.2 и родитель P3 DONE. Следующий этап P4: реальный локальный игровой цикл и его browser-проверки.

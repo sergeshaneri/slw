@@ -8,16 +8,16 @@
 | GIT-BASE | PASS | codex/lite-local создана от c7f2b3c; tracked diff пуст |
 | TS-BASE | PASS | npm.cmd run typecheck, exit 0, в созданной ветке |
 | HARNESS | PASS | RUN-006: verify.ps1 -Mode Docs, exit 0; baseline Preparation/Typecheck также PASS |
-| LITE-UNIT | PASS (P1 state) | RUN-011: 25/25 state/runtime/storage; content ещё не реализован |
-| LITE-BUILD | NOT_RUN | Реализация ещё не начата |
-| LITE-NETWORK | PASS (P2 startup) | RUN-008: 2/2 default + 2/2 backend.invalid; игровой цикл ещё NOT_RUN |
-| LITE-BROWSER | PASS (P2 startup) | RUN-008; полная матрица P7 ещё NOT_RUN |
+| LITE-UNIT | PASS (P3) | RUN-013: 25/25 state/runtime/storage; content ещё не реализован |
+| LITE-BUILD | NOT_RUN (root) | P2 executor build PASS; независимая приёмка сборки запланирована P7 |
+| LITE-NETWORK | PASS (P3 session) | RUN-013: 13/13 default, 0 API; RUN-008: backend.invalid startup; игровой цикл ещё NOT_RUN |
+| LITE-BROWSER | PASS (P3 session) | RUN-013: 13/13; полная матрица P7 ещё NOT_RUN |
 
 ## Команды
 
 Сейчас: из Git-root `& ./plans/harness/verify.ps1 -Mode Preparation -Typecheck`. После начала правок продукта: Mode Docs.
 
-В будущем из slw-main/slw-main: typecheck, test:lite:unit, build, test:lite:list, test:lite:e2e. Последние тестовые scripts добавляются P1, сейчас их не запускать как существующие.
+Из slw-main/slw-main доступны typecheck, test:lite:unit, build, test:lite:list, test:lite:e2e. Итоговые production-проверки выполняются в P7.
 
 ## Обязательная матрица P7
 

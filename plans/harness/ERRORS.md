@@ -127,3 +127,11 @@ RUN-006: git diff --cached --check обнаружил new blank line at EOF в �
 - Ошибочная команда npm.cmd exec playwright install --dry-run не передала флаг и начала дополнительную загрузку Firefox/WebKit. Процесс завершился; cache не удалялся. Для будущей передачи flags использовать прямой node_modules/.bin/playwright.cmd или разделитель npm exec --.
 - Прямой chrome --version дал Windows sandbox access errors; версия основана на installer output. Повторные e2e исполнителя и оркестратора 2/2 default + 2/2 backend.invalid, exit 0; listener освобождён.
 - Исправление SDK failure fallback найдено ревью до приёмки. Ошибка CRLF-якоря при записи api/client не сохранила файл; повторная узкая правка подтверждена diff.
+
+## ERR-013 — корректировки session/browser P3.2
+
+- RUN-013; implementation/test; RESOLVED в пределах P3.2.
+- Ревью выявило falsy-проверку пустого corrupt raw, отсутствие catch validation/serialization, пропуск storage clear event, повтор initial-save в StrictMode и устаревший corrupt marker после принятия external missing. Исправлены локально; соответствующие browser сценарии прошли независимо.
+- Первый read-before-save тест записывал внешний revision до завершения React init; наблюдаемый durable соответствовал загрузке уже нового snapshot. Тест теперь ждёт отображения начального режима перед same-tab setItem и реальным click. Проверка конфликта сохранена.
+- Serialization failure проверяется явным throw JSON.stringify; название теста уточнено, поскольку payload остаётся валидным. Предыдущие три serial-skipped сценария не считаются failures.
+- Итог root: 13/13 browser exit 0. Перед конфликтными действиями синхронизировать тест с наблюдаемым исходным UI; не заменять критерий ослабленной проверкой.

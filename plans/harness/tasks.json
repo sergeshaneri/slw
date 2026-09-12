@@ -52,8 +52,10 @@
       "dependsOn": [
         "P3.2"
       ],
-      "status": "TODO",
-      "evidence": [],
+      "status": "DONE",
+      "evidence": [
+        "RUN_LOG.md#run-013"
+      ],
       "blocker": null
     },
     {
@@ -118,8 +120,10 @@
       "dependsOn": [
         "P3.1"
       ],
-      "status": "TODO",
-      "evidence": [],
+      "status": "DONE",
+      "evidence": [
+        "RUN_LOG.md#run-013"
+      ],
       "blocker": null,
       "criteria": [
         "sessionEpoch только принятая замена; volatile/conflict видимы",

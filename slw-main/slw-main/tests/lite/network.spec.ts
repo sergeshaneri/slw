@@ -10,6 +10,7 @@ const legacyStorage = {
   slw_pending_ref: 'REF-OLD',
   welcome_seen: '1',
   'hint_nav-aspects-cta': '1',
+  slw_send_key_mode: 'ctrl+enter',
 } as const
 
 async function advancePastOnlinePolling(page: Parameters<typeof installNetworkAudit>[0]) {
@@ -25,6 +26,8 @@ test('clean storage starts lite without API or Telegram SDK', async ({ page }) =
 
   await page.goto('./')
   await expect(page.locator('[data-runtime="lite"]')).toBeVisible()
+  await expect(page.locator('[data-session-status="durable"]')).toBeVisible()
+  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(['slw_lite_v1_state'])
   const absentLegacyValues = await page.evaluate((keys) => keys.map((key) => localStorage.getItem(key)), Object.keys(legacyStorage))
   expect(absentLegacyValues).toEqual(Object.keys(legacyStorage).map(() => null))
   await advancePastOnlinePolling(page)
@@ -64,6 +67,7 @@ test('legacy storage, auth URL and fake Telegram remain untouched in lite', asyn
 
   await page.goto('./?ref=REF-URL&token=URL-TOKEN&reset_token=reset-token-1234567890#tgAuthResult=e30%3D')
   await expect(page.locator('[data-runtime="lite"]')).toBeVisible()
+  await expect(page.locator('[data-session-status="durable"]')).toBeVisible()
   await advancePastOnlinePolling(page)
 
   const result = await page.evaluate((keys) => ({

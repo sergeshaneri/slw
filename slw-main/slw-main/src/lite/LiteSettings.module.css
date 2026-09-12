@@ -1,0 +1,61 @@
+.panel {
+  max-width: 52rem;
+  margin-top: 2rem;
+  padding: 1.25rem;
+  border: 1px solid #30334f;
+  border-radius: 14px;
+  background: #141529;
+}
+.heading {
+  display: flex;
+  gap: 1rem;
+  align-items: start;
+  justify-content: space-between;
+}
+.heading h2 { margin: 0.2rem 0 0; }
+.eyebrow { margin: 0; color: #9aa3b2; font-size: 0.85rem; }
+.status {
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: #262943;
+  color: #d8dcff;
+  font-size: 0.85rem;
+}
+.notice, .conflict {
+  margin: 1rem 0;
+  padding: 0.8rem;
+  border: 1px solid #7d6632;
+  border-radius: 8px;
+  background: #292311;
+  color: #f3dfab;
+}
+.conflict p { margin-top: 0; }
+.fieldset {
+  display: grid;
+  gap: 0.6rem;
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border: 1px solid #30334f;
+  border-radius: 8px;
+}
+.fieldset label { display: flex; gap: 0.55rem; align-items: center; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.65rem; }
+.actions button {
+  padding: 0.55rem 0.8rem;
+  border: 1px solid #51577f;
+  border-radius: 7px;
+  background: #252945;
+  color: #fff;
+  cursor: pointer;
+}
+.actions button:hover { background: #303657; }
+.actions .danger { border-color: #8c4c57; color: #ffd9df; }
+.file { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; }
+.confirm {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #626a9a;
+  border-radius: 10px;
+  background: #1c1e36;
+}
+.confirm h3 { margin-top: 0; }
