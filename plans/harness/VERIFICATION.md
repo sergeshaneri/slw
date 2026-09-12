@@ -8,7 +8,7 @@
 | GIT-BASE | PASS | codex/lite-local создана от c7f2b3c; tracked diff пуст |
 | TS-BASE | PASS | npm.cmd run typecheck, exit 0, в созданной ветке |
 | HARNESS | PASS | RUN-006: verify.ps1 -Mode Docs, exit 0; baseline Preparation/Typecheck также PASS |
-| LITE-UNIT | PASS (P1 state) | RUN-008: 8/8 state/runtime; storage/content ещё не реализованы |
+| LITE-UNIT | PASS (P1 state) | RUN-011: 25/25 state/runtime/storage; content ещё не реализован |
 | LITE-BUILD | NOT_RUN | Реализация ещё не начата |
 | LITE-NETWORK | PASS (P2 startup) | RUN-008: 2/2 default + 2/2 backend.invalid; игровой цикл ещё NOT_RUN |
 | LITE-BROWSER | PASS (P2 startup) | RUN-008; полная матрица P7 ещё NOT_RUN |

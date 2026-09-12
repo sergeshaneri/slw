@@ -50,7 +50,7 @@
       "id": "P3",
       "title": "Snapshot, transfer и локальная сессия",
       "dependsOn": [
-        "P2"
+        "P3.2"
       ],
       "status": "TODO",
       "evidence": [],
@@ -95,6 +95,36 @@
       "status": "TODO",
       "evidence": [],
       "blocker": null
+    },
+    {
+      "id": "P3.1",
+      "title": "Snapshot и строгий transfer",
+      "dependsOn": [
+        "P2"
+      ],
+      "status": "DONE",
+      "evidence": [
+        "RUN_LOG.md#run-011"
+      ],
+      "blocker": null,
+      "criteria": [
+        "Единый slw_lite_v1_state; строгий whitelist и roundtrip фактических данных",
+        "Storage unit success/quota/security/corrupt/schema/conflict; typecheck PASS"
+      ]
+    },
+    {
+      "id": "P3.2",
+      "title": "Локальная сессия и настройки transfer",
+      "dependsOn": [
+        "P3.1"
+      ],
+      "status": "TODO",
+      "evidence": [],
+      "blocker": null,
+      "criteria": [
+        "sessionEpoch только принятая замена; volatile/conflict видимы",
+        "Browser import/export/reset/reload/conflict/errors; failed import сохраняет memory/durable"
+      ]
     }
   ]
 }

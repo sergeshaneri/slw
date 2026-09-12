@@ -114,3 +114,37 @@ RUN-NNN — дата, этап:
 
 - Финальный отчёт P2 получен: typecheck/unit/e2e совпадают с независимыми результатами. Исполнитель также выполнил default build и online build --mode online --outDir dist-online, exit 0; оркестратор build на P2 не повторял (полная независимая приёмка сборок запланирована P7).
 - P2 DONE после проверок обязательных gate. P3 следующий; runtime исходники после независимых tests не изменялись, нормализованы только EOF новых файлов.
+
+<a id="run-009"></a>
+
+## RUN-009 — 2026-09-11, начало P3
+
+- Parent HEAD 15d1e3c; codex/lite-local. P2 отдельный commit, show/status exit 0; только защищённые untracked.
+- P3 IN_PROGRESS: один snapshot slw_lite_v1_state, строгий transfer validator, useLiteSession и минимальные настройки для проверяемого import/export/reset/error UI.
+- Предварительный read-only аудит уточнил: sparse survey answers сериализуются как null; blocks/averages nullable; diary содержит blockId/blockTitle/itemId/insight/insightSource. Собственные scores 1..10, onboardingStep 0..6 (6 задаётся при выборе аспекта). Валидатор проверяется roundtrip реально создаваемых форм; migrateState сам по себе validator не является.
+- Ожидаемые проверки: typecheck, storage unit success/quota/security/corrupt/schema/invalid fields, browser reload/import/reset/conflict/legacy-key preservation. Ошибка импорта сохраняет активную сессию и durable bytes.
+- Epoch меняется только при принятой замене/сбросе; автосохранение не remount. Повреждённый raw не перезаписывается автоматически.
+
+<a id="run-010"></a>
+
+## RUN-010 — 2026-09-12, возобновление и разбиение P3
+
+- Parent HEAD 15d1e3c453a999c6509517e19ca86e80e17d8237; codex/lite-local; cwd Git-root.
+- Два возобновления пользователя после usage limit. Предыдущая запись RUN-010 была отклонена auto-review до выполнения, обхода не было. Исполнитель остановился при compact с usage limit.
+- Текущая read-only проверка Git exit 0: product diff types/storage.ts и новый utils/liteTransfer.ts; прочая незавершённая работа только harness. Защищённые untracked на месте.
+- P3 разделён на P3.1 (storage/transfer/unit) и P3.2 (session/settings/browser), с отдельной приёмкой и коммитами. Родитель P3 TODO до обеих задач и общих проверок; P3.1 IN_PROGRESS зависит от принятого P2.
+- Возобновляется один кодовый исполнитель gpt-5.6-sol medium; дополнительных read-only агентов пока нет. Модель не заменяется.
+- Известный apply_patch write failure не доказывает причину ACL. Используются короткие штатные elevated PowerShell записи; реальные auto-review отказы не обходятся.
+
+<a id="run-011"></a>
+
+## RUN-011 — 2026-09-12, приёмка P3.1
+
+- P3.1; parent HEAD 15d1e3c453a999c6509517e19ca86e80e17d8237; codex/lite-local.
+- Исполнитель gpt-5.6-sol medium завершил 5 разрешённых файлов: types/storage.ts, utils/liteStorage.ts, utils/liteTransfer.ts, tests/lite/storage.test.ts, fixtures/storage.ts. Hook/UI не изменены.
+- Оркестратор прочитал весь storage, существенные части полного nested validator, тесты и синтетические fixtures, diff типов. По ревью добавлены explicit corrupt replacement со сверкой raw, integer answers/counters, запрет admin-skills/_admin, канонический UTC timestamp, invalid-save/no-write и legacy-read проверки.
+- Cwd frontend: оркестратор npm.cmd run typecheck exit 0; npm.cmd run test:lite:unit exit 0, 25/25 (storage17/state5/runtime3). Исполнитель отдельно storage17/17 exit 0.
+- Проверены single-key/single-setItem, roundtrip nullable survey/diary, unknown fields/schema/maps, prototype keys, quota/security, revision+raw conflict, отсутствие автоматической corrupt-перезаписи и explicit replacement. Не заявляется CAS полностью одновременных записей.
+- Непустая history отклоняется: в текущем frontend producer не подключён, строгая форма её элементов не определена. Формат lite не импортирует legacy account snapshots. SendKeyMode взят type-only из существующего hook, прежний LocalStorageKey сохранён.
+- Cwd root: git diff --check exit 0; verify.ps1 -Mode Docs exit 0, protected hashes совпали; git diff --exit-code -- backend slw-main/slw-main/src/data slw-main/slw-main/src/domain/journey/state.ts exit 0.
+- P3.1 DONE; P3.2 и родитель P3 TODO. Browser/session/импорт при смонтированном UI ещё NOT_RUN. Следующий шаг P3.2, session/settings/browser.

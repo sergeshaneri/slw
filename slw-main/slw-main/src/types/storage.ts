@@ -1,6 +1,10 @@
+import type { SendKeyMode } from '../hooks/useSendKeyMode'
+import type { AspectScores } from './aspect'
+import type { DiaryEntry } from './diary'
+import type { JourneyState } from './journey'
+
 // Known localStorage keys. The trailing `string` keeps this open for
 // dynamic per-id keys like `hint_${id}` while documenting the known set.
-// Found in src/api/client.js, src/App.jsx, components/Heatmap, etc.
 export type LocalStorageKey =
   | 'slw_token'
   | 'slw_dev_admin'
@@ -10,3 +14,24 @@ export type LocalStorageKey =
   | 'hint_nav-aspects-cta'
   | 'hint_journey-chat-intro'
   | string
+
+export type LitePreferences = {
+  sendKeyMode?: SendKeyMode
+  hintsSeen?: Record<string, boolean>
+}
+
+export type LiteData = {
+  journey: JourneyState
+  scores: AspectScores
+  diary: DiaryEntry[]
+  history: unknown[]
+  preferences: LitePreferences
+}
+
+export type LiteSnapshot = {
+  format: 'slw-lite'
+  schemaVersion: 1
+  revision: number
+  updatedAt: string
+  data: LiteData
+}
