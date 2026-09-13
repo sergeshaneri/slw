@@ -6,7 +6,7 @@ import ScriptButtons from './ScriptButtons'
 import Slider from './Slider'
 import StepInsightPrompt from './StepInsightPrompt'
 import Hint from '../Onboarding/Hint'
-import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
+import { useSendKeyMode, shouldSendOnKeyDown, useUiPreferences } from '../../hooks/useSendKeyMode'
 import styles from './JourneyView.module.css'
 
 // JourneyView передаёт «плоский» state — глобальный + поля активной папки
@@ -36,6 +36,7 @@ type Props = {
   planet?: string
   // NOTE(ts): tightened in P3 after App.jsx conversion.
   user?: unknown
+  backendEnabled?: boolean
 }
 
 export default function Chat({
@@ -44,7 +45,7 @@ export default function Chat({
   onOpenProfile, onOpenTasks, pendingCount = 0,
   onGoToSurveys, surveyRemaining = 0,
   onOpenPlanetMap,
-  aspectName, planet, user
+  aspectName, planet, user, backendEnabled = true
 }: Props) {
   // Резолвер из props учитывает level, fallback на текущие scripts.
   const lookup = (m: ChatMessage): Script | null | undefined => {
@@ -54,6 +55,7 @@ export default function Chat({
   }
 
   const [sendKeyMode] = useSendKeyMode()
+  const preferences = useUiPreferences()
 
   // Локальный стейт ползунка для awaitingInput='number'. Сбрасывается на 5
   // каждый раз, когда новый шаг просит число.
@@ -108,11 +110,12 @@ export default function Chat({
   // отсутствует (старые browsers).
   const handleInputFocus = () => setInputFocused(true)
   const handleInputBlur = () => {
-    // Если visualViewport есть — не сбрасываем сразу, он сам поймает
-    // закрытие клавиатуры. Иначе сбрасываем по blur.
-    if (typeof window === 'undefined' || !window.visualViewport) {
+    if (typeof window === 'undefined') {
       setInputFocused(false)
+      return
     }
+    const vv = window.visualViewport
+    setInputFocused(Boolean(vv && window.innerHeight - vv.height > 100))
   }
 
   // Когда inputFocused становится true — скроллим чат вниз чтобы последнее
@@ -193,8 +196,12 @@ export default function Chat({
             обе подсказки сыпались одновременно — было перегружено. */}
         {(() => {
           const userObj = user as { hints_seen?: Record<string, unknown> } | null | undefined
+          let seenLegacy = false
+          if (!preferences && typeof window !== 'undefined') {
+            try { seenLegacy = localStorage.getItem('hint_journey-chat-intro') === '1' } catch { /* ignore */ }
+          }
           const chatIntroSeen = !!(userObj?.hints_seen?.['journey-chat-intro'])
-            || (typeof window !== 'undefined' && localStorage.getItem('hint_journey-chat-intro') === '1')
+            || (preferences ? !!preferences.hintsSeen?.['journey-chat-intro'] : seenLegacy)
           const folder = state.aspects?.[state.currentAspect]
           const completedCount = (folder?.completedScripts ?? []).length
           if (!chatIntroSeen || completedCount < 1) return null
@@ -230,7 +237,7 @@ export default function Chat({
         )}
 
         {!isTyping && currentScript && !state.awaitingInput && (
-          <ScriptButtons script={currentScript} onAction={onAction} />
+          <ScriptButtons script={currentScript} onAction={onAction} localTaskMode={!backendEnabled} />
         )}
 
         {/* Intro-сообщения первого захода: одна кнопка «Далее» (без insight).

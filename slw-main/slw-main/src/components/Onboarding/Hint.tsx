@@ -3,6 +3,7 @@ import { markHintSeen } from '../../api/client'
 import type { User } from '@/types/user'
 import styles from './Hint.module.css'
 import { backendEnabled } from '@/config/runtime'
+import { useUiPreferences } from '@/hooks/useSendKeyMode'
 
 type HintPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left'
 
@@ -42,16 +43,25 @@ export default function Hint({
   onDismiss,
   position = 'top-right',
 }: Props) {
+  const preferences = useUiPreferences()
   const hintsSeen = user && typeof user === 'object' ? (user as { hints_seen?: Record<string, boolean | undefined> }).hints_seen : undefined
   const seenServer = !!hintsSeen?.[id]
-  const seenLocal = backendEnabled && typeof window !== 'undefined' &&
-    localStorage.getItem(`hint_${id}`) === '1'
+  let seenLegacy = false
+  if (!preferences && backendEnabled && typeof window !== 'undefined') {
+    try { seenLegacy = localStorage.getItem(`hint_${id}`) === '1' } catch { /* ignore */ }
+  }
+  const seenLocal = preferences ? !!preferences.hintsSeen?.[id] : seenLegacy
   const [dismissed, setDismissed] = useState(false)
 
   if (seenServer || seenLocal || dismissed) return null
 
   const handleClose = async () => {
     setDismissed(true)
+    if (preferences) {
+      preferences.markHintSeen(id)
+      onDismiss?.(id)
+      return
+    }
     if (!backendEnabled) {
       onDismiss?.(id)
       return

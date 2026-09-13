@@ -169,3 +169,48 @@ RUN-NNN — дата, этап:
 - Исполнитель также test:lite:list exit 0, 13 tests/2 files. Root до e2e проверил свободный порт 4174.
 - Root cwd Git-root: git diff --check exit 0; verify.ps1 -Mode Docs exit 0; protected hashes совпали; backend/data/domain state не менялись.
 - P3.2 и родитель P3 DONE. Следующий этап P4: реальный локальный игровой цикл и его browser-проверки.
+
+<a id="run-014"></a>
+
+## RUN-014 — 2026-09-12, начало P4
+
+- Parent HEAD aeacc75; codex/lite-local. P3 принят отдельным commit; только защищённые untracked. После P3 browser порт 4174 освобождён.
+- P4 IN_PROGRESS: JourneyView/AspectsView/DiaryView подключаются к session; optional entry, сохранение смонтированных панелей при навигации, remount по epoch. ConfirmProvider обязателен для дневника.
+- Единственный code writer gpt-5.6-sol medium. Allowlist frontend: src/lite/LiteApp.tsx и LiteApp.module.css; src/hooks/useSendKeyMode.ts; src/components/Onboarding/Hint.tsx; src/components/JourneyView/JourneyView.tsx, Chat.tsx, SurveyScreen.tsx, TasksScreen.tsx; src/components/AspectsView/AspectsView.tsx; src/components/DiaryView/DiaryView.tsx; tests/lite/journey.spec.ts, journey.test.ts, storage.spec.ts, network.spec.ts. Последние два только адаптация навигации при сохранении прежних критериев.
+- Аудит расширил исходный список P4 файлами Chat/SurveyScreen/TasksScreen: прямые legacy hint keys, hover timer и защита завершения задания требуют локальных изменений. data/backend/domain/transfer остаются read-only; необходимость изменения формы snapshot сначала возвращается root.
+- Общие preferences через typed context в существующем useSendKeyMode; legacy online поведение сохраняется. Journey postStepCompleted/chooseHabit отключены в lite; pendingTasks и локальные начисления остаются. Aspects HabitSection не монтируется в lite из-за запросов при mount.
+- Проверки: typecheck/unit; реальные шаг, ответ, инсайт, задание, анкета, reload/aspect return; draft при навигации, double-click/StrictMode, import при смонтированном JourneyView и очистка отложенных callbacks; 0 API attempts, старые ключи неизменны. Свободное чтение всех материалов — P5.
+
+- RUN-014 scope уточнение до правки: дополнительно src/components/JourneyView/ScriptButtons.tsx. Exercise CTA обещает ежедневные практики; capability передаётся через Chat, lite показывает активное локальное задание. Это интерфейсный текст, src/data не меняется.
+
+- 2026-09-13: пользователь уточнил остановиться после текущей задачи. Завершить и принять только P4 с локальным коммитом; P5–P7 в этом запуске не начинать. Уже начатый read-only аудит P5 заканчивается краткой передачей без правок.
+
+### Передача после остановки на P4
+
+- Уже выполненный read-only аудит P5 (gpt-5.6-sol medium) изменений не делал. По его AST-подсчёту skill maps: Si51/Fe34/Ne36/Ni43/Te62/Ti41/Fi58/Se47 = 372; root эти counts независимо не проверял, P5 остаётся TODO.
+- Будущий каталог: JOURNEYS из data/journey/registry; 8 прямых *_CONTENT maps из data/skills/<Aspect>; ASPECT_DATA и BLOCKS из AspectsView/blocks. core/scripts — aliases, не объединять. Composite ID включает aspect/level/kind/sourceId. Hall blocks/HALL_CONTENT относятся P6.
+- Будущий P5 scope: contentAccess/contentCatalog/CatalogView/MaterialView и tests; LiteApp, AspectsView, JourneyView, SkillDetail/SkillTraits/SurveyInsight и 8 trees. У Ne/Te/Ti/Fi tree потребуется добавить detail destination. Проверять exact ID-set независимо от catalog builder и отсутствие изменения progression при чтении. Перед реализацией сверить актуальный P4 diff.
+
+- 2026-09-13: P4 прерван usage limit. Команда root diff/check/harness была отклонена auto-review до выполнения; исполнитель завершился с тем же лимитом. После нового запроса продолжить read-only Git разрешён: HEAD aeacc75, незавершённые файлы P4 сохранены, .last-run.json содержит passed без количества тестов, listener 4174 не найден. Это не заменяет обязательную независимую приёмку P4. Возобновлён прежний исполнитель sol medium; остановка после P4 сохраняется.
+
+- RUN-014 scope уточнение 2026-09-13: добавить frontend playwright.config.ts. Browser evidence: JourneyView.tsx HTTP200, затем тестовый audit abort статического Vite-модуля /slw/src/api/client.ts из-за совпадения /api/. Это разрешённая загрузка исходника, не игровой backend запрос. Shared imports api/client допустимы планом002; переписывать их ради теста не требуется.
+- Решение: browser webServer P4 использует последовательные build + production preview на прежнем4174, strictPort/reuseExistingServer:false, прежний API audit без исключений и прежние критерии. P7 повторит полный production gate после оставшихся этапов. Root diagnostic npm.cmd run build exit0:304 modules, Vite5.88s; крупные chunks (Journey3094kB,Hint1945kB,se-skills1602kB), предупреждение500kB сохранено.
+
+- Повторное возобновление 2026-09-13 после usage limit исполнителя (сообщение next retry 4:18 PM). Root read-only проверка успешна: HEAD aeacc75; playwright уже build+preview; journey.spec.ts существует; .last-run passed без количества сценариев; 4174 свободен. Точный command/result запрашивается у исполнителя, P4 остаётся IN_PROGRESS. Указание остановиться после P4 сохраняется.
+
+<a id="run-015"></a>
+
+## RUN-015 — 2026-09-13, приёмка P4 и остановка
+
+- P4; parent HEAD aeacc75; ветка codex/lite-local. После usage limit прежнего исполнителя работу завершил один новый gpt-5.6-sol medium. Пользовательское ограничение сохраняется: после принятого P4 остановиться; P5–P7 TODO.
+- Root прочитал фактический diff и новые тесты. Journey/Aspects/Diary подключены к lite session, лениво монтируются и сохраняют draft при навигации; epoch заменяет смонтированные игровые панели. Preferences/hints используют snapshot. Settings сохраняет сообщение принятого импорта. Exercise создаёт локальное задание, серверные completion/habit вызовы отключены capability.
+- Отложенные callbacks отменяются при unmount/смене аспекта; Promise отмены разрешается false, последующие начисления не выполняются. Актуальный diary ref сохраняет параллельную ручную запись. Защищены повторные ответы анкеты и завершение задания. По независимому ревью воспроизведены и исправлены desktop blur со скрытой панелью и потеря первого intro из-за deferred setState updater (ERR-014).
+- Root cwd frontend: npm.cmd run typecheck exit 0; npm.cmd run test:lite:unit exit 0, 27/27 (17 storage, 5 state, 3 runtime, 2 shared online characterization). После последних Chat/Journey правок typecheck повторён исполнителем exit 0 и обоими root browser build (tsc --noEmit). Unit-зависимости после root прогона не менялись.
+- Root npm.cmd run test:lite:list exit 0: 18 tests / 3 files.
+- Root с NODE_ENV=development и VITE_API_URL=https://backend.invalid: npm.cmd run test:lite:e2e exit 0, 18/18, 37.4s. Playwright запускает npm.cmd run build и preview на 127.0.0.1:4174/slw/ со strictPort. В реальных dist assets найдены development ReactDOM diagnostic marker и backend.invalid. Это проверка повторных React StrictMode effects, а не предположение по наличию JSX StrictMode в production.
+- Root обычный npm.cmd run test:lite:e2e exit 0: 18/18, 36.0s, production build+preview. Обе сборки завершены; предупреждение chunks >500kB сохранено. Полная оптимизация bundle не входит в P4.
+- Проверены реальные double-click, шаг/инсайт/числовой ответ, взятие/завершение задания, пять ответов анкеты, промежуточный и итоговый инсайты, reload, сохранение draft при навигации, импорт во время незавершённого callback, параллельный дневник, отмена ответа при смене аспекта и возврат. Clock pause/runFor фиксирует порядок событий; force clicks отсутствуют.
+- Во всех 18 сценариях audit установлен до goto: API/Telegram SDK/backend WebSocket attempts 0. Ранее принятые 13 session/network сценариев прошли повторно, включая corrupt/volatile/conflict/import/reset/legacy-byte checks. Общий gate всех материалов и server-заглушек остаётся P5–P7; Aspects full access здесь не заявляется.
+- Исполнитель дополнительно: bounded import 1/1 и navigation 1/1 exit 0; отдельный полный прогон передан root без дублирования.
+- P4 DONE после описанных проверок. Перед commit выполняются diff --check, verify.ps1 -Mode Docs, проверка неизменности backend/data/domain/storage/transfer и protected hashes; staging только явных путей. Push/deploy/main не выполняются. Следующий разрешаемый этап при новом запросе — P5; сейчас остановка.
+- Финальные root gate: git diff --check exit 0; verify.ps1 -Mode Docs exit 0 (10 задач, protected hashes совпали); git diff --exit-code по backend/data/domain/liteStorage/liteTransfer exit 0. Listener4174 отсутствует. В восстановленных production assets development React marker отсутствует. Рабочие изменения ограничены P4/harness; два защищённых untracked остаются вне staging.

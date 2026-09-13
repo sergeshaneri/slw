@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import { buildSurveyStatements, SURVEY_BLOCKS } from '../../data/journey/skills'
 import { resolveSurvey } from '../../data/journey/skills/resolve'
 import Slider from './Slider'
-import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
+import { useSendKeyMode, shouldSendOnKeyDown, useUiPreferences } from '../../hooks/useSendKeyMode'
 import styles from './JourneyView.module.css'
 
 const INSIGHT_HINT_KEY = 'survey_insight_hint_dismissed'
@@ -85,13 +85,17 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
     })
   }
   const [sendKeyMode] = useSendKeyMode()
+  const preferences = useUiPreferences()
   // Подсказка-тултип: показывается на стартовых вопросах, закрывается крестиком
   // (запоминается в localStorage), и поднимается на ховер через 3 сек.
-  const [hintVisible, setHintVisible] = useState<boolean>(() =>
-    typeof window !== 'undefined' && localStorage.getItem(INSIGHT_HINT_KEY) !== '1'
-  )
+  const [hintVisible, setHintVisible] = useState<boolean>(() => {
+    if (preferences) return !preferences.hintsSeen?.[INSIGHT_HINT_KEY]
+    if (typeof window === 'undefined') return false
+    try { return localStorage.getItem(INSIGHT_HINT_KEY) !== '1' } catch { return true }
+  })
   const [hintHover, setHintHover] = useState<boolean>(false)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isSubmittingRef = useRef(false)
 
   useEffect(() => {
     setValue(initialValue)
@@ -99,12 +103,21 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
     // textarea заново (он не пустой). Иначе закрыто, ждём явного клика.
     setInsightOpen((insightsByIdx.get(idx) ?? '').length > 0)
     setHintHover(false)
+    isSubmittingRef.current = false
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx])
 
+  useEffect(() => () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+  }, [])
+
   const dismissHint = () => {
     setHintVisible(false)
+    if (preferences) {
+      preferences.markHintSeen(INSIGHT_HINT_KEY)
+      return
+    }
     try { localStorage.setItem(INSIGHT_HINT_KEY, '1') } catch { /* ignore */ }
   }
 
@@ -119,6 +132,8 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
   }
 
   const handleAnswer = () => {
+    if (isSubmittingRef.current) return
+    isSubmittingRef.current = true
     onAnswer(value, insightText)
   }
 
@@ -237,7 +252,10 @@ export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, o
           <button
             type="button"
             className={`${styles.btn} ${styles.btnAccent}`}
-            onClick={handleAnswer}
+            onClick={(event) => {
+              if (event.detail > 1) return
+              handleAnswer()
+            }}
           >
             Дальше →
           </button>

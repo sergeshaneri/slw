@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 
 /**
  * Режим отправки сообщений в чат-инпутах:
@@ -7,11 +7,25 @@ import { useEffect, useState } from 'react'
  *  - 'ctrl+enter' — Ctrl/Cmd+Enter отправляет, Enter — перенос строки
  *                   (как было раньше; безопаснее от случайных отправок)
  *
- * Хранится в localStorage, переживает logout (это девайс-настройка, не аккаунт).
+ * В lite хранится в общем snapshot через UiPreferencesContext; online fallback
+ * использует прежний device-local ключ и переживает logout.
  * Применяется в HallView, DMView, JourneyView/Chat, CoachView через
  * `shouldSendOnKeyDown(e, mode)`.
  */
 export type SendKeyMode = 'enter' | 'ctrl+enter'
+
+export type UiPreferencesContextValue = {
+  sendKeyMode?: SendKeyMode
+  hintsSeen?: Record<string, boolean>
+  setSendKeyMode: (mode: SendKeyMode) => void
+  markHintSeen: (id: string) => void
+}
+
+export const UiPreferencesContext = createContext<UiPreferencesContextValue | null>(null)
+
+export function useUiPreferences(): UiPreferencesContextValue | null {
+  return useContext(UiPreferencesContext)
+}
 
 const STORAGE_KEY = 'slw_send_key_mode'
 const DEFAULT_MODE: SendKeyMode = 'enter'
@@ -33,9 +47,11 @@ function write(m: SendKeyMode): void {
 }
 
 export function useSendKeyMode(): [SendKeyMode, (m: SendKeyMode) => void] {
-  const [mode, setMode] = useState<SendKeyMode>(read)
+  const preferences = useUiPreferences()
+  const [legacyMode, setLegacyMode] = useState<SendKeyMode>(() => preferences ? DEFAULT_MODE : read())
   useEffect(() => {
-    const sync = (): void => setMode(read())
+    if (preferences) return
+    const sync = (): void => setLegacyMode(read())
     window.addEventListener(EVENT_NAME, sync)
     // `storage` event срабатывает в других вкладках того же origin.
     window.addEventListener('storage', sync)
@@ -43,10 +59,13 @@ export function useSendKeyMode(): [SendKeyMode, (m: SendKeyMode) => void] {
       window.removeEventListener(EVENT_NAME, sync)
       window.removeEventListener('storage', sync)
     }
-  }, [])
-  return [mode, (m: SendKeyMode) => {
+  }, [preferences])
+  if (preferences) {
+    return [preferences.sendKeyMode ?? DEFAULT_MODE, preferences.setSendKeyMode]
+  }
+  return [legacyMode, (m: SendKeyMode) => {
     write(m)
-    setMode(m)
+    setLegacyMode(m)
   }]
 }
 

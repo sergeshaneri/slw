@@ -145,13 +145,14 @@ type Props = {
   // callback с выбором стартовой вкладки ('login' / 'register').
   // Гость может проигнорить плашку.
   onRequestAuth?: (mode?: 'login' | 'register') => void
+  backendEnabled?: boolean
 }
 
 export default function JourneyView({
   journey: extJourney, onJourneyChange, scores, onScoresChange, diary, onDiaryChange,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   t: _t,
-  isAdmin = false, user, onRequestAuth
+  isAdmin = false, user, onRequestAuth, backendEnabled = true
 }: Props) {
   // Локальный стейт — единственный source of truth.
   // Наружу синхронизируется через useEffect (ниже), чтобы persist-callback
@@ -162,7 +163,9 @@ export default function JourneyView({
   // Стабильная ссылка на текущий persist-callback (он пересоздаётся
   // каждый рендер родителя — через ref эффект-зависимость остаётся чистой).
   const persistRef = useRef<Props['onJourneyChange']>(onJourneyChange)
+  const diaryRef = useRef<DiaryEntry[]>(diary ?? [])
   useEffect(() => { persistRef.current = onJourneyChange }, [onJourneyChange])
+  useEffect(() => { diaryRef.current = diary ?? [] }, [diary])
 
   // Сохраняем стейт наружу при каждом изменении, кроме первого рендера.
   const isFirstRender = useRef<boolean>(true)
@@ -185,6 +188,33 @@ export default function JourneyView({
   // уезжает на 2 шага, инсайт записывается дважды. ref (не state) чтобы не
   // вызывать re-render, и checked synchronously в самом начале handler'а.
   const isProcessingRef = useRef<boolean>(false)
+  const mountedRef = useRef(true)
+  const timersRef = useRef<Map<ReturnType<typeof setTimeout>, (() => void) | undefined>>(new Map())
+  const schedule = useCallback((callback: () => void, delay: number, onCancel?: () => void) => {
+    const id = setTimeout(() => {
+      timersRef.current.delete(id)
+      if (mountedRef.current) callback()
+    }, delay)
+    timersRef.current.set(id, onCancel)
+    return id
+  }, [])
+  const clearScheduledTimers = useCallback(() => {
+    const pending = [...timersRef.current.entries()]
+    timersRef.current.clear()
+    pending.forEach(([id, onCancel]) => {
+      clearTimeout(id)
+      onCancel?.()
+    })
+  }, [])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      clearScheduledTimers()
+    }
+  }, [clearScheduledTimers])
+
 
   // Активная per-aspect папка. Все per-aspect чтения идут через `a`,
   // все per-aspect записи — через updateAspect(s, ...).
@@ -248,20 +278,23 @@ export default function JourneyView({
 
   const showToast = useCallback((msg: string) => {
     setToast(msg)
-    setTimeout(() => setToast(null), 2800)
+    schedule(() => setToast(null), 2800)
   }, [])
 
-  const addBotMessage = useCallback((text: string, delay: number = 400): Promise<void> => new Promise<void>((resolve) => {
+  const addBotMessage = useCallback((text: string, delay: number = 400): Promise<boolean> => new Promise<boolean>((resolve) => {
     setIsTyping(true)
-    setTimeout(() => {
+    schedule(() => {
       setIsTyping(false)
       setState(s => updateAspect(s, cur => ({
         ...cur,
         messages: [...cur.messages, { id: Date.now() + Math.random(), role: 'bot', text }]
       })))
-      resolve()
-    }, delay)
-  }), [setState])
+      resolve(true)
+    }, delay, () => {
+      if (mountedRef.current) setIsTyping(false)
+      resolve(false)
+    })
+  }), [schedule, setState])
 
   const addUserMessage = useCallback((text: string) => {
     setState(s => updateAspect(s, cur => ({
@@ -309,18 +342,19 @@ export default function JourneyView({
     // ВНЕ setState чтобы не вызывать side-effect в React 18 strict mode.
     if (completedSnapshot && (completedSnapshot as { short_id: string | null }).short_id && (completedSnapshot as { aspect: AspectKey }).aspect) {
       const snap = completedSnapshot as { aspect: AspectKey; level: number; short_id: string }
-      postStepCompleted(snap)
-        .catch((err: unknown) => {
+      if (backendEnabled) {
+        postStepCompleted(snap).catch((err: unknown) => {
           const msg = err instanceof Error ? err.message : String(err)
           console.warn('event log failed:', msg)
         })
+      }
     }
 
     const parts: string[] = []
     if (xp > 0) parts.push(`+${xp} XP`)
     if (stardust > 0) parts.push(`+${stardust} ✦`)
     showToast(parts.join('   '))
-  }, [setState, showToast])
+  }, [backendEnabled, setState, showToast])
 
   const deliverScript = useCallback((index: number) => {
     const script = scripts[index]
@@ -347,7 +381,7 @@ export default function JourneyView({
     const step = state.onboardingStep
     addUserMessage(ONBOARDING[Math.min(step, 3)]?.button || 'Далее')
     if (step < 3) {
-      await addBotMessage(ONBOARDING[step + 1].text, 700)
+      if (!await addBotMessage(ONBOARDING[step + 1].text, 700)) return
       setState(s => ({ ...s, onboardingStep: step + 1 }))
     } else if (step === 3) {
       // Раньше тут был extra-шаг 4 с промежуточным сообщением «Готово.
@@ -442,7 +476,7 @@ export default function JourneyView({
 
       addUserMessage(d.clickedLabel)
       if (d.kind === 'next-intro') {
-        await addBotMessage(d.text, 700)
+        if (!await addBotMessage(d.text, 700)) return
       } else if (d.kind === 'first-script') {
         const sid = d.scriptId
         setState(s => updateAspect(s, cur => ({
@@ -476,25 +510,27 @@ export default function JourneyView({
         // Для exercise — «взять в ежедневные практики» (привычка аспекта).
         // Для question (B) — просто «взял задание» в активные.
         if (script.type === 'exercise') {
-          addUserMessage('Беру в ежедневные практики')
-          await addBotMessage(
-            `Упражнение «${script.title}» теперь твоя ежедневная практика для этого аспекта. Открой дашборд, чтобы ставить галочку каждый день.`,
+          addUserMessage(backendEnabled ? 'Беру в ежедневные практики' : 'Беру в активные задания')
+          if (!await addBotMessage(
+            backendEnabled
+              ? `Упражнение «${script.title}» теперь твоя ежедневная практика для этого аспекта. Открой дашборд, чтобы ставить галочку каждый день.`
+              : `Упражнение «${script.title}» добавлено в локальные активные задания.`,
             500
-          )
-          // Best-effort: пишем в user_habits, чтобы упражнение появилось
-          // в блоке «Сегодня» на дашборде. Ошибки игнорируем — фронт
-          // пока всё равно хранит в pendingTasks (enqueueTask ниже).
-          chooseHabit({
-            aspect: state.currentAspect,
-            title: script.title,
-            exerciseId: script.id,
-          }).catch((err: unknown) => {
-            const msg = err instanceof Error ? err.message : String(err)
-            console.warn('chooseHabit failed:', msg)
-          })
+          )) return
+          if (backendEnabled) {
+            // Online best-effort: добавляем упражнение в ежедневные привычки.
+            chooseHabit({
+              aspect: state.currentAspect,
+              title: script.title,
+              exerciseId: script.id,
+            }).catch((err: unknown) => {
+              const msg = err instanceof Error ? err.message : String(err)
+              console.warn('chooseHabit failed:', msg)
+            })
+          }
         } else {
           addUserMessage('Взял задание')
-          await addBotMessage('Задание добавлено в активные. Открой раздел «Активные задания», когда выполнишь.', 500)
+          if (!await addBotMessage('Задание добавлено в активные. Открой раздел «Активные задания», когда выполнишь.', 500)) return
         }
       } else {
         // action === 'next'
@@ -507,7 +543,7 @@ export default function JourneyView({
         // Задание уехало в активные — XP даётся только при реальном выполнении
         // (через TasksScreen или через answer_number / complete_exercise).
         enqueueTask(script, action === 'done' ? 'taken' : 'deferred')
-        setTimeout(() => deliverScript(a.currentScriptIndex + 1), 600)
+        schedule(() => deliverScript(a.currentScriptIndex + 1), 600)
       } else if (
         (script.type === 'theory' || script.type === 'word' || script.type === 'reflection')
         && action === 'next'
@@ -515,23 +551,23 @@ export default function JourneyView({
         // Обязательный insight: открываем поле для записи в дневник.
         // XP/diary/advance произойдёт в handleSend для awaitingInput='step-insight'.
         setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: 'step-insight' })))
-        setTimeout(() => inputRef.current?.focus(), 50)
+        schedule(() => inputRef.current?.focus(), 50)
       } else {
         // Прочие случаи (например skip на reflection без insight) — без XP, advance.
-        setTimeout(() => deliverScript(a.currentScriptIndex + 1), 600)
+        schedule(() => deliverScript(a.currentScriptIndex + 1), 600)
       }
     } else if (action === 'answer_number') {
       setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: 'number' })))
-      setTimeout(() => inputRef.current?.focus(), 50)
+      schedule(() => inputRef.current?.focus(), 50)
     } else if (action === 'answer_text') {
       setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: 'text' })))
-      setTimeout(() => inputRef.current?.focus(), 50)
+      schedule(() => inputRef.current?.focus(), 50)
     } else if (action === 'complete_exercise') {
       // Открываем поле для обязательного комментария. XP и переход к
       // следующему скрипту произойдут после ввода в handleSend
       // (ветка awaitingInput === 'exercise_note').
       setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: 'exercise_note' })))
-      setTimeout(() => inputRef.current?.focus(), 50)
+      schedule(() => inputRef.current?.focus(), 50)
     } else if (action === 'start_survey') {
       // Запуск анкеты. Переходим на отдельный экран с поэтапным UI.
       // Если по этому навыку уже был сохранён черновик (юзер прервал
@@ -552,7 +588,7 @@ export default function JourneyView({
       // null script), мы пришли сюда и можем принять следующий клик.
       isProcessingRef.current = false
     }
-  }, [scripts, a.currentScriptIndex, state.skills, state.currentAspect, addBotMessage, addUserMessage, deliverScript, enqueueTask, setState])
+  }, [scripts, a.currentScriptIndex, state.skills, state.currentAspect, addBotMessage, addUserMessage, backendEnabled, deliverScript, enqueueTask, schedule, setState])
 
   // ─── Ввод текста / числа ─────────────────────────────────────
   // override — опциональный аргумент с уже известным значением (используется
@@ -579,8 +615,10 @@ export default function JourneyView({
       addUserMessage(val)
       setInputVal('')
       setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: null })))
-      if (script?.followUp) await addBotMessage(script.followUp(val), 700)
-      else await addBotMessage(`Записал: ${val}/10.`, 500)
+      const acknowledged = script?.followUp
+        ? await addBotMessage(script.followUp(val), 700)
+        : await addBotMessage(`Записал: ${val}/10.`, 500)
+      if (!acknowledged) return
 
       // Если у скрипта есть skill+block — пишем ответ в state.skills как
       // statementIndex=0 (соответствует pass=1) и пересчитываем score
@@ -629,14 +667,14 @@ export default function JourneyView({
 
       if (script?.id) removePending(script.id)
       awardXP(script?.xp ?? 10, 0, script?.id ?? null)
-      setTimeout(() => deliverScript(a.currentScriptIndex + 1), 700)
+      schedule(() => deliverScript(a.currentScriptIndex + 1), 700)
     } else if (a.awaitingInput === 'text') {
       addUserMessage(val)
       setInputVal('')
       setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: null })))
       // Нейтральная реплика без похвалы за факт ответа (см. §3.6).
       const ack = script?.type === 'question' ? 'Записано в карту.' : 'Записано в дневник.'
-      await addBotMessage(ack, 500)
+      if (!await addBotMessage(ack, 500)) return
       // Сайд-эффект: рефлексия → запись в дневник с подписью «на какой вопрос ответ».
       onDiaryChange([
         {
@@ -650,18 +688,18 @@ export default function JourneyView({
           promptTitle: script?.title ?? null,
           prompt: script?.text ?? null
         },
-        ...(diary ?? [])
+        ...diaryRef.current
       ])
       if (script?.id) removePending(script.id)
       const stardust = script?.type === 'word' ? (script?.stardust ?? 0) : 0
       awardXP(script?.xp ?? 10, stardust, script?.id ?? null)
-      setTimeout(() => deliverScript(a.currentScriptIndex + 1), 700)
+      schedule(() => deliverScript(a.currentScriptIndex + 1), 700)
     } else if (a.awaitingInput === 'exercise_note') {
       // Завершение упражнения с обязательным комментарием.
       addUserMessage(val)
       setInputVal('')
       setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: null })))
-      await addBotMessage('Записано в дневник.', 500)
+      if (!await addBotMessage('Записано в дневник.', 500)) return
       onDiaryChange([
         {
           id: Date.now(),
@@ -674,17 +712,17 @@ export default function JourneyView({
           promptTitle: script?.title ?? null,
           prompt: script?.text ?? null
         },
-        ...(diary ?? [])
+        ...diaryRef.current
       ])
       if (script?.id) removePending(script.id)
       awardXP(script?.xp ?? 15, script?.stardust ?? 0, script?.id ?? null)
-      setTimeout(() => deliverScript(a.currentScriptIndex + 1), 700)
+      schedule(() => deliverScript(a.currentScriptIndex + 1), 700)
     } else if (a.awaitingInput === 'step-insight') {
       // Обязательный инсайт после T/S/R.
       addUserMessage(val)
       setInputVal('')
       setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: null })))
-      await addBotMessage('Записано в дневник.', 400)
+      if (!await addBotMessage('Записано в дневник.', 400)) return
       onDiaryChange([
         {
           id: Date.now(),
@@ -697,17 +735,17 @@ export default function JourneyView({
           promptTitle: script?.title ?? null,
           prompt: script?.text ?? null,
         },
-        ...(diary ?? [])
+        ...diaryRef.current
       ])
       // XP/stardust по типу скрипта. Word даёт stardust как и раньше.
       const stardust = script?.type === 'word' ? (script?.stardust ?? 0) : (script?.stardust ?? 0)
       awardXP(script?.xp ?? 10, stardust, script?.id ?? null)
-      setTimeout(() => deliverScript(a.currentScriptIndex + 1), 600)
+      schedule(() => deliverScript(a.currentScriptIndex + 1), 600)
     }
     } finally {
       isProcessingRef.current = false
     }
-  }, [inputVal, a.awaitingInput, a.currentScriptIndex, state.currentAspect, state.skills, scripts, scores, diary, addBotMessage, addUserMessage, awardXP, deliverScript, onDiaryChange, onScoresChange, removePending])
+  }, [inputVal, a.awaitingInput, a.currentScriptIndex, state.currentAspect, state.skills, scripts, scores, diary, addBotMessage, addUserMessage, awardXP, deliverScript, onDiaryChange, onScoresChange, removePending, schedule])
 
   const handleReset = useCallback(() => {
     setState(DEFAULT_JOURNEY)
@@ -763,7 +801,7 @@ export default function JourneyView({
           promptTitle: skillName,
           skillId: active?.skillId,
         },
-        ...(diary ?? []),
+        ...diaryRef.current,
       ])
     }
 
@@ -878,7 +916,7 @@ export default function JourneyView({
 
     if (fromChatScript) {
       const nextIdx = (aspectOf(state).currentScriptIndex ?? 0) + 1
-      setTimeout(() => deliverScript(nextIdx), 100)
+      schedule(() => deliverScript(nextIdx), 100)
     }
 
     // Пересчёт средних по всем 8 аспектам с tree.
@@ -931,7 +969,7 @@ export default function JourneyView({
           mode: active.mode
         }
       },
-      ...(diary ?? [])
+      ...diaryRef.current
     ])
 
     // XP: 10 за каждый закрытый проход.
@@ -980,7 +1018,7 @@ export default function JourneyView({
         level,
         insightSource: source
       },
-      ...(diary ?? [])
+      ...diaryRef.current
     ])
   }, [setState, onDiaryChange, diary, state.currentAspect])
 
@@ -1301,28 +1339,25 @@ export default function JourneyView({
   // скрипт инжектятся по клику в handleScriptAction → 'intro-next'.
   // Раньше вся пачка валилась сразу, юзер не успевал прочитать.
   const handleSwitchAspect = useCallback(async (aspectKey: AspectKey) => {
+    clearScheduledTimers()
+    isProcessingRef.current = false
+    setIsTyping(false)
     if (!aspectKey) return
 
-    let isFresh = false
-    let firstIntroText: string | undefined
+    const existingAtClick = state.aspects?.[aspectKey]
+    // «Свежий» = планета ещё не начата (нет скрипта) И не идёт intro-цикл.
+    // messages может содержать сообщения общего онбординга (по умолчанию
+    // он пишет в aspects[Si].messages) — это НЕ настоящий прогресс,
+    // нужно затереть. Но если awaitingInput='intro-next' — юзер уже
+    // в середине intro, не сбрасываем.
+    const isFresh = !existingAtClick || (
+      !existingAtClick.currentScriptId && existingAtClick.awaitingInput !== 'intro-next'
+    )
+    const firstIntroText = isFresh ? getJourney(aspectKey)?.intro?.[0]?.text : undefined
 
     setState(s => {
       const cleaned = dismissActiveSurveyToDraft(s)
       const existing = cleaned.aspects?.[aspectKey]
-      // «Свежий» = планета ещё не начата (нет скрипта) И не идёт intro-цикл.
-      // messages может содержать сообщения общего онбординга (по умолчанию
-      // он пишет в aspects[Si].messages) — это НЕ настоящий прогресс,
-      // нужно затереть. Но если awaitingInput='intro-next' — юзер уже
-      // в середине intro, не сбрасываем.
-      isFresh = !existing || (
-        !existing.currentScriptId && existing.awaitingInput !== 'intro-next'
-      )
-
-      if (isFresh) {
-        const j = getJourney(aspectKey)
-        firstIntroText = j?.intro?.[0]?.text
-      }
-
       const folder: AspectState = isFresh
         ? { ...DEFAULT_ASPECT_STATE, messages: [], awaitingInput: 'intro-next' }
         : (existing ?? { ...DEFAULT_ASPECT_STATE })
@@ -1340,17 +1375,18 @@ export default function JourneyView({
     if (!isFresh || !firstIntroText) return
 
     // Дать React применить state (currentAspect=aspectKey) до addBotMessage.
-    await new Promise(r => setTimeout(r, 50))
+    const ready = await new Promise<boolean>(resolve => schedule(() => resolve(true), 50, () => resolve(false)))
+    if (!ready) return
     await addBotMessage(firstIntroText, 700)
-  }, [setState, dismissActiveSurveyToDraft, addBotMessage])
+  }, [state.aspects, setState, dismissActiveSurveyToDraft, addBotMessage, clearScheduledTimers, schedule])
 
   // ─── Админ-действия (видимы только при isAdmin) ──────────────
 
   // 1. Пропустить текущий шаг в чате.
   const handleAdminSkipStep = useCallback(() => {
     setState(s => updateAspect(s, cur => ({ ...cur, awaitingInput: null })))
-    setTimeout(() => deliverScript(a.currentScriptIndex + 1), 50)
-  }, [deliverScript, a.currentScriptIndex])
+    schedule(() => deliverScript(a.currentScriptIndex + 1), 50)
+  }, [deliverScript, a.currentScriptIndex, schedule])
 
   // 2. Заполнить активную анкету. Все утверждения текущей сессии = 7.
   const handleAdminFillSurvey = useCallback(() => {
@@ -1620,6 +1656,7 @@ export default function JourneyView({
             : 'Путешествие'}
           planet={currentJourney?.planet}
           user={user}
+          backendEnabled={backendEnabled}
         />
       )}
 
@@ -1911,7 +1948,7 @@ export default function JourneyView({
                 promptTitle: script.title,
                 prompt: script.text
               },
-              ...(diary ?? [])
+              ...diaryRef.current
             ])
           }}
           onDelete={(scriptId: string) => removePending(scriptId)}

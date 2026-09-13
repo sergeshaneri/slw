@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { Script, ScriptType } from '@/types/script'
 import type { PendingTask } from '@/types/journey'
@@ -83,9 +83,11 @@ function TaskItem({ task, script, accent, onCompleteWithNote, onDelete }: ItemPr
   const [noteOpen, setNoteOpen] = useState<boolean>(false)
   const [noteText, setNoteText] = useState<string>('')
   const confirm = useConfirm()
+  const completionStartedRef = useRef(false)
 
   const handleSaveWithNote = () => {
-    if (!noteText.trim()) return
+    if (!noteText.trim() || completionStartedRef.current) return
+    completionStartedRef.current = true
     onCompleteWithNote(script, noteText.trim())
     setNoteText('')
     setNoteOpen(false)

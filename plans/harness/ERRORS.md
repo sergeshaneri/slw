@@ -135,3 +135,20 @@ RUN-006: git diff --cached --check обнаружил new blank line at EOF в �
 - Первый read-before-save тест записывал внешний revision до завершения React init; наблюдаемый durable соответствовал загрузке уже нового snapshot. Тест теперь ждёт отображения начального режима перед same-tab setItem и реальным click. Проверка конфликта сохранена.
 - Serialization failure проверяется явным throw JSON.stringify; название теста уточнено, поскольку payload остаётся валидным. Предыдущие три serial-skipped сценария не считаются failures.
 - Итог root: 13/13 browser exit 0. Перед конфликтными действиями синхронизировать тест с наблюдаемым исходным UI; не заменять критерий ослабленной проверкой.
+
+## ERR-014 — узкие текстовые правки P4 в Windows
+
+- RUN-014; 2026-09-13; environment/process; исправление проверяется в P4.
+- Исполнитель повторно получил apply_patch deny-read и использовал штатный elevated PowerShell (ERR-001). Запись Hint завершилась exit 0 после задержки около 42 секунд без вывода; дубликат не запускался.
+- CRLF-якорь Chat не совпал; команда успела изменить ScriptButtons до остановки. Следующая single-quoted regex replacement вставила буквальный backtick-n в два type Props. После двух попыток стратегия пересмотрена: точные Replace с настоящим newline и немедленный typecheck.
+- Root поиск с Windows wildcard в пути получил rg os error 123; повтор с каталогами и -g '*.tsx' exit 0. Действующее правило RULES уже покрывает этот случай, нового запрета не требуется.
+- Ревью до приёмки выявило сброс success message через LiteSettings key=epoch, потерю draft других панелей и зависание Promise/processing state после отмены таймера при смене аспекта. Обязательная проверка исправлений остаётся частью P4, DONE пока не выставлен.
+
+### ERR-014: результат приёмки RUN-015
+
+- Исправления подтверждены root: typecheck PASS, unit 27/27, browser 18/18 production и 18/18 development React StrictMode с backend.invalid. Открытого блокера P4 нет.
+- Dev Vite запрашивал статический /slw/src/api/client.ts, который audit распознавал по /api/. Перешли на build+preview; audit и критерий 0 API attempts не ослаблялись. Запрос исходника не считается свидетельством реального backend-вызова.
+- Тесты уточнены по наблюдаемому UI: точное имя кнопки активных заданий; после import Settings остаётся выбранным, Journey надо открыть; B-2 fixture имеет awaitingInput=number, соответствующий штатному mounted state. Seed выполняется только при missing snapshot. Реальные задержки concurrency заменены pause/runFor с проверкой отсутствия completion до управляющего действия.
+- Root отклонил force-click обход pointer interception. Причина воспроизведена: desktop visualViewport существует, но blur не вызывает resize; inputFocused оставлял topbarHidden с pointer-events:none. Chat blur теперь вычисляет реальное состояние viewport. Обычный browser click прошёл.
+- После доступного click выявлена отдельная причина отсутствующего первого Ti intro: значения присваивались внутри deferred setState updater и читались сразу после setState. Вычисление перенесено перед updater. Проверка первого intro, отмены старого ответа и возврата Si прошла.
+- Существующие ERR-001/Windows quoting правила достаточны. Профилактика P4 закреплена browser-тестами: не обходить недоступный UI force-click; синхронизировать pending callbacks управляемыми часами; проверять видимый результат первого перехода, а не только currentAspect.

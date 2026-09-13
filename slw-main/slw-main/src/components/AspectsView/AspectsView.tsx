@@ -41,13 +41,14 @@ type AspectsViewProps = {
   isAdmin?: boolean
   t?: unknown
   user?: User | null
+  backendEnabled?: boolean
 }
 
 export default function AspectsView({
   selectedAspect, onAspectSelect, scores, diary, onDiaryChange, journey,
   onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys,
   onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys,
-  onEnterHall, isAdmin = false, t, user,
+  onEnterHall, isAdmin = false, t, user, backendEnabled = true,
 }: AspectsViewProps) {
   // `t` (локаль) пока не используется в этом view, прокидывается родителем
   // для будущей i18n — оставляем в props для парности с App.jsx.
@@ -73,7 +74,7 @@ export default function AspectsView({
       return <Toc aspect={selectedAspect} data={data} color={color} available={available}
         scores={scores} onAspectSelect={onAspectSelect}
         journey={journey} onGoToSiSurveys={onGoToSiSurveys} onGoToFeSurveys={onGoToFeSurveys} onGoToNeSurveys={onGoToNeSurveys} onGoToNiSurveys={onGoToNiSurveys} onGoToFiSurveys={onGoToFiSurveys} onGoToTeSurveys={onGoToTeSurveys} onGoToTiSurveys={onGoToTiSurveys} onGoToSeSurveys={onGoToSeSurveys} onOpenBlock={setBlockId}
-    onEnterHall={onEnterHall} isAdmin={isAdmin} />
+    onEnterHall={onEnterHall} isAdmin={isAdmin} backendEnabled={backendEnabled} />
     }
     return (
       <BlockReader
@@ -100,7 +101,7 @@ export default function AspectsView({
   return <Toc aspect={selectedAspect} data={data} color={color} available={available}
     scores={scores} onAspectSelect={onAspectSelect}
     journey={journey} onGoToSiSurveys={onGoToSiSurveys} onGoToFeSurveys={onGoToFeSurveys} onGoToNeSurveys={onGoToNeSurveys} onGoToNiSurveys={onGoToNiSurveys} onGoToFiSurveys={onGoToFiSurveys} onGoToTeSurveys={onGoToTeSurveys} onGoToTiSurveys={onGoToTiSurveys} onGoToSeSurveys={onGoToSeSurveys} onOpenBlock={setBlockId}
-    onEnterHall={onEnterHall} isAdmin={isAdmin} />
+    onEnterHall={onEnterHall} isAdmin={isAdmin} backendEnabled={backendEnabled} />
 }
 
 // ─── Сетка 8 аспектов ──────────────────────────────────────────────────────
@@ -209,9 +210,10 @@ type TocProps = {
   onOpenBlock: (id: string) => void
   onEnterHall?: (aspect: AspectKey, section?: HallSection) => void
   isAdmin?: boolean
+  backendEnabled?: boolean
 }
 
-function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys, onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys, onOpenBlock, onEnterHall, isAdmin = false }: TocProps) {
+function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys, onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys, onOpenBlock, onEnterHall, isAdmin = false, backendEnabled = true }: TocProps) {
   // `scores` сейчас не используется в Toc — слайдер оценки удалён 2026-05.
   // Оставляем в props для совместимости с App.jsx (Phase 3 уберёт если что).
   void scores
@@ -335,7 +337,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
         />
       )}
 
-      <HabitSection aspect={aspect} color={color} />
+      {backendEnabled && <HabitSection aspect={aspect} color={color} />}
 
       {onEnterHall && (() => {
         const hall = HALL_CONTENT?.[aspect]
@@ -504,6 +506,7 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
   const [noteOpen, setNoteOpen] = useState(false)
   const [noteText, setNoteText] = useState('')
   const [noteSaved, setNoteSaved] = useState(false)
+  const noteSavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [pickedItemId, setPickedItemId] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -515,6 +518,10 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
     () => blockItems.find(it => it.id === pickedItemId) ?? null,
     [blockItems, pickedItemId]
   )
+
+  useEffect(() => () => {
+    if (noteSavedTimerRef.current) clearTimeout(noteSavedTimerRef.current)
+  }, [])
 
   // Закрыть форму и сбросить при смене блока + скролл вверх + закрыть drawer.
   // Без скролла на мобиле после тапа в TOC/sidebar контент блока остаётся
@@ -576,7 +583,8 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
     setNoteSaved(true)
     setNoteOpen(false)
     setPickedItemId('')
-    setTimeout(() => setNoteSaved(false), 2200)
+    if (noteSavedTimerRef.current) clearTimeout(noteSavedTimerRef.current)
+    noteSavedTimerRef.current = setTimeout(() => setNoteSaved(false), 2200)
   }
 
   const totalBlocks = available.length

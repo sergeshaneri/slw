@@ -4,9 +4,10 @@ import styles from './JourneyView.module.css'
 type Props = {
   script: Script
   onAction: (action: string, scriptId: string) => void
+  localTaskMode?: boolean
 }
 
-export default function ScriptButtons({ script, onAction }: Props) {
+export default function ScriptButtons({ script, onAction, localTaskMode = false }: Props) {
   const act = (a: string) => onAction(a, script.id)
   switch (script.type) {
     case 'theory':
@@ -38,7 +39,7 @@ export default function ScriptButtons({ script, onAction }: Props) {
     }
     case 'exercise':
       // «Позже» убрано — упражнение можно либо сделать сейчас (с инсайтом),
-      // либо взять в ежедневные практики (запись в habits + pendingTasks).
+      // либо добавить в активные задания; online также записывает habits.
       // Просто «пропустить без следа» больше нельзя.
       return (
         <div className={styles.btnRow}>
@@ -47,11 +48,10 @@ export default function ScriptButtons({ script, onAction }: Props) {
           <button type="button" className={`${styles.btn} ${styles.btnAccent}`} onClick={() => act('complete_exercise')}>
             ✓ Сделал, записать инсайт
           </button>
-          {/* «Взять в практики» — заносит упражнение в активные задания
-              и одновременно делает его ежедневной практикой аспекта
-              (POST /api/habits/choose в handleScriptAction). */}
+          {/* В lite упражнение сохраняется только в локальных активных заданиях.
+              Online дополнительно создаёт ежедневную практику через API. */}
           <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => act('done')}>
-            🪐 Взять в ежедневные практики
+            {localTaskMode ? '🪐 Взять в активные задания' : '🪐 Взять в ежедневные практики'}
           </button>
         </div>
       )
