@@ -152,3 +152,22 @@ RUN-006: git diff --cached --check обнаружил new blank line at EOF в �
 - Root отклонил force-click обход pointer interception. Причина воспроизведена: desktop visualViewport существует, но blur не вызывает resize; inputFocused оставлял topbarHidden с pointer-events:none. Chat blur теперь вычисляет реальное состояние viewport. Обычный browser click прошёл.
 - После доступного click выявлена отдельная причина отсутствующего первого Ti intro: значения присваивались внутри deferred setState updater и читались сразу после setState. Вычисление перенесено перед updater. Проверка первого intro, отмены старого ответа и возврата Si прошла.
 - Существующие ERR-001/Windows quoting правила достаточны. Профилактика P4 закреплена browser-тестами: не обходить недоступный UI force-click; синхронизировать pending callbacks управляемыми часами; проверять видимый результат первого перехода, а не только currentAspect.
+
+## ERR-015 — коллизии legacy skill lookup, обнаруженные при P5
+
+- RUN-016; implementation/content; проверяется в P5.
+- Независимый root runtime audit подтвердил два совпадающих raw ID между аспектами. getSkillContent('manipulation-detection') возвращает Ni-материал вместо Ti; getSkillContent('completion') возвращает Te-материал вместо Se. Комментарий старого lookup о непересекающихся IDs не соответствует фактическим реестрам.
+- Scope P5: catalog composite ID + source refs; локальные SkillDetail/SkillTraits используют аспектный источник. Авторские IDs и исходники data не изменяются. Влияние одинаковых ключей на старую схему прогресса отделяется от доступа к чтению; не объявлять его исправленным без проверки и миграции.
+- Read-only audit P5 подтвердил дополнительное проявление: resolveSurvey и handler выбора анкеты определяют аспект по rawId, ошибочно выбирая Ni/Te. P5 разрешён аспектный resolver с прежним online fallback. Flat skills map остаётся известной отдельной проблемой: совпавшие rawId разделяют passes/result; это не устраняется одним resolver и требует самостоятельной схемы/миграции. Не заявлять полностью исправленную изоляцию прогресса этих двух пар.
+
+### ERR-015: результат P5
+
+- Каталог хранит аспектный source ref; SkillDetail/SkillTraits и анкеты lite используют currentAspect как discriminator. Root browser проверил заголовок, первое утверждение и прохождение Ti manipulation-detection, а также заголовок и первое утверждение Se completion.
+- Остаток OPEN: state.skills[rawId] объединяет passes/result этих пар. P5 устраняет ошибочный выбор материала и анкеты, но не изолирует их прогресс; отдельная schema migration с совместимостью старых snapshot остаётся будущей задачей.
+
+## ERR-016 — stale navigation request и identity справочного блока при приёмке P5
+
+- RUN-017; implementation/test; RESOLVED в P5.
+- Независимое ревью установило, что сохранённый navigationRequest повторно применялся после sessionEpoch remount и мог перезаписать imported/reset currentAspect и screen. Request привязан к sessionEpoch и синхронно отфильтровывается до передачи новому JourneyView; browser проверяет wheel → import → один remount и неизменённые импортированные данные.
+- Вложенный AspectsView менял block через next/sidebar/Toc без синхронизации внешнего composite ID и источника заметки. Единый переход сообщает blockId каталогу; внешний заголовок и ID обновляются, а заметку сохраняет текущий BlockReader.
+- Первые browser-прогоны новых тестов выявляли только несоответствия selectors/fixtures наблюдаемому UI. Критерии не ослаблялись; итоговые content 8/8 и полный root e2e 26/26 прошли обычными кликами без force.

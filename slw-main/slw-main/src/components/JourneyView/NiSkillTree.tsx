@@ -10,6 +10,8 @@ import type { SkillStateEntry } from '../../data/journey/skills'
 import type { NiArchetypeKey } from '../../data/journey/skills/ni-tree'
 import type { SkillTreeNode } from '../../data/journey/skills/tree'
 import type { SkillState } from '@/types/journey'
+import { hasSkillContent } from '@/data/skills'
+import type { ContentAccessPolicy } from '@/lite/contentAccess'
 import styles from './JourneyView.module.css'
 
 // Колесо БИ — интерактивное дерево 43 навыков по 4 архетипам
@@ -55,10 +57,11 @@ type Props = {
   onClose: () => void
   onStartSkill?: (skillId: string) => void
   onOpenSkillDetail?: (skillId: string) => void
+  contentAccess?: ContentAccessPolicy
   onOpenPlanetMap?: () => void
 }
 
-export default function NiSkillTree({ accent, skills, onClose, onStartSkill, onOpenSkillDetail, onOpenPlanetMap }: Props) {
+export default function NiSkillTree({ accent, skills, onClose, onStartSkill, onOpenSkillDetail, onOpenPlanetMap, contentAccess }: Props) {
   const progress = getNiSkillProgress((skills ?? {}) as Record<string, SkillStateEntry>)
 
   // По умолчанию все ветки свёрнуты — 43 навыка сразу пугают.
@@ -170,6 +173,7 @@ export default function NiSkillTree({ accent, skills, onClose, onStartSkill, onO
                         st.kind === 'draft'  ? styles.treeSkillDraft :
                         ''
                       const hasPasses = st.kind === 'light' || st.kind === 'medium' || st.kind === 'full'
+                      const canReadDetail = hasPasses || (contentAccess?.fullContentAccess === true && hasSkillContent(skill.id))
                       return (
                         <li key={skill.id} className={styles.treeSkillRow}>
                           <button
@@ -192,7 +196,7 @@ export default function NiSkillTree({ accent, skills, onClose, onStartSkill, onO
                               {st.kind === 'draft'  && `${st.mode === 'full' ? 'полный' : 'короткий'} · продолжить`}
                             </span>
                           </button>
-                          {hasPasses && onOpenSkillDetail && (
+                          {canReadDetail && onOpenSkillDetail && (
                             <button
                               type="button"
                               className={styles.treeSkillInfoBtn}
@@ -203,7 +207,7 @@ export default function NiSkillTree({ accent, skills, onClose, onStartSkill, onO
                               ⓘ
                             </button>
                           )}
-                          {hasPasses && onOpenSkillDetail && (
+                          {canReadDetail && onOpenSkillDetail && (
                             <button
                               type="button"
                               className={styles.treeSkillDevBtn}

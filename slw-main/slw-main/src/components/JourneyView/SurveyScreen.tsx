@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { buildSurveyStatements, SURVEY_BLOCKS } from '../../data/journey/skills'
 import { resolveSurvey } from '../../data/journey/skills/resolve'
+import type { SurveyResolver } from '@/lite/contentSurvey'
 import Slider from './Slider'
 import { useSendKeyMode, shouldSendOnKeyDown, useUiPreferences } from '../../hooks/useSendKeyMode'
 import styles from './JourneyView.module.css'
@@ -37,10 +38,11 @@ type Props = {
   onBack: () => void
   onComplete: () => void
   onCancel: () => void
+  surveyResolver?: SurveyResolver
 }
 
-export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, onComplete, onCancel }: Props) {
-  const survey = resolveSurvey(activeSurvey.skillId)
+export default function SurveyScreen({ activeSurvey, accent, onAnswer, onBack, onComplete, onCancel, surveyResolver = resolveSurvey }: Props) {
+  const survey = surveyResolver(activeSurvey.skillId)
   const mode = activeSurvey.mode ?? 'short'
   const startPass = activeSurvey.startPass ?? 1
 

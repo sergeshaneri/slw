@@ -6,6 +6,9 @@ import {
   getArchetypeNameForSkill
 } from '../../data/skills'
 import InsightInput from './InsightInput'
+import type { Skill } from '@/types/skill'
+import type { ContentAccessPolicy } from '@/lite/contentAccess'
+import { readableLevel } from '@/lite/contentAccess'
 import styles from './JourneyView.module.css'
 
 /**
@@ -45,16 +48,18 @@ type Props = {
   accent?: string
   onSaveInsight?: (skillId: string, level: number, source: string, text: string) => void
   onClose: () => void
+  contentAccess?: ContentAccessPolicy
+  skillContentOverride?: Skill | null
 }
 
-export default function SkillTraits({ skillId, currentLevel, passes, accent, onSaveInsight, onClose }: Props) {
-  const content = getSkillContent(skillId) as SkillContent | null | undefined
+export default function SkillTraits({ skillId, currentLevel, passes, accent, onSaveInsight, onClose, contentAccess, skillContentOverride }: Props) {
+  const content = (skillContentOverride !== undefined ? skillContentOverride : getSkillContent(skillId)) as SkillContent | null | undefined
   const cl = currentLevel ?? 0
   const p = passes ?? 0
-  const unlockedLevel = getUnlockedSkillLevel(cl, p)
+  const unlockedLevel = readableLevel(contentAccess, getUnlockedSkillLevel(cl, p))
 
-  const skillName = getSkillName(skillId)
-  const archeName = getArchetypeNameForSkill(skillId)
+  const skillName = content?.name ?? getSkillName(skillId)
+  const archeName = skillContentOverride ? null : getArchetypeNameForSkill(skillId)
 
   const shellStyle: AccentStyle = { '--accent': accent }
 

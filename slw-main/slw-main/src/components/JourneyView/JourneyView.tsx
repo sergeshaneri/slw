@@ -7,6 +7,9 @@ import type {
 } from '@/types/journey'
 import type { Script } from '@/types/script'
 import type { DiaryEntry } from '@/types/diary'
+import type { ContentAccessPolicy } from '@/lite/contentAccess'
+import { resolveSurveyForAspect, type SurveyResolver } from '@/lite/contentSurvey'
+import { SKILL_CONTENT_BY_ASPECT } from '@/lite/contentCatalog'
 import { postStepCompleted, chooseHabit } from '../../api/client'
 import { tmaHaptic } from '../../tma/hooks'
 import { ASPECT_COLORS, ASPECT_DATA, ASPECT_DISPLAY_KEY } from '../../data/aspects'
@@ -146,13 +149,22 @@ type Props = {
   // Гость может проигнорить плашку.
   onRequestAuth?: (mode?: 'login' | 'register') => void
   backendEnabled?: boolean
+  contentAccess?: ContentAccessPolicy
+  navigationRequest?: JourneyNavigationRequest | null
 }
+
+export type JourneyNavigationRequest = Readonly<{
+  id: number
+  sessionEpoch: number
+  aspect: AspectKey
+  destination: 'skill-tree'
+}>
 
 export default function JourneyView({
   journey: extJourney, onJourneyChange, scores, onScoresChange, diary, onDiaryChange,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   t: _t,
-  isAdmin = false, user, onRequestAuth, backendEnabled = true
+  isAdmin = false, user, onRequestAuth, backendEnabled = true, contentAccess, navigationRequest
 }: Props) {
   // Локальный стейт — единственный source of truth.
   // Наружу синхронизируется через useEffect (ниже), чтобы persist-callback
@@ -230,6 +242,14 @@ export default function JourneyView({
   const scripts: Script[] = currentLevel?.core ?? currentLevel?.scripts ?? []
   const aspectIntro = currentJourney?.intro ?? []
   const accent = ASPECT_COLORS[state.currentAspect] ?? '#4cc9f0'
+  const surveyResolver = useCallback<SurveyResolver>((skillId) => (
+    contentAccess?.fullContentAccess
+      ? resolveSurveyForAspect(state.currentAspect, skillId)
+      : resolveSurvey(skillId)
+  ), [contentAccess?.fullContentAccess, state.currentAspect])
+  const currentSkillContent = useCallback((skillId: string) => (
+    contentAccess?.fullContentAccess ? (SKILL_CONTENT_BY_ASPECT[state.currentAspect][skillId] ?? null) : undefined
+  ), [contentAccess?.fullContentAccess, state.currentAspect])
 
   // Лукап скрипта по {scriptId, level} — нужен в чате для архивных
   // сообщений: T-1 в L0 ≠ T-1 в L1, ID может повторяться между
@@ -782,7 +802,7 @@ export default function JourneyView({
     const trimmedInsight = (insightText ?? '').trim()
     if (trimmedInsight) {
       const active = state.activeSurvey
-      const survey = active ? resolveSurvey(active.skillId) : null
+      const survey = active ? surveyResolver(active.skillId) : null
       const stmts = survey
         ? buildSurveyStatements(survey, active?.mode ?? 'short', active?.startPass ?? 1)
         : []
@@ -808,7 +828,7 @@ export default function JourneyView({
     setState(s => {
       const active = s.activeSurvey
       if (!active) return s
-      const survey = resolveSurvey(active.skillId)
+      const survey = surveyResolver(active.skillId)
       if (!survey) return s
       const stmts = buildSurveyStatements(survey, active.mode ?? 'short', active.startPass ?? 1)
       const current = stmts[active.stepIndex ?? 0]
@@ -828,7 +848,7 @@ export default function JourneyView({
         }
       }
     })
-  }, [setState, state.activeSurvey, state.currentAspect, diary, onDiaryChange])
+  }, [setState, state.activeSurvey, state.currentAspect, diary, onDiaryChange, surveyResolver])
 
   // Назад на одно утверждение (внутри текущей сессии).
   const handleSurveyBack = useCallback(() => {
@@ -860,7 +880,7 @@ export default function JourneyView({
   const handleSurveyInsight = useCallback((insightText: string) => {
     const active = state.activeSurvey
     if (!active) return
-    const survey = resolveSurvey(active.skillId)
+    const survey = surveyResolver(active.skillId)
     if (!survey) return
 
     const cleanedAnswers: Record<string, number[]> = {}
@@ -903,8 +923,8 @@ export default function JourneyView({
     // если для него есть развёрнутый контент И L1 уже открыт.
     const fromChatScript = scripts.some(sc => sc.id === active.scriptId)
     const cl = aspectOf(state).currentLevel ?? 0
-    const skillContent = getSkillContent(active.skillId)
-    const willOpenDetail = !!skillContent && getUnlockedSkillLevel(cl, actualPasses) >= 1
+    const skillContent = currentSkillContent(active.skillId) ?? getSkillContent(active.skillId)
+    const willOpenDetail = !!skillContent && (contentAccess?.fullContentAccess === true || getUnlockedSkillLevel(cl, actualPasses) >= 1)
 
     setState(s => ({
       ...s,
@@ -977,7 +997,7 @@ export default function JourneyView({
     const xp = (actualPasses - wasPasses) * 10
     if (script) removePending(script.id)
     awardXP(xp, wentToFinal ? (script?.stardust ?? 0) : 0, script?.id ?? null)
-  }, [state, scripts, scores, diary, onDiaryChange, onScoresChange, awardXP, removePending, setState, deliverScript])
+  }, [state, scripts, scores, diary, onDiaryChange, onScoresChange, awardXP, removePending, setState, deliverScript, surveyResolver, currentSkillContent, contentAccess?.fullContentAccess])
 
   // Сохранить inline-инсайт с карточки уровня (SkillDetail / SkillTraits).
   const handleSaveSkillInsight = useCallback((skillId: string, level: number, source: string, text: string) => {
@@ -998,10 +1018,10 @@ export default function JourneyView({
 
     // Имя навыка для записи в дневник.
     let skillName = skillId
-    const survey = resolveSurvey(skillId)
+    const survey = surveyResolver(skillId)
     if (survey?.name) skillName = survey.name
     else {
-      const c = getSkillContent(skillId) as { name?: string } | null | undefined
+      const c = (currentSkillContent(skillId) ?? getSkillContent(skillId)) as { name?: string } | null | undefined
       if (c?.name) skillName = c.name
     }
 
@@ -1020,7 +1040,7 @@ export default function JourneyView({
       },
       ...diaryRef.current
     ])
-  }, [setState, onDiaryChange, diary, state.currentAspect])
+  }, [setState, onDiaryChange, diary, state.currentAspect, surveyResolver, currentSkillContent])
 
   // Отмена анкеты или инсайта — сохраняем текущий прогресс как draft.
   const handleSurveyCancel = useCallback(() => {
@@ -1070,7 +1090,7 @@ export default function JourneyView({
     const draft = skillEntry?.draft
 
     // ЧИ (Ne)
-    if (isNeSkill(skillId)) {
+    if (contentAccess?.fullContentAccess ? state.currentAspect === 'Ne' : isNeSkill(skillId)) {
       if (draft) {
         setState(s => ({
           ...s,
@@ -1098,7 +1118,7 @@ export default function JourneyView({
     }
 
     // БИ (Ni)
-    if (isNiSkill(skillId)) {
+    if (contentAccess?.fullContentAccess ? state.currentAspect === 'Ni' : isNiSkill(skillId)) {
       if (draft) {
         setState(s => ({
           ...s,
@@ -1126,7 +1146,7 @@ export default function JourneyView({
     }
 
     // ЧЛ (Te)
-    if (isTeSkill(skillId)) {
+    if (contentAccess?.fullContentAccess ? state.currentAspect === 'Te' : isTeSkill(skillId)) {
       if (draft) {
         setState(s => ({
           ...s,
@@ -1154,7 +1174,7 @@ export default function JourneyView({
     }
 
     // БЛ (Ti)
-    if (isTiSkill(skillId)) {
+    if (contentAccess?.fullContentAccess ? state.currentAspect === 'Ti' : isTiSkill(skillId)) {
       if (draft) {
         setState(s => ({
           ...s,
@@ -1182,7 +1202,7 @@ export default function JourneyView({
     }
 
     // БЭ (Fi)
-    if (isFiSkill(skillId)) {
+    if (contentAccess?.fullContentAccess ? state.currentAspect === 'Fi' : isFiSkill(skillId)) {
       if (draft) {
         setState(s => ({
           ...s,
@@ -1210,7 +1230,7 @@ export default function JourneyView({
     }
 
     // ЧС (Se)
-    if (isSeSkill(skillId)) {
+    if (contentAccess?.fullContentAccess ? state.currentAspect === 'Se' : isSeSkill(skillId)) {
       if (draft) {
         setState(s => ({
           ...s,
@@ -1279,7 +1299,7 @@ export default function JourneyView({
       },
       cur => ({ ...cur, awaitingInput: null })
     ))
-  }, [state.skills, setState])
+  }, [state.skills, state.currentAspect, setState, contentAccess?.fullContentAccess])
 
   // Юзер выбрал режим в SurveyChoice. Стартуем активную анкету.
   const handleChooseSurveyMode = useCallback((mode: 'short' | 'full') => {
@@ -1327,6 +1347,21 @@ export default function JourneyView({
       },
     }
   }, [])
+
+  const lastNavigationRequestRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!navigationRequest || lastNavigationRequestRef.current === navigationRequest.id) return
+    lastNavigationRequestRef.current = navigationRequest.id
+    clearScheduledTimers()
+    isProcessingRef.current = false
+    setIsTyping(false)
+    setState(s => ({
+      ...dismissActiveSurveyToDraft(s),
+      currentAspect: navigationRequest.aspect,
+      screen: navigationRequest.destination,
+      onboardingStep: Math.max(s.onboardingStep ?? 0, 6),
+    }))
+  }, [navigationRequest, clearScheduledTimers, dismissActiveSurveyToDraft])
 
   // Открыть Карту Планет. Если открыта анкета — сохраняем её draft.
   const handleOpenPlanetMap = useCallback(() => {
@@ -1636,7 +1671,7 @@ export default function JourneyView({
           // Пилюля «Оценить навыки» появляется только после L0 (или для админа).
           // Прогресс считается по skill-tree активного аспекта.
           surveyRemaining={(() => {
-            if (!isAdmin && (a.currentLevel ?? 0) < 1) return 0
+            if (!isAdmin && !contentAccess?.fullContentAccess && (a.currentLevel ?? 0) < 1) return 0
             const sk = state.skills ?? {}
             switch (state.currentAspect) {
               case 'Si': return getSkillProgress(sk).remaining
@@ -1754,6 +1789,8 @@ export default function JourneyView({
           skills={state.skills ?? {}}
           onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
           onStartSkill={handleStartSkillSurvey}
+          onOpenSkillDetail={handleOpenSkillDetail}
+          contentAccess={contentAccess}
           onOpenPlanetMap={handleOpenPlanetMap}
         />
       )}
@@ -1765,6 +1802,7 @@ export default function JourneyView({
           onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
           onStartSkill={handleStartSkillSurvey}
           onOpenSkillDetail={handleOpenSkillDetail}
+          contentAccess={contentAccess}
           onOpenPlanetMap={handleOpenPlanetMap}
         />
       )}
@@ -1776,6 +1814,7 @@ export default function JourneyView({
           onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
           onStartSkill={handleStartSkillSurvey}
           onOpenSkillDetail={handleOpenSkillDetail}
+          contentAccess={contentAccess}
           onOpenPlanetMap={handleOpenPlanetMap}
         />
       )}
@@ -1787,6 +1826,7 @@ export default function JourneyView({
           onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
           onStartSkill={handleStartSkillSurvey}
           onOpenSkillDetail={handleOpenSkillDetail}
+          contentAccess={contentAccess}
           onOpenPlanetMap={handleOpenPlanetMap}
         />
       )}
@@ -1797,6 +1837,8 @@ export default function JourneyView({
           skills={state.skills ?? {}}
           onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
           onStartSkill={handleStartSkillSurvey}
+          onOpenSkillDetail={handleOpenSkillDetail}
+          contentAccess={contentAccess}
           onOpenPlanetMap={handleOpenPlanetMap}
         />
       )}
@@ -1807,6 +1849,8 @@ export default function JourneyView({
           skills={state.skills ?? {}}
           onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
           onStartSkill={handleStartSkillSurvey}
+          onOpenSkillDetail={handleOpenSkillDetail}
+          contentAccess={contentAccess}
           onOpenPlanetMap={handleOpenPlanetMap}
         />
       )}
@@ -1817,6 +1861,8 @@ export default function JourneyView({
           skills={state.skills ?? {}}
           onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
           onStartSkill={handleStartSkillSurvey}
+          onOpenSkillDetail={handleOpenSkillDetail}
+          contentAccess={contentAccess}
           onOpenPlanetMap={handleOpenPlanetMap}
         />
       )}
@@ -1828,6 +1874,7 @@ export default function JourneyView({
           onClose={() => goToScreen(state.onboardingStep < 6 ? 'onboarding' : 'chat')}
           onStartSkill={handleStartSkillSurvey}
           onOpenSkillDetail={handleOpenSkillDetail}
+          contentAccess={contentAccess}
           onOpenPlanetMap={handleOpenPlanetMap}
         />
       )}
@@ -1841,6 +1888,8 @@ export default function JourneyView({
           onClose={() => goToScreen('skill-tree')}
           onOpenTraits={(id: string) => setState(s => ({ ...s, skillDetailId: id, screen: 'skill-traits' }))}
           onSaveInsight={handleSaveSkillInsight}
+          contentAccess={contentAccess}
+          skillContentOverride={currentSkillContent(state.skillDetailId)}
         />
       )}
 
@@ -1851,6 +1900,8 @@ export default function JourneyView({
           passes={getCompletedPasses(state.skills?.[state.skillDetailId] as StoredSkillEntry | undefined)}
           accent={accent}
           onSaveInsight={handleSaveSkillInsight}
+          contentAccess={contentAccess}
+          skillContentOverride={currentSkillContent(state.skillDetailId)}
           onClose={() => goToScreen('skill-detail')}
         />
       )}
@@ -1865,7 +1916,7 @@ export default function JourneyView({
 
       {state.screen === 'survey-choice' && state.activeSurvey && (() => {
         let name: string = state.activeSurvey.skillId
-        const survey = resolveSurvey(state.activeSurvey.skillId)
+        const survey = surveyResolver(state.activeSurvey.skillId)
         if (survey?.name) {
           name = survey.name
         } else {
@@ -1882,6 +1933,7 @@ export default function JourneyView({
             accent={accent}
             onChoose={handleChooseSurveyMode}
             onCancel={() => goToScreen('skill-tree')}
+            surveyResolver={surveyResolver}
           />
         )
       })()}
@@ -1894,6 +1946,7 @@ export default function JourneyView({
           onBack={handleSurveyBack}
           onComplete={handleSurveyComplete}
           onCancel={handleSurveyCancel}
+          surveyResolver={surveyResolver}
         />
       )}
 
@@ -1902,6 +1955,9 @@ export default function JourneyView({
           activeSurvey={state.activeSurvey}
           accent={accent}
           currentLevel={a.currentLevel ?? 0}
+          surveyResolver={surveyResolver}
+          contentAccess={contentAccess}
+          skillContentOverride={currentSkillContent(state.activeSurvey.skillId)}
           onSave={handleSurveyInsight}
           onCancel={handleSurveyCancel}
         />

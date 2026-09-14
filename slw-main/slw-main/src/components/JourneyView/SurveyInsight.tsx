@@ -2,6 +2,9 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { calcSurveyResult, SURVEY_BLOCKS } from '../../data/journey/skills'
 import { resolveSurvey } from '../../data/journey/skills/resolve'
+import type { SurveyResolver } from '@/lite/contentSurvey'
+import type { ContentAccessPolicy } from '@/lite/contentAccess'
+import type { Skill } from '@/types/skill'
 import { getSkillContent, getUnlockedSkillLevel } from '../../data/skills'
 import { useSendKeyMode, shouldSendOnKeyDown } from '../../hooks/useSendKeyMode'
 import styles from './JourneyView.module.css'
@@ -44,12 +47,15 @@ type Props = {
   currentLevel?: number | null
   onSave: (text: string) => void
   onCancel: () => void
+  surveyResolver?: SurveyResolver
+  contentAccess?: ContentAccessPolicy
+  skillContentOverride?: Skill | null
 }
 
-export default function SurveyInsight({ activeSurvey, accent, currentLevel, onSave, onCancel }: Props) {
+export default function SurveyInsight({ activeSurvey, accent, currentLevel, onSave, onCancel, surveyResolver = resolveSurvey, contentAccess, skillContentOverride }: Props) {
   const [text, setText] = useState<string>('')
   const [sendKeyMode] = useSendKeyMode()
-  const survey = resolveSurvey(activeSurvey.skillId)
+  const survey = surveyResolver(activeSurvey.skillId)
   const pass = activeSurvey.pass ?? 1
 
   // calcSurveyResult expects Record<string, number[]>, наш активный буфер
@@ -86,8 +92,8 @@ export default function SurveyInsight({ activeSurvey, accent, currentLevel, onSa
   actualPasses = Math.min(3, actualPasses)
 
   const cl = currentLevel ?? 0
-  const skillContent = getSkillContent(activeSurvey.skillId) as SkillContentLike | null | undefined
-  const willOpenDetail = !!skillContent && getUnlockedSkillLevel(cl, actualPasses) >= 1
+  const skillContent = (skillContentOverride !== undefined ? skillContentOverride : getSkillContent(activeSurvey.skillId)) as SkillContentLike | null | undefined
+  const willOpenDetail = !!skillContent && (contentAccess?.fullContentAccess === true || getUnlockedSkillLevel(cl, actualPasses) >= 1)
   const isCore = skillContent?.archetype === 'common' || skillContent?.role === 'core'
   const showCoreAnnounce = !!skillContent && isCore && !willOpenDetail
 

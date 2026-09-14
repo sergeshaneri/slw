@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import type { SkillState } from '@/types/journey'
 import { getCompletedPasses } from '../../data/journey/skills'
 import { resolveSurvey } from '../../data/journey/skills/resolve'
+import type { SurveyResolver } from '@/lite/contentSurvey'
 import styles from './JourneyView.module.css'
 
 /**
@@ -22,10 +23,11 @@ type Props = {
   accent?: string
   onChoose: (mode: SurveyMode) => void
   onCancel: () => void
+  surveyResolver?: SurveyResolver
 }
 
-export default function SurveyChoice({ skillId, skillName, skillEntry, accent, onChoose, onCancel }: Props) {
-  const survey = resolveSurvey(skillId)
+export default function SurveyChoice({ skillId, skillName, skillEntry, accent, onChoose, onCancel, surveyResolver = resolveSurvey }: Props) {
+  const survey = surveyResolver(skillId)
   const passesDone = getCompletedPasses(skillEntry)
   const nextPass = passesDone + 1
   const remainingPasses = 3 - passesDone   // 3, 2 или 1

@@ -20,6 +20,7 @@ import type { AspectKey } from '@/types/aspect'
 import type { JourneyState, SkillState } from '@/types/journey'
 import type { DiaryEntry } from '@/types/diary'
 import type { User } from '@/types/user'
+import type { ContentAccessPolicy } from '@/lite/contentAccess'
 import styles from './AspectsView.module.css'
 
 type AspectsViewProps = {
@@ -42,22 +43,29 @@ type AspectsViewProps = {
   t?: unknown
   user?: User | null
   backendEnabled?: boolean
+  initialBlockId?: string | null
+  onBlockNavigate?: (blockId: string) => void
+  contentAccess?: ContentAccessPolicy
 }
 
 export default function AspectsView({
   selectedAspect, onAspectSelect, scores, diary, onDiaryChange, journey,
   onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys,
   onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys,
-  onEnterHall, isAdmin = false, t, user, backendEnabled = true,
+  onEnterHall, isAdmin = false, t, user, backendEnabled = true, initialBlockId = null, onBlockNavigate, contentAccess,
 }: AspectsViewProps) {
   // `t` (локаль) пока не используется в этом view, прокидывается родителем
   // для будущей i18n — оставляем в props для парности с App.jsx.
   void t
-  const [blockId, setBlockId] = useState<string | null>(null)
+  const [blockId, setBlockId] = useState<string | null>(initialBlockId)
+  const navigateToBlock = (id: string) => {
+    setBlockId(id)
+    onBlockNavigate?.(id)
+  }
 
   useEffect(() => {
-    setBlockId(null)
-  }, [selectedAspect])
+    setBlockId(initialBlockId)
+  }, [selectedAspect, initialBlockId])
 
   if (!selectedAspect) {
     return <AspectsGrid scores={scores} onAspectSelect={onAspectSelect} journey={journey} user={user} />
@@ -73,8 +81,8 @@ export default function AspectsView({
     if (!block) {
       return <Toc aspect={selectedAspect} data={data} color={color} available={available}
         scores={scores} onAspectSelect={onAspectSelect}
-        journey={journey} onGoToSiSurveys={onGoToSiSurveys} onGoToFeSurveys={onGoToFeSurveys} onGoToNeSurveys={onGoToNeSurveys} onGoToNiSurveys={onGoToNiSurveys} onGoToFiSurveys={onGoToFiSurveys} onGoToTeSurveys={onGoToTeSurveys} onGoToTiSurveys={onGoToTiSurveys} onGoToSeSurveys={onGoToSeSurveys} onOpenBlock={setBlockId}
-    onEnterHall={onEnterHall} isAdmin={isAdmin} backendEnabled={backendEnabled} />
+        journey={journey} onGoToSiSurveys={onGoToSiSurveys} onGoToFeSurveys={onGoToFeSurveys} onGoToNeSurveys={onGoToNeSurveys} onGoToNiSurveys={onGoToNiSurveys} onGoToFiSurveys={onGoToFiSurveys} onGoToTeSurveys={onGoToTeSurveys} onGoToTiSurveys={onGoToTiSurveys} onGoToSeSurveys={onGoToSeSurveys} onOpenBlock={navigateToBlock}
+    onEnterHall={onEnterHall} isAdmin={isAdmin} backendEnabled={backendEnabled} contentAccess={contentAccess} />
     }
     return (
       <BlockReader
@@ -89,19 +97,20 @@ export default function AspectsView({
         diary={diary}
         onDiaryChange={onDiaryChange}
         onBack={() => setBlockId(null)}
-        onGoto={setBlockId}
+        onGoto={navigateToBlock}
         journey={journey}
         isAdmin={isAdmin}
         user={user}
         onEnterHall={onEnterHall}
+        contentAccess={contentAccess}
       />
     )
   }
 
   return <Toc aspect={selectedAspect} data={data} color={color} available={available}
     scores={scores} onAspectSelect={onAspectSelect}
-    journey={journey} onGoToSiSurveys={onGoToSiSurveys} onGoToFeSurveys={onGoToFeSurveys} onGoToNeSurveys={onGoToNeSurveys} onGoToNiSurveys={onGoToNiSurveys} onGoToFiSurveys={onGoToFiSurveys} onGoToTeSurveys={onGoToTeSurveys} onGoToTiSurveys={onGoToTiSurveys} onGoToSeSurveys={onGoToSeSurveys} onOpenBlock={setBlockId}
-    onEnterHall={onEnterHall} isAdmin={isAdmin} backendEnabled={backendEnabled} />
+    journey={journey} onGoToSiSurveys={onGoToSiSurveys} onGoToFeSurveys={onGoToFeSurveys} onGoToNeSurveys={onGoToNeSurveys} onGoToNiSurveys={onGoToNiSurveys} onGoToFiSurveys={onGoToFiSurveys} onGoToTeSurveys={onGoToTeSurveys} onGoToTiSurveys={onGoToTiSurveys} onGoToSeSurveys={onGoToSeSurveys} onOpenBlock={navigateToBlock}
+    onEnterHall={onEnterHall} isAdmin={isAdmin} backendEnabled={backendEnabled} contentAccess={contentAccess} />
 }
 
 // ─── Сетка 8 аспектов ──────────────────────────────────────────────────────
@@ -211,9 +220,10 @@ type TocProps = {
   onEnterHall?: (aspect: AspectKey, section?: HallSection) => void
   isAdmin?: boolean
   backendEnabled?: boolean
+  contentAccess?: ContentAccessPolicy
 }
 
-function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys, onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys, onOpenBlock, onEnterHall, isAdmin = false, backendEnabled = true }: TocProps) {
+function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, onGoToSiSurveys, onGoToFeSurveys, onGoToNeSurveys, onGoToNiSurveys, onGoToFiSurveys, onGoToTeSurveys, onGoToTiSurveys, onGoToSeSurveys, onOpenBlock, onEnterHall, isAdmin = false, backendEnabled = true, contentAccess }: TocProps) {
   // `scores` сейчас не используется в Toc — слайдер оценки удалён 2026-05.
   // Оставляем в props для совместимости с App.jsx (Phase 3 уберёт если что).
   void scores
@@ -227,7 +237,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
   // Admin видит всё (99 — sentinel). При гостевом state и без journey
   // считаем 0 — тогда L1+ заблюрится в BlockReader, в Toc мы помечаем
   // карточки lock-иконкой.
-  const accessLevel = isAdmin
+  const accessLevel = isAdmin || contentAccess?.fullContentAccess
     ? 99
     : (journey?.aspects?.[aspect]?.currentLevel ?? 0)
 
@@ -250,7 +260,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
           skills={skillsForWheels}
           color={color}
           onContinueSurveys={onGoToSiSurveys}
-          isLocked={!isAdmin && (journey?.aspects?.['Si']?.currentLevel ?? 0) < 1}
+          isLocked={!contentAccess?.fullContentAccess && !isAdmin && (journey?.aspects?.['Si']?.currentLevel ?? 0) < 1}
         />
       )}
 
@@ -261,7 +271,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
           skills={skillsForWheels}
           color={color}
           onContinueSurveys={onGoToFeSurveys}
-          isLocked={!isAdmin && (journey?.aspects?.['Fe']?.currentLevel ?? 0) < 1}
+          isLocked={!contentAccess?.fullContentAccess && !isAdmin && (journey?.aspects?.['Fe']?.currentLevel ?? 0) < 1}
         />
       )}
 
@@ -273,7 +283,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
           skills={skillsForWheels}
           color={color}
           onContinueSurveys={onGoToNeSurveys}
-          isLocked={!isAdmin && (journey?.aspects?.['Ne']?.currentLevel ?? 0) < 1}
+          isLocked={!contentAccess?.fullContentAccess && !isAdmin && (journey?.aspects?.['Ne']?.currentLevel ?? 0) < 1}
         />
       )}
 
@@ -285,7 +295,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
           skills={skillsForWheels}
           color={color}
           onContinueSurveys={onGoToNiSurveys}
-          isLocked={!isAdmin && (journey?.aspects?.['Ni']?.currentLevel ?? 0) < 1}
+          isLocked={!contentAccess?.fullContentAccess && !isAdmin && (journey?.aspects?.['Ni']?.currentLevel ?? 0) < 1}
         />
       )}
 
@@ -297,7 +307,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
           skills={skillsForWheels}
           color={color}
           onContinueSurveys={onGoToFiSurveys}
-          isLocked={!isAdmin && (journey?.aspects?.['Fi']?.currentLevel ?? 0) < 1}
+          isLocked={!contentAccess?.fullContentAccess && !isAdmin && (journey?.aspects?.['Fi']?.currentLevel ?? 0) < 1}
         />
       )}
 
@@ -309,7 +319,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
           skills={skillsForWheels}
           color={color}
           onContinueSurveys={onGoToTeSurveys}
-          isLocked={!isAdmin && (journey?.aspects?.['Te']?.currentLevel ?? 0) < 1}
+          isLocked={!contentAccess?.fullContentAccess && !isAdmin && (journey?.aspects?.['Te']?.currentLevel ?? 0) < 1}
         />
       )}
 
@@ -321,7 +331,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
           skills={skillsForWheels}
           color={color}
           onContinueSurveys={onGoToSeSurveys}
-          isLocked={!isAdmin && (journey?.aspects?.['Se']?.currentLevel ?? 0) < 1}
+          isLocked={!contentAccess?.fullContentAccess && !isAdmin && (journey?.aspects?.['Se']?.currentLevel ?? 0) < 1}
         />
       )}
 
@@ -333,7 +343,7 @@ function Toc({ aspect, data, color, available, scores, onAspectSelect, journey, 
           skills={skillsForWheels}
           color={color}
           onContinueSurveys={onGoToTiSurveys}
-          isLocked={!isAdmin && (journey?.aspects?.['Ti']?.currentLevel ?? 0) < 1}
+          isLocked={!contentAccess?.fullContentAccess && !isAdmin && (journey?.aspects?.['Ti']?.currentLevel ?? 0) < 1}
         />
       )}
 
@@ -484,9 +494,10 @@ type BlockReaderProps = {
   isAdmin?: boolean
   user?: User | null
   onEnterHall?: (aspect: AspectKey, section?: HallSection) => void
+  contentAccess?: ContentAccessPolicy
 }
 
-function BlockReader({ aspect, data, color, block, available, prev, next, diary, onDiaryChange, onBack, onGoto, journey, isAdmin = false, user, onEnterHall }: BlockReaderProps) {
+function BlockReader({ aspect, data, color, block, available, prev, next, diary, onDiaryChange, onBack, onGoto, journey, isAdmin = false, user, onEnterHall, contentAccess }: BlockReaderProps) {
   const byLevel = useMemo(() => {
     const m: Record<BlockLevel, Block[]> = { 0: [], 1: [], 2: [], 3: [] }
     available.forEach(b => m[b.level].push(b))
@@ -494,7 +505,7 @@ function BlockReader({ aspect, data, color, block, available, prev, next, diary,
   }, [available])
 
   // Уровень доступа по этому аспекту. Admin видит всё.
-  const accessLevel = isAdmin
+  const accessLevel = isAdmin || contentAccess?.fullContentAccess
     ? 99
     : (journey?.aspects?.[aspect]?.currentLevel ?? 0)
   const isBlockUnlocked = block.level <= accessLevel

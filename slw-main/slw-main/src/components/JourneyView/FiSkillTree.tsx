@@ -10,6 +10,8 @@ import type { SkillStateEntry } from '../../data/journey/skills'
 import type { FiArchetypeKey } from '../../data/journey/skills/fi-tree'
 import type { SkillTreeNode } from '../../data/journey/skills/tree'
 import type { SkillState } from '@/types/journey'
+import { hasSkillContent } from '@/data/skills'
+import type { ContentAccessPolicy } from '@/lite/contentAccess'
 import styles from './JourneyView.module.css'
 
 // Колесо БЭ — интерактивное дерево 58 навыков по 4 архетипам
@@ -54,10 +56,12 @@ type Props = {
   skills: Record<string, SkillState> | undefined
   onClose: () => void
   onStartSkill?: (skillId: string) => void
+  onOpenSkillDetail?: (skillId: string) => void
+  contentAccess?: ContentAccessPolicy
   onOpenPlanetMap?: () => void
 }
 
-export default function FiSkillTree({ accent, skills, onClose, onStartSkill, onOpenPlanetMap }: Props) {
+export default function FiSkillTree({ accent, skills, onClose, onStartSkill, onOpenSkillDetail, onOpenPlanetMap, contentAccess }: Props) {
   const progress = getFiSkillProgress((skills ?? {}) as Record<string, SkillStateEntry>)
 
   // По умолчанию все ветки свёрнуты — 58 навыков сразу пугают.
@@ -168,6 +172,7 @@ export default function FiSkillTree({ accent, skills, onClose, onStartSkill, onO
                         st.kind === 'light'  ? styles.treeSkillLight :
                         st.kind === 'draft'  ? styles.treeSkillDraft :
                         ''
+                      const canReadDetail = contentAccess?.fullContentAccess === true && hasSkillContent(skill.id)
                       return (
                         <li key={skill.id} className={styles.treeSkillRow}>
                           <button
@@ -190,6 +195,9 @@ export default function FiSkillTree({ accent, skills, onClose, onStartSkill, onO
                               {st.kind === 'draft'  && `${st.mode === 'full' ? 'полный' : 'короткий'} · продолжить`}
                             </span>
                           </button>
+                          {canReadDetail && onOpenSkillDetail && (
+                            <button type="button" className={styles.treeSkillInfoBtn} onClick={() => onOpenSkillDetail(skill.id)} aria-label={`Детальный разбор: ${skill.name}`} title="Что развиваешь и как">ⓘ</button>
+                          )}
                         </li>
                       )
                     })}

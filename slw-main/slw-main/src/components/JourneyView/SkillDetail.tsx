@@ -7,6 +7,9 @@ import {
   getArchetypeNameForSkill
 } from '../../data/skills'
 import InsightInput from './InsightInput'
+import type { Skill } from '@/types/skill'
+import type { ContentAccessPolicy } from '@/lite/contentAccess'
+import { readableLevel } from '@/lite/contentAccess'
 import styles from './JourneyView.module.css'
 
 // SkillDetail — экран «Как развить» для одного навыка.
@@ -59,19 +62,22 @@ type Props = {
   onClose: () => void
   onOpenTraits?: (skillId: string) => void
   onSaveInsight?: (skillId: string, level: number, source: string, text: string) => void
+  contentAccess?: ContentAccessPolicy
+  skillContentOverride?: Skill | null
 }
 
 export default function SkillDetail({
   skillId, currentLevel, passes, accent, onClose,
-  onOpenTraits, onSaveInsight
+  onOpenTraits, onSaveInsight, contentAccess, skillContentOverride
 }: Props) {
-  const content = getSkillContent(skillId) as SkillContent | null | undefined
+  const content = (skillContentOverride !== undefined ? skillContentOverride : getSkillContent(skillId)) as SkillContent | null | undefined
   const cl = currentLevel ?? 0
   const p  = passes ?? 0
-  const unlockedLevel = getUnlockedSkillLevel(cl, p)
+  const earnedUnlockedLevel = getUnlockedSkillLevel(cl, p)
+  const unlockedLevel = readableLevel(contentAccess, earnedUnlockedLevel)
 
-  const skillName = getSkillName(skillId)
-  const archeName = getArchetypeNameForSkill(skillId)
+  const skillName = content?.name ?? getSkillName(skillId)
+  const archeName = skillContentOverride ? null : getArchetypeNameForSkill(skillId)
 
   const shellStyle: AccentStyle = { '--accent': accent }
 

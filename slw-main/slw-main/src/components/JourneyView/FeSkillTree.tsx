@@ -9,6 +9,8 @@ import { getCompletedPasses } from '../../data/journey/skills'
 import type { SkillStateEntry } from '../../data/journey/skills'
 import type { FeArchetypeKey, FeSkillTreeNode } from '../../data/journey/fe-skills/tree'
 import type { SkillState } from '@/types/journey'
+import { hasSkillContent } from '@/data/skills'
+import type { ContentAccessPolicy } from '@/lite/contentAccess'
 import styles from './JourneyView.module.css'
 
 // Колесо ЧЭ — 4 архетипа, под каждым — список навыков с 3 ядерными сверху.
@@ -49,10 +51,11 @@ type Props = {
   onClose: () => void
   onStartSkill: (skillId: string) => void
   onOpenSkillDetail?: (skillId: string) => void
+  contentAccess?: ContentAccessPolicy
   onOpenPlanetMap?: () => void
 }
 
-export default function FeSkillTree({ accent, skills, onClose, onStartSkill, onOpenSkillDetail, onOpenPlanetMap }: Props) {
+export default function FeSkillTree({ accent, skills, onClose, onStartSkill, onOpenSkillDetail, onOpenPlanetMap, contentAccess }: Props) {
   const feScore = calcFeScoreFromSkills(skills as Record<string, SkillStateEntry>)
   const progress = getSkillProgress(skills as Record<string, SkillStateEntry>)
 
@@ -157,6 +160,7 @@ export default function FeSkillTree({ accent, skills, onClose, onStartSkill, onO
                         st.kind === 'draft'  ? styles.treeSkillDraft :
                         ''
                       const hasPasses = st.kind === 'light' || st.kind === 'medium' || st.kind === 'full'
+                      const canReadDetail = hasPasses || (contentAccess?.fullContentAccess === true && hasSkillContent(skill.id))
                       const isCommon = skill.isCommon || COMMON_BASE_SKILL_IDS.has(skill.id)
                       return (
                         <li key={`${key}-${skill.id}`} className={styles.treeSkillRow}>
@@ -177,7 +181,7 @@ export default function FeSkillTree({ accent, skills, onClose, onStartSkill, onO
                               {st.kind === 'draft'  && `${st.mode === 'full' ? 'полный' : 'короткий'} · продолжить`}
                             </span>
                           </button>
-                          {hasPasses && onOpenSkillDetail && (
+                          {canReadDetail && onOpenSkillDetail && (
                             <button
                               type="button"
                               className={styles.treeSkillInfoBtn}
@@ -188,7 +192,7 @@ export default function FeSkillTree({ accent, skills, onClose, onStartSkill, onO
                               ⓘ
                             </button>
                           )}
-                          {hasPasses && onOpenSkillDetail && (
+                          {canReadDetail && onOpenSkillDetail && (
                             <button
                               type="button"
                               className={styles.treeSkillDevBtn}

@@ -7,11 +7,11 @@
 | GIT-REMOTE | PASS | Fetch/ls-remote, main и slw-instruct сверены с GitHub |
 | GIT-BASE | PASS | codex/lite-local создана от c7f2b3c; tracked diff пуст |
 | TS-BASE | PASS | npm.cmd run typecheck, exit 0, в созданной ветке |
-| HARNESS | PASS | RUN-015: verify.ps1 -Mode Docs; защищённые файлы проверены |
-| LITE-UNIT | PASS (P4) | RUN-015: root 27/27 state/runtime/storage/shared online; content P5 ещё не реализован |
-| LITE-BUILD | PASS (P4) | RUN-015: root production build+preview и development React build; warning крупных chunks; итоговый P7 TODO |
-| LITE-NETWORK | PASS (P4 scenarios) | RUN-015: root 18/18 default и 18/18 development React с backend.invalid; 0 API/SDK/backend WebSocket attempts |
-| LITE-BROWSER | PASS (P4 scenarios) | RUN-015: root 18/18 production, 18/18 development React StrictMode; полная матрица P7 ещё NOT_RUN |
+| HARNESS | PASS | RUN-017: verify.ps1 -Mode Docs; защищённые файлы проверены |
+| LITE-UNIT | PASS (P5) | RUN-017: root 32/32, включая независимый content manifest |
+| LITE-BUILD | PASS (P5) | RUN-017: root production build+preview через Playwright; warning крупных chunks; итоговый P7 TODO |
+| LITE-NETWORK | PASS (P5 scenarios) | RUN-017: root 26/26 production; 0 API/SDK/backend WebSocket attempts |
+| LITE-BROWSER | PASS (P5 scenarios) | RUN-017: root 26/26 production; полная матрица server-заглушек P6/P7 ещё NOT_RUN |
 
 ## Команды
 
