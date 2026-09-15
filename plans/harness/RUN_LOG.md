@@ -242,3 +242,31 @@ RUN-NNN — дата, этап:
 - Во всех content сценариях network audit установлен до goto; общий production gate подтвердил 0 API, Telegram SDK и backend WebSocket attempts. Проверены нулевой progress, 8 аспектов, L0-L3, 7 классов, неизменность journey/scores при чтении, заметка/reload, draft, details/traits, реальная анкета и две коллизии.
 - Сохраняется warning Vite о chunks >500kB. Полный P7, server-заглушки/HALL_CONTENT и desktop/mobile/keyboard matrix остаются P6-P7.
 - Перед commit: git diff --check, verify.ps1 -Mode Docs, protected hashes, scope diff и явный staging. Backend, src/data, domain, storage/transfer, online App и network fixture не изменялись. Push/deploy/main не выполняются.
+
+<a id="run-018"></a>
+
+## RUN-018 — 2026-09-14, начало P6
+
+- Parent HEAD fc0edef; ветка codex/lite-local; tracked tree чист, два защищённых untracked сохранены. P5 принят отдельным локальным коммитом.
+- P6 IN_PROGRESS. Observable outcome: главная без регистрации, явная локальная навигация с back/settings на desktop и mobile, доступ к полному статическому HALL_CONTENT и единая честная заглушка для всех server-only направлений до mount online-компонентов.
+- Один code writer gpt-5.6-sol medium; root ведёт harness и независимо проверяет diff, маршруты, тесты и сетевую изоляцию. Allowlist frontend: новые src/lite/LiteHome.tsx, LiteHeader.tsx, UnavailableFeature.tsx, LiteHallView.tsx и соответствующие CSS Modules; существующие src/lite/LiteApp.tsx, LiteApp.module.css, LiteSettings.tsx, LiteSettings.module.css; tests/lite/navigation.spec.ts. Дополнительные файлы сначала согласуются с root.
+- Read-only: backend, src/data, online App/Header/HallView, domain migration, lite storage/transfer/state, api/tma/auth и существующая network fixture. HALL_CONTENT импортируется напрямую без копирования и изменения контента.
+- Критерии: catalog/journey доступны сразу, onboarding только опционален; old/unknown route безопасно сводится к локальному fallback; server menu/callback/deeplink направления показывают точную фразу «Временно недоступно в локальной версии» и возврат; заглушки не меняют currency/progress; auth/admin отсутствуют даже при legacy slw_dev_admin; fake TMA не активируется; desktop/mobile keyboard/back/settings и все static hall sections проверены; network audit установлен до goto, 0 API/SDK/backend WebSocket attempts.
+- Scope уточнение до продуктовой правки: tests/lite/storage.spec.ts разрешён только для замены прежней предпосылки «Settings — начальный экран» на явный переход через локальный Header. Default P6 остаётся отдельным Home; настройки не встраиваются в Home ради обратной совместимости теста.
+- Root full e2e после первого patch: list 30; 17 PASS, 2 FAIL, 11 serial-skipped. Home CTA создали неоднозначность старых неточных role-selectors «Каталог» и «Путешествие». Scope тестов уточнён: tests/lite/content.spec.ts и journey.spec.ts — только добавление exact:true к этим literal selectors; критерии и продуктовый UI не меняются.
+- Первая selector-итерация дала targeted content+journey 6 PASS, 1 FAIL, 6 serial-skipped: тот же механизм обнаружен у literal «Дневник» после reload. После согласованного exact:true повторный targeted suite прошёл 13/13; полный e2e ещё требуется после review-fixes.
+- Независимое read-only ревью P6 выявило три P1/P2 пробела: auth-параметры оставались в URL/history; server-stub matrix не имела доступных входов для server diary/habit/streak/word-bonus направлений; decrement-only navigationDepth расходился после forward и hash anchors. Разрешён ограниченный fix только в LiteApp/Header/UnavailableFeature/LiteHallView CSS и navigation/network specs.
+
+<a id="run-019"></a>
+
+## RUN-019 — 2026-09-15, приёмка P6
+
+- P6; parent HEAD fc0edef; ветка codex/lite-local. Один code writer gpt-5.6-sol medium выполнил оболочку и две fix-итерации; root вёл harness. Первое независимое ревью прервалось usage limit без результата; повторный независимый reviewer выдал три блокирующих finding, затем подтвердил их исправление без новых блокирующих дефектов.
+- Реализованы default Home без регистрации, локальный Header с back/settings, отдельные panels Journey/Aspects/Catalog/Diary/Settings, опциональное объяснение режима, единая UnavailableFeature и прямой reader полного HALL_CONTENT. HALL_CONTENT импортируется из src/data и полностью рендерит пять секций восьми аспектов: 1962 элемента суммарно; source content не изменён.
+- Header содержит 22 доступных server-направления: account/admin/coach/community/messages/profile/likes/follows, hall chat/Q&A/publications, notifications/habit tracker, diary emotions/trainings/reports/Vault Sync/search, leaderboard/streak protection/word bonus/support. Каждое ведёт в exact общую заглушку с отдельным feature ID; snapshot до/после всех callbacks побайтово равен.
+- Auth token/reset_token/auth/tgAuthResult удаляются из URL через replaceState после определения intent; unrelated query/hash и legacy storage сохраняются. Unknown route получает Home notice. Fake TMA остаётся inert, auth/admin формы и online screens не монтируются.
+- Навигация хранит route+index в history.state; back/forward/Header Back, Escape/Alt+Left, direct deeplink и mobile 390x844 проверены. Hall contents прокручивается без hash entries; Aspects hallStub section callback открывает и прокручивает figures.
+- Первый root full e2e выявил ERR-017: 17 PASS, 2 FAIL, 11 serial-skipped из-за неточных Header selectors после Home CTA. После exact selectors targeted content+journey 13/13. ERR-018 review-fixes targeted navigation+network 6/6.
+- Итоговый root cwd frontend: npm.cmd run typecheck exit 0; npm.cmd run test:lite:unit exit 0, 32/32; npm.cmd run test:lite:list exit 0, 30 тестов в 5 файлах; npm.cmd run test:lite:e2e exit 0, 30/30 за 57.5s. Playwright выполнил production build+preview 127.0.0.1:4174/slw/; 0 API, Telegram SDK и backend WebSocket attempts.
+- Сохраняется Vite warning о chunks >500 kB. Итоговая cross-mode/build/module-graph/bundle/manual acceptance относится P7. Неблокирующий UX residual: non-auth deeplink URL после Back сохраняется; reload повторно открывает его серверную заглушку.
+- Перед commit: generated test-results удалён; listener 4174 отсутствует. Требуются git diff --check, verify.ps1 -Mode Docs, protected hashes, scope diff и явный staging. Push/deploy/main не выполняются.

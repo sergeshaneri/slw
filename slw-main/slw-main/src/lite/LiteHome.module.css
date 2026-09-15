@@ -1,0 +1,25 @@
+.home { max-width: 74rem; margin: 0 auto; }
+.notice { margin: 0 0 1rem; padding: .8rem 1rem; border: 1px solid #786936; border-radius: 10px; background: #28230f; color: #f0dda5; }
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 2rem; padding: clamp(2rem, 6vw, 5rem) 0 2rem; border-bottom: 1px solid #2d3047; }
+.eyebrow { margin: 0 0 .5rem; color: #9ca9ef; font-size: .8rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+.hero h1 { max-width: 18ch; margin: 0; font-size: clamp(2.2rem, 7vw, 4.8rem); line-height: .98; }
+.hero p:not(.eyebrow) { max-width: 52ch; margin: 1rem 0 0; color: #b9bdc8; line-height: 1.55; }
+.primary, .localLinks button, .serverLinks button { border: 1px solid #4d567e; border-radius: 10px; color: #f3f4f7; cursor: pointer; }
+.primary { min-height: 48px; padding: .75rem 1.15rem; background: #e7e9f0; color: #14151c; font-weight: 700; white-space: nowrap; }
+.localLinks { display: grid; grid-template-columns: 1.2fr .8fr; gap: .8rem; margin-top: 1.5rem; }
+.localLinks button { display: grid; gap: .35rem; min-height: 7rem; padding: 1.25rem; background: #141526; text-align: left; }
+.localLinks button:hover, .localLinks button:focus-visible, .serverLinks button:hover, .serverLinks button:focus-visible { border-color: #8793d2; background: #1c1f36; }
+.localLinks strong { font-size: 1.2rem; }
+.localLinks span { color: #aeb3c0; line-height: 1.45; }
+.summary { display: flex; gap: clamp(1.5rem, 6vw, 5rem); margin: 2rem 0; padding: 1.5rem 0; border-block: 1px solid #2d3047; }
+.summary div { display: grid; gap: .3rem; }
+.summary dt { color: #999fac; font-size: .8rem; }
+.summary dd { margin: 0; font-size: 1.6rem; font-weight: 700; }
+.guide { max-width: 50rem; margin: 1.5rem 0; color: #b9bdc8; }
+.guide summary { color: #eef0f4; cursor: pointer; font-weight: 700; }
+.serverLinks { margin-top: 2.5rem; }
+.serverLinks h2 { margin-bottom: .25rem; }
+.serverLinks > p { margin-top: 0; color: #999fac; }
+.serverLinks > div { display: flex; flex-wrap: wrap; gap: .6rem; }
+.serverLinks button { min-height: 42px; padding: .55rem .8rem; background: #151726; }
+@media (max-width: 700px) { .hero { grid-template-columns: 1fr; align-items: start; padding-top: 1.5rem; } .primary { width: 100%; } .localLinks { grid-template-columns: 1fr; } .summary { justify-content: space-between; gap: .5rem; } }

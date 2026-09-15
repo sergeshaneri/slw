@@ -26,6 +26,11 @@ async function seed(page: Page, raw: string): Promise<void> {
   }, { key: KEY, value: raw })
 }
 
+async function openSettings(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Настройки', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Настройки', exact: true })).toBeVisible()
+}
+
 function expectNoNetwork(audit: NetworkAudit): void {
   expect(audit.apiAttempts).toEqual([])
   expect(audit.sdkAttempts).toEqual([])
@@ -44,6 +49,7 @@ test.describe.configure({ mode: 'serial' })
 test('clean start writes only the lite snapshot and reloads preferences', async ({ page }) => {
   const audit = await installNetworkAudit(page)
   await page.goto('./')
+  await openSettings(page)
   await expect(page.locator('[data-session-status="durable"]')).toBeVisible()
 
   expect(await page.evaluate(() => Object.keys(localStorage))).toEqual([KEY])
@@ -57,6 +63,7 @@ test('clean start writes only the lite snapshot and reloads preferences', async 
   expect(saved.data.preferences.sendKeyMode).toBe('ctrl+enter')
 
   await page.reload()
+  await openSettings(page)
   await expect(page.getByLabel('Ctrl/Cmd + Enter')).toBeChecked()
   await expect(page.locator('[data-session-epoch="0"]')).toBeVisible()
   expectNoNetwork(audit)
@@ -69,6 +76,7 @@ test('real upload previews, cancel preserves bytes, confirm imports and reload r
   imported.data.preferences.sendKeyMode = 'ctrl+enter'
   await seed(page, original)
   await page.goto('./')
+  await openSettings(page)
 
   await page.getByLabel('Файл импорта').setInputFiles({
     name: 'import.json',
@@ -90,6 +98,7 @@ test('real upload previews, cancel preserves bytes, confirm imports and reload r
   await expect(page.locator('[data-session-epoch="1"]')).toBeVisible()
 
   await page.reload()
+  await openSettings(page)
   await expect(page.getByLabel('Ctrl/Cmd + Enter')).toBeChecked()
   const exported = await downloadedJson(page)
   expect(exported.format).toBe('slw-lite')
@@ -112,6 +121,7 @@ test('invalid and quota-failed imports preserve active memory and durable bytes'
     }
   }, { key: KEY, value: original })
   await page.goto('./')
+  await openSettings(page)
 
   await page.getByLabel('Файл импорта').setInputFiles({
     name: 'invalid.json',
@@ -150,6 +160,7 @@ test('security-failed import preserves active memory and durable bytes', async (
     }
   }, { key: KEY, value: original })
   await page.goto('./')
+  await openSettings(page)
   await page.getByLabel('Файл импорта').setInputFiles({
     name: 'security.json',
     mimeType: 'application/json',
@@ -171,6 +182,7 @@ test('localStorage SecurityError leaves an explicit volatile session', async ({ 
     })
   })
   await page.goto('./')
+  await openSettings(page)
   await expect(page.locator('[data-session-status="volatile"]')).toBeVisible()
   await expect(page.getByRole('alert')).toContainText('запретил доступ')
   await page.getByLabel('Ctrl/Cmd + Enter').check()
@@ -185,6 +197,7 @@ test('empty corrupt raw is preserved, separately downloadable, and replaced only
   const corrupt = ''
   await seed(page, corrupt)
   await page.goto('./')
+  await openSettings(page)
   await expect(page.getByRole('alert')).toContainText('повреждена')
   expect(await page.evaluate((key) => localStorage.getItem(key), KEY)).toBe(corrupt)
 
@@ -216,6 +229,8 @@ test('storage event exposes conflict, keeps own export, and accepts external sta
   await seed(first, raw)
   await first.goto('./')
   await second.goto('./')
+  await openSettings(first)
+  await openSettings(second)
   await second.getByLabel('Ctrl/Cmd + Enter').check()
 
   await expect(first.locator('[data-session-status="conflict"]')).toBeVisible()
@@ -232,6 +247,7 @@ test('read-before-save detects a changed revision without a storage event', asyn
   const audit = await installNetworkAudit(page)
   await seed(page, snapshotRaw(3, 'enter'))
   await page.goto('./')
+  await openSettings(page)
   await expect(page.locator('[data-send-key-mode="enter"]')).toBeVisible()
   await page.evaluate(({ key, raw }) => localStorage.setItem(key, raw), { key: KEY, raw: snapshotRaw(9, 'ctrl+enter') })
   await page.getByLabel('Ctrl/Cmd + Enter').click()
@@ -247,6 +263,7 @@ test('serialization failure makes the session volatile and blocks export', async
   const original = snapshotRaw(5, 'enter')
   await seed(page, original)
   await page.goto('./')
+  await openSettings(page)
   await expect(page.locator('[data-session-status="durable"]')).toBeVisible()
   await page.evaluate(() => {
     JSON.stringify = () => { throw new TypeError('serialization failed') }
@@ -270,6 +287,8 @@ test('clear in another page is surfaced as a storage conflict', async ({ context
   await seed(first, '')
   await first.goto('./')
   await second.goto('./')
+  await openSettings(first)
+  await openSettings(second)
   await expect(first.getByRole('alert')).toContainText('повреждена')
   await first.waitForTimeout(100)
   await second.evaluate(() => localStorage.clear())
@@ -293,6 +312,7 @@ test('preferences, import, and reset leave all legacy keys byte-identical', asyn
     for (const [name, value] of Object.entries(legacy)) localStorage.setItem(name, value)
   }, { key: KEY, raw: snapshotRaw(2, 'enter'), legacy: legacyBytes })
   await page.goto('./')
+  await openSettings(page)
 
   const assertLegacy = async () => {
     expect(await page.evaluate((legacy) =>

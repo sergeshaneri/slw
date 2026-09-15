@@ -67,7 +67,7 @@ test('theory insight and numeric answer persist once under real double-click and
   const audit = await installNetworkAudit(page)
   await seed(page, gameSnapshot('T-1', 0))
   await page.goto('./')
-  await page.getByRole('button', { name: 'Путешествие' }).click()
+  await page.getByRole('button', { name: 'Путешествие', exact: true }).click()
 
   const next = page.getByRole('button', { name: 'Далее', exact: true })
   await expect(next).toBeVisible({ timeout: 15_000 })
@@ -98,7 +98,7 @@ test('theory insight and numeric answer persist once under real double-click and
   })
 
   await page.reload()
-  await page.getByRole('button', { name: 'Путешествие' }).click()
+  await page.getByRole('button', { name: 'Путешествие', exact: true }).click()
   await expect(page.getByRole('button', { name: /Ответить · 5\/10/ })).toBeVisible({ timeout: 15_000 })
   const reloaded = await stored(page)
   expect(reloaded.data.journey.xp).toBe(10)
@@ -110,7 +110,7 @@ test('exercise becomes one local task and completion awards once under double-cl
   const audit = await installNetworkAudit(page)
   await seed(page, gameSnapshot('U-1', 6))
   await page.goto('./')
-  await page.getByRole('button', { name: 'Путешествие' }).click()
+  await page.getByRole('button', { name: 'Путешествие', exact: true }).click()
 
   const take = page.getByRole('button', { name: '🪐 Взять в активные задания' })
   await expect(take).toBeVisible({ timeout: 15_000 })
@@ -167,7 +167,7 @@ test('survey keeps draft across navigation, rejects dblclick skip, completes fiv
   }, legacy)
   await seed(page, surveySnapshot())
   await page.goto('./')
-  await page.getByRole('button', { name: 'Путешествие' }).click()
+  await page.getByRole('button', { name: 'Путешествие', exact: true }).click()
 
   await expect(page.getByRole('tooltip')).toBeVisible({ timeout: 15_000 })
   await page.getByRole('button', { name: 'Больше не показывать' }).click()
@@ -176,7 +176,7 @@ test('survey keeps draft across navigation, rejects dblclick skip, completes fiv
   await statementInsight.fill('Черновик утверждения сохраняется')
   await page.getByRole('button', { name: 'Дневник' }).click()
   await expect(page.getByRole('heading', { name: 'Дневник' })).toBeVisible({ timeout: 15_000 })
-  await page.getByRole('button', { name: 'Путешествие' }).click()
+  await page.getByRole('button', { name: 'Путешествие', exact: true }).click()
   await expect(statementInsight).toHaveValue('Черновик утверждения сохраняется')
 
   await setSurveyScore(page, 7)
@@ -234,7 +234,7 @@ test('confirmed import remounts mounted journey once and cancels its delayed com
   imported.data.diary = fixture.data.diary
   imported.data.preferences.hintsSeen = { 'journey-chat-intro': true }
   await page.goto('./')
-  await page.getByRole('button', { name: 'Путешествие' }).click()
+  await page.getByRole('button', { name: 'Путешествие', exact: true }).click()
 
   await page.getByRole('button', { name: 'Далее', exact: true }).click()
   await page.getByPlaceholder('Что задело? С чем согласен или нет?').fill('Старый отложенный инсайт')
@@ -252,7 +252,7 @@ test('confirmed import remounts mounted journey once and cancels its delayed com
   await page.getByRole('button', { name: 'Подтвердить замену' }).click()
   await expect(page.getByRole('status')).toContainText('Импорт завершён')
   await expect(page.locator('[data-session-epoch="1"]')).toBeVisible()
-  await page.getByRole('button', { name: 'Путешествие' }).click()
+  await page.getByRole('button', { name: 'Путешествие', exact: true }).click()
   await expect(page.getByRole('button', { name: /Ответить · 5\/10/ })).toBeVisible()
   await page.clock.runFor(1_500)
 
@@ -267,7 +267,7 @@ test('navigation merges a concurrent diary entry and planet switch cancels old b
   const audit = await installNetworkAudit(page)
   await seed(page, gameSnapshot('T-1', 0))
   await page.goto('./')
-  await page.getByRole('button', { name: 'Путешествие' }).click()
+  await page.getByRole('button', { name: 'Путешествие', exact: true }).click()
 
   await page.getByRole('button', { name: 'Далее', exact: true }).click()
   await page.getByPlaceholder('Что задело? С чем согласен или нет?').fill('Инсайт сохраняется параллельно')
@@ -281,7 +281,7 @@ test('navigation merges a concurrent diary entry and planet switch cancels old b
   await page.clock.runFor(1_500)
 
   await expect.poll(async () => (await stored(page)).data.diary.map((entry: { source: string }) => entry.source).sort()).toEqual(['journey-step-insight', 'manual'])
-  await page.getByRole('button', { name: 'Путешествие' }).click()
+  await page.getByRole('button', { name: 'Путешествие', exact: true }).click()
   const answer = page.getByRole('button', { name: /Ответить · 5\/10/ })
   await expect(answer).toBeVisible()
   await answer.click()

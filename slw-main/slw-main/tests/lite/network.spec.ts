@@ -26,7 +26,7 @@ test('clean storage starts lite without API or Telegram SDK', async ({ page }) =
 
   await page.goto('./')
   await expect(page.locator('[data-runtime="lite"]')).toBeVisible()
-  await expect(page.locator('[data-session-status="durable"]')).toBeVisible()
+  await expect(page.locator('[data-global-session-status="durable"]')).toBeVisible()
   expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(['slw_lite_v1_state'])
   const absentLegacyValues = await page.evaluate((keys) => keys.map((key) => localStorage.getItem(key)), Object.keys(legacyStorage))
   expect(absentLegacyValues).toEqual(Object.keys(legacyStorage).map(() => null))
@@ -67,7 +67,7 @@ test('legacy storage, auth URL and fake Telegram remain untouched in lite', asyn
 
   await page.goto('./?ref=REF-URL&token=URL-TOKEN&reset_token=reset-token-1234567890#tgAuthResult=e30%3D')
   await expect(page.locator('[data-runtime="lite"]')).toBeVisible()
-  await expect(page.locator('[data-session-status="durable"]')).toBeVisible()
+  await expect(page.locator('[data-global-session-status="durable"]')).toBeVisible()
   await advancePastOnlinePolling(page)
 
   const result = await page.evaluate((keys) => ({
@@ -81,8 +81,8 @@ test('legacy storage, auth URL and fake Telegram remain untouched in lite', asyn
   expect(result.storage).toEqual(legacyStorage)
   expect(result.tmaCalls).toEqual({ ready: 0, expand: 0, disableVerticalSwipes: 0, backShow: 0 })
   expect(result.hasStorageBridge).toBe(false)
-  expect(result.search).toBe('?ref=REF-URL&token=URL-TOKEN&reset_token=reset-token-1234567890')
-  expect(result.hash).toBe('#tgAuthResult=e30%3D')
+  expect(result.search).toBe('?ref=REF-URL')
+  expect(result.hash).toBe('')
   expect(audit.apiAttempts).toEqual([])
   expect(audit.sdkAttempts).toEqual([])
   expect(audit.backendWebSockets).toEqual([])

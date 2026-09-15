@@ -121,7 +121,7 @@ test('catalog exposes the independent 2968-record manifest at zero progress', as
   const audit = await installNetworkAudit(page)
   await seed(page)
   await page.goto('./')
-  await page.getByRole('button', { name: 'Каталог' }).click()
+  await page.getByRole('button', { name: 'Каталог', exact: true }).click()
   await expect(page.getByTestId('content-catalog')).toBeVisible({ timeout: 15_000 })
 
   expect(catalogManifest.reduce((sum, item) => sum + item.total, 0)).toBe(2968)
@@ -159,7 +159,7 @@ test('catalog reading preserves progression and a note survives reload', async (
   await page.goto('./')
   const before = await stored(page)
 
-  await page.getByRole('button', { name: 'Каталог' }).click()
+  await page.getByRole('button', { name: 'Каталог', exact: true }).click()
   await page.getByRole('button', { name: 'БЛ · Белая Логика', exact: true }).click()
   await page.getByLabel('Класс материала').selectOption('skill-intro')
   await page.getByPlaceholder('Название или ID').fill('manipulation-detection')
@@ -184,7 +184,7 @@ test('catalog reading preserves progression and a note survives reload', async (
   })
 
   await page.reload()
-  await page.getByRole('button', { name: 'Дневник' }).click()
+  await page.getByRole('button', { name: 'Дневник', exact: true }).click()
   await expect(page.getByText('Заметка к точному источнику БЛ', { exact: true })).toBeVisible({ timeout: 15_000 })
   expectNoNetwork(audit)
 })
@@ -193,7 +193,7 @@ test('catalog renders representatives of all seven kinds and keeps aspect-block 
   const audit = await installNetworkAudit(page)
   await seed(page)
   await page.goto('./')
-  await page.getByRole('button', { name: 'Каталог' }).click()
+  await page.getByRole('button', { name: 'Каталог', exact: true }).click()
   await expect(page.getByTestId('content-catalog')).toBeVisible({ timeout: 15_000 })
 
   const representatives = [
@@ -266,20 +266,20 @@ test('catalog keeps its cursor and survey draft; wheel navigation preserves epoc
   await page.goto('./')
   const epoch = await page.locator('[data-runtime="lite"]').getAttribute('data-session-epoch')
 
-  await page.getByRole('button', { name: 'Путешествие' }).click()
+  await page.getByRole('button', { name: 'Путешествие', exact: true }).click()
   await page.getByRole('button', { name: 'Записать инсайт' }).click()
   const insight = page.getByPlaceholder('Что приходит в голову по этому утверждению?')
   await insight.fill('Черновик остаётся при свободном чтении')
-  await page.getByRole('button', { name: 'Каталог' }).click()
+  await page.getByRole('button', { name: 'Каталог', exact: true }).click()
   await page.getByRole('button', { name: 'БЛ · Белая Логика', exact: true }).click()
   await page.getByLabel('Класс материала').selectOption('journey-core')
   await page.locator('[data-material-id="Ti:3:journey-core:T-1"]').click()
   await expect(page.getByRole('heading', { name: 'Тень БЛ' })).toBeVisible()
   expect((await stored(page)).data.journey.currentAspect).toBe('Si')
 
-  await page.getByRole('button', { name: 'Путешествие' }).click()
+  await page.getByRole('button', { name: 'Путешествие', exact: true }).click()
   await expect(insight).toHaveValue('Черновик остаётся при свободном чтении')
-  await page.getByRole('button', { name: 'Каталог' }).click()
+  await page.getByRole('button', { name: 'Каталог', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Тень БЛ' })).toBeVisible()
 
   await openAspectTree(page, /БЛ.*Белая Логика/, 'Навыки БЛ')
@@ -303,7 +303,7 @@ test('all eight aspect wheels dispatch the matching navigation request at zero p
   const audit = await installNetworkAudit(page)
   await seed(page)
   await page.goto('./')
-  await page.getByRole('button', { name: 'Путешествие' }).click()
+  await page.getByRole('button', { name: 'Путешествие', exact: true }).click()
 
   const wheels = [
     { aspect: 'Te', card: /ЧЛ.*Черная Логика/, title: 'Навыки ЧЛ' },
@@ -333,7 +333,7 @@ test('an import remount ignores a navigation request from the previous session e
   const audit = await installNetworkAudit(page)
   await seed(page)
   await page.goto('./')
-  await page.getByRole('button', { name: 'Путешествие' }).click()
+  await page.getByRole('button', { name: 'Путешествие', exact: true }).click()
   await openAspectTree(page, /БЛ.*Белая Логика/, 'Навыки БЛ')
   await expect.poll(async () => (await stored(page)).data.journey.currentAspect).toBe('Ti')
 
@@ -362,7 +362,7 @@ test('an import remount ignores a navigation request from the previous session e
   await expect(page.locator('[data-session-epoch="1"]')).toBeVisible()
   await expect(page.locator('[data-session-epoch="2"]')).toHaveCount(0)
 
-  await page.getByRole('button', { name: 'Путешествие' }).click()
+  await page.getByRole('button', { name: 'Путешествие', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Сменить планету' })).toBeVisible({ timeout: 15_000 })
   await expect(page.getByText('Навыки БЛ', { exact: true })).toHaveCount(0)
   await new Promise(resolve => setTimeout(resolve, 500))
@@ -377,7 +377,7 @@ test('zero-progress Ti detail, traits and real survey use the Ti collision sourc
   const audit = await installNetworkAudit(page)
   await seed(page)
   await page.goto('./')
-  await page.getByRole('button', { name: 'Путешествие' }).click()
+  await page.getByRole('button', { name: 'Путешествие', exact: true }).click()
   await openAspectTree(page, /БЛ.*Белая Логика/, 'Навыки БЛ')
   await page.getByRole('button', { name: /Аналитик/ }).click()
 
@@ -418,7 +418,7 @@ test('zero-progress Se collision opens the Se title and first statement', async 
   const audit = await installNetworkAudit(page)
   await seed(page)
   await page.goto('./')
-  await page.getByRole('button', { name: 'Путешествие' }).click()
+  await page.getByRole('button', { name: 'Путешествие', exact: true }).click()
   await openAspectTree(page, /ЧС.*Черная Сенсорика/, 'Навыки ЧС')
   await page.getByRole('button', { name: /Строитель/ }).click()
   await page.getByRole('button', { name: /Завершение.*оценить/ }).click()

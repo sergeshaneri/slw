@@ -1,0 +1,24 @@
+.hall { --hall-accent: #8390cf; max-width: 72rem; margin: 0 auto; color: #eef0f5; }
+.back { min-height: 42px; padding: .55rem .8rem; border: 1px solid #474c6c; border-radius: 9px; background: #151726; color: #eef0f5; cursor: pointer; }
+.heading { padding: 2.5rem 0 1.5rem; border-bottom: 1px solid #303349; }
+.heading > p:first-child, .itemType { margin: 0; color: var(--hall-accent); font-size: .8rem; font-weight: 700; }
+.heading h1 { margin: .35rem 0; font-size: clamp(2.2rem, 6vw, 4.2rem); }
+.subline { max-width: 60ch; color: #c2c6d1; font-size: 1.05rem; line-height: 1.55; }
+.boundary { max-width: 68ch; padding: .8rem 1rem; border-left: 3px solid var(--hall-accent); background: #151726; color: #b8bdc9; line-height: 1.5; }
+.contents { display: flex; flex-wrap: wrap; gap: .55rem; padding: 1rem 0; }
+.contents button, .serverActions button { min-height: 40px; padding: .5rem .75rem; border: 1px solid #3e435f; border-radius: 9px; background: #151726; color: #e8eaf0; cursor: pointer; font: inherit; }
+.contents span { color: #a9afbc; }
+.serverActions { display: flex; flex-wrap: wrap; gap: .55rem; padding: 0 0 1.5rem; border-bottom: 1px solid #303349; }
+.serverActions button { cursor: pointer; }
+.serverActions button:hover, .serverActions button:focus-visible, .contents button:hover, .contents button:focus-visible { border-color: var(--hall-accent); background: #20233a; }
+.collection { scroll-margin-top: 1rem; padding: 2rem 0; border-bottom: 1px solid #303349; }
+.collection h2 { margin: 0 0 1rem; font-size: 1.55rem; }
+.collection h2 span { color: #989eac; font-size: .9rem; font-weight: 400; }
+.collection ol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; margin: 0; padding: 0; list-style: none; }
+.collection li { padding: 1rem; border: 1px solid #2f3248; border-radius: 11px; background: #131423; }
+.collection h3, .collection blockquote { margin: 0 0 .55rem; font-size: 1rem; line-height: 1.45; }
+.collection blockquote { color: #f0f1f5; }
+.collection strong { color: var(--hall-accent); }
+.collection p { margin: .5rem 0 0; color: #b3b8c4; line-height: 1.5; }
+.empty { padding: 1rem; border: 1px dashed #3b3f58; border-radius: 10px; }
+@media (max-width: 700px) { .collection ol { grid-template-columns: 1fr; } .heading { padding-top: 1.5rem; } }

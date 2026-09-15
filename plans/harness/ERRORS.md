@@ -171,3 +171,23 @@ RUN-006: git diff --cached --check обнаружил new blank line at EOF в �
 - Независимое ревью установило, что сохранённый navigationRequest повторно применялся после sessionEpoch remount и мог перезаписать imported/reset currentAspect и screen. Request привязан к sessionEpoch и синхронно отфильтровывается до передачи новому JourneyView; browser проверяет wheel → import → один remount и неизменённые импортированные данные.
 - Вложенный AspectsView менял block через next/sidebar/Toc без синхронизации внешнего composite ID и источника заметки. Единый переход сообщает blockId каталогу; внешний заголовок и ID обновляются, а заметку сохраняет текущий BlockReader.
 - Первые browser-прогоны новых тестов выявляли только несоответствия selectors/fixtures наблюдаемому UI. Критерии не ослаблялись; итоговые content 8/8 и полный root e2e 26/26 прошли обычными кликами без force.
+
+## ERR-017 — неоднозначные role-selectors после добавления Home
+
+- RUN-018/RUN-019; test; RESOLVED в P6.
+- Root production e2e перечислил 30 тестов. Первые serial-сценарии content и journey упали: неточные selectors по имени «Каталог» и «Путешествие» совпали одновременно с кнопкой Header и составным accessible name Home CTA. Результат: 17 PASS, 2 FAIL, 11 serial-skipped; это не приёмка P6.
+- Минимальное исправление: 21 существующий literal role-selector «Каталог»/«Путешествие» и один обнаруженный тем же прогоном «Дневник» получили exact:true. Тексты Home, критерии, обычные клики и network audit сохранены; force не применяется. Targeted content+journey после правки: 13/13 PASS.
+
+## ERR-018 — URL auth secrets, неполная stub matrix и history index в P6
+
+- RUN-018/RUN-019; independent review; RESOLVED в P6.
+- initialRoute показывал account stub для token/reset_token/auth/tgAuthResult, но оставлял значения в URL/history. Это против требования удалить auth-параметры через replaceState и повторно открывает stub после возврата Home + reload. Исправление должно сохранять legacy account storage и unrelated URL части.
+- Header/stub покрывали общие server-группы, но не давали наблюдаемых входов для server tracker привычек, diary emotions/trainings/reports/Vault Sync и отдельных server streak/word bonus направлений. Скрытие online Diary tabs при user=null исключает network mount, но не выполняет требование явной заглушки.
+- navigationDepth уменьшался при любом popstate, включая forward; Hall hash anchors создавали неучтённые history entries. Исправление: индекс в history.state, direction-independent восстановление целевого индекса; статическое оглавление Hall прокручивает без новой history entry. Browser должен проверить back/forward/back, hash и direct-deeplink return.
+
+### ERR-018: результат приёмки RUN-019
+
+- Auth intent определяется до очистки URL. token/reset_token/auth и tgAuthResult удаляются replaceState; unrelated query/hash и legacy storage сохраняются. Возврат Home + reload не повторяет account stub.
+- Header даёт 22 наблюдаемых server-направления с отдельными feature IDs; browser проверяет каждый callback и byte-identical lite snapshot. Hall chat/Q&A/publications проверены отдельно.
+- History route и index хранятся в history.state. Browser back, forward и реальная Header Back восстанавливают ожидаемые экраны; direct deeplink остаётся внутри Lite. Оглавление Hall прокручивает без изменения hash, section callback Aspects открывает соответствующую секцию.
+- Повторное независимое read-only ревью не нашло блокирующих findings. Неблокирующие ограничения: специализированный текст каждой заглушки проверен source review, но e2e фиксирует общий текст и feature ID; non-auth deeplink URL после Back сохраняется и при reload снова открывает ту же заглушку.

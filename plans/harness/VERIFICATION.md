@@ -7,11 +7,11 @@
 | GIT-REMOTE | PASS | Fetch/ls-remote, main и slw-instruct сверены с GitHub |
 | GIT-BASE | PASS | codex/lite-local создана от c7f2b3c; tracked diff пуст |
 | TS-BASE | PASS | npm.cmd run typecheck, exit 0, в созданной ветке |
-| HARNESS | PASS | RUN-017: verify.ps1 -Mode Docs; защищённые файлы проверены |
-| LITE-UNIT | PASS (P5) | RUN-017: root 32/32, включая независимый content manifest |
-| LITE-BUILD | PASS (P5) | RUN-017: root production build+preview через Playwright; warning крупных chunks; итоговый P7 TODO |
-| LITE-NETWORK | PASS (P5 scenarios) | RUN-017: root 26/26 production; 0 API/SDK/backend WebSocket attempts |
-| LITE-BROWSER | PASS (P5 scenarios) | RUN-017: root 26/26 production; полная матрица server-заглушек P6/P7 ещё NOT_RUN |
+| HARNESS | PASS | RUN-019: verify.ps1 -Mode Docs; защищённые файлы проверены |
+| LITE-UNIT | PASS (P6) | RUN-019: root 32/32 |
+| LITE-BUILD | PASS (P6) | RUN-019: root production build+preview через Playwright; warning крупных chunks; итоговый P7 TODO |
+| LITE-NETWORK | PASS (P6 scenarios) | RUN-019: root 30/30 production; 0 API/SDK/backend WebSocket attempts |
+| LITE-BROWSER | PASS (P6 scenarios) | RUN-019: root 30/30 production; Home/Header/Settings, 22 server-направления, desktop/mobile/history/auth URL/HALL_CONTENT |
 
 ## Команды
 

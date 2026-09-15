@@ -2,6 +2,7 @@ import { useRef, useState, type ChangeEvent } from 'react'
 import type { LiteData, LiteSnapshot } from '@/types/storage'
 import { parseLiteSnapshot, serializeLiteSnapshot, LiteValidationError } from '@/utils/liteTransfer'
 import type { LiteSession } from './useLiteSession'
+import type { UnavailableFeatureId } from './UnavailableFeature'
 import styles from './LiteSettings.module.css'
 
 type PendingAction =
@@ -26,7 +27,7 @@ function importSummary(data: LiteData): string {
   return `Аспектов с прогрессом: ${progressed}; записей дневника: ${data.diary.length}; результатов анкет: ${Object.keys(data.journey.skills).length}.`
 }
 
-export function LiteSettings({ session }: { session: LiteSession }) {
+export function LiteSettings({ session, onUnavailable }: { session: LiteSession; onUnavailable?: (feature: UnavailableFeatureId) => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState<PendingAction>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -118,6 +119,16 @@ export function LiteSettings({ session }: { session: LiteSession }) {
           Ctrl/Cmd + Enter
         </label>
       </fieldset>
+
+      <section className={styles.boundary} aria-labelledby="lite-boundary-title">
+        <h3 id="lite-boundary-title">Граница локального режима</h3>
+        <p>Сохраняются путешествие, анкеты, дневник и настройки этого браузера. Статические файлы приложения загружаются с хостинга; полный автономный режим не заявлен.</p>
+        {onUnavailable && <div className={styles.boundaryActions}>
+          <button type="button" onClick={() => onUnavailable('account')}>Аккаунт и восстановление</button>
+          <button type="button" onClick={() => onUnavailable('support')}>Поддержка</button>
+          <button type="button" onClick={() => onUnavailable('admin')}>Администрирование</button>
+        </div>}
+      </section>
 
       <div className={styles.actions}>
         <button

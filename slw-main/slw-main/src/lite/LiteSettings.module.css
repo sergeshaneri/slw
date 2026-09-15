@@ -39,6 +39,11 @@
   border-radius: 8px;
 }
 .fieldset label { display: flex; gap: 0.55rem; align-items: center; }
+.boundary { margin: 1.25rem 0; padding: 1rem; border: 1px solid #30334f; border-radius: 8px; background: #111224; }
+.boundary h3 { margin: 0 0 .5rem; }
+.boundary p { margin: 0; color: #b9bdc8; line-height: 1.5; }
+.boundaryActions { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: .9rem; }
+.boundaryActions button { min-height: 40px; padding: .5rem .7rem; border: 1px solid #484d70; border-radius: 7px; background: #20233d; color: #fff; cursor: pointer; }
 .actions { display: flex; flex-wrap: wrap; gap: 0.65rem; }
 .actions button {
   padding: 0.55rem 0.8rem;
