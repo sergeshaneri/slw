@@ -35,10 +35,10 @@ function initialRoute(): LocalRoute {
   if (requested === 'hall') { const aspect = params.get('aspect'); return isAspect(aspect) ? { panel: 'hall', aspect } : { panel: 'unavailable', feature: 'hall-chat' } }
   if (requested && LOCAL_PANELS.includes(requested as LocalPanel)) return { panel: requested as LocalPanel }
   if (requested && SERVER_ROUTES[requested]) return { panel: 'unavailable', feature: SERVER_ROUTES[requested]! }
-  if (requested) return { panel: 'home', fallbackNotice: `Маршрут «${requested}» отсутствует в локальной версии. Открыта главная.` }
+  if (requested) return { panel: 'home', fallbackNotice: 'Страница «' + requested + '» не найдена. Открыта главная.' }
   const baseParts = import.meta.env.BASE_URL.split('/').filter(Boolean)
   const pathParts = window.location.pathname.split('/').filter(Boolean)
-  if (pathParts.slice(baseParts.length).length > 0) return { panel: 'home', fallbackNotice: 'Неизвестный адрес заменён безопасной локальной главной.' }
+  if (pathParts.slice(baseParts.length).length > 0) return { panel: 'home', fallbackNotice: 'Страница не найдена. Открыта главная.' }
   return { panel: 'home' }
 }
 
@@ -115,7 +115,7 @@ export function LiteApp() {
   const currentNavigationRequest = navigationRequest?.sessionEpoch === session.sessionEpoch ? navigationRequest : null
   return <UiPreferencesContext.Provider value={preferences}><ConfirmProvider><main className={styles.app} data-runtime="lite" data-session-epoch={session.sessionEpoch} data-route={route.panel}>
     <LiteHeader panel={route.panel} canGoBack={historyIndex > 0 || route.panel !== 'home'} onBack={goBack} onNavigate={openPanel} onUnavailable={openUnavailable} />
-    {route.panel !== 'settings' && <p className={styles.persistence} role="status" data-global-session-status={session.status}>{session.status === 'durable' ? 'Локальные данные сохранены' : session.status === 'conflict' ? 'Обнаружен конфликт локальных данных. Откройте настройки.' : 'Изменения хранятся только в памяти. Откройте настройки.'}</p>}
+    {route.panel !== 'settings' && <p className={styles.persistence} role="status" data-global-session-status={session.status}>{session.status === 'durable' ? 'Данные сохранены в браузере' : session.status === 'conflict' ? 'Данные изменились в другой вкладке. Откройте настройки.' : 'Изменения хранятся только в памяти. Откройте настройки.'}</p>}
     {route.panel === 'home' && <section className={styles.panel} aria-label="Главная"><LiteHome journey={session.data.journey} diaryCount={session.data.diary.length} fallbackNotice={route.fallbackNotice} onNavigate={openPanel} onUnavailable={openUnavailable} /></section>}
     <section className={`${styles.panel} ${styles.journeyPanel}`} hidden={route.panel !== 'journey'} aria-label="Путешествие"><Suspense fallback={<p>Загрузка путешествия…</p>}>{journeyMounted && <JourneyView key={session.sessionEpoch} journey={session.data.journey} onJourneyChange={session.updateJourney} scores={session.data.scores as Record<string, number>} onScoresChange={session.updateScores} diary={session.data.diary} onDiaryChange={session.updateDiary} t={ru} user={null} isAdmin={false} backendEnabled={false} contentAccess={LITE_CONTENT_ACCESS} navigationRequest={currentNavigationRequest} />}</Suspense></section>
     <section className={styles.panel} hidden={route.panel !== 'aspects'} aria-label="Аспекты"><Suspense fallback={<p>Загрузка аспектов…</p>}>{aspectsMounted && <AspectsView key={session.sessionEpoch} selectedAspect={route.panel === 'aspects' ? route.selectedAspect ?? null : null} onAspectSelect={aspect => navigate({ panel: 'aspects', selectedAspect: aspect })} scores={session.data.scores} diary={session.data.diary} onDiaryChange={session.updateDiary} journey={session.data.journey} user={null} isAdmin={false} backendEnabled={false} contentAccess={LITE_CONTENT_ACCESS} onGoToSiSurveys={() => openAspectSkillTree('Si')} onGoToFeSurveys={() => openAspectSkillTree('Fe')} onGoToNeSurveys={() => openAspectSkillTree('Ne')} onGoToNiSurveys={() => openAspectSkillTree('Ni')} onGoToTeSurveys={() => openAspectSkillTree('Te')} onGoToTiSurveys={() => openAspectSkillTree('Ti')} onGoToFiSurveys={() => openAspectSkillTree('Fi')} onGoToSeSurveys={() => openAspectSkillTree('Se')} onEnterHall={openHall} />}</Suspense></section>

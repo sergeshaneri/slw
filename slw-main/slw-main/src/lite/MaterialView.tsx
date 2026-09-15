@@ -7,6 +7,7 @@ import MarkdownLite from '@/components/JourneyView/MarkdownLite'
 import type { CatalogEntry } from './contentCatalog'
 import type { ArchetypeId, SkillRole } from '@/types/skill'
 import type { ScriptType } from '@/types/script'
+import { ASPECT_DATA, ASPECT_DISPLAY_KEY } from '@/data/aspects'
 import { LITE_CONTENT_ACCESS } from './contentAccess'
 import styles from './CatalogView.module.css'
 
@@ -18,16 +19,6 @@ type Props = {
   onDiaryChange: (next: DiaryEntry[]) => void
   onBack: () => void
   onNavigateAspectBlock: (blockId: string) => void
-}
-
-const KIND_LABELS: Record<CatalogEntry['kind'], string> = {
-  'journey-intro': 'Введение в путешествие',
-  'journey-core': 'Шаг путешествия',
-  'journey-survey': 'Анкета путешествия',
-  'journey-complete': 'Завершение уровня',
-  'skill-intro': 'Описание навыка',
-  'skill-level': 'Развитие навыка',
-  'aspect-block': 'Материал аспекта',
 }
 
 const SCRIPT_TYPE_LABELS: Record<ScriptType, string> = {
@@ -79,7 +70,7 @@ export function MaterialView({ entry, journey, scores, diary, onDiaryChange, onB
     <article className={styles.material} data-material-id={entry.id} data-material-kind={entry.kind}>
       <button type="button" className={styles.back} onClick={onBack}>← К каталогу</button>
       <header>
-        <p className={styles.kicker}>{KIND_LABELS[entry.kind]} · {entry.aspect}{entry.level == null ? '' : ` · уровень ${entry.level}`}</p>
+        <p className={styles.kicker}>{ASPECT_DISPLAY_KEY[entry.aspect]}: {ASPECT_DATA[entry.aspect].name}{entry.level == null ? '' : ' · уровень ' + entry.level}</p>
         <h2>{entry.title}</h2>
         <p className={styles.readingNotice}>Режим чтения: XP, ответы, оценки и прохождение не изменяются.</p>
       </header>

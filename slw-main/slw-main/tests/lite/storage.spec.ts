@@ -198,7 +198,7 @@ test('empty corrupt raw is preserved, separately downloadable, and replaced only
   await seed(page, corrupt)
   await page.goto('./')
   await openSettings(page)
-  await expect(page.getByRole('alert')).toContainText('повреждена')
+  await expect(page.getByRole('alert')).toContainText('повреждены')
   expect(await page.evaluate((key) => localStorage.getItem(key), KEY)).toBe(corrupt)
 
   const rawDownload = page.waitForEvent('download')
@@ -206,11 +206,11 @@ test('empty corrupt raw is preserved, separately downloadable, and replaced only
   const rawFile = await rawDownload
   expect(await readFile(await rawFile.path() as string, 'utf8')).toBe(corrupt)
 
-  await page.getByRole('button', { name: 'Сбросить локальные данные' }).click()
+  await page.getByRole('button', { name: 'Сбросить данные' }).click()
   await page.getByRole('button', { name: 'Отмена' }).click()
   expect(await page.evaluate((key) => localStorage.getItem(key), KEY)).toBe(corrupt)
 
-  await page.getByRole('button', { name: 'Сбросить локальные данные' }).click()
+  await page.getByRole('button', { name: 'Сбросить данные' }).click()
   await page.getByRole('button', { name: 'Подтвердить замену' }).click()
   await expect(page.locator('[data-session-epoch="1"]')).toBeVisible()
   const reset = JSON.parse(await page.evaluate((key) => localStorage.getItem(key) as string, KEY))
@@ -289,7 +289,7 @@ test('clear in another page is surfaced as a storage conflict', async ({ context
   await second.goto('./')
   await openSettings(first)
   await openSettings(second)
-  await expect(first.getByRole('alert')).toContainText('повреждена')
+  await expect(first.getByRole('alert')).toContainText('повреждены')
   await first.waitForTimeout(100)
   await second.evaluate(() => localStorage.clear())
   await expect(first.locator('[data-session-status="conflict"]')).toBeVisible()
@@ -331,7 +331,7 @@ test('preferences, import, and reset leave all legacy keys byte-identical', asyn
   await page.getByRole('button', { name: 'Подтвердить замену' }).click()
   await assertLegacy()
 
-  await page.getByRole('button', { name: 'Сбросить локальные данные' }).click()
+  await page.getByRole('button', { name: 'Сбросить данные' }).click()
   await page.getByRole('button', { name: 'Подтвердить замену' }).click()
   await assertLegacy()
   expectNoNetwork(audit)

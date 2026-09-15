@@ -15,16 +15,6 @@ const catalogManifest = [
   { aspect: 'Ni', label: 'БИ · Белая Интуиция', total: 314, counts: [2, 112, 0, 4, 43, 129, 24] },
 ] as const
 
-const catalogKinds = [
-  'journey-intro',
-  'journey-core',
-  'journey-survey',
-  'journey-complete',
-  'skill-intro',
-  'skill-level',
-  'aspect-block',
-] as const
-
 function zeroSnapshot() {
   const snapshot = makeSnapshot(1)
   snapshot.data.journey = {
@@ -125,18 +115,20 @@ test('catalog exposes the independent 2968-record manifest at zero progress', as
   await expect(page.getByTestId('content-catalog')).toBeVisible({ timeout: 15_000 })
 
   expect(catalogManifest.reduce((sum, item) => sum + item.total, 0)).toBe(2968)
-  const kindSelect = page.getByLabel('Класс материала')
   for (const item of catalogManifest) {
     await page.getByRole('button', { name: item.label, exact: true }).click()
-    await expect(page.getByText(`${item.total} материалов`, { exact: true })).toBeVisible()
+    const catalog = page.getByTestId('content-catalog')
+    await expect(catalog).toHaveAttribute('data-entry-count', String(item.total))
+    await expect(catalog.locator('[data-material-id]')).toHaveCount(0)
 
-    for (const [index, kind] of catalogKinds.entries()) {
-      await kindSelect.selectOption(kind)
-      await expect(page.getByTestId('content-catalog').getByRole('status')).toHaveText(`Найдено: ${item.counts[index]}`)
-      await expect(page.locator(`[data-material-kind="${kind}"] [data-material-id]`)).toHaveCount(item.counts[index])
-    }
+    const skills = catalog.locator('[data-catalog-cluster="skills"]')
+    await expect(skills.locator('summary').first()).toContainText(item.counts[4] + ' навы')
+    await skills.locator('summary').first().click()
+    await expect(skills.locator('[data-archetype-id]')).not.toHaveCount(0)
+    await expect(skills.locator('[data-skill-id]')).toHaveCount(0)
+    await expect(skills.locator('[data-material-id]')).toHaveCount(0)
 
-    await kindSelect.selectOption('journey-core')
+    await page.getByPlaceholder('Например: управление временем').fill('T-1')
     for (const level of [0, 1, 2, 3]) {
       await expect(page.locator(`[data-material-id="${item.aspect}:${level}:journey-core:T-1"]`)).toHaveCount(1)
     }
@@ -161,8 +153,7 @@ test('catalog reading preserves progression and a note survives reload', async (
 
   await page.getByRole('button', { name: 'Каталог', exact: true }).click()
   await page.getByRole('button', { name: 'БЛ · Белая Логика', exact: true }).click()
-  await page.getByLabel('Класс материала').selectOption('skill-intro')
-  await page.getByPlaceholder('Название или ID').fill('manipulation-detection')
+  await page.getByPlaceholder('Например: управление временем').fill('manipulation-detection')
   await page.locator('[data-material-id="Ti:all:skill-intro:manipulation-detection"]').click()
   await expect(page.getByRole('heading', { name: 'Распознавание манипулятивных приёмов' })).toBeVisible()
   await expect(page.getByText(/Архетип: Аналитик · роль: вспомогательный/)).toBeVisible()
@@ -206,7 +197,7 @@ test('catalog renders representatives of all seven kinds and keeps aspect-block 
   ] as const
 
   for (const representative of representatives) {
-    await page.getByLabel('Класс материала').selectOption(representative.kind)
+    await page.getByPlaceholder('Например: управление временем').fill(representative.id.split(':').at(-1)!)
     await page.locator(`[data-material-id="${representative.id}"]`).click()
     await expect(page.getByRole('heading', { name: representative.title })).toBeVisible()
     await expect(page.getByText(representative.text, { exact: false }).first()).toBeVisible()
@@ -216,7 +207,7 @@ test('catalog renders representatives of all seven kinds and keeps aspect-block 
     await page.getByRole('button', { name: '← К каталогу', exact: true }).click()
   }
 
-  await page.getByLabel('Класс материала').selectOption('aspect-block')
+  await page.getByPlaceholder('Например: управление временем').fill('essence')
   await page.locator('[data-material-id="Te:0:aspect-block:essence"]').click()
   await expect(page.locator('[data-material-id="Te:0:aspect-block:essence"]')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Суть аспекта' }).first()).toBeVisible()
@@ -272,7 +263,7 @@ test('catalog keeps its cursor and survey draft; wheel navigation preserves epoc
   await insight.fill('Черновик остаётся при свободном чтении')
   await page.getByRole('button', { name: 'Каталог', exact: true }).click()
   await page.getByRole('button', { name: 'БЛ · Белая Логика', exact: true }).click()
-  await page.getByLabel('Класс материала').selectOption('journey-core')
+  await page.getByPlaceholder('Например: управление временем').fill('T-1')
   await page.locator('[data-material-id="Ti:3:journey-core:T-1"]').click()
   await expect(page.getByRole('heading', { name: 'Тень БЛ' })).toBeVisible()
   expect((await stored(page)).data.journey.currentAspect).toBe('Si')

@@ -30,7 +30,7 @@ export function LiteHallView({ aspect, initialSection, onBack, onUnavailable }: 
       <p>{ASPECT_DISPLAY_KEY[aspect]}: статическая коллекция</p>
       <h1>{data.name}</h1>
       {content.subline && <p className={styles.subline}>{content.subline}</p>}
-      <p className={styles.boundary}>Все элементы HALL_CONTENT показаны полностью. Пользовательские публикации и обсуждения требуют серверной части.</p>
+      <p className={styles.boundary}>Все материалы этой подборки доступны для чтения. Публикации пользователей и обсуждения требуют подключения.</p>
     </header>
     <nav className={styles.contents} aria-label="Разделы статической коллекции">
       {(Object.keys(SECTION_LABELS) as HallSection[]).map(section => <button type="button" key={section} onClick={() => document.getElementById(`lite-hall-${section}`)?.scrollIntoView({ block: 'start' })}>{SECTION_LABELS[section]} <span>{content[section]?.length ?? 0}</span></button>)}
@@ -62,6 +62,6 @@ export function LiteHallView({ aspect, initialSection, onBack, onUnavailable }: 
 function HallSectionBlock({ id, title, count, children }: { id: HallSection | 'archetypes'; title: string; count: number; children: React.ReactNode }) {
   return <section id={`lite-hall-${id}`} className={styles.collection} data-hall-section={id} data-item-count={count}>
     <h2>{title} <span>{count}</span></h2>
-    {count > 0 ? <ol>{children}</ol> : <p className={styles.empty}>В исходном HALL_CONTENT элементов этого класса нет.</p>}
+    {count > 0 ? <ol>{children}</ol> : <p className={styles.empty}>В этой подборке пока нет материалов.</p>}
   </section>
 }

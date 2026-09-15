@@ -64,9 +64,9 @@ export function createDefaultLiteData(): LiteData {
 }
 
 function storageMessage(reason?: string): string {
-  if (reason === 'quota') return 'Локальное хранилище переполнено. Изменения сохранены только в памяти.'
-  if (reason === 'security') return 'Браузер запретил доступ к локальному хранилищу. Изменения сохранены только в памяти.'
-  return 'Локальное хранилище недоступно. Изменения сохранены только в памяти.'
+  if (reason === 'quota') return 'Хранилище браузера переполнено. Изменения сохранены только в памяти.'
+  if (reason === 'security') return 'Браузер запретил доступ к хранилищу. Изменения сохранены только в памяти.'
+  return 'Хранилище браузера недоступно. Изменения сохранены только в памяти.'
 }
 
 function initialize(): SessionInitial {
@@ -84,7 +84,7 @@ function initialize(): SessionInitial {
     return { data: createDefaultLiteData(), status: 'volatile', storage, expectation: expectationFromLoad(loaded), issue: null }
   }
   if (loaded.status === 'corrupt') {
-    return { data: createDefaultLiteData(), status: 'volatile', storage, expectation: null, issue: { kind: 'corrupt', raw: loaded.raw, message: 'Локальная запись повреждена. Она сохранена без изменений.' } }
+    return { data: createDefaultLiteData(), status: 'volatile', storage, expectation: null, issue: { kind: 'corrupt', raw: loaded.raw, message: 'Сохранённые данные повреждены. Исходная запись оставлена без изменений.' } }
   }
   return { data: createDefaultLiteData(), status: 'volatile', storage, expectation: null, issue: { kind: 'storage', message: storageMessage() } }
 }
@@ -131,7 +131,7 @@ export function useLiteSession(): LiteSession {
       setExternal(result.status === 'conflict' ? result.current : result)
       if (result.status === 'corrupt') {
         corruptRawRef.current = result.raw
-        setIssue({ kind: 'corrupt', raw: result.raw, message: 'Локальная запись была повреждена вне этой вкладки.' })
+        setIssue({ kind: 'corrupt', raw: result.raw, message: 'Сохранённые данные были повреждены в другой вкладке.' })
       }
       publishStatus('conflict')
       return false
@@ -213,7 +213,7 @@ export function useLiteSession(): LiteSession {
     } catch {
       return { ok: false as const, message: 'Новые данные не прошли проверку. Активные данные оставлены без изменений.' }
     }
-    if (!result) return { ok: false as const, message: 'Сначала разрешите конфликт локальных данных.' }
+    if (!result) return { ok: false as const, message: 'Сначала разрешите конфликт данных.' }
     if (result.status === 'saved') {
       expectationRef.current = { revision: result.snapshot.revision, raw: result.raw }
       installReplacement(result.snapshot.data)
@@ -222,7 +222,7 @@ export function useLiteSession(): LiteSession {
     if (result.status === 'conflict' || result.status === 'corrupt') {
       setExternal(result.status === 'conflict' ? result.current : result)
       publishStatus('conflict')
-      return { ok: false as const, message: 'Локальные данные изменились в другой вкладке. Сначала разрешите конфликт.' }
+      return { ok: false as const, message: 'Данные изменились в другой вкладке. Сначала разрешите конфликт.' }
     }
     setIssue({ kind: 'storage', message: storageMessage(result.reason) })
     publishStatus('volatile')
@@ -255,7 +255,7 @@ export function useLiteSession(): LiteSession {
     }
     if (loaded.status === 'corrupt') {
       corruptRawRef.current = loaded.raw
-      setIssue({ kind: 'corrupt', raw: loaded.raw, message: 'Внешняя локальная запись повреждена.' })
+      setIssue({ kind: 'corrupt', raw: loaded.raw, message: 'Данные из другой вкладки повреждены.' })
       setExternal(loaded)
     } else {
       setIssue({ kind: 'storage', message: storageMessage() })

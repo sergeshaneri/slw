@@ -63,7 +63,7 @@ export function LiteSettings({ session, onUnavailable }: { session: LiteSession;
       ? session.replaceData(pending.snapshot.data)
       : session.resetData()
     if (result.ok) {
-      setMessage(pending.kind === 'import' ? 'Импорт завершён и сохранён.' : 'Локальные данные сброшены.')
+      setMessage(pending.kind === 'import' ? 'Импорт завершён и сохранён.' : 'Данные сброшены.')
       setPending(null)
     } else {
       setMessage(result.message)
@@ -73,15 +73,14 @@ export function LiteSettings({ session, onUnavailable }: { session: LiteSession;
   const statusText = session.status === 'durable'
     ? 'Сохранено в этом браузере'
     : session.status === 'conflict'
-      ? 'Обнаружен конфликт локальных данных'
+      ? 'Данные изменились в другой вкладке'
       : 'Работа в памяти браузера'
 
   return (
     <section className={styles.panel} aria-labelledby="lite-settings-title" data-send-key-mode={mode}>
       <div className={styles.heading}>
         <div>
-          <p className={styles.eyebrow}>Локальные данные</p>
-          <h2 id="lite-settings-title">Настройки и перенос</h2>
+          <h2 id="lite-settings-title">Настройки и данные</h2>
         </div>
         <span className={styles.status} data-session-status={session.status}>{statusText}</span>
       </div>
@@ -121,8 +120,8 @@ export function LiteSettings({ session, onUnavailable }: { session: LiteSession;
       </fieldset>
 
       <section className={styles.boundary} aria-labelledby="lite-boundary-title">
-        <h3 id="lite-boundary-title">Граница локального режима</h3>
-        <p>Сохраняются путешествие, анкеты, дневник и настройки этого браузера. Статические файлы приложения загружаются с хостинга; полный автономный режим не заявлен.</p>
+        <h3 id="lite-boundary-title">Что сохраняется</h3>
+        <p>Путешествие, анкеты, дневник и настройки сохраняются в этом браузере. Для открытия приложения требуется доступ к сайту.</p>
         {onUnavailable && <div className={styles.boundaryActions}>
           <button type="button" onClick={() => onUnavailable('account')}>Аккаунт и восстановление</button>
           <button type="button" onClick={() => onUnavailable('support')}>Поддержка</button>
@@ -147,7 +146,7 @@ export function LiteSettings({ session, onUnavailable }: { session: LiteSession;
           aria-label="Файл импорта"
         />
         <button type="button" className={styles.danger} onClick={() => { setPending({ kind: 'reset' }); setMessage(null) }}>
-          Сбросить локальные данные
+          Сбросить данные
         </button>
         {session.corruptRaw !== null && (
           <button type="button" onClick={() => download('slw-lite-corrupt.txt', session.corruptRaw ?? '', 'text/plain')}>
@@ -161,7 +160,7 @@ export function LiteSettings({ session, onUnavailable }: { session: LiteSession;
           <h3 id="lite-confirm-title">{pending.kind === 'import' ? 'Подтвердить импорт' : 'Подтвердить сброс'}</h3>
           <p>
             {pending.kind === 'import'
-              ? 'Файл полностью заменит текущие локальные данные. ' + importSummary(pending.snapshot.data)
+              ? 'Файл полностью заменит текущие данные. ' + importSummary(pending.snapshot.data)
               : 'Текущие путешествие, результаты, дневник и настройки будут заменены начальными значениями.'}
           </p>
           <div className={styles.actions}>

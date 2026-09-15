@@ -1,20 +1,63 @@
 .app {
+  --lite-text: #f1f2f5;
+  --lite-text-soft: #c8cad1;
+  --lite-text-muted: #9295a1;
+  --lite-line: rgba(255, 255, 255, 0.09);
+  --lite-line-strong: rgba(199, 125, 255, 0.28);
+  --lite-surface: rgba(21, 22, 28, 0.88);
+  --lite-surface-raised: rgba(28, 29, 39, 0.9);
+  --lite-purple: #b39ddb;
+  --lite-purple-strong: #9d4edd;
+  --lite-cyan: #4cc9f0;
   box-sizing: border-box;
   min-height: 100dvh;
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: #0a0a1a;
-  color: #fff;
-  font-family: Inter, sans-serif;
+  background:
+    radial-gradient(circle at 10% -12%, rgba(157, 78, 221, 0.24), transparent 33rem),
+    radial-gradient(circle at 92% 4%, rgba(76, 201, 240, 0.13), transparent 30rem),
+    linear-gradient(180deg, #0c0e16 0%, #0e1014 52%, #0a0b11 100%);
+  color: var(--lite-text);
+  font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-.panel { min-height: 0; flex: 1; overflow: auto; padding: clamp(16px, 3vw, 32px); }
+.panel {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: clamp(18px, 3vw, 36px);
+}
+
 .panel[hidden] { display: none; }
-.journeyPanel { display: flex; padding-block: 16px; }
-.settingsPanel { overflow: auto; padding: clamp(20px, 5vw, 56px); }
+
+.journeyPanel {
+  display: flex;
+  padding-block: 16px;
+}
+
+.settingsPanel {
+  overflow: auto;
+  padding: clamp(20px, 5vw, 56px);
+}
+
+.persistence {
+  margin: 0;
+  padding: 7px 16px;
+  border-top: 1px solid rgba(199, 125, 255, 0.16);
+  background: rgba(14, 15, 23, 0.88);
+  color: var(--lite-text-soft);
+  font-size: 12px;
+  text-align: center;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
 
 @media (max-width: 640px) {
+  .panel { padding: 14px; }
   .journeyPanel { padding: 0; }
 }
-.persistence { margin: 0; padding: 6px 16px; background: #171728; color: #c8cad1; font-size: 12px; text-align: center; }
+
+@media (prefers-reduced-transparency: reduce) {
+  .persistence { background: #11121a; backdrop-filter: none; }
+}

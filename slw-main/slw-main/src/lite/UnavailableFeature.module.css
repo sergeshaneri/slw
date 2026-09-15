@@ -1,5 +1,4 @@
 .stub { max-width: 42rem; margin: clamp(2rem, 8vh, 6rem) auto; padding: clamp(1.5rem, 5vw, 3rem); border: 1px solid #343752; border-radius: 14px; background: #141526; color: #f0f1f5; }
-.label { margin: 0 0 .5rem; color: #9ca9ef; font-size: .8rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .stub h2 { margin: 0 0 1.5rem; font-size: clamp(1.8rem, 5vw, 2.8rem); line-height: 1.08; }
 .stub h3 { margin: 0 0 .5rem; font-size: 1.1rem; }
 .stub p { color: #c2c6d2; line-height: 1.6; }

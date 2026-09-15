@@ -20,10 +20,10 @@ function expectNoNetwork(audit: NetworkAudit): void {
 }
 
 async function expectUnavailable(page: Page, feature?: string, title?: string): Promise<void> {
-  await expect(page.getByRole('heading', { name: 'Временно недоступно в локальной версии', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Сейчас недоступно', exact: true })).toBeVisible()
   if (feature) await expect(page.locator('[data-unavailable-feature]')).toHaveAttribute('data-unavailable-feature', feature)
   if (title) await expect(page.getByRole('heading', { level: 3, name: title, exact: true })).toBeVisible()
-  await expect(page.getByText('Локально работают учебные материалы, путешествие, анкеты, дневник и сохранение в этом браузере.')).toBeVisible()
+  await expect(page.getByText('Без аккаунта доступны материалы, путешествие, анкеты, дневник и сохранение данных в этом браузере.')).toBeVisible()
 }
 
 test('desktop home exposes local routes and every server menu direction uses one inert stub', async ({ page }) => {
@@ -31,7 +31,7 @@ test('desktop home exposes local routes and every server menu direction uses one
   await page.goto('./')
   await expect(page.getByRole('heading', { name: 'Соционика: Колесо Баланса' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Продолжить путешествие' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Каталог Все существующие материалы и уровни без изменения прогресса' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Каталог Теория, навыки и вопросы по восьми аспектам' })).toBeVisible()
   await expect(page.getByText('Войти', { exact: true })).toHaveCount(0)
   await expect(page.locator('input[type="email"], input[type="password"]')).toHaveCount(0)
   const before = await page.evaluate(key => localStorage.getItem(key), KEY)
@@ -40,16 +40,16 @@ test('desktop home exposes local routes and every server menu direction uses one
     ['Сообщество', 'community', 'Сообщество'], ['ИИ-коуч', 'coach', 'ИИ-коуч'], ['Сообщения', 'messages', 'Личные сообщения'], ['Профиль', 'profile', 'Публичный профиль'],
     ['Реакции', 'likes', 'Реакции и отметки'], ['Подписки', 'follows', 'Подписки'], ['Чат холла', 'hall-chat', 'Чат холла'], ['Вопросы и ответы холла', 'hall-qa', 'Вопросы и ответы холла'],
     ['Публикации холла', 'hall-publications', 'Публикации холла'], ['Трекер привычек', 'habit-tracker', 'Трекер привычек'], ['Эмоции дневника', 'diary-emotions', 'Эмоции дневника'],
-    ['Тренировки дневника', 'diary-trainings', 'Тренировки дневника'], ['Аналитические отчёты', 'analytics-reports', 'Аналитические отчёты'], ['Vault Sync', 'vault-sync', 'Vault Sync'],
+    ['Тренировки дневника', 'diary-trainings', 'Тренировки дневника'], ['Аналитические отчёты', 'analytics-reports', 'Аналитические отчёты'], ['Синхронизация данных', 'vault-sync', 'Синхронизация данных'],
     ['Защита серии', 'streak-protection', 'Защита серии'], ['Бонус слова дня', 'word-bonus', 'Бонус слова дня'], ['Рейтинг и достижения', 'leaderboard', 'Рейтинг и достижения'],
-    ['Уведомления', 'notifications', 'Уведомления'], ['Поиск по серверу', 'server-search', 'Поиск по серверу'], ['Администрирование', 'admin', 'Администрирование'],
+    ['Уведомления', 'notifications', 'Уведомления'], ['Поиск людей и публикаций', 'server-search', 'Поиск людей и публикаций'], ['Администрирование', 'admin', 'Администрирование'],
     ['Поддержка', 'support', 'Обращение в поддержку'], ['Вход и аккаунт', 'account', 'Аккаунт и авторизация'],
   ] as const
   for (const [label, feature, title] of serverItems) {
-    await page.locator('summary').filter({ hasText: 'Серверные функции' }).click()
+    await page.locator('summary').filter({ hasText: 'Ещё' }).click()
     await page.locator('details').getByRole('button', { name: label, exact: true }).click()
     await expectUnavailable(page, feature, title)
-    await page.getByRole('button', { name: 'К локальным материалам' }).click()
+    await page.getByRole('button', { name: 'К материалам' }).click()
     await expect(page.getByRole('heading', { name: 'Соционика: Колесо Баланса' })).toBeVisible()
   }
   expect(await page.evaluate(key => localStorage.getItem(key), KEY)).toBe(before)
@@ -61,13 +61,13 @@ test('mobile keeps back and settings reachable; keyboard and browser back restor
   const audit = await installNetworkAudit(page)
   await page.goto('./')
   await page.getByRole('button', { name: 'Настройки', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Настройки и перенос' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Настройки и данные' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Назад' })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('heading', { name: 'Соционика: Колесо Баланса' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Каталог', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Каталог учебных материалов' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Каталог материалов' })).toBeVisible()
   await page.keyboard.press('Alt+ArrowLeft')
   await expect(page.getByRole('heading', { name: 'Соционика: Колесо Баланса' })).toBeVisible()
   await page.getByRole('button', { name: 'Аспекты', exact: true }).click()
@@ -92,7 +92,7 @@ test('auth, public profile, admin and old unknown deeplinks never mount online s
   await page.goto('./?keep=1&token=x&reset_token=reset&auth=login#section&tgAuthResult=e30%3D')
   await expectUnavailable(page, 'account', 'Аккаунт и авторизация')
   await expect(page).toHaveURL(/\?keep=1#section$/)
-  await page.getByRole('button', { name: 'К локальным материалам' }).click()
+  await page.getByRole('button', { name: 'К материалам' }).click()
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Соционика: Колесо Баланса' })).toBeVisible()
   await expect(page.locator('[data-unavailable-feature="account"]')).toHaveCount(0)
@@ -113,7 +113,7 @@ test('auth, public profile, admin and old unknown deeplinks never mount online s
   await expect(page.getByRole('heading', { name: 'Соционика: Колесо Баланса' })).toBeVisible()
   await page.goto('./?view=old-removed-route')
   await expect(page.getByRole('heading', { name: 'Соционика: Колесо Баланса' })).toBeVisible()
-  await expect(page.getByText('Маршрут «old-removed-route» отсутствует в локальной версии. Открыта главная.')).toBeVisible()
+  await expect(page.getByText('Страница «old-removed-route» не найдена. Открыта главная.')).toBeVisible()
   expect(await page.evaluate(() => (window as Window & { __liteTmaCalls: Record<string, number> }).__liteTmaCalls)).toEqual({ ready: 0, expand: 0, backShow: 0 })
   expect(await page.evaluate(() => localStorage.getItem('slw_dev_admin'))).toBe('1')
   expectNoNetwork(audit)
