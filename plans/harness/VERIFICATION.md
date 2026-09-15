@@ -7,17 +7,18 @@
 | GIT-REMOTE | PASS | Fetch/ls-remote, main и slw-instruct сверены с GitHub |
 | GIT-BASE | PASS | codex/lite-local создана от c7f2b3c; tracked diff пуст |
 | TS-BASE | PASS | npm.cmd run typecheck, exit 0, в созданной ветке |
-| HARNESS | PASS | RUN-019: verify.ps1 -Mode Docs; защищённые файлы проверены |
-| LITE-UNIT | PASS (P6) | RUN-019: root 32/32 |
-| LITE-BUILD | PASS (P6) | RUN-019: root production build+preview через Playwright; warning крупных chunks; итоговый P7 TODO |
-| LITE-NETWORK | PASS (P6 scenarios) | RUN-019: root 30/30 production; 0 API/SDK/backend WebSocket attempts |
-| LITE-BROWSER | PASS (P6 scenarios) | RUN-019: root 30/30 production; Home/Header/Settings, 22 server-направления, desktop/mobile/history/auth URL/HALL_CONTENT |
+| HARNESS | PASS (P7) | RUN-021: verify.ps1 -Mode Docs; scope и hashes защищённых файлов проверены |
+| LITE-UNIT | PASS (P7) | RUN-021: root 32/32 |
+| LITE-BUILD | PASS (P7) | RUN-021: production-lite и online build по 318 modules; outputDir разделены |
+| LITE-NETWORK | PASS (P7) | RUN-021: 30/30 default, 30/30 с backend.invalid, 30/30 development React; 0 API/SDK/backend WebSocket attempts |
+| LITE-BROWSER | PASS (P7) | RUN-021: полная матрица 30/30; отдельный preview 4173 HTTP 200 и navigation smoke 4/4 |
+| LITE-GRAPH | PASS (P7) | RUN-021: production entry импортирует только LiteApp; online/Telegram отсутствуют в исполняемой цепочке lite |
 
 ## Команды
 
 Сейчас: из Git-root `& ./plans/harness/verify.ps1 -Mode Preparation -Typecheck`. После начала правок продукта: Mode Docs.
 
-Из slw-main/slw-main доступны typecheck, test:lite:unit, build, test:lite:list, test:lite:e2e. Итоговые production-проверки выполняются в P7.
+Из slw-main/slw-main доступны typecheck, test:lite:unit, build, test:lite:list, test:lite:e2e. Итоговая матрица P7 выполнена в RUN-021.
 
 ## Обязательная матрица P7
 
@@ -37,3 +38,5 @@
 - Lite build с непустым VITE_API_URL остаётся без API; online build/typecheck отдельно, без подключения live backend.
 
 PASS каждого gate должен иметь RUN-ID и результат команды. Невозможность запустить test/runtime даёт NOT_RUN/BLOCKED, не PASS.
+
+Матрица выполнена в RUN-021. Открытый остаток ERR-015 относится к общей flat-схеме state.skills[rawId]: две пары одинаковых raw ID разделяют прогресс; доступ к правильным материалам и анкетам в lite проверен, миграция схемы в P1–P7 не входила.

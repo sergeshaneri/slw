@@ -270,3 +270,28 @@ RUN-NNN — дата, этап:
 - Итоговый root cwd frontend: npm.cmd run typecheck exit 0; npm.cmd run test:lite:unit exit 0, 32/32; npm.cmd run test:lite:list exit 0, 30 тестов в 5 файлах; npm.cmd run test:lite:e2e exit 0, 30/30 за 57.5s. Playwright выполнил production build+preview 127.0.0.1:4174/slw/; 0 API, Telegram SDK и backend WebSocket attempts.
 - Сохраняется Vite warning о chunks >500 kB. Итоговая cross-mode/build/module-graph/bundle/manual acceptance относится P7. Неблокирующий UX residual: non-auth deeplink URL после Back сохраняется; reload повторно открывает его серверную заглушку.
 - Перед commit: generated test-results удалён; listener 4174 отсутствует. Требуются git diff --check, verify.ps1 -Mode Docs, protected hashes, scope diff и явный staging. Push/deploy/main не выполняются.
+
+<a id="run-020"></a>
+
+## RUN-020 — 2026-09-15, начало P7
+
+- Parent HEAD 28a767d; ветка codex/lite-local; tracked tree чист, два защищённых untracked сохранены. P6 принят отдельным локальным коммитом.
+- P7 IN_PROGRESS. Observable outcome: финальная матрица typecheck/unit/build/list/e2e, отдельный production lite прогон с непустым VITE_API_URL, development React StrictMode прогон, online build в отдельном временном outputDir, проверенный module graph/bundle size и отдельный preview /slw/ на strictPort.
+- Один verification executor gpt-5.6-sol medium; root независимо проверяет команды, artifacts, scope и harness. Начальный allowlist: frontend playwright.config.ts и tests/lite/navigation.spec.ts только для усиления/параметризации acceptance; harness у root. Продуктовые файлы, package scripts и content/backend read-only до конкретного воспроизводимого дефекта.
+- Browser audit устанавливается до goto и считает attempts до abort: /api на любом origin, backend.invalid целиком, Telegram SDK и backend WebSocket. Production polling observation остаётся 61 s, timer cleanup/concurrency/storage/content/navigation сохраняются существующими regression suites. Force-click и фиктивный PASS запрещены.
+- Generated dist/test-results/временный online output не коммитятся. Перед удалением временного outputDir проверяется его абсолютный путь внутри frontend. Push/deploy/main/gh-pages не выполняются.
+
+<a id="run-021"></a>
+
+## RUN-021 — 2026-09-15, итоговая приёмка P7
+
+- P7; parent HEAD 28a767d; ветка codex/lite-local. Назначенный gpt-5.6-sol medium verification executor завершился до действий из-за usage limit; модель не заменялась. Root выполнил матрицу, а завершившийся ранее sol medium reviewer независимо проверил P7 diff: блокирующих findings нет, product/src, content, backend, package scripts/lock не изменены.
+- Основная последовательность из frontend: npm.cmd run typecheck exit 0; npm.cmd run test:lite:unit exit 0, 32/32 в 5 файлах; npm.cmd run build exit 0, 318 modules; npm.cmd run test:lite:list exit 0, 30 тестов в 5 файлах; npm.cmd run test:lite:e2e exit 0, 30/30 за 57.5s. Default Playwright использовал собственный production build+preview 127.0.0.1:4174/slw/, strictPort, reuseExistingServer:false.
+- Отдельный production-lite прогон с VITE_API_URL=https://backend.invalid: exit 0, 30/30 за 58.1s. Отдельный React development/StrictMode прогон с NODE_ENV=development и тем же URL: exit 0, 30/30 за 1.1m; в assets найдены один development React marker file и два backend.invalid marker files. После него обычная production-сборка восстановлена; оба marker count равны нулю.
+- Во всех полных browser-прогонах network audit устанавливался до goto. Два network-сценария продвигали browser clock на 61 s, что превышает найденный максимум polling/backoff 60 s; попытки /api на любом origin, backend.invalid, Telegram SDK и backend WebSocket отсутствуют. Journey regressions отдельно покрывают unmount timer cleanup, смену аспекта и конкурентную запись.
+- Online-проверка без live backend: npm.cmd run typecheck exit 0; vite build --mode online --outDir .p7-online-dist exit 0, 318 modules, 6.76s, 13 313 031 bytes. Online entry ссылался на online chunk и не ссылался на LiteApp. Абсолютный временный путь проверен внутри frontend и удалён.
+- Финальная обычная npm.cmd run build: exit 0, 318 modules, 5.37s. dist: 23 файла, 13 019 732 bytes, JS 12 786 325, CSS 151 409. Production entry assets/index-Cuw1vcwC.js содержит единственный dynamic import ./LiteApp-DqMWCjsT.js; ссылок на online и Telegram в entry нет. Крупнейшие raw chunks: MarkdownLite 5 199 941 bytes, LiteApp 4 165 457, se-skills 2 831 668. Vite warning о chunks больше 500 kB сохраняется как измеренный неблокирующий остаток.
+- Playwright 1.55.0, Chromium 140.0.7339.16. Отдельный npm.cmd run preview -- --host 127.0.0.1 --port 4173 --strictPort вернул HTTP 200 для /slw/; внешний абсолютный LITE_TEST_BASE_URL=http://127.0.0.1:4173/slw/ использован только для navigation/network smoke, exit 0, 4/4 за 17.2s. После остановки listeners 4173/4174 отсутствуют.
+- Усиление acceptance: конфигурация допускает явно управляемый внешний preview, сохраняя default managed webServer; browser теперь проверяет точный общий заголовок, feature ID и специализированный h3 всех 22 серверных направлений. Force-click отсутствует, network fixture не ослаблялся.
+- Финальные root gates: git diff --check exit 0; verify.ps1 -Mode Docs exit 0, tasks=10, branch совпадает, защищённые hashes сохранены; tasks.json разобран без ошибки. Scope состоит из трёх harness-файлов и двух acceptance-файлов frontend.
+- P7 DONE. Все P1–P7 имеют evidence. Сохраняются ERR-015 о двух парах raw skill ID в flat progress map, Vite chunk warning и UX-остаток non-auth deeplink reload. Generated test-results и online output удалены; push, deploy, main/default branch и gh-pages не изменялись.

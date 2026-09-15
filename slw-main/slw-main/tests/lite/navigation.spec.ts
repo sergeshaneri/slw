@@ -19,8 +19,10 @@ function expectNoNetwork(audit: NetworkAudit): void {
   expect(audit.backendWebSockets).toEqual([])
 }
 
-async function expectUnavailable(page: Page): Promise<void> {
-  await expect(page.getByRole('heading', { name: 'Временно недоступно в локальной версии' })).toBeVisible()
+async function expectUnavailable(page: Page, feature?: string, title?: string): Promise<void> {
+  await expect(page.getByRole('heading', { name: 'Временно недоступно в локальной версии', exact: true })).toBeVisible()
+  if (feature) await expect(page.locator('[data-unavailable-feature]')).toHaveAttribute('data-unavailable-feature', feature)
+  if (title) await expect(page.getByRole('heading', { level: 3, name: title, exact: true })).toBeVisible()
   await expect(page.getByText('Локально работают учебные материалы, путешествие, анкеты, дневник и сохранение в этом браузере.')).toBeVisible()
 }
 
@@ -35,19 +37,18 @@ test('desktop home exposes local routes and every server menu direction uses one
   const before = await page.evaluate(key => localStorage.getItem(key), KEY)
 
   const serverItems = [
-    ['Сообщество', 'community'], ['ИИ-коуч', 'coach'], ['Сообщения', 'messages'], ['Профиль', 'profile'],
-    ['Реакции', 'likes'], ['Подписки', 'follows'], ['Чат холла', 'hall-chat'], ['Вопросы и ответы холла', 'hall-qa'],
-    ['Публикации холла', 'hall-publications'], ['Трекер привычек', 'habit-tracker'], ['Эмоции дневника', 'diary-emotions'],
-    ['Тренировки дневника', 'diary-trainings'], ['Аналитические отчёты', 'analytics-reports'], ['Vault Sync', 'vault-sync'],
-    ['Защита серии', 'streak-protection'], ['Бонус слова дня', 'word-bonus'], ['Рейтинг и достижения', 'leaderboard'],
-    ['Уведомления', 'notifications'], ['Поиск по серверу', 'server-search'], ['Администрирование', 'admin'],
-    ['Поддержка', 'support'], ['Вход и аккаунт', 'account'],
+    ['Сообщество', 'community', 'Сообщество'], ['ИИ-коуч', 'coach', 'ИИ-коуч'], ['Сообщения', 'messages', 'Личные сообщения'], ['Профиль', 'profile', 'Публичный профиль'],
+    ['Реакции', 'likes', 'Реакции и отметки'], ['Подписки', 'follows', 'Подписки'], ['Чат холла', 'hall-chat', 'Чат холла'], ['Вопросы и ответы холла', 'hall-qa', 'Вопросы и ответы холла'],
+    ['Публикации холла', 'hall-publications', 'Публикации холла'], ['Трекер привычек', 'habit-tracker', 'Трекер привычек'], ['Эмоции дневника', 'diary-emotions', 'Эмоции дневника'],
+    ['Тренировки дневника', 'diary-trainings', 'Тренировки дневника'], ['Аналитические отчёты', 'analytics-reports', 'Аналитические отчёты'], ['Vault Sync', 'vault-sync', 'Vault Sync'],
+    ['Защита серии', 'streak-protection', 'Защита серии'], ['Бонус слова дня', 'word-bonus', 'Бонус слова дня'], ['Рейтинг и достижения', 'leaderboard', 'Рейтинг и достижения'],
+    ['Уведомления', 'notifications', 'Уведомления'], ['Поиск по серверу', 'server-search', 'Поиск по серверу'], ['Администрирование', 'admin', 'Администрирование'],
+    ['Поддержка', 'support', 'Обращение в поддержку'], ['Вход и аккаунт', 'account', 'Аккаунт и авторизация'],
   ] as const
-  for (const [label, feature] of serverItems) {
+  for (const [label, feature, title] of serverItems) {
     await page.locator('summary').filter({ hasText: 'Серверные функции' }).click()
     await page.locator('details').getByRole('button', { name: label, exact: true }).click()
-    await expectUnavailable(page)
-    await expect(page.locator('[data-unavailable-feature]')).toHaveAttribute('data-unavailable-feature', feature)
+    await expectUnavailable(page, feature, title)
     await page.getByRole('button', { name: 'К локальным материалам' }).click()
     await expect(page.getByRole('heading', { name: 'Соционика: Колесо Баланса' })).toBeVisible()
   }
@@ -89,21 +90,25 @@ test('auth, public profile, admin and old unknown deeplinks never mount online s
     Object.defineProperty(window, 'Telegram', { configurable: true, value: { WebApp: { initData: 'fake', initDataUnsafe: { start_param: 'admin' }, ready: () => { calls.ready += 1 }, expand: () => { calls.expand += 1 }, BackButton: { show: () => { calls.backShow += 1 }, hide: () => {}, onClick: () => {}, offClick: () => {} } } } })
   })
   await page.goto('./?keep=1&token=x&reset_token=reset&auth=login#section&tgAuthResult=e30%3D')
-  await expectUnavailable(page)
+  await expectUnavailable(page, 'account', 'Аккаунт и авторизация')
   await expect(page).toHaveURL(/\?keep=1#section$/)
   await page.getByRole('button', { name: 'К локальным материалам' }).click()
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Соционика: Колесо Баланса' })).toBeVisible()
   await expect(page.locator('[data-unavailable-feature="account"]')).toHaveCount(0)
 
-  for (const path of ['./?u=42', './?view=admin', './?view=community']) {
+  for (const [path, feature, title] of [
+    ['./?u=42', 'profile', 'Публичный профиль'],
+    ['./?view=admin', 'admin', 'Администрирование'],
+    ['./?view=community', 'community', 'Сообщество'],
+  ] as const) {
     await page.goto(path)
-    await expectUnavailable(page)
+    await expectUnavailable(page, feature, title)
     await expect(page.locator('input[type="password"]')).toHaveCount(0)
     await expect(page.locator('[data-runtime="lite"]')).not.toContainText(/Admin Panel|Загрузка профиля|Загрузка сообщества/)
   }
   await page.goto('./?view=admin')
-  await expectUnavailable(page)
+  await expectUnavailable(page, 'admin', 'Администрирование')
   await page.getByRole('button', { name: 'Назад', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Соционика: Колесо Баланса' })).toBeVisible()
   await page.goto('./?view=old-removed-route')
@@ -140,12 +145,11 @@ test('the local hall reader renders every static HALL_CONTENT item for all eight
     expect(snapshot.data.journey.stardust).toBe(0)
     const beforeStub = await page.evaluate(key => localStorage.getItem(key), KEY)
     const hallActions = aspect === 'Ne'
-      ? [['Чат холла', 'hall-chat'], ['Вопросы и ответы', 'hall-qa'], ['Пользовательские публикации', 'hall-publications']] as const
-      : [['Чат холла', 'hall-chat']] as const
-    for (const [action, feature] of hallActions) {
+      ? [['Чат холла', 'hall-chat', 'Чат холла'], ['Вопросы и ответы', 'hall-qa', 'Вопросы и ответы холла'], ['Пользовательские публикации', 'hall-publications', 'Публикации холла']] as const
+      : [['Чат холла', 'hall-chat', 'Чат холла']] as const
+    for (const [action, feature, title] of hallActions) {
       await page.getByRole('button', { name: action, exact: true }).click()
-      await expectUnavailable(page)
-      await expect(page.locator('[data-unavailable-feature]')).toHaveAttribute('data-unavailable-feature', feature)
+      await expectUnavailable(page, feature, title)
       expect(await page.evaluate(key => localStorage.getItem(key), KEY)).toBe(beforeStub)
       if (action !== hallActions.at(-1)?.[0]) {
         await page.getByRole('button', { name: 'Вернуться назад' }).click()

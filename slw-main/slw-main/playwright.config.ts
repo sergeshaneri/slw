@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test'
 
-const liteURL = 'http://127.0.0.1:4174/slw/'
+const externalLiteURL = process.env.LITE_TEST_BASE_URL?.trim()
+const liteURL = externalLiteURL || 'http://127.0.0.1:4174/slw/'
 
 export default defineConfig({
   testDir: './tests/lite',
@@ -8,7 +9,7 @@ export default defineConfig({
   use: {
     baseURL: liteURL,
   },
-  webServer: {
+  webServer: externalLiteURL ? undefined : {
     command: 'npm.cmd run build && npm.cmd run preview -- --host 127.0.0.1 --port 4174 --strictPort',
     url: liteURL,
     reuseExistingServer: false,
