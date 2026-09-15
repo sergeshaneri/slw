@@ -191,3 +191,11 @@ RUN-006: git diff --cached --check обнаружил new blank line at EOF в �
 - Header даёт 22 наблюдаемых server-направления с отдельными feature IDs; browser проверяет каждый callback и byte-identical lite snapshot. Hall chat/Q&A/publications проверены отдельно.
 - History route и index хранятся в history.state. Browser back, forward и реальная Header Back восстанавливают ожидаемые экраны; direct deeplink остаётся внутри Lite. Оглавление Hall прокручивает без изменения hash, section callback Aspects открывает соответствующую секцию.
 - Повторное независимое read-only ревью не нашло блокирующих findings. Неблокирующие ограничения: специализированный текст каждой заглушки проверен source review, но e2e фиксирует общий текст и feature ID; non-auth deeplink URL после Back сохраняется и при reload снова открывает ту же заглушку.
+
+## ERR-019 - home wheel click state and layout shift
+
+- RUN-022; implementation/test; RESOLVED.
+- First navigation check failed because the new visible h1 was hidden from the test and the old catalog quick link had been moved offscreen. Restored a visible compact brand heading and utility links without restoring the old card layout; navigation spec passed 4/4.
+- DOM diagnosis found axis click toggled off immediately: onFocus selected the axis, then onClick treated it as already selected. The click handler now selects idempotently.
+- A second DOM check found CTA pointer click could miss after axis selection because onBlur removed the focus card between pointerdown and pointerup, shifting the panel. The blur reset was removed; selected state remains stable until another axis is chosen or the route changes. Final headless pointer check passed.
+- No force-click workaround used. Typecheck, build, full lite e2e and final navigation spec passed.

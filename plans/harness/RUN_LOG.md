@@ -295,3 +295,15 @@ RUN-NNN — дата, этап:
 - Усиление acceptance: конфигурация допускает явно управляемый внешний preview, сохраняя default managed webServer; browser теперь проверяет точный общий заголовок, feature ID и специализированный h3 всех 22 серверных направлений. Force-click отсутствует, network fixture не ослаблялся.
 - Финальные root gates: git diff --check exit 0; verify.ps1 -Mode Docs exit 0, tasks=10, branch совпадает, защищённые hashes сохранены; tasks.json разобран без ошибки. Scope состоит из трёх harness-файлов и двух acceptance-файлов frontend.
 - P7 DONE. Все P1–P7 имеют evidence. Сохраняются ERR-015 о двух парах raw skill ID в flat progress map, Vite chunk warning и UX-остаток non-auth deeplink reload. Generated test-results и online output удалены; push, deploy, main/default branch и gh-pages не изменялись.
+
+<a id="run-022"></a>
+
+## RUN-022 - 2026-09-16, redesign home balance wheel
+
+- Cwd: slw-main/slw-main; branch codex/lite-local.
+- Scope: LiteHome.tsx, LiteHome.module.css, one LiteApp.tsx prop pass-through. Existing package/package-lock changes and two protected untracked Markdown files preserved.
+- Implemented a data-bound eight-axis SVG balance wheel from session scores, animated membrane/glass treatment, ambient dark-violet/cyan composition, axis hover/focus/click state, focus card, CTA, diary summary and utility links. Existing local routes and accessible navigation names remain available.
+- npm.cmd run typecheck: exit 0. npm.cmd run build: exit 0, 318 modules; existing Vite chunks >500 kB warning remains.
+- npm.cmd run test:lite:e2e: exit 0, 30/30. Final navigation spec after the last click-state fix: exit 0, 4/4. Headless preview check: no horizontal overflow at 1920x1080 or 390x844; axis selection and CTA route transition pass.
+- git diff --check: exit 0. Generated test-results and temporary screenshots removed. No commit, push, deploy or main/default branch change.
+- Harness task statuses unchanged; this is a direct UI refinement after P7 acceptance.
