@@ -199,3 +199,22 @@ RUN-006: git diff --cached --check обнаружил new blank line at EOF в �
 - DOM diagnosis found axis click toggled off immediately: onFocus selected the axis, then onClick treated it as already selected. The click handler now selects idempotently.
 - A second DOM check found CTA pointer click could miss after axis selection because onBlur removed the focus card between pointerdown and pointerup, shifting the panel. The blur reset was removed; selected state remains stable until another axis is chosen or the route changes. Final headless pointer check passed.
 - No force-click workaround used. Typecheck, build, full lite e2e and final navigation spec passed.
+## ERR-020 — existing Windows sandbox startup failure during RUN-023
+
+- Environment: exec_command and view_image failed before reading files with helper_unknown_error: apply deny-read ACLs, reproducing the known sandbox failure.
+- Narrow elevated PowerShell calls succeeded; screenshots were inspected from their local bytes. No automatic approval rejection occurred.
+- An initial Git status ran one directory above the repository; corrected to the AGENTS.md root. One later journal read used frontend cwd instead of repository cwd; corrected without modifying files.
+
+## ERR-021 — numeric rounding assertion in RUN-023 browser fixture
+
+- Test issue, resolved: UI correctly displayed 5,9 for mean 5,85. toBeCloseTo at precision 1 requires a strict difference below 0.05, and floating arithmetic produced 0.05000000000000071.
+- Replaced the approximation with exact equality to the independently calculated, locale-formatted one-decimal average. The targeted fixture passed (1/1, exit 0). No product criterion was weakened.
+- The old assertion was already loaded by the ongoing test process when the file changed; its failure report therefore displayed newer source text. Subsequent validation uses the saved final test file.
+
+## ERR-022 — RUN-024 visual iteration and interrupted validation
+
+- image_gen could not load the reference pathname because of the existing sandbox ACL helper failure. Generated the background from the visible reference's descriptive specification; no CLI/API fallback used.
+- A comparison fixture initially put fractional scores into persisted storage, whose existing validator accepts integers 1..10. The app correctly refused the snapshot. Corrected only the isolated test fixture to integer scores; did not change the storage model. Fractional geometry/motion still tested through the component/session fixture.
+- An added JSX map lacked its closing brace. Vite reported LiteHome.tsx:143 and e2e webServer exited 2. Fixed the brace; subsequent build and full e2e persisted a passed result.
+- Automatic approval review rejected a screenshot-read call because of an account usage limit. Work was interrupted without bypassing the rejection. After the user explicitly resumed, approved shell calls worked again. Prior process ids were no longer available; verification used the timestamped persisted results and a fresh final focused run.
+- Final review found a late CSS gradient overriding reduced-transparency background. Moved the opaque fallback last and added a computed-style browser assertion. Removed trailing blank lines flagged by git diff --check.

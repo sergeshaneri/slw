@@ -61,3 +61,10 @@
 @media (prefers-reduced-transparency: reduce) {
   .persistence { background: #11121a; backdrop-filter: none; }
 }
+
+/* The home scene extends under the glass header and has no inset page frame. */
+.app[data-route='home'] { background: #030918 url('../assets/home-scene.png') center center / cover no-repeat; }
+.app[data-route='home'] > .panel { padding: 0; }
+.app[data-route='home'] > .persistence[data-global-session-status='durable'] { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); border: 0; }
+@media (max-width:1020px) { .app[data-route='home'] { background-position: center top; background-size: auto 100dvh; background-color:#04091a; } }
+.app[data-route='home'] { background-image:radial-gradient(ellipse at 21% 15%,#030917bb,transparent 46%),url('../assets/home-scene.png'); }

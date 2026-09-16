@@ -16,9 +16,12 @@
     "test:lite:list": "playwright test --config playwright.config.ts --list"
   },
   "dependencies": {
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "recharts": "^2.12.7"
+    "recharts": "^2.12.7",
+    "three": "^0.186.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
@@ -27,6 +30,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.3.1",
     "gh-pages": "^6.1.1",
+    "hyperframes": "^0.8.40",
     "openapi-typescript": "^7.13.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.59.3",

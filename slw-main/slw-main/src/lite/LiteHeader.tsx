@@ -32,9 +32,9 @@ export function LiteHeader({ panel, canGoBack, onBack, onNavigate, onUnavailable
   return <header className={styles.header}>
     <div className={styles.identity}>
       {canGoBack && <button type="button" className={styles.iconButton} onClick={onBack} aria-label="Назад" title="Назад">←</button>}
-      <button type="button" className={styles.brand} onClick={() => onNavigate('home')} aria-label="На главную">
+      <h1 className={styles.wordmark} aria-label="Соционика: Колесо Баланса"><button type="button" className={styles.brand} onClick={() => onNavigate('home')} aria-label="На главную">
         <span>Соционика</span><strong>Колесо Баланса</strong>
-      </button>
+      </button></h1>
     </div>
     <nav className={styles.nav} aria-label="Разделы приложения">
       {LOCAL_NAV.map(item => <button key={item.panel} type="button" aria-current={panel === item.panel ? 'page' : undefined} onClick={() => onNavigate(item.panel)}>{item.label}</button>)}

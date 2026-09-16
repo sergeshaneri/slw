@@ -307,3 +307,49 @@ RUN-NNN — дата, этап:
 - npm.cmd run test:lite:e2e: exit 0, 30/30. Final navigation spec after the last click-state fix: exit 0, 4/4. Headless preview check: no horizontal overflow at 1920x1080 or 390x844; axis selection and CTA route transition pass.
 - git diff --check: exit 0. Generated test-results and temporary screenshots removed. No commit, push, deploy or main/default branch change.
 - Harness task statuses unchanged; this is a direct UI refinement after P7 acceptance.
+<a id="run-023"></a>
+
+## RUN-023 — 2026-09-16, data-driven smooth membrane
+
+- Direct user scope: real session scores, anchored cubic contour, synchronous material/numeric transition, six score fixtures and reduced motion. Attached redesign brief treated as context; no background image generation or wider navigation redesign.
+- Sources: LiteApp passes session.data.scores unchanged; preserved aspect order, Russian labels, callbacks, storage model and missing-score fallback (5).
+- Added wheelGeometry.ts and useWheelMotion.ts; modified LiteHome.tsx and LiteHome.module.css. Cubics stay within ordered angular sectors; ordered control-point angles and circular-arc tangents prevent loops. Zero scores meet at the origin. The 640 ms transition uses one interpolated score vector; trailing geometry follows by 65 ms. RAF writes DOM/SVG without React state per frame. Reduced motion immediately adopts target values and cancels motion, including preference changes during a transition.
+- Removed the unsupported static +0.4 weekly trend. Added same-geometry glow, fill, highlights and three strands; removed independent scale breathing. Existing package files and unrelated Markdown preserved.
+- First validation: npm.cmd run typecheck exit 0; npm.cmd run test:lite:unit exit 0 (41/41); npm.cmd run test:lite:e2e -- --workers=2 exit 0 (37/37), including its production build/typecheck. Existing chunk-size warning remains.
+- DOM layouts: 1680x942, 1440x900, 1280x800, 1024x768, 768x900, 390x844; chart/panel non-overlap and document horizontal overflow passed. Desktop/mobile screenshots inspected. Live browser fixture mounts real useLiteSession and LiteHome in StrictMode; production routes checked by the existing suite.
+- Final focused browser validation after interruption-glow continuity and missing-score compatibility fix: pending below.
+- Final validation: npm.cmd run test:lite:e2e -- wheel.spec.ts --workers=1 exit 0, 8/8, including successful production build/typecheck. Five static score fixtures verified against every DOM node and both averages; live update, interruption, reduced motion and all six viewports passed. Final geometry unit rerun: 9/9, exit 0. Asymmetric final screenshot inspected.
+- Final contour uses circular-arc tangent lengths rather than short adjacent-minimum tangents: smoother high-score lobes, same exact semantic points and monotone sector traversal. No generated visual assets, new dependencies, commits, push or deploy.
+- git diff --check passed. Generated test-results removed after inspection; persistent tests remain in tests/lite/wheel.test.ts, wheel.spec.ts and fixtures/wheel.html + wheelHarness.tsx.
+
+<a id="run-024"></a>
+
+## RUN-024 — 2026-09-16, reference-led home composition
+
+- Direct user correction: make the screen as close as possible to the supplied reference, beyond the prior geometry-only pass. Skills read: design-taste-frontend and imagegen. No delegation, route changes, dependencies or publication.
+- Replaced the inset three-column card layout with a full-width atmospheric scene, large centrally placed wheel, upper-left heading, right glass summary and lower action row. Header wordmark now carries the existing accessible h1. Hidden only the routine durable storage banner visually; conflict/volatile warnings remain visible. Primary callbacks, aspect order/labels and session.data.scores remain unchanged.
+- Added src/assets/home-scene.png (1672x941, 2,037,444 bytes), generated with built-in image_gen. Source output preserved at its generated_images location. SVG chart is live; generated image contains background only.
+- Material: transparent radial surface, geometry-anchored ribbons, fine spectral filaments, broad diffuse ribbons, inward veils, halo nodes and highlights. Every decorative path is recalculated by the same useWheelMotion score interpolation. Semantic contour and nodes retain exact radial coordinates.
+- Updated LiteHome.tsx/CSS, LiteHeader.tsx/CSS, LiteApp.module.css, wheelGeometry.ts and useWheelMotion.ts. Preserved unrelated package/package-lock and pre-existing Markdown changes.
+- Unit: 41/41 passed. Full e2e after JSX fix: persisted test-results/.last-run.json reports passed, no failed tests, timestamp 01:23:08; 38 tests at that point. dist/index.html timestamp 01:21:55 is newer than the final JSX source at 01:21:04. Original exec session was unavailable after usage-limit interruption, so the final stdout for that full run could not be recovered.
+- Visually inspected desktop 1280x720 and mobile 390x844. DOM viewport checks also covered 1680x942, 1440x900, 1280x800, 1024x768 and 768x900. No chart/summary overlap or horizontal scroll-container overflow. Preview uses a separate browser context with synthetic integer scores [8,6,7,6,5,8,8,6]; average 6.75 displayed as 6.8. User storage was not changed.
+- Added a reduced-transparency browser check; fixed the late gradient override so the summary becomes opaque with no backdrop filter. Final focused build/browser check recorded below when complete.
+- Preview copies saved outside the repository in the task visualization directory as home-reference-preview.png and home-mobile-preview.png. The composition follows the reference; the generated background and current data-dependent silhouette are not pixel-identical to it.
+
+Background generation prompt (built-in image_gen, final successful call):
+
+> Use case: stylized-concept. Asset type: background scene for a real web application. Generate a clean atmospheric background plate, 16:9 landscape ideally 2560x1440 or larger. Deep midnight navy nearly black space. Luminous transparent flowing silk/plasma ribbons hugging the far left edge and far right edge, violet magenta electric-blue and cyan with tiny warm amber accents. Reflective dark wet floor in the bottom 18 percent, horizontal ripples and elongated spectral reflections. Left ribbon descends vertically from upper left hugging x=0-5%, curves inward near y=55%, then sweeps down to x=20% near floor y=82%. Right ribbon curves along far-right border and dissolves near lower right. Keep broad center x=25%-75% very dark and almost empty, and upper-left title region x=5%-30% y=12%-40% dark and calm; a live interface will be overlaid. Fine sparse blue star particles, subtle blue haze, extremely fine filament details in edge ribbons, polished cinematic light, luminous holographic liquid-glass aesthetic. Black floor reflects cyan violet magenta lighting, but remains dark. No text, letters, numbers, UI, navigation, buttons, cards, circles, radar chart, orb, wheel, logos, mountains or landscape objects. Background only, NOT an interface mockup. Composition should feel like a luminous holographic web dashboard stage with a dark usable center.
+- Final focused verification: npm.cmd run test:lite:e2e -- wheel.spec.ts --workers=1 exit 0, 9/9 (1.0m), including successful TypeScript/build. Reduced motion and reduced transparency pass. Existing >500 kB chunk warning remains.
+- Final git diff --check passed. Temporary browser captures/scripts and test-results removed after preserving review images outside the repository. No commit, push or deploy.
+
+<a id="run-025"></a>
+
+## RUN-025 — 2026-09-16, supplied background and sphere assets
+
+- User supplied a quieter background and pearl sphere, requested translucent summary, brighter membrane interior, visible top label and central GIF.
+- Copied the supplied background to src/assets/home-scene.png and sphere to wheel-pearl.png. Located the GIF at Pictures/54394403_ca17ed447a40be9b99bc1cd36d90e4be.gif (the request's directory separator was actually part of the filename). Copied byte-for-byte to wheel-core.gif; extracted frame 0 as wheel-core-still.png for prefers-reduced-motion. All three copied source hashes match. GIF: 800x600, 101 frames, 11,849,687 bytes.
+- Pearl artwork is displayed with an SVG circle clip and native-coordinate viewBox; no generated replacement or destructive source edits. Both score nodes and outer radial nodes use the supplied image. useWheelMotion updates score-sprite centres in sync with semantic halo coordinates.
+- Increased radial surface light and inner filaments. Lowered glass fill opacity and blur to show background silhouettes; retained opaque reduced-transparency fallback. Capped desktop wheel width by viewport height, preserving top labels on wide/short windows.
+- npm.cmd run typecheck exit 0. npm.cmd run test:lite:e2e -- wheel.spec.ts --workers=1 exit 0: 11/11, including successful build/typecheck. Existing chunk-size warning remains. Checks cover GIF static fallback, sprite coordinates, reduced transparency, data fixtures, 1920x600, 1920x720, 1680x942, 1440x900, 1280x800, 1024x768, 768x900 and 390x844. Every top label is below the header and within viewport height.
+- Inspected production screenshots at 1280x800 and 1920x600. Saved home-updated-preview.png in the task visualization directory. Snapshot uses default real session initialization (all scores 5) in the isolated test browser.
+- Routes, callbacks, aspect names/order and storage model unchanged. No dependencies, commit, push or deploy. Temporary test-results removed after preserving preview; git diff --check passed.
