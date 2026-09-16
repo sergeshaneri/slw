@@ -27,7 +27,7 @@ export function useWheelMotion(root: RefObject<HTMLDivElement>, target: number[]
     })
     element.querySelectorAll<SVGSVGElement>('[data-orb]').forEach(node => {
       const point = wheelPoint(Number(node.dataset.orb), values[Number(node.dataset.orb)])
-      node.setAttribute('x', String(point.x - 9)); node.setAttribute('y', String(point.y - 9))
+      node.setAttribute('x', String(point.x - 4.5)); node.setAttribute('y', String(point.y - 4.5))
     })
     element.querySelectorAll<HTMLElement>('[data-score]').forEach(label => {
       label.textContent = format(values[Number(label.dataset.score)]) + (label.dataset.suffix ?? '')

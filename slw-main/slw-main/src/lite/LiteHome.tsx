@@ -148,14 +148,11 @@ export function LiteHome({ journey, scores, diaryCount, fallbackNotice, onNaviga
             <path data-membrane="highlight" className={styles.membraneHighlight} d={membranePath(values)} />
             {AXES.map((axis, index) => {
               const point = polarPoint(axis.angle, RADIUS * (values[index] / 10))
-              const outer = polarPoint(axis.angle, RADIUS)
+
               const isActive = activeAxis === index
               return <g key={axis.key} className={styles.axisPoint + ' ' + (isActive ? styles.axisActive : '')}>
                 <circle data-node={index} className={styles.axisHalo} cx={point.x} cy={point.y} r={isActive ? 19 : 14} />
-                <svg data-orb={index} className={styles.pearlNode} x={point.x - 9} y={point.y - 9} width="18" height="18" viewBox="89 89 422 422" aria-hidden="true">
-                  <image href={pearlImage} width="600" height="600" clipPath="url(#pearl-crop)" />
-                </svg>
-                <svg className={styles.outerPearl} x={outer.x - 4.5} y={outer.y - 4.5} width="9" height="9" viewBox="89 89 422 422" aria-hidden="true">
+                <svg data-orb={index} className={styles.pearlNode} x={point.x - 4.5} y={point.y - 4.5} width="9" height="9" viewBox="89 89 422 422" aria-hidden="true">
                   <image href={pearlImage} width="600" height="600" clipPath="url(#pearl-crop)" />
                 </svg>
               </g>
